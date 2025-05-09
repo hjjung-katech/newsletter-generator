@@ -175,3 +175,6 @@ cython_debug/
 
 # Google Cloud credentials
 credentials.json
+
+# 출력문서 폴더
+output/*.html

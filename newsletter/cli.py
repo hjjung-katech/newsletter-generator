@@ -41,25 +41,23 @@ def run(
     if not articles:
         console.print("[yellow]No articles found. Exiting.[/yellow]")
         return
-    console.print(f"Collected {len(articles)} articles.")
-
-    # 2. Summarize articles
+    console.print(f"Collected {len(articles)} articles.")    # 2. Summarize articles
     console.print("\n[cyan]Step 2: Summarizing articles...[/cyan]")
     # 실제 API를 사용하려면 config.GEMINI_API_KEY 등을 설정해야 합니다.
-    summaries = news_summarize.summarize_articles(articles)
+    # 문자열 키워드를 쉼표로 구분하여 리스트로 변환
+    keyword_list = keywords.split(",") if keywords else []
+    summaries = news_summarize.summarize_articles(keyword_list, articles)
     if not summaries:
         console.print("[yellow]Failed to summarize articles. Exiting.[/yellow]")
         return
-    console.print(f"Summarized {len(summaries)} articles.")
-
-    # 3. Compose newsletter
-    console.print("\n[cyan]Step 3: Composing newsletter...[/cyan]")
-    template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
-    template_name = "newsletter_template.html"
-    # Set generation date for the template
+    # 이제 summaries는 HTML 문자열이므로 변수명을 변경하는 것이 적절합니다
+    html_content = summaries
+    console.print("Newsletter generated successfully.")    # 3. Newsletter composition (now handled by the AI model)
+    console.print("\n[cyan]Step 3: Newsletter already composed by AI...[/cyan]")
+    # 날짜 정보 설정
     os.environ["GENERATION_DATE"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    html_content = news_compose.compose_newsletter_html(summaries, template_dir, template_name)
-    console.print("Newsletter composed successfully.")
+    # html_content는 이미 summarize_articles 함수에서 생성되어 있음
+    console.print("Newsletter generated successfully.")
 
     current_date_str = datetime.now().strftime('%Y-%m-%d')
     filename_base = f"{current_date_str}_newsletter_{keywords.replace(',', '_').replace(' ', '')}"

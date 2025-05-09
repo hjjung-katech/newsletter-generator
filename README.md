@@ -191,6 +191,69 @@ flowchart TD
 
 ---
 
+## 15. 설치 및 사용법
+
+### 설치 방법
+
+```bash
+# 개발 환경 설정
+git clone https://github.com/username/newsletter-generator.git
+cd newsletter-generator
+pip install -e .
+
+# 또는 배포된 패키지 설치
+pip install newsletter-generator
+```
+
+### 환경 설정
+
+`.env` 파일을 프로젝트 루트 디렉터리에 생성하고 다음과 같이 API 키를 설정하세요:
+
+```
+# 뉴스 수집용 API 키
+NEWS_API_KEY=your_news_api_key
+SERPER_API_KEY=your_serper_api_key
+
+# 생성형 AI 요약용 API 키
+GEMINI_API_KEY=your_gemini_api_key
+
+# 이메일 발송용 API 키 (선택사항)
+SENDGRID_API_KEY=your_sendgrid_api_key
+
+# Google Drive 업로드용 (선택사항)
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+```
+
+### 사용 방법
+
+뉴스레터를 생성하는 기본 명령어는 다음과 같습니다:
+
+```bash
+# 키워드로 뉴스 검색 및 뉴스레터 생성
+newsletter run --keywords "친환경 자동차,배터리 기술" --output-format html
+
+# 특정 이메일 주소로 발송
+newsletter run --keywords "AI,머신러닝" --to recipient@example.com
+
+# Google Drive에도 저장
+newsletter run --keywords "자율주행,ADAS" --drive
+
+# 모든 옵션 함께 사용
+newsletter run --keywords "반도체,파운드리" --to recipient@example.com --output-format html --drive
+```
+
+### 주요 명령어 옵션
+
+| 옵션 | 설명 | 기본값 |
+|-----|-----|-----|
+| `--keywords` | 검색할 키워드 (쉼표로 구분) | "AI,LLM" |
+| `--to` | 뉴스레터를 발송할 이메일 주소 | 없음 (이메일 발송 건너뜀) |
+| `--output-format` | 로컬에 저장할 형식 (html 또는 md) | 지정하지 않으면 `--drive` 옵션 시 Drive에만 저장, 아니면 html로 로컬 저장 |
+| `--drive` | Google Drive에 저장할지 여부 | False |
+
+---
+
 ### 문서 버전 기록
 
 | 버전  | 일자         | 작성자     | 변경 요약                                           |
