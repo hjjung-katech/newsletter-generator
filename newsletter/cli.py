@@ -2,13 +2,14 @@ import typer
 from rich.console import Console
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from . import collect as news_collect
 from . import summarize as news_summarize
 from . import compose as news_compose
 from . import deliver as news_deliver
 from . import config
+from . import graph  # 새로운 LangGraph 모듈 임포트
 
 app = typer.Typer()
 console = Console()
@@ -18,7 +19,8 @@ def run(
     keywords: str = typer.Option("AI,LLM", help="Keywords to search for, comma-separated."),
     to: Optional[str] = typer.Option(None, "--to", help="Email address to send the newsletter to. If not provided, email sending will be skipped."),
     output_format: Optional[str] = typer.Option(None, "--output-format", help="Format to save the newsletter locally (html or md). If not provided, saves to Drive if --drive is used, otherwise defaults to html."),
-    drive: bool = typer.Option(False, "--drive", help="Save the newsletter to Google Drive (HTML and Markdown).")
+    drive: bool = typer.Option(False, "--drive", help="Save the newsletter to Google Drive (HTML and Markdown)."),
+    use_langgraph: bool = typer.Option(True, "--langgraph/--no-langgraph", help="Use LangGraph workflow (recommended).")
 ):
     """
     Run the newsletter generation and saving process.
@@ -32,57 +34,77 @@ def run(
         console.print(f"[bold green]Local output format: {output_format}[/bold green]")
     if drive:
         console.print(f"[bold green]Save to Google Drive: Enabled[/bold green]")
-
-    # 1. Collect articles
-    console.print("\n[cyan]Step 1: Collecting articles...[/cyan]")
-    # 실제 API를 사용하려면 config.NEWS_API_KEY 등을 설정해야 합니다.
-    # 여기서는 예시로 collect_articles를 직접 호출합니다.
-    articles = news_collect.collect_articles(keywords)
-    if not articles:
-        console.print("[yellow]No articles found. Exiting.[/yellow]")
-        return
-    console.print(f"Collected {len(articles)} articles.")    # 2. Summarize articles
-    console.print("\n[cyan]Step 2: Summarizing articles...[/cyan]")
-    # 실제 API를 사용하려면 config.GEMINI_API_KEY 등을 설정해야 합니다.
-    # 문자열 키워드를 쉼표로 구분하여 리스트로 변환
+    
+    # 키워드 리스트로 변환
     keyword_list = keywords.split(",") if keywords else []
-    summaries = news_summarize.summarize_articles(keyword_list, articles)
-    if not summaries:
-        console.print("[yellow]Failed to summarize articles. Exiting.[/yellow]")
-        return
-    # 이제 summaries는 HTML 문자열이므로 변수명을 변경하는 것이 적절합니다
-    html_content = summaries
-    console.print("Newsletter generated successfully.")    # 3. Newsletter composition (now handled by the AI model)
-    console.print("\n[cyan]Step 3: Newsletter already composed by AI...[/cyan]")
+    
     # 날짜 정보 설정
     os.environ["GENERATION_DATE"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # html_content는 이미 summarize_articles 함수에서 생성되어 있음
-    console.print("Newsletter generated successfully.")
-
+    
+    html_content = ""
+    
+    # LangGraph를 사용하는 경우
+    if use_langgraph:
+        console.print("\n[cyan]Using LangGraph workflow...[/cyan]")
+        console.print("\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]")
+        
+        # LangGraph 워크플로우 실행
+        html_content, status = graph.generate_newsletter(keyword_list)
+        
+        if status == "error":
+            console.print(f"[yellow]Error in newsletter generation: {html_content}[/yellow]")
+            return
+        
+        console.print("[green]Newsletter generated successfully using LangGraph.[/green]")
+    
+    # 기존 방식 사용하는 경우
+    else:
+        # 1. Collect articles
+        console.print("\n[cyan]Step 1: Collecting articles...[/cyan]")
+        articles = news_collect.collect_articles(keywords)
+        if not articles:
+            console.print("[yellow]No articles found. Exiting.[/yellow]")
+            return
+        console.print(f"Collected {len(articles)} articles.")
+        
+        # 2. Summarize articles
+        console.print("\n[cyan]Step 2: Summarizing articles...[/cyan]")
+        summaries = news_summarize.summarize_articles(keyword_list, articles)
+        if not summaries:
+            console.print("[yellow]Failed to summarize articles. Exiting.[/yellow]")
+            return        # 이제 summaries는 HTML 문자열이므로 변수명을 변경
+        html_content = summaries
+        console.print("\n[green]Newsletter generated successfully using legacy pipeline.[/green]")
+    
     current_date_str = datetime.now().strftime('%Y-%m-%d')
     filename_base = f"{current_date_str}_newsletter_{keywords.replace(',', '_').replace(' ', '')}"
 
-    # 4. Send email
+    # 3. Send email
+    step_num = 3  # 현재 단계 번호 추적
+    
     if to:
-        console.print("\n[cyan]Step 4: Sending email...[/cyan]")
+        console.print(f"\n[cyan]Step {step_num}: Sending email...[/cyan]")
         email_subject = f"오늘의 뉴스레터: {keywords}"
         news_deliver.send_email(to_email=to, subject=email_subject, html_content=html_content)
     else:
-        console.print("\n[yellow]Step 4: Email sending skipped as no recipient was provided.[/yellow]")
+        console.print(f"\n[yellow]Step {step_num}: Email sending skipped as no recipient was provided.[/yellow]")
     
-    # 5. Save or Upload
+    step_num += 1
+    
+    # 4. Save or Upload
     saved_locally = False
     if output_format:
-        console.print(f"\n[cyan]Step 5: Saving newsletter locally as {output_format.upper()}...[/cyan]")
+        console.print(f"\n[cyan]Step {step_num}: Saving newsletter locally as {output_format.upper()}...[/cyan]")
         if news_deliver.save_locally(html_content, filename_base, output_format):
             console.print(f"Newsletter saved locally as {output_format.upper()}.")
             saved_locally = True
         else:
             console.print(f"[red]Failed to save newsletter locally as {output_format.upper()}.[/red]")
+        
+        step_num += 1
 
     if drive:
-        step_number = 6 if saved_locally else 5
-        console.print(f"\n[cyan]Step {step_number}: Saving to Google Drive...[/cyan]")
+        console.print(f"\n[cyan]Step {step_num}: Saving to Google Drive...[/cyan]")
         if news_deliver.save_to_drive(html_content, filename_base):
             console.print(f"Newsletter (HTML and Markdown) saved to Google Drive.")
         else:
