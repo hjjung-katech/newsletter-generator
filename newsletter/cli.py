@@ -16,6 +16,7 @@ console = Console()
 @app.command()
 def run(
     keywords: str = typer.Option("AI,LLM", help="Keywords to search for, comma-separated."),
+    to: Optional[str] = typer.Option(None, "--to", help="Email address to send the newsletter to. If not provided, email sending will be skipped."),
     output_format: Optional[str] = typer.Option(None, "--output-format", help="Format to save the newsletter locally (html or md). If not provided, saves to Drive if --drive is used, otherwise defaults to html."),
     drive: bool = typer.Option(False, "--drive", help="Save the newsletter to Google Drive (HTML and Markdown).")
 ):
@@ -63,10 +64,18 @@ def run(
     current_date_str = datetime.now().strftime('%Y-%m-%d')
     filename_base = f"{current_date_str}_newsletter_{keywords.replace(',', '_').replace(' ', '')}"
 
-    # 4. Save or Upload
+    # 4. Send email
+    if to:
+        console.print("\n[cyan]Step 4: Sending email...[/cyan]")
+        email_subject = f"오늘의 뉴스레터: {keywords}"
+        news_deliver.send_email(to_email=to, subject=email_subject, html_content=html_content)
+    else:
+        console.print("\n[yellow]Step 4: Email sending skipped as no recipient was provided.[/yellow]")
+    
+    # 5. Save or Upload
     saved_locally = False
     if output_format:
-        console.print(f"\n[cyan]Step 4: Saving newsletter locally as {output_format.upper()}...[/cyan]")
+        console.print(f"\n[cyan]Step 5: Saving newsletter locally as {output_format.upper()}...[/cyan]")
         if news_deliver.save_locally(html_content, filename_base, output_format):
             console.print(f"Newsletter saved locally as {output_format.upper()}.")
             saved_locally = True
@@ -74,7 +83,7 @@ def run(
             console.print(f"[red]Failed to save newsletter locally as {output_format.upper()}.[/red]")
 
     if drive:
-        step_number = 5 if saved_locally else 4
+        step_number = 6 if saved_locally else 5
         console.print(f"\n[cyan]Step {step_number}: Saving to Google Drive...[/cyan]")
         if news_deliver.save_to_drive(html_content, filename_base):
             console.print(f"Newsletter (HTML and Markdown) saved to Google Drive.")
