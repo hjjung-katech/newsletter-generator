@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 뉴스레터</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .article { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        .article:last-child { border-bottom: none; }
+        .article h2 { margin-top: 0; color: #555; }
+        .article p { margin-bottom: 5px; }
+        .keywords { font-size: 0.9em; color: #777; }
+        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>오늘의 뉴스레터 ({{ generation_date }})</h1>
+        
+        {% if articles %}
+            {% for article in articles %}
+            <div class="article">
+                <h2>{{ article.title }}</h2>
+                <p>{{ article.summary_text }}</p>
+                {% if article.keywords %}
+                <p class="keywords">키워드: {{ article.keywords|join(', ') }}</p>
+                {% endif %}
+                {% if article.url %}
+                <p><a href="{{ article.url }}">기사 원문 읽기</a></p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>오늘 요약할 뉴스가 없습니다.</p>
+        {% endif %}
+
+        <div class="footer">
+            <p>본 뉴스레터는 Newsletter Generator에 의해 자동 생성되었습니다.</p>
+        </div>
+    </div>
+</body>
+</html>
