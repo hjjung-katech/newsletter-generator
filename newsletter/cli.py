@@ -1,13 +1,14 @@
 import typer
 from rich.console import Console
-import os # Added
-from datetime import datetime # Added
+import os
+from datetime import datetime
+from typing import Optional
 
 from . import collect as news_collect
 from . import summarize as news_summarize
 from . import compose as news_compose
 from . import deliver as news_deliver
-from . import config # Added
+from . import config
 
 app = typer.Typer()
 console = Console()
@@ -15,13 +16,21 @@ console = Console()
 @app.command()
 def run(
     keywords: str = typer.Option("AI,LLM", help="Keywords to search for, comma-separated."),
-    to: str = typer.Option("test@example.com", help="Email address to send the newsletter to."),
-    drive: bool = typer.Option(False, "--drive", help="Save the newsletter to Google Drive.")
+    output_format: Optional[str] = typer.Option(None, "--output-format", help="Format to save the newsletter locally (html or md). If not provided, saves to Drive if --drive is used, otherwise defaults to html."),
+    drive: bool = typer.Option(False, "--drive", help="Save the newsletter to Google Drive (HTML and Markdown).")
 ):
     """
-    Run the newsletter generation and sending process.
+    Run the newsletter generation and saving process.
     """
-    console.print(f"[bold green]Starting newsletter generation for keywords: '{keywords}', to: '{to}', Drive: {drive}[/bold green]")
+    if not output_format and not drive:
+        console.print("[yellow]No output option selected. Defaulting to local HTML save.[/yellow]")
+        output_format = "html" # Default to local html if no other option
+
+    console.print(f"[bold green]Starting newsletter generation for keywords: '{keywords}'[/bold green]")
+    if output_format:
+        console.print(f"[bold green]Local output format: {output_format}[/bold green]")
+    if drive:
+        console.print(f"[bold green]Save to Google Drive: Enabled[/bold green]")
 
     # 1. Collect articles
     console.print("\n[cyan]Step 1: Collecting articles...[/cyan]")
@@ -51,21 +60,29 @@ def run(
     html_content = news_compose.compose_newsletter_html(summaries, template_dir, template_name)
     console.print("Newsletter composed successfully.")
 
-    # 4. Send email
-    console.print("\n[cyan]Step 4: Sending email...[/cyan]")
-    email_subject = f"오늘의 뉴스레터: {keywords}"
-    # 실제 API를 사용하려면 config.SENDGRID_API_KEY 등을 설정해야 합니다.
-    news_deliver.send_email(to_email=to, subject=email_subject, html_content=html_content)
-    
-    # 5. Optionally save to Google Drive
+    current_date_str = datetime.now().strftime('%Y-%m-%d')
+    filename_base = f"{current_date_str}_newsletter_{keywords.replace(',', '_').replace(' ', '')}"
+
+    # 4. Save or Upload
+    saved_locally = False
+    if output_format:
+        console.print(f"\n[cyan]Step 4: Saving newsletter locally as {output_format.upper()}...[/cyan]")
+        if news_deliver.save_locally(html_content, filename_base, output_format):
+            console.print(f"Newsletter saved locally as {output_format.upper()}.")
+            saved_locally = True
+        else:
+            console.print(f"[red]Failed to save newsletter locally as {output_format.upper()}.[/red]")
+
     if drive:
-        console.print("\n[cyan]Step 5: Saving to Google Drive...[/cyan]")
-        drive_filename = f"{datetime.now().strftime('%Y-%m-%d')}_newsletter.html"
-        # 실제 Google Drive API 연동 필요
-        if news_deliver.save_to_drive(html_content, drive_filename):
-            console.print(f"Newsletter saved to Google Drive as {drive_filename} (simulated).")
+        step_number = 5 if saved_locally else 4
+        console.print(f"\n[cyan]Step {step_number}: Saving to Google Drive...[/cyan]")
+        if news_deliver.save_to_drive(html_content, filename_base):
+            console.print(f"Newsletter (HTML and Markdown) saved to Google Drive.")
         else:
             console.print("[red]Failed to save to Google Drive.[/red]")
+    
+    if not saved_locally and not drive:
+        console.print("[yellow]No output method was successful.[/yellow]")
 
     console.print("\n[bold green]Newsletter process completed.[/bold green]")
 
