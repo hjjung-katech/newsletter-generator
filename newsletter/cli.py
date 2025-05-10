@@ -10,6 +10,7 @@ from . import compose as news_compose
 from . import deliver as news_deliver
 from . import config
 from . import graph  # 새로운 LangGraph 모듈 임포트
+from . import tools # Import the tools module
 
 app = typer.Typer()
 console = Console()
@@ -125,13 +126,28 @@ def collect(keywords: str):
     console.print("Article collection completed (simulated).")
 
 @app.command()
-def suggest(domain: str = ""):
+def suggest(
+    domain: str = typer.Option(..., "--domain", help="Domain to suggest keywords for."),
+    count: int = typer.Option(10, "--count", min=1, help="Number of keywords to generate.")
+):
     """
-    Suggest keywords based on a domain or general trends.
+    Suggests trend keywords for a given domain using Google Gemini.
     """
-    console.print(f"Suggesting keywords for domain: {domain}")
-    # Placeholder
-    console.print("Keyword suggestion completed (simulated).")
+    console.print(f"[bold green]Suggesting {count} keywords for domain: '{domain}'[/bold green]")
+
+    if not config.GEMINI_API_KEY: # GOOGLE_API_KEY 대신 GEMINI_API_KEY 사용
+        console.print("[bold red]Error: GEMINI_API_KEY is not set in the environment variables or .env file.[/bold red]")
+        console.print("Please set it to use the keyword suggestion feature.")
+        raise typer.Exit(code=1)
+
+    suggested_keywords = tools.generate_keywords_with_gemini(domain, count=count)
+
+    if suggested_keywords:
+        console.print("\n[bold blue]Suggested Keywords:[/bold blue]")
+        for keyword in suggested_keywords:
+            console.print(f"- {keyword}")
+    else:
+        console.print("\n[yellow]Could not generate keywords for the given domain. Please check the logs for errors.[/yellow]")
 
 if __name__ == "__main__":
     app()

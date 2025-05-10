@@ -10,7 +10,13 @@ import os
 from bs4 import BeautifulSoup
 import markdownify
 from typing import Dict, List, Any, Optional
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from . import config
+from rich.console import Console
+
+console = Console()
 
 @tool
 def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
@@ -179,7 +185,7 @@ def save_newsletter_locally(html_content: str, filename_base: str, output_format
     try:
         # 출력 디렉토리 생성 (없는 경우)
         output_dir = os.path.join(os.getcwd(), 'output')
-        os.makedirs(output_dir, exist_ok=True)
+        os.makedirs(output_dir, exist=True)
         
         # 파일 경로 생성
         file_path = os.path.join(output_dir, f"{filename_base}.{output_format}")
@@ -218,3 +224,52 @@ def clean_html_markers(html_content: str) -> str:
         cleaned_content = cleaned_content[:-len("```")] 
         
     return cleaned_content.strip()
+
+def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
+    """
+    Generates trend keywords for a given domain using Google Gemini.
+    """
+    if not config.GEMINI_API_KEY: # GOOGLE_API_KEY 대신 GEMINI_API_KEY 사용
+        console.print("[bold red]Error: GEMINI_API_KEY is not configured. Cannot generate keywords.[/bold red]")
+        return []
+
+    try:
+        llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=config.GEMINI_API_KEY, temperature=0.7) # 모델명 변경
+
+        prompt_template = PromptTemplate.from_template(
+            "Please generate exactly {count} of the latest trend keywords related to the field of '{domain}'. Present each keyword on a new line without any numbering or bullet points."
+        )
+        
+        chain = prompt_template | llm | StrOutputParser()
+        
+        console.print(f"\n[cyan]Generating keywords for '{domain}' using Google Gemini...[/cyan]")
+        console.print(f"[cyan]Prompt sent to Gemini:[/cyan] {prompt_template.format(domain=domain, count=count)}")
+        
+        response_content = chain.invoke({"domain": domain, "count": count})
+        
+        console.print(f"\n[cyan]Raw response from Gemini:[/cyan]\n{response_content}")
+        
+        # Process the response: split by newlines and remove empty strings
+        keywords = [keyword.strip() for keyword in response_content.split('\n') if keyword.strip()]
+        
+        # Ensure we return the requested number of keywords, even if Gemini provides more or less
+        final_keywords = keywords[:count]
+        if len(final_keywords) < count and keywords: # If not enough, try to take from the beginning
+             final_keywords = keywords 
+        
+        # If Gemini returns a single line with comma separation (less ideal but handle it)
+        if len(final_keywords) == 1 and ',' in final_keywords[0]:
+            final_keywords = [kw.strip() for kw in final_keywords[0].split(',')][:count]
+
+
+        console.print(f"\n[cyan]Processed keywords (target: {count}):[/cyan]\n{final_keywords}")
+        
+        if not final_keywords:
+            console.print("[yellow]Warning: Gemini did not return any keywords or the format was unexpected.[/yellow]")
+            return []
+            
+        return final_keywords
+
+    except Exception as e:
+        console.print(f"[bold red]Error generating keywords with Gemini: {e}[/bold red]")
+        return []
