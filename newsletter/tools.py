@@ -178,3 +178,24 @@ def save_newsletter_locally(html_content: str, filename_base: str, output_format
     except Exception as e:
         raise ToolException(f"Error saving newsletter: {str(e)}")
         raise ToolException(f"Error saving newsletter locally: {e}")
+
+def clean_html_markers(html_content: str) -> str:
+    """
+    Removes ```html and ``` markers from the beginning and end of an HTML string.
+    """
+    cleaned_content = html_content
+    if cleaned_content.startswith("```html\\n"):
+        cleaned_content = cleaned_content[len("```html\\n"):] 
+    elif cleaned_content.startswith("```html\\r\\n"):
+        cleaned_content = cleaned_content[len("```html\\r\\n"):] 
+    elif cleaned_content.startswith("```html"):
+        cleaned_content = cleaned_content[len("```html"):] 
+
+    if cleaned_content.endswith("\\n```"):
+        cleaned_content = cleaned_content[:-len("\\n```")] 
+    elif cleaned_content.endswith("\\r\\n```"):
+        cleaned_content = cleaned_content[:-len("\\r\\n```")] 
+    elif cleaned_content.endswith("```"):
+        cleaned_content = cleaned_content[:-len("```")] 
+        
+    return cleaned_content.strip()

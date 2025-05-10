@@ -33,7 +33,7 @@
 
 1. **CLI 도구(Typer)**
 2. 기사 수집(NewsAPI or Serper.dev or GDELT)
-3. **LLM 요약·편집(Google Gemini Pro)**
+3. **LLM 요약·편집 (LangChain, LangGraph, Google Gemini Pro)**
 4. 이메일 발송(SendGrid API 또는 Outlook Graph)
 5. Google Drive 파일 업로드(선택)
 6. 키워드 자동 추천(Trends API + LLM)
@@ -61,7 +61,7 @@
 | FR-ID | 기능                  | 상세 설명                                                                        |
 | ----- | ------------------- | ---------------------------------------------------------------------------- |
 | FR‑01 | 키워드 기반 기사 수집        | `newsletter collect --keywords "ADAS,LiDAR"` ⇢ 최근 24 시간 기사 ≤ 20건 JSON 반환     |
-| FR‑02 | 기사 요약               | Gemini Pro API로 ①30자 제목 ②300자 요약 ③키워드 3개 JSON 생성                             |
+| FR‑02 | 기사 요약               | LangChain/LangGraph 기반 Gemini Pro API 호출로 ①30자 제목 ②300자 요약 ③키워드 3개 JSON 생성                             |
 | FR‑03 | 뉴스레터 Compose        | Jinja2 템플릿으로 한국어 HTML 뉴스레터 합성                                                |
 | FR‑04 | **이메일 발송**          | `newsletter send --to alice@corp.com` 또는 `newsletter run` 통합 ⇢ HTML 본문 메일 발송 |
 | FR‑05 | Google Drive 저장(옵션) | `/YYYY-MM-DD/newsletter.html` 업로드                                            |
@@ -77,7 +77,7 @@
 
 | FR-ID | 기능        | 상세                           |
 | ----- | --------- | ---------------------------- |
-| FR‑08 | 벡터 DB RAG | 과거 기사 벡터 검색 후 관련 링크 삽입       |
+| FR‑08 | 벡터 DB RAG | LangChain/LangGraph 활용, 과거 기사 벡터 검색(Chroma) 후 관련 링크 삽입 (RAG 파이프라인)       |
 | FR‑09 | 개인화 뉴스레터  | `profiles.yaml`  관심 태그 기준 필터 |
 
 ---
@@ -102,7 +102,7 @@ flowchart TD
     end
     subgraph Core
         C1[collect.py]\nREST Crawlers
-        C2[summarize.py]\nGemini Pro
+        C2[summarize.py]\nLangChain/LangGraph\nGemini Pro
         C3[compose.py]\nJinja2
         C4[deliver.py]\nEmail / Drive
     end
@@ -127,7 +127,7 @@ flowchart TD
 | 영역  | 라이브러리                                | 이유                    |
 | --- | ------------------------------------ | --------------------- |
 | CLI | Typer                                | click 기반, 자동 --help   |
-| LLM | **google‑generativeai (Gemini Pro)** | 한국어 성능, 내부 연구 라이선스    |
+| LLM | LangChain, LangGraph, google-generativeai (Gemini Pro) | LLM Orchestration, Agentic Workflows, 한국어 성능, 내부 연구 라이선스    |
 | 크롤링 | NewsAPI, Serper.dev, GDELT           | 백업용 다중 소스             |
 | 이메일 | SendGrid / Outlook Graph             | 대량 발송 & 내부 SMTP 대체 가능 |
 | 포맷  | Jinja2 + Tailwind CDN                | 빠른 스타일링               |
@@ -258,5 +258,6 @@ newsletter run --keywords "반도체,파운드리" --to recipient@example.com --
 
 | 버전  | 일자         | 작성자     | 변경 요약                                           |
 | --- | ---------- | ------- | ----------------------------------------------- |
+| 0.3 | 2025‑05‑09 | GitHub Copilot | LangChain/LangGraph 통합 반영, 관련 문서 업데이트 |
 | 0.2 | 2025‑05‑09 | ChatGPT | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원 |
 | 0.1 | 2025‑05‑09 | ChatGPT | 초기 초안                                           |
