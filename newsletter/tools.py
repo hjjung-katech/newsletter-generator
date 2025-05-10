@@ -15,11 +15,11 @@ from . import config
 @tool
 def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     """
-    Search for news articles using the Serper.dev API.
+    Search for news articles using the Serper.dev API for each keyword.
     
     Args:
-        keywords: Keywords to search for, like 'AI in healthcare'
-        num_results: Number of results to return (default: 10, max: 20)
+        keywords: Comma-separated keywords to search for, like 'AI,Machine Learning'
+        num_results: Number of results to return per keyword (default: 10, max: 20)
     
     Returns:
         A list of article dictionaries with 'title', 'url', and 'snippet' keys.
@@ -29,40 +29,60 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     
     if num_results > 20:
         num_results = 20  # Limit to 20 results max
-      url = "https://google.serper.dev/search"
-    payload = json.dumps({
-        "q": keywords,
-        "gl": "kr",  # 한국 지역 결과
-        "hl": "ko",  # 한국어 결과
-        "num": num_results
-    })
-    headers = {
-        'X-API-KEY': config.SERPER_API_KEY,
-        'Content-Type': 'application/json'
-    }
-    
-    try:
-        response = requests.request("POST", url, headers=headers, data=payload)
-        response.raise_for_status()
+
+    individual_keywords = [kw.strip() for kw in keywords.split(',')]
+    all_collected_articles = []
+    keyword_article_counts = {}
+
+    print("\nStarting article collection process:")
+    for keyword in individual_keywords:
+        print(f"Searching articles for keyword: '{keyword}'")
+        url = "https://google.serper.dev/search"
+        payload = json.dumps({
+            "q": keyword, # Search for individual keyword
+            "gl": "kr",  # 한국 지역 결과
+            "hl": "ko",  # 한국어 결과
+            "num": num_results
+        })
+        headers = {
+            'X-API-KEY': config.SERPER_API_KEY,
+            'Content-Type': 'application/json'
+        }
         
-        results = response.json()
-        articles = []
-        
-        # 검색 결과에서 기사 정보 추출
-        if "organic" in results:
-            for item in results["organic"]:
-                article = {
-                    "title": item.get("title", "제목 없음"),
-                    "url": item.get("link", ""),
-                    "snippet": item.get("snippet", "내용 없음")
-                }
-                articles.append(article)
-        
-        return articles
-    except requests.exceptions.RequestException as e:
-        raise ToolException(f"Error fetching articles from Serper.dev: {e}")
-    except json.JSONDecodeError:
-        raise ToolException(f"Error decoding JSON response from Serper.dev. Response: {response.text}")
+        try:
+            response = requests.request("POST", url, headers=headers, data=payload)
+            response.raise_for_status()
+            
+            results = response.json()
+            articles_for_keyword = []
+            
+            if "organic" in results:
+                for item in results["organic"]:
+                    article = {
+                        "title": item.get("title", "제목 없음"),
+                        "url": item.get("link", ""),
+                        "snippet": item.get("snippet", "내용 없음")
+                    }
+                    articles_for_keyword.append(article)
+            
+            num_found = len(articles_for_keyword)
+            keyword_article_counts[keyword] = num_found
+            print(f"Found {num_found} articles for keyword: '{keyword}'")
+            all_collected_articles.extend(articles_for_keyword)
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching articles for keyword '{keyword}' from Serper.dev: {e}")
+            # Continue to next keyword if one fails
+        except json.JSONDecodeError:
+            print(f"Error decoding JSON response for keyword '{keyword}' from Serper.dev. Response: {response.text}")
+            # Continue to next keyword
+
+    print("\nSummary of articles collected per keyword:")
+    for kw, count in keyword_article_counts.items():
+        print(f"- '{kw}': {count} articles")
+    print(f"Total articles collected: {len(all_collected_articles)}\n")
+            
+    return all_collected_articles
 
 @tool
 def fetch_article_content(url: str) -> Dict[str, Any]:
@@ -173,10 +193,9 @@ def save_newsletter_locally(html_content: str, filename_base: str, output_format
         # 파일 저장
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
-              return f"Newsletter saved locally as {filename_base}.{output_format} at {file_path}"
+        return f"Newsletter saved locally as {filename_base}.{output_format} at {file_path}"
             
     except Exception as e:
-        raise ToolException(f"Error saving newsletter: {str(e)}")
         raise ToolException(f"Error saving newsletter locally: {e}")
 
 def clean_html_markers(html_content: str) -> str:

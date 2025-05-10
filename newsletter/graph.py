@@ -34,8 +34,8 @@ def collect_articles(state: NewsletterState) -> NewsletterState:
         # 키워드 문자열 생성
         keyword_str = ", ".join(state["keywords"])
         
-        # 기사 수집
-        articles = search_news_articles(keywords=keyword_str, num_results=10)
+        # 기사 수집 (invoke 사용 및 딕셔너리 입력으로 변경)
+        articles = search_news_articles.invoke({"keywords": keyword_str, "num_results": 10})
         
         # 상태 업데이트
         return {
@@ -90,12 +90,12 @@ def summarize_articles(state: NewsletterState) -> NewsletterState:
             "status": "error"
         }
 
-def handle_error(state: NewsletterState) -> Literal["end"]:
+def handle_error(state: NewsletterState) -> NewsletterState:
     """
     에러 처리 노드
     """
     print(f"[오류] {state['error']}")
-    return "end"
+    return state
 
 # 그래프 정의
 def create_newsletter_graph() -> StateGraph:
@@ -110,7 +110,7 @@ def create_newsletter_graph() -> StateGraph:
     workflow.add_node("handle_error", handle_error)
     
     # 엣지 추가 (노드 간 전환)
-    workflow.add_edge("collect_articles", "summarize_articles")
+    # workflow.add_edge("collect_articles", "summarize_articles") # This line is redundant and causes the error
     workflow.add_conditional_edges(
         "collect_articles",
         lambda state: "handle_error" if state["status"] == "error" else "summarize_articles"
