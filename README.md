@@ -254,6 +254,18 @@ newsletter run --keywords "반도체,파운드리" --to recipient@example.com --
 
 ---
 
+### 단위 테스트 실행
+
+프로젝트의 단위 테스트를 실행하려면 다음 명령을 사용하세요:
+
+```bash
+python -m unittest discover -s ./tests -p "test_*.py"
+```
+
+이 명령은 `tests` 디렉토리 내의 `test_*.py` 패턴과 일치하는 모든 테스트 파일을 찾아 실행합니다.
+
+---
+
 ### 문서 버전 기록
 
 | 버전  | 일자         | 작성자     | 변경 요약                                           |
