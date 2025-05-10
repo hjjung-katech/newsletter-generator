@@ -5,7 +5,7 @@ Newsletter Generator - LangGraph Workflow
 
 from typing import Dict, List, Any, Tuple, TypedDict, Annotated, Literal
 from langgraph.graph import StateGraph, END
-from langchain_core.pydantic_v1 import BaseModel, Field
+from pydantic.v1 import BaseModel, Field # Updated import for Pydantic v1 compatibility
 from langchain_core.messages import HumanMessage
 import json
 
