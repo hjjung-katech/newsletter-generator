@@ -5,6 +5,7 @@
 from newsletter.chains import get_summarization_chain
 import os
 import sys
+import datetime
 
 # 테스트 데이터 생성
 test_data = {
@@ -36,13 +37,14 @@ def test_newsletter_generation():
         print("\n2. 뉴스레터 생성 중...")
         result = chain.invoke(test_data)
         print(f"✅ 뉴스레터 생성 완료 (길이: {len(result)} 자)")
-        
-        # 결과 파일에 저장
+          # 결과 파일에 저장
+        # 프로젝트 루트의 output 디렉토리에 파일 저장
         output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output")
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
             
-        output_path = os.path.join(output_dir, "test_newsletter_result.html")
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = os.path.join(output_dir, f"test_newsletter_result_{timestamp}.html")
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result)
         

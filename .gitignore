@@ -178,3 +178,9 @@ credentials.json
 
 # 출력문서 폴더
 output/*.html
+
+# 테스트 결과 파일
+tests/test_newsletter_result.html
+test_newsletter_result.html
+template_debug_*.txt
+tests/output/
