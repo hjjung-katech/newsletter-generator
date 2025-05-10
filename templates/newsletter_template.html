@@ -3,42 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오늘의 뉴스레터</title>
+    <title>주간 산업 동향 뉴스 클리핑 ({{ newsletter_topic }} - {{ generation_date }})</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
-        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        h1 { color: #333; }
-        .article { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-        .article:last-child { border-bottom: none; }
-        .article h2 { margin-top: 0; color: #555; }
-        .article p { margin-bottom: 5px; }
-        .keywords { font-size: 0.9em; color: #777; }
-        .footer { text-align: center; margin-top: 20px; font-size: 0.8em; color: #aaa; }
+        body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; line-height: 1.6; }
+        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 800px; margin: 20px auto; }
+        
+        .header-title { color: #2c3e50; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 10px; }
+        .sub-header { text-align: center; color: #555; font-size: 16px; margin-bottom: 30px; }
+
+        .greeting { margin-bottom: 20px; font-size: 16px; }
+        .introduction { margin-bottom: 30px; font-size: 16px; }
+
+        .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ecf0f1; }
+        .section:last-of-type { border-bottom: none; }
+        .section-title { font-size: 20px; font-weight: bold; color: #3498db; margin-top: 0; margin-bottom: 15px; }
+        
+        .section-content p { margin-bottom: 10px; }
+        
+        .definitions-box { background-color: #f9f9f9; border: 1px solid #e0e0e0; border-left: 5px solid #3498db; padding: 15px; margin-top: 15px; margin-bottom: 15px; border-radius: 5px; }
+        .definitions-box h3 { font-size: 16px; color: #333; margin-top: 0; margin-bottom: 10px; font-weight: bold; }
+        .definitions-box ul { list-style-type: none; padding-left: 0; margin-bottom: 0; }
+        .definitions-box ul li { margin-bottom: 10px; }
+        .definitions-box ul li strong { color: #2980b9; }
+
+        .news-links-section { margin-top: 20px; }
+        .news-links-section h4 { font-size: 16px; color: #333; margin-bottom: 10px; font-weight: bold; }
+        .news-links-section ul { list-style-type: disc; padding-left: 20px; margin: 0; }
+        .news-links-section ul li { margin-bottom: 8px; }
+        .news-links-section ul li a { color: #3498db; text-decoration: none; }
+        .news-links-section ul li a:hover { text-decoration: underline; }
+        .news-links-section ul li .source { font-size: 0.9em; color: #777; }
+
+        .food-for-thought { background-color: #eaf2f8; padding: 20px; border-radius: 5px; margin-top: 30px; margin-bottom: 20px; text-align: center; }
+        .food-for-thought .quote { font-style: italic; color: #2c3e50; font-size: 18px; margin-bottom: 10px; }
+        .food-for-thought .author { color: #555; font-size: 14px; margin-bottom: 15px; }
+        .food-for-thought .message { color: #333; font-size: 16px; }
+
+        .closing { margin-top: 30px; font-size: 16px; }
+        .editor-signature { margin-top: 10px; font-style: italic; color: #555; }
+
+        .footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #aaa; }
+        .footer p { margin-bottom: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>오늘의 뉴스레터 ({{ generation_date }})</h1>
+        <div class="header-title">주간 산업 동향 뉴스 클리핑</div>
+        <div class="sub-header">{{ newsletter_topic }} ({{ generation_date }})</div>
+
+        {% if recipient_greeting %}
+        <p class="greeting">{{ recipient_greeting }}</p>
+        {% endif %}
         
-        {% if articles %}
-            {% for article in articles %}
-            <div class="article">
-                <h2>{{ article.title }}</h2>
-                <p>{{ article.summary_text }}</p>
-                {% if article.keywords %}
-                <p class="keywords">키워드: {{ article.keywords|join(', ') }}</p>
+        {% if introduction_message %}
+        <div class="introduction">
+            {% for para in introduction_message.split('\n') %}
+            <p>{{ para }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if sections %}
+            {% for section in sections %}
+            <div class="section">
+                <h2 class="section-title">{{ section.title }}</h2>
+                
+                <div class="section-content">
+                    {% for paragraph in section.summary_paragraphs %}
+                    <p>{{ paragraph }}</p>
+                    {% endfor %}
+                </div>
+
+                {% if section.definitions %}
+                <div class="definitions-box">
+                    <h3>💡 이런 뜻이에요!</h3>
+                    <ul>
+                        {% for def in section.definitions %}
+                        <li><strong>{{ def.term }}:</strong> {{ def.explanation }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
                 {% endif %}
-                {% if article.url %}
-                <p><a href="{{ article.url }}">기사 원문 읽기</a></p>
+
+                {% if section.news_links %}
+                <div class="news-links-section">
+                    <h4>📄 참고 뉴스 링크</h4>
+                    <ul>
+                        {% for link in section.news_links %}
+                        <li>
+                            {% if link.url %}<a href="{{ link.url }}" target="_blank">{% endif %}
+                            {{ link.title }}
+                            {% if link.url %}</a>{% endif %}
+                            {% if link.source_and_date %} <span class="source">{{ link.source_and_date }}</span>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
                 {% endif %}
             </div>
             {% endfor %}
         {% else %}
-            <p>오늘 요약할 뉴스가 없습니다.</p>
+            <p>오늘 전달드릴 뉴스가 없습니다.</p>
+        {% endif %}
+
+        {% if food_for_thought %}
+        <div class="food-for-thought">
+            <p class="quote">"{{ food_for_thought.quote }}"</p>
+            <p class="author">- {{ food_for_thought.author }} -</p>
+            {% if food_for_thought.message %}
+            <div class="message">
+                {% for para in food_for_thought.message.split('\n') %}
+                <p>{{ para }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if closing_message %}
+        <p class="closing">{{ closing_message }}</p>
+        {% endif %}
+        
+        {% if editor_signature %}
+        <p class="editor-signature">{{ editor_signature }}</p>
         {% endif %}
 
         <div class="footer">
             <p>본 뉴스레터는 Newsletter Generator에 의해 자동 생성되었습니다.</p>
+            {% if company_info %}<p>{{ company_info }}</p>{% endif %}
         </div>
     </div>
 </body>
