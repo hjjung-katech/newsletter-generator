@@ -227,30 +227,68 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 
 ### 사용 방법
 
-뉴스레터를 생성하는 기본 명령어는 다음과 같습니다:
+뉴스레터를 생성하는 방법은 두 가지가 있습니다.
+
+**1. `suggest` 명령어로 키워드를 추천받고, 추천된 명령어로 뉴스레터 생성 (2단계)**
+
+```bash
+# 특정 분야의 트렌드 키워드 추천받기
+newsletter suggest --domain "자율주행"
+
+# 위 명령 실행 후, 터미널에 다음과 같이 실행할 명령어가 안내됩니다.
+# To generate a newsletter with these keywords, you can use the following command:
+# newsletter run --keywords "추천된 키워드1,추천된 키워드2,..."
+
+# 안내된 명령어를 복사하여 실행
+newsletter run --keywords "추천된 키워드1,추천된 키워드2,..." --output-format html 
+```
+
+**2. `run` 명령어에 `--domain` 옵션을 사용하여 키워드 생성부터 뉴스레터 발행까지 한 번에 실행 (1단계)**
+
+```bash
+# 특정 분야의 키워드를 자동으로 생성하여 뉴스레터 만들기
+newsletter run --domain "친환경 자동차" --output-format html
+
+# 생성할 키워드 개수 지정 (기본값: 10개)
+newsletter run --domain "배터리 기술" --suggest-count 5 --output-format md
+
+# 특정 이메일 주소로 발송
+newsletter run --domain "AI" --to recipient@example.com
+
+# Google Drive에도 저장
+newsletter run --domain "머신러닝" --drive
+
+# 모든 옵션 함께 사용
+newsletter run --domain "반도체" --suggest-count 7 --to recipient@example.com --output-format html --drive
+```
+
+**기존 방식: `--keywords` 옵션으로 직접 키워드 지정하여 뉴스레터 생성**
 
 ```bash
 # 키워드로 뉴스 검색 및 뉴스레터 생성
-newsletter run --keywords "친환경 자동차,배터리 기술" --output-format html
-
-# 특정 이메일 주소로 발송
-newsletter run --keywords "AI,머신러닝" --to recipient@example.com
-
-# Google Drive에도 저장
-newsletter run --keywords "자율주행,ADAS" --drive
-
-# 모든 옵션 함께 사용
-newsletter run --keywords "반도체,파운드리" --to recipient@example.com --output-format html --drive
+newsletter run --keywords "자율주행,ADAS" --output-format html
 ```
 
 ### 주요 명령어 옵션
 
+**`newsletter run` 명령어 옵션:**
+
 | 옵션 | 설명 | 기본값 |
 |-----|-----|-----|
-| `--keywords` | 검색할 키워드 (쉼표로 구분) | "AI,LLM" |
+| `--keywords` | 검색할 키워드 (쉼표로 구분). `--domain`이 제공되지 않거나 키워드 생성 실패 시 사용됩니다. | 없음 |
+| `--domain` | 키워드를 생성할 분야. 이 옵션 사용 시 `--keywords`는 무시될 수 있습니다 (키워드 생성 실패 시 제외). | 없음 |
+| `--suggest-count` | `--domain` 사용 시 생성할 키워드 개수. | 10 |
 | `--to` | 뉴스레터를 발송할 이메일 주소 | 없음 (이메일 발송 건너뜀) |
 | `--output-format` | 로컬에 저장할 형식 (html 또는 md) | 지정하지 않으면 `--drive` 옵션 시 Drive에만 저장, 아니면 html로 로컬 저장 |
 | `--drive` | Google Drive에 저장할지 여부 | False |
+| `--use-langgraph` | LangGraph 워크플로우 사용 여부 (권장) | True |
+
+**`newsletter suggest` 명령어 옵션:**
+
+| 옵션 | 설명 | 기본값 |
+|-----|-----|-----|
+| `--domain` | 추천 키워드를 생성할 분야 (필수) | - |
+| `--count` | 생성할 키워드 개수 | 10 |
 
 ---
 
