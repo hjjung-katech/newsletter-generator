@@ -7,38 +7,46 @@ from rich.console import Console
 
 console = Console()
 
-def collect_articles(keywords: Union[str, List[str]], num_results: int = 10) -> List[Dict[str, Any]]:
+
+def collect_articles(
+    keywords: Union[str, List[str]], num_results: int = 10
+) -> List[Dict[str, Any]]:
     """
     Collect news articles from multiple sources based on keywords.
-    
+
     This function collects news from various configured sources including:
     - Serper.dev API (Google search results)
     - RSS feeds from major Korean news outlets
     - Naver News API (if configured)
-    
+
     Args:
         keywords: String of comma-separated keywords OR list of keyword strings
         num_results: Number of results to return per keyword per source (default: 10)
-        
+
     Returns:
         List of article dictionaries with standardized format
     """
     # 다양한 뉴스 소스를 관리하는 매니저 생성
     source_manager = configure_default_sources()
-    
+
     if not source_manager.sources:
-        console.print("[bold red]Error: No news sources configured. Please check your API keys.[/bold red]")
+        console.print(
+            "[bold red]Error: No news sources configured. Please check your API keys.[/bold red]"
+        )
         return []
-    
+
     # 모든 소스에서 뉴스 수집
     all_articles = source_manager.fetch_all_sources(keywords, num_results)
-    
+
     # 중복 기사 제거
     unique_articles = source_manager.remove_duplicates(all_articles)
-    
-    console.print(f"[bold green]Final article count after deduplication: {len(unique_articles)}[/bold green]")
-    
+
+    console.print(
+        f"[bold green]Final article count after deduplication: {len(unique_articles)}[/bold green]"
+    )
+
     return unique_articles
+
 
 def collect_articles_from_serper(keywords, num_results: int = 10):
     """
@@ -52,8 +60,10 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
     Returns:
         List of article dictionaries
     """
-    console.print("[yellow]Warning: Using legacy Serper-only collection method.[/yellow]")
-    
+    console.print(
+        "[yellow]Warning: Using legacy Serper-only collection method.[/yellow]"
+    )
+
     # 키워드가 문자열로 제공된 경우 리스트로 변환
     if isinstance(keywords, str):
         keywords_list = [kw.strip() for kw in keywords.split(",")]

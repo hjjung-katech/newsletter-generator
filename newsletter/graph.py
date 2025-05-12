@@ -515,7 +515,9 @@ def create_newsletter_graph() -> StateGraph:
 
 
 # 뉴스레터 생성 함수
-def generate_newsletter(keywords: List[str], news_period_days: int = 14) -> Tuple[str, str]:
+def generate_newsletter(
+    keywords: List[str], news_period_days: int = 14
+) -> Tuple[str, str]:
     """
     키워드를 기반으로 뉴스레터를 생성하는 메인 함수
 

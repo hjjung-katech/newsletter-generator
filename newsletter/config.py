@@ -15,7 +15,9 @@ GOOGLE_APPLICATION_CREDENTIALS = os.getenv(
 # 새로운 API 키 설정
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")  # 네이버 API 클라이언트 ID
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")  # 네이버 API 클라이언트 시크릿
-ADDITIONAL_RSS_FEEDS = os.getenv("ADDITIONAL_RSS_FEEDS", "")  # 추가 RSS 피드 URL (쉼표로 구분)
+ADDITIONAL_RSS_FEEDS = os.getenv(
+    "ADDITIONAL_RSS_FEEDS", ""
+)  # 추가 RSS 피드 URL (쉼표로 구분)
 
 # 이메일 발송 설정
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")

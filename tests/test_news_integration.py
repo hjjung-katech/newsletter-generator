@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # 테스트할 모듈 임포트
 from newsletter.tools import search_news_articles
 from newsletter.collect import collect_articles
+from newsletter.sources import SerperAPISource, NewsSourceManager
 
 
 class TestNewsIntegration(unittest.TestCase):
@@ -75,7 +76,8 @@ class TestNewsIntegration(unittest.TestCase):
                 )
 
     @patch("newsletter.collect.requests.request")
-    def test_mocked_integration(self, mock_request):
+    @patch("newsletter.collect.configure_default_sources")
+    def test_mocked_integration(self, mock_configure_sources, mock_request):
         """모의 응답을 사용한 통합 테스트"""
         # 모의 응답 설정
         mock_response = MagicMock()
@@ -92,6 +94,24 @@ class TestNewsIntegration(unittest.TestCase):
             ]
         }
         mock_request.return_value = mock_response
+
+        # 실제 SerperAPISource 인스턴스 사용, fetch_news만 mock
+        serper_source = SerperAPISource()
+        serper_source.fetch_news = MagicMock(
+            return_value=[
+                {
+                    "title": "테스트 기사 제목",
+                    "url": "https://example.com/article1",
+                    "link": "https://example.com/article1",
+                    "snippet": "테스트 기사 내용 요약",
+                    "source": "테스트 출처",
+                    "date": "1 hour ago",
+                }
+            ]
+        )
+        real_source_manager = NewsSourceManager()
+        real_source_manager.sources = [serper_source]
+        mock_configure_sources.return_value = real_source_manager
 
         # collect_articles 호출
         articles = collect_articles(["테스트"], 1)

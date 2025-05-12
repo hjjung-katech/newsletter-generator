@@ -8,7 +8,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import unittest
 from unittest.mock import patch, MagicMock
 import requests  # requests 모듈 임포트 추가
-from newsletter.collect import collect_articles, collect_articles_from_serper  # collect_articles_from_serper 추가
+from newsletter.collect import (
+    collect_articles,
+    collect_articles_from_serper,
+)  # collect_articles_from_serper 추가
 
 
 class TestCollect(unittest.TestCase):
@@ -26,43 +29,43 @@ class TestCollect(unittest.TestCase):
         mock_manager.remove_duplicates.return_value = [
             {"title": "Test Article 1", "url": "http://example.com/1"},
         ]
-        
+
         mock_configure_sources.return_value = mock_manager
-        
+
         # 테스트 실행
         result = collect_articles("test keyword")
-        
+
         # 소스 구성 함수 호출 확인
         mock_configure_sources.assert_called_once()
-        
+
         # fetch_all_sources 호출 확인
         mock_manager.fetch_all_sources.assert_called_once()
-        
+
         # 중복 제거 호출 확인
         mock_manager.remove_duplicates.assert_called_once()
-        
+
         # 결과 검증
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["title"], "Test Article 1")
-    
+
     @patch("newsletter.collect.configure_default_sources")
     def test_collect_articles_with_no_sources(self, mock_configure_sources):
         """소스가 없는 경우 테스트"""
         # 소스가 없는 모의 NewsSourceManager 생성
         mock_manager = MagicMock()
         mock_manager.sources = []  # 빈 소스 목록
-        
+
         mock_configure_sources.return_value = mock_manager
-        
+
         # 테스트 실행
         result = collect_articles("test keyword")
-        
+
         # 소스 구성 함수 호출 확인
         mock_configure_sources.assert_called_once()
-        
+
         # fetch_all_sources 호출 안됨 확인
         mock_manager.fetch_all_sources.assert_not_called()
-        
+
         # 결과는 빈 목록
         self.assertEqual(result, [])
 
