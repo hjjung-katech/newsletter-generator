@@ -2,7 +2,7 @@
 
 ## 개요
 
-Newsletter Generator는 내부 연구원이 입력(또는 자동 추천)한 키워드를 기반으로 최신 뉴스를 수집‧요약하여 이메일로 발송하고, 필요 시 Google Drive에 저장하는 Python CLI 도구입니다.
+Newsletter Generator는 내부 연구원이 입력(또는 자동 추천)한 키워드를 기반으로 **다양한 뉴스 소스**에서 최신 뉴스를 수집‧요약하여 이메일로 발송하고, 필요 시 Google Drive에 저장하는 Python CLI 도구입니다.
 
 자세한 프로젝트 요구사항은 [PRD.md](PRD.md) 문서를 참고하세요.
 
@@ -20,6 +20,9 @@ pip install -e .
 
 # 또는 배포된 패키지 설치
 pip install newsletter-generator
+
+# 추가로 feedparser 설치
+pip install feedparser==6.0.11
 ```
 
 ### 환경 설정
@@ -31,11 +34,19 @@ pip install newsletter-generator
 NEWS_API_KEY=your_news_api_key
 SERPER_API_KEY=your_serper_api_key
 
+# 네이버 뉴스 API (선택사항)
+NAVER_CLIENT_ID=your_naver_client_id
+NAVER_CLIENT_SECRET=your_naver_client_secret
+
+# 추가 RSS 피드 URL (쉼표로 구분, 선택사항)
+ADDITIONAL_RSS_FEEDS=https://example.com/rss/feed1.xml,https://example.com/rss/feed2.xml
+
 # 생성형 AI 요약용 API 키
 GEMINI_API_KEY=your_gemini_api_key
 
 # 이메일 발송용 API 키 (선택사항)
 SENDGRID_API_KEY=your_sendgrid_api_key
+EMAIL_SENDER=sender@example.com
 
 # Google Drive 업로드용 (선택사항)
 GOOGLE_CLIENT_ID=your_google_client_id
@@ -110,6 +121,37 @@ newsletter run --keywords "자율주행,ADAS" --output-format html
 
 ---
 
+## 다양한 뉴스 소스
+
+Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴스 기사를 수집합니다:
+
+### 지원되는 뉴스 소스
+
+1. **Serper.dev API (Google 검색)**
+   - 키워드 기반으로 Google 검색을 통해 뉴스 기사를 수집합니다.
+   - 설정: `.env` 파일에 `SERPER_API_KEY` 값 필요
+
+2. **RSS 피드**
+   - 국내 주요 언론사 RSS 피드를 통해 최신 뉴스를 수집합니다.
+   - 기본 제공 피드:
+     - 연합뉴스TV: https://www.yonhapnewstv.co.kr/feed/
+     - 한겨레: https://www.hani.co.kr/rss/
+     - 동아일보: https://rss.donga.com/total.xml
+     - 경향신문: https://www.khan.co.kr/rss/rssdata/total_news.xml
+   - 추가 피드 설정: `.env` 파일에 `ADDITIONAL_RSS_FEEDS` 값을 쉼표로 구분된 URL 목록으로 설정
+
+3. **네이버 뉴스 API**
+   - 네이버의 뉴스 검색 API를 통해 한국어 뉴스 기사를 수집합니다.
+   - 설정: `.env` 파일에 `NAVER_CLIENT_ID`와 `NAVER_CLIENT_SECRET` 값 필요
+
+### 뉴스 소스 동작 방식
+
+- 모든 활성화된 뉴스 소스에서 병렬로 기사를 수집합니다.
+- 중복된 기사는 URL과 제목을 기준으로 자동 제거됩니다.
+- 각 소스에서 최대 10개(기본값)의 기사를 수집하며, 명령줄 인수로 조정 가능합니다.
+
+---
+
 ## 개발 가이드
 
 ### 코드 포맷팅
@@ -146,6 +188,7 @@ python run_tests.py --format --all
    - `test_serper_direct.py` - Serper.dev API 직접 호출 테스트
    - `test_search_improved.py` - 개선된 검색 기능 테스트
    - `test_news_integration.py` - 뉴스 수집 통합 테스트
+   - `test_sources.py` - 다양한 뉴스 소스 모듈 테스트
 
 2. **핵심 기능 테스트**
    - `test_collect.py` - 기사 수집 기능 테스트
@@ -170,8 +213,8 @@ python run_tests.py --all
 # 테스트 목록 확인
 python run_tests.py --list
 
-# 특정 테스트 파일 실행 (예: serper_api 테스트)
-python run_tests.py --test serper_api
+# 특정 테스트 파일 실행 (예: sources 테스트)
+python run_tests.py --test sources
 ```
 
 #### pytest 사용하여 실행
@@ -181,10 +224,10 @@ python run_tests.py --test serper_api
 pytest tests/
 
 # 특정 테스트 파일 실행
-pytest tests/test_serper_api.py
+pytest tests/test_sources.py
 
 # 특정 테스트 클래스 실행
-pytest tests/test_serper_api.py::TestSerperApi
+pytest tests/test_sources.py::TestRSSFeedSource
 ```
 
 #### unittest 사용하여 실행
@@ -194,7 +237,7 @@ pytest tests/test_serper_api.py::TestSerperApi
 python -m unittest discover -s ./tests -p "test_*.py"
 
 # 특정 테스트 파일 실행
-python -m unittest tests.test_serper_api
+python -m unittest tests.test_sources
 ```
 
 자세한 테스트 정보는 [tests/README.md](tests/README.md) 파일을 참조하세요.
@@ -205,6 +248,7 @@ python -m unittest tests.test_serper_api
 
 | 버전  | 일자         | 작성자     | 변경 요약                                           |
 | --- | ---------- | ------- | ----------------------------------------------- |
+| 0.4 | 2025‑05‑11 | Claude | 다양한 뉴스 소스 통합 기능 반영 (RSS, 네이버 API) |
 | 0.3 | 2025‑05‑09 | GitHub Copilot | LangChain/LangGraph 통합 반영, 관련 문서 업데이트 |
-| 0.2 | 2025‑05‑09 | ChatGPT | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원 |
+| 0.2 | 2025‑05‑09 | ChatGPT | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원 |
 | 0.1 | 2025‑05‑09 | ChatGPT | 초기 초안                                           |

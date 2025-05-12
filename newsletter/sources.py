@@ -1,0 +1,363 @@
+"""
+Newsletter Generator - News Sources
+이 모듈은 다양한 뉴스 소스를 통합하여 뉴스 기사를 수집하는 기능을 제공합니다.
+"""
+
+import json
+import requests
+import feedparser
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+import os
+import time
+from bs4 import BeautifulSoup
+from . import config
+from rich.console import Console
+
+console = Console()
+
+class NewsSource:
+    """기본 뉴스 소스 클래스 - 모든 소스의 기본 인터페이스를 정의"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        
+    def fetch_news(self, keywords: List[str], num_results: int = 10) -> List[Dict[str, Any]]:
+        """키워드 기반으로 뉴스 기사를 검색하는 메서드"""
+        raise NotImplementedError("Subclasses must implement fetch_news method")
+        
+    def get_source_name(self) -> str:
+        """소스 이름을 반환"""
+        return self.name
+        
+    def _standardize_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
+        """각 소스별 기사 형식을 표준화"""
+        return {
+            "title": article.get("title", "제목 없음"),
+            "url": article.get("url", article.get("link", "#")),
+            "link": article.get("link", article.get("url", "#")),
+            "content": article.get("snippet", article.get("description", article.get("content", "내용 없음"))),
+            "source": article.get("source", self.name),
+            "date": article.get("date", article.get("publishedAt", article.get("published", "날짜 없음"))),
+            "source_type": self.name,  # 어떤 소스에서 수집되었는지 추적
+        }
+
+class SerperAPISource(NewsSource):
+    """Serper.dev API를 사용하여 뉴스 기사를 검색하는 소스"""
+    
+    def __init__(self):
+        super().__init__("SerperAPI")
+        self.api_key = config.SERPER_API_KEY
+        
+    def fetch_news(self, keywords: List[str], num_results: int = 10) -> List[Dict[str, Any]]:
+        """Serper.dev API를 통해 뉴스 기사를 검색"""
+        if not self.api_key:
+            console.print("[bold red]Error: SERPER_API_KEY not found. Please set it in the .env file.[/bold red]")
+            return []
+            
+        all_articles = []
+        keyword_article_counts = {}
+        
+        url = "https://google.serper.dev/news"
+        
+        for keyword in keywords:
+            console.print(f"[cyan]Searching articles for keyword: '{keyword}' using Serper.dev[/cyan]")
+            payload = json.dumps({
+                "q": keyword,
+                "gl": "kr",  # 한국 지역 결과
+                "num": num_results
+            })
+            
+            headers = {
+                "X-API-KEY": self.api_key,
+                "Content-Type": "application/json",
+            }
+            
+            try:
+                response = requests.request("POST", url, headers=headers, data=payload)
+                response.raise_for_status()
+                
+                results = response.json()
+                articles_for_keyword = []
+                
+                # 여러 가능한 결과 컨테이너를 확인하여 데이터 추출
+                containers = []
+                
+                # 1. 'news' 키 확인 (뉴스 엔드포인트의 주요 응답 형식)
+                if "news" in results:
+                    containers.extend(results["news"])
+                
+                # 2. 'topStories' 키도 확인 (일부 응답에 존재할 수 있음)
+                if "topStories" in results:
+                    containers.extend(results["topStories"])
+                
+                # 3. 'organic' 키 확인 (fallback - 일반 검색 결과)
+                if "organic" in results and not containers:
+                    containers.extend(results["organic"])
+                
+                # 각 아이템 처리
+                for item in containers[:min(num_results, len(containers))]:
+                    article = {
+                        "title": item.get("title", "제목 없음"),
+                        "url": item.get("link", ""),
+                        "link": item.get("link", ""),
+                        "snippet": item.get("snippet") or item.get("description", "내용 없음"),
+                        "source": item.get("source", "출처 없음"),
+                        "date": item.get("date") or item.get("publishedAt") or "날짜 없음",
+                    }
+                    articles_for_keyword.append(self._standardize_article(article))
+                
+                num_found = len(articles_for_keyword)
+                keyword_article_counts[keyword] = num_found
+                console.print(f"[green]Found {num_found} articles for keyword: '{keyword}' from Serper.dev[/green]")
+                all_articles.extend(articles_for_keyword)
+                
+            except requests.exceptions.RequestException as e:
+                console.print(f"[bold red]Error fetching articles for keyword '{keyword}' from Serper.dev: {e}[/bold red]")
+            except json.JSONDecodeError:
+                console.print(f"[bold red]Error decoding JSON response for keyword '{keyword}' from Serper.dev.[/bold red]")
+        
+        return all_articles
+
+class RSSFeedSource(NewsSource):
+    """RSS 피드를 사용하여 뉴스 기사를 수집하는 소스"""
+    
+    def __init__(self, name: str, feed_urls: List[str]):
+        super().__init__(name)
+        self.feed_urls = feed_urls
+        
+    def fetch_news(self, keywords: List[str], num_results: int = 10) -> List[Dict[str, Any]]:
+        """RSS 피드에서 뉴스 기사를 수집하고 키워드로 필터링"""
+        all_articles = []
+        keyword_article_counts = {keyword: 0 for keyword in keywords}
+        
+        for feed_url in self.feed_urls:
+            try:
+                console.print(f"[cyan]Fetching RSS feed: {feed_url}[/cyan]")
+                feed = feedparser.parse(feed_url)
+                
+                if feed.status != 200:
+                    console.print(f"[yellow]Warning: Could not fetch RSS feed {feed_url}, status: {feed.status}[/yellow]")
+                    continue
+                    
+                console.print(f"[green]Successfully fetched RSS feed: {feed_url} - {len(feed.entries)} entries[/green]")
+                
+                # RSS 항목을 순회하면서 키워드 필터링
+                matched_entries = []
+                
+                for entry in feed.entries:
+                    # 제목과 설명에서 키워드 검색
+                    title = entry.get('title', '').lower()
+                    description = entry.get('description', '').lower()
+                    content = entry.get('content', '')
+                    content_value = content[0].get('value', '') if content else ''
+                    
+                    for keyword in keywords:
+                        keyword_lower = keyword.lower()
+                        if (keyword_lower in title or 
+                            keyword_lower in description or 
+                            keyword_lower in content_value.lower()):
+                            
+                            # RSS 항목을 표준 형식으로 변환
+                            article = {
+                                "title": entry.get('title', '제목 없음'),
+                                "url": entry.get('link', '#'),
+                                "link": entry.get('link', '#'),
+                                "snippet": entry.get('description', '내용 없음'),
+                                "source": feed.feed.get('title', self.name),
+                                "date": self._parse_rss_date(entry),
+                            }
+                            
+                            matched_entries.append(article)
+                            keyword_article_counts[keyword] += 1
+                            break  # 하나의 키워드라도 매칭되면 기사 추가
+                
+                # 각 피드에서 최대 num_results개의 기사만 선택
+                for article in matched_entries[:num_results]:
+                    all_articles.append(self._standardize_article(article))
+                
+                console.print(f"[green]Found {len(matched_entries)} matching articles from {feed_url}[/green]")
+                
+            except Exception as e:
+                console.print(f"[bold red]Error fetching RSS feed {feed_url}: {e}[/bold red]")
+        
+        # 키워드별 수집한 기사 수 출력
+        for keyword, count in keyword_article_counts.items():
+            console.print(f"[cyan]- '{keyword}': {count} articles from RSS feeds[/cyan]")
+            
+        return all_articles
+    
+    def _parse_rss_date(self, entry) -> str:
+        """RSS 피드 항목의 날짜 정보를 파싱"""
+        # feedparser가 자동으로 파싱한 published_parsed 필드 사용
+        date_field = None
+        for field in ['published_parsed', 'updated_parsed', 'created_parsed']:
+            if hasattr(entry, field) and getattr(entry, field):
+                date_field = getattr(entry, field)
+                break
+        
+        if date_field:
+            try:
+                # time.struct_time를 datetime으로 변환
+                dt = datetime(*date_field[:6])
+                return dt.strftime("%Y-%m-%d")
+            except Exception:
+                pass
+        
+        # 원본 날짜 문자열 반환 시도
+        for field in ['published', 'updated', 'created']:
+            if hasattr(entry, field) and getattr(entry, field):
+                return getattr(entry, field)
+        
+        return "날짜 없음"
+
+class NaverNewsAPISource(NewsSource):
+    """네이버 뉴스 검색 API를 사용하여 뉴스 기사를 검색하는 소스"""
+    
+    def __init__(self):
+        super().__init__("NaverNewsAPI")
+        self.client_id = config.NAVER_CLIENT_ID
+        self.client_secret = config.NAVER_CLIENT_SECRET
+        
+    def fetch_news(self, keywords: List[str], num_results: int = 10) -> List[Dict[str, Any]]:
+        """네이버 뉴스 API를 통해 뉴스 기사를 검색"""
+        if not self.client_id or not self.client_secret:
+            console.print("[bold yellow]Warning: Naver API credentials not found. Skipping Naver news source.[/bold yellow]")
+            return []
+            
+        all_articles = []
+        keyword_article_counts = {}
+        
+        for keyword in keywords:
+            console.print(f"[cyan]Searching articles for keyword: '{keyword}' using Naver News API[/cyan]")
+            
+            url = f"https://openapi.naver.com/v1/search/news.json?query={keyword}&display={num_results}&sort=date"
+            headers = {
+                "X-Naver-Client-Id": self.client_id,
+                "X-Naver-Client-Secret": self.client_secret
+            }
+            
+            try:
+                response = requests.get(url, headers=headers)
+                response.raise_for_status()
+                
+                results = response.json()
+                articles_for_keyword = []
+                
+                if "items" in results and results["items"]:
+                    for item in results["items"]:
+                        # HTML 태그 제거
+                        title = BeautifulSoup(item.get("title", "제목 없음"), "html.parser").get_text()
+                        description = BeautifulSoup(item.get("description", "내용 없음"), "html.parser").get_text()
+                        
+                        article = {
+                            "title": title,
+                            "url": item.get("link", "#"),
+                            "link": item.get("link", "#"),
+                            "snippet": description,
+                            "source": item.get("originallink", "네이버 뉴스"),
+                            "date": item.get("pubDate", "날짜 없음"),
+                        }
+                        articles_for_keyword.append(self._standardize_article(article))
+                
+                num_found = len(articles_for_keyword)
+                keyword_article_counts[keyword] = num_found
+                console.print(f"[green]Found {num_found} articles for keyword: '{keyword}' from Naver News API[/green]")
+                all_articles.extend(articles_for_keyword)
+                
+            except requests.exceptions.RequestException as e:
+                console.print(f"[bold red]Error fetching articles for keyword '{keyword}' from Naver News API: {e}[/bold red]")
+        
+        return all_articles
+
+class NewsSourceManager:
+    """여러 뉴스 소스를 관리하고 통합 결과를 제공하는 관리자 클래스"""
+    
+    def __init__(self):
+        self.sources = []
+        
+    def add_source(self, source: NewsSource) -> None:
+        """뉴스 소스 추가"""
+        self.sources.append(source)
+        
+    def fetch_all_sources(self, keywords: List[str], num_results_per_source: int = 10) -> List[Dict[str, Any]]:
+        """모든 소스에서 뉴스 기사 수집"""
+        if isinstance(keywords, str):
+            keywords_list = [k.strip() for k in keywords.split(",")]
+        else:
+            keywords_list = keywords
+            
+        console.print(f"[bold green]Fetching news for keywords: {keywords_list}[/bold green]")
+        
+        all_articles = []
+        for source in self.sources:
+            console.print(f"[bold]Fetching news from {source.get_source_name()}...[/bold]")
+            articles = source.fetch_news(keywords_list, num_results_per_source)
+            all_articles.extend(articles)
+            
+        console.print(f"[bold green]Total articles collected from all sources: {len(all_articles)}[/bold green]")
+        return all_articles
+    
+    def remove_duplicates(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """중복된 기사 제거"""
+        unique_articles = []
+        seen_urls = set()
+        seen_titles = set()
+        
+        for article in articles:
+            url = article.get("url", "")
+            title = article.get("title", "")
+            
+            # URL과 제목이 모두 없는 경우는 스킵
+            if not url and not title:
+                continue
+                
+            # URL 기반 중복 확인
+            if url and url in seen_urls:
+                continue
+                
+            # 제목 기반 중복 확인 (URL이 다르더라도)
+            if title and title in seen_titles:
+                continue
+                
+            if url:
+                seen_urls.add(url)
+            if title:
+                seen_titles.add(title)
+                
+            unique_articles.append(article)
+            
+        console.print(f"[cyan]Removed {len(articles) - len(unique_articles)} duplicate articles[/cyan]")
+        return unique_articles
+
+# 기본 뉴스 소스 설정 함수
+def configure_default_sources() -> NewsSourceManager:
+    """기본 뉴스 소스를 구성"""
+    manager = NewsSourceManager()
+    
+    # Serper API 소스 추가 (항상 추가)
+    if config.SERPER_API_KEY:
+        manager.add_source(SerperAPISource())
+    
+    # 네이버 뉴스 API 소스 추가 (자격 증명이 있는 경우)
+    if hasattr(config, 'NAVER_CLIENT_ID') and hasattr(config, 'NAVER_CLIENT_SECRET'):
+        if config.NAVER_CLIENT_ID and config.NAVER_CLIENT_SECRET:
+            manager.add_source(NaverNewsAPISource())
+    
+    # 기본 RSS 피드 추가
+    default_feeds = [
+        # 국내 주요 언론사 RSS 피드
+        "https://www.yonhapnewstv.co.kr/feed/",      # 연합뉴스TV
+        "https://www.hani.co.kr/rss/",               # 한겨레
+        "https://rss.donga.com/total.xml",           # 동아일보
+        "https://www.khan.co.kr/rss/rssdata/total_news.xml",  # 경향신문
+    ]
+    
+    # 환경 변수에서 추가 RSS 피드 URL 가져오기
+    additional_feeds = os.environ.get('ADDITIONAL_RSS_FEEDS', '').split(',')
+    feeds = default_feeds + [feed for feed in additional_feeds if feed.strip()]
+    
+    if feeds:
+        manager.add_source(RSSFeedSource("DefaultRSSFeeds", feeds))
+    
+    return manager 
