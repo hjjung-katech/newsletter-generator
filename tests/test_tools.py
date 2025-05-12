@@ -1,6 +1,7 @@
 import unittest
 from newsletter.tools import clean_html_markers
 
+
 class TestTools(unittest.TestCase):
 
     def test_clean_html_markers_with_filepath_comment(self):
@@ -28,7 +29,9 @@ class TestTools(unittest.TestCase):
 </html>"""
         self.assertEqual(clean_html_markers(html_with_comment), expected_html)
 
-    def test_clean_html_markers_with_filepath_comment_and_no_leading_newline_for_marker(self):
+    def test_clean_html_markers_with_filepath_comment_and_no_leading_newline_for_marker(
+        self,
+    ):
         html_with_comment = """<!-- filepath: c:\\path\\to\\file.html -->```html
 <!DOCTYPE html>
 <html>
@@ -105,5 +108,6 @@ class TestTools(unittest.TestCase):
     def test_clean_html_markers_empty_string(self):
         self.assertEqual(clean_html_markers(""), "")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

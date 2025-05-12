@@ -109,6 +109,31 @@ newsletter run --keywords "자율주행,ADAS" --output-format html
 
 ---
 
+## 개발 가이드
+
+### 코드 포맷팅
+
+이 프로젝트는 [Black](https://github.com/psf/black) 코드 포맷터를 사용하여 일관된 코드 스타일을 유지합니다:
+
+```bash
+# Black 설치
+pip install black
+
+# 코드 포맷팅 실행
+black newsletter
+black tests
+```
+
+자동화된 포맷팅 검사를 위해 다음 명령어를 사용할 수 있습니다:
+
+```bash
+# 코드 포맷팅 검사 실행
+python run_tests.py --format-only
+
+# 코드 포맷팅 후 테스트 실행
+python run_tests.py --format --all
+```
+
 ## 테스트
 
 ### 테스트 구조

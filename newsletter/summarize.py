@@ -1,5 +1,5 @@
 import google.generativeai as genai
-from . import config # Import config module
+from . import config  # Import config module
 
 SYSTEM_PROMPT = """
 Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
@@ -83,12 +83,15 @@ Instructions:
 -   최종 결과물은 위의 HTML 템플릿을 완벽하게 따르는 단일 HTML 문자열이어야 합니다. 다른 부가적인 텍스트나 설명은 포함하지 마세요.
 """
 
+
 def summarize_articles(keywords: list[str], articles: list):
     """
     Generates a newsletter HTML for the given keywords and articles using Gemini Pro.
     """
     keyword_str = ", ".join(keywords) if keywords else "지정된 주제 없음"
-    print(f"Summarizing {len(articles)} articles for keywords: {keyword_str} using Gemini Pro...")
+    print(
+        f"Summarizing {len(articles)} articles for keywords: {keyword_str} using Gemini Pro..."
+    )
 
     if not config.GEMINI_API_KEY:
         print("Error: GEMINI_API_KEY not found. Please set it in the .env file.")
@@ -108,20 +111,20 @@ def summarize_articles(keywords: list[str], articles: list):
 
     genai.configure(api_key=config.GEMINI_API_KEY)
     model = genai.GenerativeModel(
-        model_name='gemini-1.5-pro-latest', # Changed from 'gemini-pro'
-        system_instruction=SYSTEM_PROMPT 
+        model_name="gemini-1.5-pro-latest",  # Changed from 'gemini-pro'
+        system_instruction=SYSTEM_PROMPT,
     )
 
     # Prepare content for LLM. Combine all articles and keywords into one prompt.
     articles_details = []
     for article in articles:
-        title = article.get('title', '제목 없음')
-        url = article.get('url', '#')
-        content = article.get('content', '내용 없음')
+        title = article.get("title", "제목 없음")
+        url = article.get("url", "#")
+        content = article.get("content", "내용 없음")
         articles_details.append(f"기사 제목: {title}\nURL: {url}\n내용:\n{content}")
-    
+
     articles_content_str = "\n\n---\n\n".join(articles_details)
-    
+
     content_to_summarize = f"""
 다음 키워드에 대한 뉴스레터를 생성해주세요: {keyword_str}
 
@@ -130,14 +133,16 @@ def summarize_articles(keywords: list[str], articles: list):
 
 위 정보를 바탕으로 시스템 프롬프트에 명시된 HTML 템플릿에 따라 전체 뉴스레터 HTML을 생성해주세요.
 """
-    
+
     try:
         print(f"  Generating newsletter for keywords: {keyword_str}...")
         response = model.generate_content(content_to_summarize)
         # The response.text is expected to be the full HTML newsletter
         return response.text
     except Exception as e:
-        print(f"Error summarizing articles for keywords '{keyword_str}' with Gemini: {e}")
+        print(
+            f"Error summarizing articles for keywords '{keyword_str}' with Gemini: {e}"
+        )
         return f"""<!DOCTYPE html>
 <html lang="ko">
 <head>

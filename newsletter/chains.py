@@ -14,12 +14,17 @@ from langchain_core.messages import SystemMessage, HumanMessage
 import os
 import datetime
 
+
 # HTML 템플릿 파일 로딩
 def load_html_template():
     """HTML 템플릿 파일을 로드합니다."""
-    template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "templates", "newsletter_template.html")
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)),
+        "templates",
+        "newsletter_template.html",
+    )
     try:
-        with open(template_path, 'r', encoding='utf-8') as file:
+        with open(template_path, "r", encoding="utf-8") as file:
             return file.read()
     except Exception as e:
         print(f"템플릿 파일 로딩 중 오류 발생: {e}")
@@ -38,12 +43,17 @@ def load_html_template():
         </html>
         """
 
+
 # HTML 템플릿 로드
 HTML_TEMPLATE = load_html_template()
 
 # 디버깅을 위해 템플릿을 파일에 저장
 try:
-    with open(f"template_debug_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", "w", encoding="utf-8") as f:
+    with open(
+        f"template_debug_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+        "w",
+        encoding="utf-8",
+    ) as f:
         f.write(HTML_TEMPLATE)
 except Exception as e:
     print(f"디버그 파일 작성 중 오류: {e}")
@@ -172,6 +182,7 @@ Task Breakdown:
 6.  **Concluding Remarks**: 전체 뉴스 내용을 바탕으로 독자들에게 생각해볼 만한 질문이나 영감을 줄 수 있는 메시지를 포함한 마무리 문단을 작성합니다.
 """
 
+
 def get_llm():
     """구글 Gemini Pro 모델 인스턴스를 생성합니다."""
     if not config.GEMINI_API_KEY:
@@ -179,32 +190,36 @@ def get_llm():
     return ChatGoogleGenerativeAI(
         model="gemini-1.5-pro-latest",
         google_api_key=config.GEMINI_API_KEY,
-        temperature=0.3
+        temperature=0.3,
     )
+
 
 # 기사 목록을 텍스트로 변환하는 함수
 def format_articles(data):
     articles = data["articles"]
     formatted_articles = []
-    
+
     for i, article in enumerate(articles):
-        title = article.get('title', '제목 없음')
-        url = article.get('url', '#')
-        content = article.get('content', '내용 없음')
-        source = article.get('source', '출처 없음') # 추가
-        date = article.get('date', '날짜 없음')     # 추가
-        formatted_articles.append(f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n") # 수정
-    
+        title = article.get("title", "제목 없음")
+        url = article.get("url", "#")
+        content = article.get("content", "내용 없음")
+        source = article.get("source", "출처 없음")  # 추가
+        date = article.get("date", "날짜 없음")  # 추가
+        formatted_articles.append(
+            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n"
+        )  # 수정
+
     return "\n---\n".join(formatted_articles)
+
 
 def get_summarization_chain():
     llm = get_llm()
-    
+
     # 메시지 생성 함수
     def create_messages(data):
         # 시스템 메시지 생성
         system_message = SystemMessage(content=SYSTEM_PROMPT)
-        
+
         # 사용자 메시지 생성
         user_content = f"""다음 키워드에 대한 뉴스레터를 생성해주세요: {data['keywords']}
 
@@ -216,14 +231,10 @@ def get_summarization_chain():
 복잡한 주제나 여러 기사가 있는 경우 카테고리별로 정리하는 것이 좋습니다.
 """
         human_message = HumanMessage(content=user_content)
-        
+
         return [system_message, human_message]
-    
+
     # 체인 정의
-    chain = (
-        create_messages
-        | llm
-        | StrOutputParser()
-    )
-    
+    chain = create_messages | llm | StrOutputParser()
+
     return chain
