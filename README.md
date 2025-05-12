@@ -109,15 +109,69 @@ newsletter run --keywords "자율주행,ADAS" --output-format html
 
 ---
 
-### 단위 테스트 실행
+## 테스트
 
-프로젝트의 단위 테스트를 실행하려면 다음 명령을 사용하세요:
+### 테스트 구조
+
+프로젝트 테스트는 `tests` 디렉토리에 체계적으로 관리되며 다음과 같은 유형이 있습니다:
+
+1. **API 및 검색 테스트**
+   - `test_serper_api.py` - Serper.dev API 통합 테스트
+   - `test_serper_direct.py` - Serper.dev API 직접 호출 테스트
+   - `test_search_improved.py` - 개선된 검색 기능 테스트
+   - `test_news_integration.py` - 뉴스 수집 통합 테스트
+
+2. **핵심 기능 테스트**
+   - `test_collect.py` - 기사 수집 기능 테스트
+   - `test_summarize.py` - 요약 기능 테스트
+   - `test_template.py` - 템플릿 기능 테스트
+   - `test_compose.py` - 뉴스레터 작성 기능 테스트
+   - `test_graph_date_parser.py` - 날짜 파싱 기능 테스트
+
+3. **종합 기능 테스트**
+   - `test_newsletter.py` - 뉴스레터 종합 기능 테스트
+
+### 테스트 실행
+
+#### 테스트 자동화 스크립트 사용
+
+제공된 `run_tests.py` 스크립트로 쉽게 테스트를 실행할 수 있습니다:
 
 ```bash
-python -m unittest discover -s ./tests -p "test_*.py"
+# 모든 테스트 실행
+python run_tests.py --all
+
+# 테스트 목록 확인
+python run_tests.py --list
+
+# 특정 테스트 파일 실행 (예: serper_api 테스트)
+python run_tests.py --test serper_api
 ```
 
-이 명령은 `tests` 디렉토리 내의 `test_*.py` 패턴과 일치하는 모든 테스트 파일을 찾아 실행합니다.
+#### pytest 사용하여 실행
+
+```bash
+# 모든 테스트 실행
+pytest tests/
+
+# 특정 테스트 파일 실행
+pytest tests/test_serper_api.py
+
+# 특정 테스트 클래스 실행
+pytest tests/test_serper_api.py::TestSerperApi
+```
+
+#### unittest 사용하여 실행
+
+```bash
+# 모든 테스트 실행
+python -m unittest discover -s ./tests -p "test_*.py"
+
+# 특정 테스트 파일 실행
+python -m unittest tests.test_serper_api
+```
+
+자세한 테스트 정보는 [tests/README.md](tests/README.md) 파일을 참조하세요.
 
 ---
 
