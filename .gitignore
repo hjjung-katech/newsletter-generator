@@ -177,6 +177,7 @@ cython_debug/
 credentials.json
 
 # 출력문서 폴더
+output/
 output/*.html
 
 # 테스트 결과 파일
@@ -184,6 +185,21 @@ tests/test_newsletter_result.html
 test_newsletter_result.html
 template_debug_*.txt
 tests/output/
+tests/_backup/
 
 # Newsletter generator specific
 output/intermediate_processing/
+output.txt
+
+# Backup files
+*.bak
+*.backup
+*.fixed
+*.new
+*.updated
+collect.py.fixed
+
+# Test data and results
+search_test_results.txt
+serper_test_*.json
+test_date_parser.py
