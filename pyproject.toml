@@ -39,5 +39,14 @@ dependencies = [
 [project.scripts]
 newsletter = "newsletter.cli:app"
 
+[project.optional-dependencies]
+_dev = [
+    "black>=23.3.0",
+]
+
 [tool.setuptools]
 packages = ["newsletter"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
