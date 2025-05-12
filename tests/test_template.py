@@ -4,6 +4,7 @@ HTML 템플릿 로딩 기능 테스트
 """
 from newsletter.chains import load_html_template, HTML_TEMPLATE
 import sys
+import pytest
 
 
 def test_template_loading():
@@ -17,14 +18,10 @@ def test_template_loading():
     print(f"\n미리 로드된 HTML_TEMPLATE (일부):\n{HTML_TEMPLATE[:150]}\n...")
 
     # 템플릿에 Jinja2 구문이 포함되어 있는지 확인
-    if "{{" in template and "{%" in template:
-        print("\n✅ 템플릿에 Jinja2 구문이 포함되어 있습니다.")
-    else:
-        print("\n❌ 템플릿에 Jinja2 구문이 없습니다!")
-        return False
+    assert "{{" in template and "{%" in template, "템플릿에 Jinja2 구문이 없습니다!"
+    print("\n✅ 템플릿에 Jinja2 구문이 포함되어 있습니다.")
 
     print("\n✅ 템플릿 로드 테스트 성공!")
-    return True
 
 
 if __name__ == "__main__":

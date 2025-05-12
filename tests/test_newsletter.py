@@ -6,6 +6,8 @@ from newsletter.chains import get_summarization_chain
 import os
 import sys
 import datetime
+import pytest
+import re
 
 # 테스트 데이터 생성
 test_data = {
@@ -38,6 +40,18 @@ def test_newsletter_generation():
         print("\n2. 뉴스레터 생성 중...")
         result = chain.invoke(test_data)
         print(f"✅ 뉴스레터 생성 완료 (길이: {len(result)} 자)")
+
+        # 마크다운 코드 블록 제거
+        # LLM이 ```html ... ``` 형태로 응답하는 경우 처리
+        clean_result = result
+        markdown_pattern = r"```(?:html)?\n([\s\S]*?)\n```"
+        markdown_match = re.search(markdown_pattern, result)
+        if markdown_match:
+            clean_result = markdown_match.group(1)
+            print(
+                f"마크다운 코드 블록이 제거되었습니다. (이전 길이: {len(result)}, 새 길이: {len(clean_result)})"
+            )
+
         # 결과 파일에 저장
         # 프로젝트 루트의 output 디렉토리에 파일 저장
         output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output")
@@ -49,42 +63,31 @@ def test_newsletter_generation():
             output_dir, f"test_newsletter_result_{timestamp}.html"
         )
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write(result)
+            f.write(clean_result)
 
         # 검증
         print("\n3. 생성된 뉴스레터 검증 중...")
-        checks = [
-            (
-                "HTML 구조 확인",
-                result.startswith("<!DOCTYPE html>"),
-                "생성된 문서가 HTML이 아닙니다.",
-            ),
-            (
-                "키워드 포함 확인",
-                "머신러닝" in result,
-                "생성된 문서에 키워드가 없습니다.",
-            ),
-            (
-                "기사 내용 포함 확인",
-                "구글" in result,
-                "생성된 문서에 기사 내용이 없습니다.",
-            ),
-        ]
 
-        for name, condition, error_msg in checks:
-            if condition:
-                print(f"✅ {name}")
-            else:
-                print(f"❌ {name}: {error_msg}")
-                return False
+        # HTML 구조 확인
+        assert clean_result.startswith(
+            "<!DOCTYPE html>"
+        ), "생성된 문서가 HTML이 아닙니다."
+        print(f"✅ HTML 구조 확인")
+
+        # 키워드 포함 확인
+        assert "머신러닝" in clean_result, "생성된 문서에 키워드가 없습니다."
+        print(f"✅ 키워드 포함 확인")
+
+        # 기사 내용 포함 확인
+        assert "구글" in clean_result, "생성된 문서에 기사 내용이 없습니다."
+        print(f"✅ 기사 내용 포함 확인")
 
         print(
             f"\n✅ 뉴스레터 생성 테스트 성공! 결과는 {output_path} 파일을 확인하세요."
         )
-        return True
     except Exception as e:
         print(f"\n❌ 뉴스레터 생성 중 오류 발생: {e}")
-        return False
+        pytest.fail(f"뉴스레터 생성 중 오류 발생: {e}")
 
 
 if __name__ == "__main__":
