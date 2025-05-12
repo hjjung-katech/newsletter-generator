@@ -100,6 +100,13 @@
             {% endfor %}
         {% endif %}
 
+        <h4>2. 생성형 AI & 멀티모달 AI</h4>
+        <ul>
+            {% for i in range(29, 39) %}
+            <li><a href="{{ '기사 #' + i|string + '의 URL' }}" target="_blank">{{ '기사 #' + i|string + '의 제목' }}</a></li>
+            {% endfor %}
+        </ul>
+
         {% if food_for_thought %}
         <div class="food-for-thought-section">
             <h3>🤔 생각해 볼 거리</h3>

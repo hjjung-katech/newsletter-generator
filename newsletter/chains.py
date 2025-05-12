@@ -191,7 +191,9 @@ def format_articles(data):
         title = article.get('title', '제목 없음')
         url = article.get('url', '#')
         content = article.get('content', '내용 없음')
-        formatted_articles.append(f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n내용:\n{content}\n")
+        source = article.get('source', '출처 없음') # 추가
+        date = article.get('date', '날짜 없음')     # 추가
+        formatted_articles.append(f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n") # 수정
     
     return "\n---\n".join(formatted_articles)
 

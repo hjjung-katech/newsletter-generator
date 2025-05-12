@@ -67,7 +67,9 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
                     article = {
                         "title": item.get("title", "제목 없음"),
                         "url": item.get("link", ""),
-                        "snippet": item.get("snippet", "내용 없음")
+                        "snippet": item.get("snippet", "내용 없음"),
+                        "source": item.get("source", "출처 없음"),  # Serper API 응답에 'source' 필드가 있다고 가정
+                        "date": item.get("publishedAt", "날짜 없음") # Serper API 응답에 'publishedAt' 필드가 있다고 가정
                     }
                     articles_for_keyword.append(article)
             
