@@ -33,6 +33,13 @@ def run(
         min=1,
         help="Number of keywords to generate if --domain is used.",
     ),
+    news_period_days: int = typer.Option(
+        14,
+        "--period",
+        "-p",
+        min=1,
+        help="Period in days for collecting recent news (default: 14 days).",
+    ),
     to: Optional[str] = typer.Option(
         None,
         "--to",
@@ -142,12 +149,11 @@ def run(
     # LangGraph를 사용하는 경우
     if use_langgraph:
         console.print("\n[cyan]Using LangGraph workflow...[/cyan]")
-        console.print("\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]")
-
-        # LangGraph 워크플로우 실행
+        console.print("\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]")        # LangGraph 워크플로우 실행
         html_content, status = graph.generate_newsletter(
-            keyword_list
-        )  # Use the final keyword_list
+            keyword_list, 
+            news_period_days
+        )  # Use the final keyword_list and news period
 
         if status == "error":
             console.print(

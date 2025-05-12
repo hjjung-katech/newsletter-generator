@@ -19,6 +19,7 @@ class NewsletterState(TypedDict):
 
     # 입력 값
     keywords: List[str]
+    news_period_days: int  # Configurable days for news recency filter
     # 중간 결과물
     collected_articles: Optional[List[Dict]]  # Made Optional
     processed_articles: Optional[List[Dict]]  # New field
@@ -234,9 +235,9 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         print(f"Saved raw collected articles to {raw_output_path}")
     except Exception as e:
         print(f"[red]Error saving raw articles: {e}[/red]")
-
     now_utc = datetime.now(timezone.utc)
-    one_week_ago_utc = now_utc - timedelta(days=7)
+    news_period_days = state.get("news_period_days", 14)  # 기본값은 14일(2주)로 설정
+    news_period_ago_utc = now_utc - timedelta(days=news_period_days)
 
     recent_articles = []
     articles_with_date = (
@@ -286,8 +287,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             ):
                 # Assuming naive datetimes from parsing are UTC. Adjust if this assumption is wrong.
                 article_date_obj = article_date_obj.replace(tzinfo=timezone.utc)
-
-            if article_date_obj >= one_week_ago_utc:
+            if article_date_obj >= news_period_ago_utc:
                 recent_articles.append(article)
                 articles_kept_recent_date += 1
             else:
@@ -339,7 +339,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         return {
             **state,
             "processed_articles": [],
-            "error": "최근 7일 내 기사가 없거나, 기사 날짜 정보를 파싱할 수 없어 요약할 내용이 없습니다.",
+            "error": f"최근 {news_period_days}일 내 기사가 없거나, 기사 날짜 정보를 파싱할 수 없어 요약할 내용이 없습니다.",
             "status": "error",
         }
 
@@ -515,12 +515,13 @@ def create_newsletter_graph() -> StateGraph:
 
 
 # 뉴스레터 생성 함수
-def generate_newsletter(keywords: List[str]) -> Tuple[str, str]:
+def generate_newsletter(keywords: List[str], news_period_days: int = 14) -> Tuple[str, str]:
     """
     키워드를 기반으로 뉴스레터를 생성하는 메인 함수
 
     Args:
         keywords: 키워드 리스트
+        news_period_days: 최신 뉴스 수집 기간(일 단위), 기본값 14일(2주)
 
     Returns:
         (뉴스레터 HTML, 상태)
@@ -528,6 +529,7 @@ def generate_newsletter(keywords: List[str]) -> Tuple[str, str]:
     # 초기 상태 생성
     initial_state: NewsletterState = {  # Added type hint for clarity
         "keywords": keywords,
+        "news_period_days": news_period_days,  # Propagate configurable period to state
         "collected_articles": None,  # Initialize as None
         "processed_articles": None,  # Initialize as None
         "article_summaries": None,  # Initialize as None

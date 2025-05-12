@@ -95,6 +95,7 @@ newsletter run --keywords "자율주행,ADAS" --output-format html
 | `--keywords` | 검색할 키워드 (쉼표로 구분). `--domain`이 제공되지 않거나 키워드 생성 실패 시 사용됩니다. | 없음 |
 | `--domain` | 키워드를 생성할 분야. 이 옵션 사용 시 `--keywords`는 무시될 수 있습니다 (키워드 생성 실패 시 제외). | 없음 |
 | `--suggest-count` | `--domain` 사용 시 생성할 키워드 개수. | 10 |
+| `--period`, `-p` | 최신 뉴스 수집 기간(일 단위) | 14 |
 | `--to` | 뉴스레터를 발송할 이메일 주소 | 없음 (이메일 발송 건너뜀) |
 | `--output-format` | 로컬에 저장할 형식 (html 또는 md) | 지정하지 않으면 `--drive` 옵션 시 Drive에만 저장, 아니면 html로 로컬 저장 |
 | `--drive` | Google Drive에 저장할지 여부 | False |
