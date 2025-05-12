@@ -26,30 +26,32 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     Args:
         keywords: Comma-separated keywords to search for, like 'AI,Machine Learning'
         num_results: Number of results to return per keyword (default: 10, max: 20)
-    
-    Returns:
-        A list of article dictionaries with 'title', 'url', and 'snippet' keys.
+      Returns:
+        A list of article dictionaries with 'title', 'url', 'snippet', 'source', and 'date' keys.
     """
     if not config.SERPER_API_KEY:
         raise ToolException("SERPER_API_KEY not found. Please set it in the .env file.")
     
     if num_results > 20:
         num_results = 20  # Limit to 20 results max
-
+        
     individual_keywords = [kw.strip() for kw in keywords.split(',')]
     all_collected_articles = []
     keyword_article_counts = {}
-
+    
     print("\nStarting article collection process:")
     for keyword in individual_keywords:
         print(f"Searching articles for keyword: '{keyword}'")
-        url = "https://google.serper.dev/search"
+        # 뉴스 전용 엔드포인트 사용으로 변경
+        url = "https://google.serper.dev/news"
+        
+        # 뉴스 전용 엔드포인트는 단순한 파라미터만 필요
         payload = json.dumps({
-            "q": keyword, # Search for individual keyword
+            "q": keyword,
             "gl": "kr",  # 한국 지역 결과
-            "hl": "ko",  # 한국어 결과
             "num": num_results
         })
+        
         headers = {
             'X-API-KEY': config.SERPER_API_KEY,
             'Content-Type': 'application/json'
@@ -62,25 +64,54 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
             results = response.json()
             articles_for_keyword = []
             
-            if "organic" in results:
-                for item_idx, item in enumerate(results["organic"]): # 인덱스 추가
-                    # ---- 디버깅 로그 추가 시작 ----
-                    if item_idx < 3: # 처음 3개 항목에 대해서만 키 출력 (로그 과다 방지)
-                        print(f"Debug: Article item keys (keyword: {keyword}, index: {item_idx}): {list(item.keys())}")
-                        raw_date_val = item.get("date")
-                        raw_published_at_val = item.get("publishedAt")
-                        print(f"Debug: Raw 'date' value (keyword: {keyword}, index: {item_idx}): '{raw_date_val}' (type: {type(raw_date_val)})")
-                        print(f"Debug: Raw 'publishedAt' value (keyword: {keyword}, index: {item_idx}): '{raw_published_at_val}' (type: {type(raw_published_at_val)})")
-                    # ---- 디버깅 로그 추가 끝 ----
-                    
-                    article = {
-                        "title": item.get("title", "제목 없음"),
-                        "url": item.get("link", ""),
-                        "snippet": item.get("snippet", "내용 없음"),
-                        "source": item.get("source", "출처 없음"),  # Serper API 응답에 'source' 필드가 있다고 가정
-                        "date": item.get("date") or item.get("publishedAt") or "날짜 없음" # Try "date", then "publishedAt", then default
-                    }
-                    articles_for_keyword.append(article)
+            # 여러 가능한 결과 컨테이너를 확인하여 데이터 추출
+            containers = []
+            
+            # 1. 'news' 키 확인 (뉴스 엔드포인트의 주요 응답 형식)
+            if "news" in results:
+                print(f"Found 'news' results for keyword '{keyword}'")
+                containers.extend(results["news"])
+                
+            # 2. 'topStories' 키도 확인 (일부 응답에 존재할 수 있음)
+            if "topStories" in results:
+                print(f"Found 'topStories' results for keyword '{keyword}'")
+                containers.extend(results["topStories"])
+                
+            # 3. 'organic' 키 확인 (fallback - 일반 검색 결과)
+            if "organic" in results and not containers:
+                print(f"Found 'organic' results for keyword '{keyword}'")
+                containers.extend(results["organic"])
+            
+            # 결과 로깅
+            print(f"Total container items found: {len(containers)}")
+            
+            # 디버깅: 응답 구조 확인
+            if not containers and results:
+                print(f"Warning: No result containers found. Available keys: {list(results.keys())}")
+                if len(results.keys()) <= 3:  # 키가 적으면 전체 구조 확인
+                    print(f"Response structure: {json.dumps(results, ensure_ascii=False)[:300]}...")
+            
+            # 각 아이템 처리
+            for item_idx, item in enumerate(containers[:min(num_results, len(containers))]):
+                # 디버깅 정보 (첫 3개 항목만)
+                if item_idx < 3:
+                    print(f"Debug: Item keys (index: {item_idx}): {list(item.keys())}")
+                    raw_date_val = item.get("date")
+                    raw_published_at_val = item.get("publishedAt")
+                    print(f"Debug: Date value: '{raw_date_val}' / PublishedAt: '{raw_published_at_val}'")
+                
+                # 공통 형식으로 변환
+                article = {
+                    "title": item.get("title", "제목 없음"),
+                    "url": item.get("link", ""),
+                    "snippet": item.get("snippet") or item.get("description", "내용 없음"),
+                    "source": item.get("source", "출처 없음"),
+                    "date": item.get("date") or item.get("publishedAt") or "날짜 없음"
+                }
+                articles_for_keyword.append(article)
+                
+            if not articles_for_keyword:
+                print(f"No articles could be parsed for keyword '{keyword}'.")
             
             num_found = len(articles_for_keyword)
             keyword_article_counts[keyword] = num_found

@@ -9,6 +9,7 @@ from pydantic.v1 import BaseModel, Field # Updated import for Pydantic v1 compat
 from langchain_core.messages import HumanMessage
 import json
 import os # Added import
+import re # Added import for regex date parsing
 from datetime import datetime, timedelta, timezone # Added imports
 
 # State 정의
@@ -35,30 +36,81 @@ def parse_article_date_for_graph(date_str: Any) -> Optional[datetime]: # Changed
     now = datetime.now(timezone.utc) # Use timezone-aware now for relative dates
 
     # 1. Handle relative Korean dates
-    if date_str.endswith("일 전"): # "X일 전"
-        try:
-            days_ago = int(date_str.split("일")[0].strip())
-            return now - timedelta(days=days_ago)
-        except ValueError:
-            pass # Fall through to other formats
-    elif date_str.endswith("시간 전"): # "X시간 전"
-        try:
-            hours_ago = int(date_str.split("시간")[0].strip())
-            return now - timedelta(hours=hours_ago)
-        except ValueError:
-            pass
-    elif date_str.endswith("분 전"): # "X분 전"
-        try:
-            minutes_ago = int(date_str.split("분")[0].strip())
-            return now - timedelta(minutes=minutes_ago)
-        except ValueError:
-            pass
-    elif date_str == "어제":
-        return now - timedelta(days=1)
-    elif date_str == "오늘": # Less common for articles, but good to have
-        return now
+    if isinstance(date_str, str): # Check if date_str is a string before calling .endswith()
+        if date_str.endswith("일 전"): # "X일 전"
+            try:
+                days_ago = int(date_str.split("일")[0].strip())
+                return now - timedelta(days=days_ago)
+            except ValueError:
+                pass # Fall through to other formats
+        elif date_str.endswith("시간 전"): # "X시간 전"
+            try:
+                hours_ago = int(date_str.split("시간")[0].strip())
+                return now - timedelta(hours=hours_ago)
+            except ValueError:
+                pass
+        elif date_str.endswith("분 전"): # "X분 전"
+            try:
+                minutes_ago = int(date_str.split("분")[0].strip())
+                return now - timedelta(minutes=minutes_ago)
+            except ValueError:
+                pass
+        elif date_str == "어제":
+            return now - timedelta(days=1)
+        elif date_str == "오늘": # Less common for articles, but good to have
+            return now    # 2. Handle relative English dates (e.g., "X minutes ago", "X hours ago", "X days ago")
+    if isinstance(date_str, str): # Ensure it's a string for regex        # Handle both "X minute ago" (단수형) 및 "X minutes ago" (복수형)
+        match_minutes = re.match(r"(\d+)\s+minutes?\s+ago", date_str, re.IGNORECASE)
+        if match_minutes:
+            try:
+                minutes_ago = int(match_minutes.group(1))
+                return now - timedelta(minutes=minutes_ago)
+            except ValueError:
+                pass
+                
+        # 영어 단수형 처리 - "X minute ago"
+        match_minute = re.match(r"(\d+)\s+minute\s+ago", date_str, re.IGNORECASE)
+        if match_minute:
+            try:
+                minutes_ago = int(match_minute.group(1))
+                return now - timedelta(minutes=minutes_ago)
+            except ValueError:
+                pass
 
-    # 2. ISO 8601 format (with or without 'Z')
+        match_hours = re.match(r"(\d+)\s+hours?\s+ago", date_str, re.IGNORECASE)
+        if match_hours:
+            try:
+                hours_ago = int(match_hours.group(1))
+                return now - timedelta(hours=hours_ago)
+            except ValueError:
+                pass
+
+        match_days = re.match(r"(\d+)\s+days?\s+ago", date_str, re.IGNORECASE)
+        if match_days:
+            try:
+                days_ago = int(match_days.group(1))
+                return now - timedelta(days=days_ago)
+            except ValueError:
+                pass
+        
+        match_weeks = re.match(r"(\d+)\s+weeks?\s+ago", date_str, re.IGNORECASE)
+        if match_weeks:
+            try:
+                weeks_ago = int(match_weeks.group(1))
+                return now - timedelta(weeks=weeks_ago)
+            except ValueError:
+                pass
+
+        match_months = re.match(r"(\d+)\s+months?\s+ago", date_str, re.IGNORECASE)
+        if match_months:
+            try:
+                months_ago = int(match_months.group(1))
+                # timedelta doesn't directly support months, approximate as 30 days
+                return now - timedelta(days=months_ago * 30) 
+            except ValueError:
+                pass
+
+    # 3. ISO 8601 format (with or without 'Z')
     try:
         if date_str.endswith('Z') and len(date_str) > 1:
             dt = datetime.fromisoformat(date_str[:-1] + '+00:00')
@@ -83,6 +135,12 @@ def parse_article_date_for_graph(date_str: Any) -> Optional[datetime]: # Changed
             '%Y.%m.%d',           # Original
             '%Y-%m-%d',
             '%Y년 %m월 %d일',      # Korean format "YYYY년 MM월 DD일"
+            # English formats
+            '%b %d, %Y',  # e.g., Apr 16, 2025
+            '%B %d, %Y',  # e.g., April 16, 2025
+            '%m/%d/%Y',   # e.g., 04/16/2025
+            '%d %b %Y',   # e.g., 16 Apr 2025
+            '%d %B %Y',   # e.g., 16 April 2025
         ]
         for fmt in common_formats:
             try:
@@ -161,26 +219,36 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     one_week_ago_utc = now_utc - timedelta(days=7)
     
     recent_articles = []
-    articles_with_date = 0
-    articles_missing_date = 0
-    articles_unparseable_date = 0
+    articles_with_date = 0  # Count of articles where a date string was present and parsing was attempted
+    articles_missing_date = 0 # Count of articles where date string was initially missing
+    articles_unparseable_date = 0 # Count of articles where date string was present but unparseable
+
+    # Counters for articles kept or discarded
+    articles_kept_recent_date = 0
+    articles_kept_missing_date = 0
+    articles_kept_unparseable_date = 0
+    articles_discarded_old_date = 0
 
     for article in collected_articles:
         if not isinstance(article, dict):
             print(f"Warning: Skipping non-dictionary item in collected_articles: {article}")
             continue
         
+        article_title_for_log = article.get('title', 'N/A') # For cleaner logs
         article_date_str = article.get("date")
         
         if not article_date_str or str(article_date_str).strip() == "날짜 없음":
             articles_missing_date += 1
-            print(f"Debug: Article missing date: {article.get('title', 'N/A')}")
-            continue
+            print(f"Debug: Article has missing date: '{article_title_for_log}'. Including by default.")
+            recent_articles.append(article)
+            articles_kept_missing_date += 1
+            continue # Process next article
 
+        # At this point, article_date_str is present and not "날짜 없음"
         article_date_obj = parse_article_date_for_graph(article_date_str)
         
         if article_date_obj:
-            articles_with_date += 1
+            articles_with_date += 1 # Incremented because parsing was successful
             # Ensure timezone-aware comparison
             if article_date_obj.tzinfo is None or article_date_obj.tzinfo.utcoffset(article_date_obj) is None:
                 # Assuming naive datetimes from parsing are UTC. Adjust if this assumption is wrong.
@@ -188,14 +256,28 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             
             if article_date_obj >= one_week_ago_utc:
                 recent_articles.append(article)
+                articles_kept_recent_date += 1
             else:
-                print(f"Debug: Article too old: {article.get('title', 'N/A')}, Date: {article_date_obj.isoformat()}")
+                articles_discarded_old_date += 1
+                print(f"Debug: Article too old: '{article_title_for_log}', Date: {article_date_obj.isoformat()}. Discarding.")
         else:
-            articles_unparseable_date +=1
-            print(f"Debug: Article with unparseable date: {article.get('title', 'N/A')}, Date string: '{article_date_str}'")
+            # article_date_str was present, but parse_article_date_for_graph returned None
+            articles_unparseable_date += 1
+            print(f"Debug: Article with unparseable date: '{article_title_for_log}', Date string: '{article_date_str}'. Including by default.")
+            recent_articles.append(article)
+            articles_kept_unparseable_date += 1
 
-    print(f"Date parsing stats: Total: {len(collected_articles)}, Parsed: {articles_with_date}, Missing: {articles_missing_date}, Unparseable: {articles_unparseable_date}")
-    print(f"Retained {len(recent_articles)} articles after recency filter (last 7 days).")
+    print(f"\nArticle date processing summary:")
+    print(f"  Total collected articles: {len(collected_articles)}")
+    print(f"  Articles with a date string provided: {articles_with_date + articles_unparseable_date}")
+    print(f"    Successfully parsed dates: {articles_with_date}")
+    print(f"    Unparseable date strings: {articles_unparseable_date}")
+    print(f"  Articles with missing date string (initially): {articles_missing_date}")
+    print(f"  Total articles included for further processing (recent_articles): {len(recent_articles)}")
+    print(f"    Kept (recent with valid date): {articles_kept_recent_date}")
+    print(f"    Kept (due to missing date): {articles_kept_missing_date}")
+    print(f"    Kept (due to unparseable date): {articles_kept_unparseable_date}")
+    print(f"  Articles discarded (parseable but too old): {articles_discarded_old_date}\n")
 
     if not recent_articles:
         print("[yellow]Warning: No articles retained after recency filter.[/yellow]")

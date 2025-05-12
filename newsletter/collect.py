@@ -4,7 +4,7 @@ from . import config
 
 def collect_articles(keywords: str):
     """
-    Collect articles from Serper.dev based on keywords.
+    Collect news articles from Serper.dev based on keywords using the news-specific endpoint.
     """
     print(f"Collecting articles for: {keywords} using Serper.dev")
     # 키워드별 기사 수를 저장할 딕셔너리
@@ -14,17 +14,19 @@ def collect_articles(keywords: str):
         print("Error: SERPER_API_KEY not found. Please set it in the .env file.")
         return []
 
-    url = "https://google.serper.dev/search"
+    # 뉴스 전용 엔드포인트로 변경
+    url = "https://google.serper.dev/news"
 
     # 각 키워드에 대해 개별적으로 API 호출
     individual_keywords = [kw.strip() for kw in keywords.split(',')]
     all_articles = []
-
+    
     for keyword in individual_keywords:
         print(f"Searching for keyword: {keyword}")
         payload = json.dumps({
             "q": keyword,
-            "num": 10  # Number of results to return per keyword
+            "gl": "kr",  # 한국 지역 결과
+            "num": 10    # Number of results to return per keyword
         })
         headers = {
             'X-API-KEY': config.SERPER_API_KEY,
@@ -37,13 +39,37 @@ def collect_articles(keywords: str):
             search_results = response.json()
             
             articles_for_keyword = []
-            if "organic" in search_results:
-                for item in search_results["organic"]:
+            
+            # 뉴스 API 응답 처리 - 여러 가능한 컨테이너 확인
+            articles_container = []
+            
+            # 1. 주요 'news' 컨테이너 확인
+            if "news" in search_results:
+                print(f"Processing news results for keyword '{keyword}'")
+                articles_container.extend(search_results["news"])
+            
+            # 2. 'topStories' 컨테이너도 확인 (일부 응답에서 사용)
+            if "topStories" in search_results and not articles_container:
+                print(f"Processing topStories results for keyword '{keyword}'")
+                articles_container.extend(search_results["topStories"])
+                
+            # 3. 'organic' 컨테이너 확인 (fallback)
+            if "organic" in search_results and not articles_container:
+                print(f"Processing organic results for keyword '{keyword}'")
+                articles_container.extend(search_results["organic"])
+                
+            # 결과 처리
+            if articles_container:
+                for item in articles_container:
                     articles_for_keyword.append({
                         "title": item.get("title", "No Title"),
                         "url": item.get("link", "#"),
-                        "content": item.get("snippet", "No Content Snippet") 
+                        "content": item.get("snippet", item.get("description", "No Content Snippet")),
+                        "source": item.get("source", "Unknown Source"),
+                        "date": item.get("date") or item.get("publishedAt") or "No Date"
                     })
+            else:
+                print(f"No results found for keyword '{keyword}'. Available keys: {list(search_results.keys())}")
             
             # 키워드별 기사 수 저장 및 출력
             num_articles_found = len(articles_for_keyword)
