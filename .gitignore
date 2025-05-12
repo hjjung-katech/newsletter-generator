@@ -184,3 +184,6 @@ tests/test_newsletter_result.html
 test_newsletter_result.html
 template_debug_*.txt
 tests/output/
+
+# Newsletter generator specific
+output/intermediate_processing/

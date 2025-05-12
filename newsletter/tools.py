@@ -63,13 +63,22 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
             articles_for_keyword = []
             
             if "organic" in results:
-                for item in results["organic"]:
+                for item_idx, item in enumerate(results["organic"]): # 인덱스 추가
+                    # ---- 디버깅 로그 추가 시작 ----
+                    if item_idx < 3: # 처음 3개 항목에 대해서만 키 출력 (로그 과다 방지)
+                        print(f"Debug: Article item keys (keyword: {keyword}, index: {item_idx}): {list(item.keys())}")
+                        raw_date_val = item.get("date")
+                        raw_published_at_val = item.get("publishedAt")
+                        print(f"Debug: Raw 'date' value (keyword: {keyword}, index: {item_idx}): '{raw_date_val}' (type: {type(raw_date_val)})")
+                        print(f"Debug: Raw 'publishedAt' value (keyword: {keyword}, index: {item_idx}): '{raw_published_at_val}' (type: {type(raw_published_at_val)})")
+                    # ---- 디버깅 로그 추가 끝 ----
+                    
                     article = {
                         "title": item.get("title", "제목 없음"),
                         "url": item.get("link", ""),
                         "snippet": item.get("snippet", "내용 없음"),
                         "source": item.get("source", "출처 없음"),  # Serper API 응답에 'source' 필드가 있다고 가정
-                        "date": item.get("publishedAt", "날짜 없음") # Serper API 응답에 'publishedAt' 필드가 있다고 가정
+                        "date": item.get("date") or item.get("publishedAt") or "날짜 없음" # Try "date", then "publishedAt", then default
                     }
                     articles_for_keyword.append(article)
             
