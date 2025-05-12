@@ -8,39 +8,41 @@
         body { font-family: 'Malgun Gothic', sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; line-height: 1.6; }
         .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 800px; margin: 20px auto; }
         
-        .header-title { color: #2c3e50; font-size: 24px; font-weight: bold; text-align: center; margin-bottom: 10px; }
+        .header-title { color: #2c3e50; font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 10px; }
         .sub-header { text-align: center; color: #555; font-size: 16px; margin-bottom: 30px; }
 
         .greeting { margin-bottom: 20px; font-size: 16px; }
-        .introduction { margin-bottom: 30px; font-size: 16px; }
+        .introduction { margin-bottom: 30px; font-size: 16px; border-bottom: 1px solid #ecf0f1; padding-bottom: 20px; }
 
         .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ecf0f1; }
-        .section:last-of-type { border-bottom: none; }
-        .section-title { font-size: 20px; font-weight: bold; color: #3498db; margin-top: 0; margin-bottom: 15px; }
+        .section:last-of-type { border-bottom: none; } /* This might need adjustment if new sections are added below 'sections' loop */
+        .section-title { font-size: 22px; font-weight: bold; color: #3498db; margin-top: 0; margin-bottom: 15px; }
         
         .section-content p { margin-bottom: 10px; }
         
         .definitions-box { background-color: #f9f9f9; border: 1px solid #e0e0e0; border-left: 5px solid #3498db; padding: 15px; margin-top: 15px; margin-bottom: 15px; border-radius: 5px; }
-        .definitions-box h3 { font-size: 16px; color: #333; margin-top: 0; margin-bottom: 10px; font-weight: bold; }
+        .definitions-box h4 { font-size: 18px; color: #333; margin-top: 0; margin-bottom: 10px; font-weight: bold; }
         .definitions-box ul { list-style-type: none; padding-left: 0; margin-bottom: 0; }
         .definitions-box ul li { margin-bottom: 10px; }
         .definitions-box ul li strong { color: #2980b9; }
 
         .news-links-section { margin-top: 20px; }
-        .news-links-section h4 { font-size: 16px; color: #333; margin-bottom: 10px; font-weight: bold; }
+        .news-links-section h4 { font-size: 18px; color: #333; margin-bottom: 10px; font-weight: bold; }
         .news-links-section ul { list-style-type: disc; padding-left: 20px; margin: 0; }
         .news-links-section ul li { margin-bottom: 8px; }
         .news-links-section ul li a { color: #3498db; text-decoration: none; }
         .news-links-section ul li a:hover { text-decoration: underline; }
         .news-links-section ul li .source { font-size: 0.9em; color: #777; }
 
-        .food-for-thought { background-color: #eaf2f8; padding: 20px; border-radius: 5px; margin-top: 30px; margin-bottom: 20px; text-align: center; }
-        .food-for-thought .quote { font-style: italic; color: #2c3e50; font-size: 18px; margin-bottom: 10px; }
-        .food-for-thought .author { color: #555; font-size: 14px; margin-bottom: 15px; }
+        .food-for-thought-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; }
+        .food-for-thought-section h3 { font-size: 20px; font-weight: bold; color: #2c3e50; margin-bottom: 15px; }
+        .food-for-thought .quote { font-style: italic; color: #2c3e50; font-size: 18px; margin-bottom: 10px; text-align: center;}
+        .food-for-thought .author { color: #555; font-size: 14px; margin-bottom: 15px; text-align: center; }
         .food-for-thought .message { color: #333; font-size: 16px; }
 
-        .closing { margin-top: 30px; font-size: 16px; }
-        .editor-signature { margin-top: 10px; font-style: italic; color: #555; }
+        .closing-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; }
+        .closing-section p { margin-bottom: 10px; font-size: 16px; }
+        .editor-signature { margin-top: 20px; font-style: italic; color: #555; text-align: right; }
 
         .footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #aaa; }
         .footer p { margin-bottom: 5px; }
@@ -57,30 +59,24 @@
         
         {% if introduction_message %}
         <div class="introduction">
-            {% for para in introduction_message.split('\n') %}
-            <p>{{ para }}</p>
-            {% endfor %}
+            {% for para in introduction_message.split('\n') %}<p>{{ para }}</p>{% endfor %}
         </div>
         {% endif %}
 
         {% if sections %}
             {% for section in sections %}
             <div class="section">
-                <h2 class="section-title">{{ section.title }}</h2>
+                <h3 class="section-title">{{ loop.index }}. {{ section.title }}</h3>
                 
                 <div class="section-content">
-                    {% for paragraph in section.summary_paragraphs %}
-                    <p>{{ paragraph }}</p>
-                    {% endfor %}
+                    {% for paragraph in section.summary_paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
                 </div>
 
                 {% if section.definitions %}
                 <div class="definitions-box">
-                    <h3>💡 이런 뜻이에요!</h3>
+                    <h4>💡 이런 뜻이에요!</h4>
                     <ul>
-                        {% for def in section.definitions %}
-                        <li><strong>{{ def.term }}:</strong> {{ def.explanation }}</li>
-                        {% endfor %}
+                        {% for def in section.definitions %}<li><strong>{{ def.term }}:</strong> {{ def.explanation }}</li>{% endfor %}
                     </ul>
                 </div>
                 {% endif %}
@@ -94,7 +90,7 @@
                             {% if link.url %}<a href="{{ link.url }}" target="_blank">{% endif %}
                             {{ link.title }}
                             {% if link.url %}</a>{% endif %}
-                            {% if link.source_and_date %} <span class="source">{{ link.source_and_date }}</span>{% endif %}
+                            {% if link.source_and_date %} <span class="source">({{ link.source_and_date }})</span>{% endif %}
                         </li>
                         {% endfor %}
                     </ul>
@@ -102,35 +98,33 @@
                 {% endif %}
             </div>
             {% endfor %}
-        {% else %}
-            <p>오늘 전달드릴 뉴스가 없습니다.</p>
         {% endif %}
 
         {% if food_for_thought %}
-        <div class="food-for-thought">
-            <p class="quote">"{{ food_for_thought.quote }}"</p>
-            <p class="author">- {{ food_for_thought.author }} -</p>
-            {% if food_for_thought.message %}
-            <div class="message">
-                {% for para in food_for_thought.message.split('\n') %}
-                <p>{{ para }}</p>
-                {% endfor %}
+        <div class="food-for-thought-section">
+            <h3>🤔 생각해 볼 거리</h3>
+            <div class="food-for-thought">
+                {% if food_for_thought.quote %}
+                <p class="quote">"{{ food_for_thought.quote }}"</p>
+                {% if food_for_thought.author %}<p class="author">- {{ food_for_thought.author }} -</p>{% endif %}
+                {% endif %}
+                {% for para in food_for_thought.message.split('\n\n') %}<p class="message">{{ para }}</p>{% endfor %}
             </div>
-            {% endif %}
         </div>
         {% endif %}
 
         {% if closing_message %}
-        <p class="closing">{{ closing_message }}</p>
-        {% endif %}
-        
-        {% if editor_signature %}
-        <p class="editor-signature">{{ editor_signature }}</p>
+        <div class="closing-section">
+            {% for para in closing_message.split('\n\n') %}<p>{{ para }}</p>{% endfor %}
+            {% if editor_signature %}
+            <p class="editor-signature"><em>{{ editor_signature }}</em></p>
+            {% endif %}
+        </div>
         {% endif %}
 
         <div class="footer">
-            <p>본 뉴스레터는 Newsletter Generator에 의해 자동 생성되었습니다.</p>
-            {% if company_info %}<p>{{ company_info }}</p>{% endif %}
+            <p>&copy; {{ generation_date.split('-')[0] }} {{ company_name | default('Your Company') }}. All rights reserved.</p>
+            <p>이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.</p>
         </div>
     </div>
 </body>

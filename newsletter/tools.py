@@ -245,7 +245,7 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
         return []
 
     try:
-        llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", google_api_key=config.GEMINI_API_KEY, temperature=0.7) # 모델명 변경
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro-exp-03-25", google_api_key=config.GEMINI_API_KEY, temperature=0.7) # 모델명 변경
 
         prompt_template = PromptTemplate.from_template(
             "Please generate exactly {count} of the latest trend keywords related to the field of '{domain}'. Present each keyword on a new line without any numbering or bullet points."
