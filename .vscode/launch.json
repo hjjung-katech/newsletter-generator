@@ -1,0 +1,77 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run All Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_tests.py",
+            "args": [
+                "--all"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run Single Test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_tests.py",
+            "args": [
+                "--test",
+                "${input:testName}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "List All Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_tests.py",
+            "args": [
+                "--list-all"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run Newsletter CLI",
+            "type": "python",
+            "request": "launch",
+            "module": "newsletter.cli",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "testName",
+            "type": "promptString",
+            "description": "Enter test name (without 'test_' prefix and '.py' extension)"
+        }
+    ]
+}

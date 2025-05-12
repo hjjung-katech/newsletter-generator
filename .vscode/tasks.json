@@ -1,0 +1,58 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Format Code",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/run_tests.py",
+                "--format-only"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run All Tests",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "${workspaceFolder}/run_tests.py",
+                "--all"
+            ],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Activate Conda Environment",
+            "type": "shell",
+            "command": "conda activate newsletter-env",
+            "windows": {
+                "command": "powershell -NoExit -Command \"conda activate newsletter-env\""
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Install Dev Dependencies",
+            "type": "shell",
+            "command": "pip install -e .[_dev]",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}
