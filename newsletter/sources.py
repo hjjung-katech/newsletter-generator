@@ -383,6 +383,47 @@ class NewsSourceManager:
 
     def __init__(self):
         self.sources = []
+        # 주요 언론사 티어 설정
+        self.major_news_sources = {
+            # 티어 1: 최우선 포함 주요 언론사
+            "tier1": [
+                "조선일보",
+                "중앙일보",
+                "동아일보",
+                "한국일보",
+                "한겨레",
+                "경향신문",
+                "매일경제",
+                "한국경제",
+                "서울경제",
+                "연합뉴스",
+                "YTN",
+                "KBS",
+                "MBC",
+                "SBS",
+                "Bloomberg",
+                "Reuters",
+                "Wall Street Journal",
+                "Financial Times",
+                "The Economist",
+                "TechCrunch",
+                "Wired",
+            ],
+            # 티어 2: 보조 언론사
+            "tier2": [
+                "뉴시스",
+                "뉴스1",
+                "아시아경제",
+                "아주경제",
+                "이데일리",
+                "머니투데이",
+                "디지털타임스",
+                "전자신문",
+                "IT조선",
+                "ZDNet Korea",
+                "디지털데일리",
+            ],
+        }
 
     def add_source(self, source: NewsSource) -> None:
         """뉴스 소스 추가"""
@@ -447,6 +488,110 @@ class NewsSourceManager:
             f"[cyan]Removed {len(articles) - len(unique_articles)} duplicate articles[/cyan]"
         )
         return unique_articles
+
+    def filter_by_major_sources(
+        self, articles: List[Dict[str, Any]], max_per_topic: int = 5
+    ) -> List[Dict[str, Any]]:
+        """주요 언론사 기사 우선 필터링
+
+        Args:
+            articles: 필터링할 기사 목록
+            max_per_topic: 각 주제별 최대 기사 수
+
+        Returns:
+            필터링된 기사 목록
+        """
+        # 언론사 소스별로 분류
+        tier1_articles = []
+        tier2_articles = []
+        other_articles = []
+
+        for article in articles:
+            source = article.get("source", "")
+
+            # 소스 이름 정규화 (대소문자 무시, 공백 제거)
+            source_norm = source.lower().strip()
+
+            # 티어에 따라 분류
+            if any(
+                major_source.lower() in source_norm
+                for major_source in self.major_news_sources["tier1"]
+            ):
+                tier1_articles.append(article)
+            elif any(
+                major_source.lower() in source_norm
+                for major_source in self.major_news_sources["tier2"]
+            ):
+                tier2_articles.append(article)
+            else:
+                other_articles.append(article)
+
+        # 티어에 따라 기사 선택 (티어1 우선, 그 다음 티어2, 마지막에 기타)
+        filtered_articles = []
+
+        # 먼저 티어1 기사 추가
+        filtered_articles.extend(tier1_articles[:max_per_topic])
+
+        # 아직 공간이 남으면 티어2 기사 추가
+        remaining_slots = max_per_topic - len(filtered_articles)
+        if remaining_slots > 0:
+            filtered_articles.extend(tier2_articles[:remaining_slots])
+
+        # 그래도 남으면 기타 기사 추가
+        remaining_slots = max_per_topic - len(filtered_articles)
+        if remaining_slots > 0:
+            filtered_articles.extend(other_articles[:remaining_slots])
+
+        console.print(
+            f"[cyan]Filtered articles by major sources: {len(filtered_articles)} selected from {len(articles)} total[/cyan]"
+        )
+
+        return filtered_articles
+
+    def group_articles_by_keywords(
+        self, articles: List[Dict[str, Any]], keywords: List[str]
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """키워드별로 기사 그룹화
+
+        Args:
+            articles: 그룹화할 기사 목록
+            keywords: 키워드 리스트
+
+        Returns:
+            키워드별 기사 그룹 (키워드: 기사 목록)
+        """
+        # 키워드별 빈 목록 초기화
+        grouped_articles = {keyword: [] for keyword in keywords}
+
+        # 각 기사에 대해 일치하는 모든 키워드 찾기
+        for article in articles:
+            title = article.get("title", "").lower()
+            content = article.get("content", "").lower()
+
+            for keyword in keywords:
+                keyword_lower = keyword.lower()
+
+                # 영문/숫자 키워드는 단어 경계, 한글 등은 단순 포함
+                if re.fullmatch(r"[a-zA-Z0-9]+", keyword_lower):
+                    keyword_pattern = r"\b" + re.escape(keyword_lower) + r"\b"
+                    if re.search(keyword_pattern, title) or re.search(
+                        keyword_pattern, content
+                    ):
+                        grouped_articles[keyword].append(article)
+                else:
+                    if keyword_lower in title or keyword_lower in content:
+                        grouped_articles[keyword].append(article)
+
+        # 각 키워드 그룹에서 중복 제거
+        for keyword in grouped_articles:
+            grouped_articles[keyword] = self.remove_duplicates(
+                grouped_articles[keyword]
+            )
+            console.print(
+                f"[green]Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'[/green]"
+            )
+
+        return grouped_articles
 
 
 # 기본 뉴스 소스 설정 함수

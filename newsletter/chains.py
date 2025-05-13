@@ -196,20 +196,48 @@ def get_llm():
 
 # 기사 목록을 텍스트로 변환하는 함수
 def format_articles(data):
-    articles = data["articles"]
-    formatted_articles = []
+    # 그룹화된 기사 또는 일반 기사 목록 처리
+    if "articles" in data:
+        # 일반 기사 목록
+        articles = data["articles"]
+        formatted_articles = []
 
-    for i, article in enumerate(articles):
-        title = article.get("title", "제목 없음")
-        url = article.get("url", "#")
-        content = article.get("content", "내용 없음")
-        source = article.get("source", "출처 없음")  # 추가
-        date = article.get("date", "날짜 없음")  # 추가
-        formatted_articles.append(
-            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n"
-        )  # 수정
+        for i, article in enumerate(articles):
+            title = article.get("title", "제목 없음")
+            url = article.get("url", "#")
+            content = article.get("content", "내용 없음")
+            source = article.get("source", "출처 없음")  # 추가
+            date = article.get("date", "날짜 없음")  # 추가
+            formatted_articles.append(
+                f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n"
+            )
 
-    return "\n---\n".join(formatted_articles)
+        return "\n---\n".join(formatted_articles)
+
+    elif "grouped_articles" in data:
+        # 그룹화된 기사 목록
+        grouped_articles = data["grouped_articles"]
+        formatted_sections = []
+
+        for keyword, articles in grouped_articles.items():
+            # 각 키워드를 섹션으로 처리
+            section = f"## 키워드: {keyword}\n\n"
+
+            for i, article in enumerate(articles):
+                title = article.get("title", "제목 없음")
+                url = article.get("url", "#")
+                content = article.get("content", "내용 없음")
+                source = article.get("source", "출처 없음")
+                date = article.get("date", "날짜 없음")
+
+                section += f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n\n"
+
+            formatted_sections.append(section)
+
+        return "\n\n===\n\n".join(formatted_sections)
+
+    else:
+        return "기사 데이터를 찾을 수 없습니다."
 
 
 def get_summarization_chain():
