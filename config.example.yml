@@ -1,0 +1,36 @@
+# GitHub Actions Newsletter Configuration
+# Copy this file to config.yml and customize it.
+
+# General newsletter settings
+newsletter_settings:
+  # Title for the newsletter (used in email subject, etc.)
+  title: "오늘의 주요 뉴스 업데이트"
+
+  # Keyword settings for 'newsletter run'
+  # Option 1: Provide direct keywords
+  keywords: ["인공지능", "자율주행", "반도체"]
+  # Option 2: Or specify a domain for automatic keyword suggestion
+  # domain: "스마트팩토리"
+  # suggest_count: 5 # Number of keywords to suggest if domain is used
+
+  # Output format for the newsletter file
+  output_format: "html" # 'html' or 'md'
+  # Path where the newsletter file will be saved (relative to repository root)
+  # The GitHub Actions workflow expects this path.
+  output_directory: "./output" # The script should create newsletter.html or newsletter.md here
+
+# Distribution settings for GitHub Actions
+distribution:
+  # Email settings
+  send_email: true # Set to true to enable email sending
+  email_recipients: # List of email addresses to send the newsletter to
+    - "user1@example.com"
+    - "user2@example.com"
+  # Alternatively, you can store a comma-separated list in a GitHub Secret
+  # and your script can be adapted to read it if needed.
+
+  # GitHub Pages settings
+  deploy_to_gh_pages: true # Set to true to deploy the newsletter to GitHub Pages
+
+  # GitHub Artifact settings
+  upload_artifact: true # Set to true to upload the newsletter as a workflow artifact

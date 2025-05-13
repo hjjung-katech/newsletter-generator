@@ -1,0 +1,111 @@
+name: Newsletter Generator CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'config.yml'
+      - '.github/workflows/newsletter.yml'
+      # Add other paths that should trigger the workflow, e.g., script changes
+      # - 'newsletter_generator/**.py' 
+  schedule:
+    # 한국 시간 기준 매일 오전 8시에 실행 (UTC 23:00)
+    # You can adjust the schedule as needed.
+    - cron: '0 23 * * *'
+  workflow_dispatch: # Allows manual triggering of the workflow
+
+jobs:
+  generate_and_distribute_newsletter:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # For committing to gh-pages branch
+      pages: write    # For deploying to GitHub Pages
+      id-token: write # For OIDC token if used by an action
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Ensure this matches your project's Python version
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # Ensure PyYAML is installed if your script uses it for config.yml
+          pip install PyYAML 
+
+      - name: Generate Newsletter
+        id: generate_newsletter
+        run: |
+          # Assuming your script is executable and takes config as an argument
+          # Or, if your script is a module: python -m newsletter_generator.main --config config.yml
+          # For this example, let's assume your main script is run.py or similar
+          # and it reads config.yml by default or via an argument.
+          # The script should output the newsletter to the path defined in config.yml (e.g., output/newsletter.html)
+          
+          # This is a placeholder for your actual script execution command.
+          # Replace 'python newsletter_generator/run.py --config config.yml' 
+          # with the actual command to run your newsletter generation.
+          # For now, we'll create a dummy output file for testing the workflow.
+          mkdir -p ./output
+          echo "<html><body><h1>Test Newsletter</h1><p>Generated on $(date)</p></body></html>" > ./output/newsletter.html
+          echo "Test Newsletter Content" > ./output/newsletter.md
+
+          # Extract output path and title from config.yml for later steps
+          # This requires a tool like yq or a small python script.
+          # For simplicity, we'll use fixed paths/values or assume script outputs them.
+          # Example: your script could write the actual path to a GITHUB_OUTPUT variable.
+          # python your_script.py --config config.yml --output-path-env NEWSLETTER_FILE_PATH
+          
+          echo "newsletter_html_path=output/newsletter.html" >> $GITHUB_OUTPUT
+          echo "newsletter_md_path=output/newsletter.md" >> $GITHUB_OUTPUT
+          echo "newsletter_output_dir=output" >> $GITHUB_OUTPUT
+          # Ideally, your script or a helper reads the title from config.yml
+          echo "newsletter_title=My Daily Newsletter" >> $GITHUB_OUTPUT
+
+
+      # --- Option 1: 이메일로 뉴스레터 발송 ---
+      - name: Send Newsletter Email
+        if: success() # Add condition based on config.yml: e.g., steps.config_reader.outputs.send_email == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com # Replace with your SMTP server
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: '[뉴스레터] ${{ steps.generate_newsletter.outputs.newsletter_title }} - ${{ github.run_number }}'
+          to: ${{ secrets.EMAIL_RECIPIENTS }} # Comma-separated list from secrets
+          from: 'Newsletter Bot <${{ secrets.MAIL_USERNAME }}>'
+          html_body: file://${{ steps.generate_newsletter.outputs.newsletter_html_path }}
+          content_type: text/html
+          # Attachments can be added if needed
+          # attachments: ${{ steps.generate_newsletter.outputs.newsletter_md_path }}
+
+      # --- 옵션 2: GitHub Pages로 뉴스레터 게시 ---
+      - name: Deploy to GitHub Pages
+        if: success() && github.ref == 'refs/heads/main' # Add condition based on config.yml
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is automatically available
+          publish_dir: ${{ steps.generate_newsletter.outputs.newsletter_output_dir }} # Directory containing newsletter.html
+          publish_branch: gh-pages # Branch to deploy to
+          commit_message: 'Automated deploy: Newsletter update (${{ github.sha }})'
+          # user_name: 'github-actions[bot]'
+          # user_email: 'github-actions[bot]@users.noreply.github.com'
+          # keep_files: true # Set to true if you want to keep existing files in gh-pages branch
+
+      # --- 옵션 3: 생성된 뉴스레터를 아티팩트로 저장 ---
+      - name: Upload Newsletter Artifact
+        if: success() # Add condition based on config.yml
+        uses: actions/upload-artifact@v4
+        with:
+          name: newsletter-output-${{ github.run_number }}
+          path: |
+            ${{ steps.generate_newsletter.outputs.newsletter_output_dir }}/*.html
+            ${{ steps.generate_newsletter.outputs.newsletter_output_dir }}/*.md
+          retention-days: 7
