@@ -69,9 +69,9 @@ jobs:
           echo "newsletter_title=My Daily Newsletter" >> $GITHUB_OUTPUT
 
 
-      # --- Option 1: 이메일로 뉴스레터 발송 ---
+      # --- 옵션 1: 이메일로 뉴스레터 발송 ---
       - name: Send Newsletter Email
-        if: success() # Add condition based on config.yml: e.g., steps.config_reader.outputs.send_email == 'true'
+        if: false # 이메일 발송을 비활성화하여 파일 생성 테스트에 집중
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com # Replace with your SMTP server
