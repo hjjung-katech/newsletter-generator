@@ -16,7 +16,7 @@ def collect_articles(
     filter_duplicates: bool = True,
     group_by_keywords: bool = True,
     use_major_sources_filter: bool = True,
-) -> List[Dict[str, Any]]:
+) -> Union[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]]:
     """
     Collect news articles from multiple sources based on keywords.
 

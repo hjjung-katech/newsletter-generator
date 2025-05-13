@@ -103,10 +103,21 @@ def summarize_articles(
     # Check if we have any articles to summarize
     if not articles:
         print("No articles to summarize.")
-        return ""
+        # 비어있는 기사 목록에 대해 Gemini API를 호출하지 않고 즉시 결과 반환
+        return "<html><body>No articles summary</body></html>"
+
+    # 기사 수 계산
+    article_count = (
+        len(articles)
+        if isinstance(articles, list)
+        else sum(len(group) for group in articles.values())
+    )
+
+    # 키워드가 비어있는지 확인
+    keyword_display = ", ".join(keywords) if keywords else ""
 
     print(
-        f"Summarizing {len(articles) if isinstance(articles, list) else sum(len(group) for group in articles.values())} articles for keywords: {', '.join(keywords)} using Gemini Pro..."
+        f"Summarizing {article_count} articles for keywords: {keyword_display} using Gemini Pro..."
     )
 
     # Initialize Gemini Pro model
@@ -116,58 +127,102 @@ def summarize_articles(
     # Set up the Gemini API key
     if not hasattr(config, "GEMINI_API_KEY") or not config.GEMINI_API_KEY:
         print("ERROR: GEMINI_API_KEY is not set. Cannot generate newsletter.")
-        return ""
+        error_html = """
+        <html>
+        <body>
+        <h1>오류: GEMINI_API_KEY가 설정되지 않았습니다.</h1>
+        <p>뉴스레터를 생성하려면 Gemini API 키가 필요합니다.</p>
+        <p>키워드: {}</p>
+        <p>제공된 기사 수: {}</p>
+        </body>
+        </html>
+        """.format(
+            ", ".join(keywords) if keywords else "없음",
+            article_count,
+        )
+        return error_html
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
+    try:
+        genai.configure(api_key=config.GEMINI_API_KEY)
 
-    # Create the model with system instructions
-    model = genai.GenerativeModel(
-        model_name="models/gemini-1.5-pro-latest",
-        generation_config={},
-        safety_settings={},
-        system_instruction=SYSTEM_INSTRUCTION,
-    )
+        # Create the model with system instructions
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-pro-latest",
+            system_instruction=SYSTEM_INSTRUCTION,
+        )
 
-    # Convert keywords to comma-separated string for prompt
-    keyword_str = ", ".join(keywords)
+        # Convert keywords to comma-separated string for prompt
+        if not keywords:
+            keyword_str = "지정된 주제 없음"
+        else:
+            keyword_str = ", ".join(keywords)
 
-    # Prepare content for LLM. Combine all articles and keywords into one prompt.
-    articles_details = []
+        # Prepare content for LLM. Combine all articles and keywords into one prompt.
+        articles_details = []
 
-    # Handle different article formats
-    if isinstance(articles, dict):
-        # Process grouped articles (dictionary where keys are keywords and values are article lists)
-        for keyword, keyword_articles in articles.items():
-            for article in keyword_articles:
+        # Handle different article formats
+        if isinstance(articles, dict):
+            # Process grouped articles (dictionary where keys are keywords and values are article lists)
+            for keyword, keyword_articles in articles.items():
+                for article in keyword_articles:
+                    title = article.get("title", "제목 없음")
+                    url = article.get("url", "#")
+                    content = article.get("content", "내용 없음")
+                    articles_details.append(
+                        f"기사 제목: {title}\nURL: {url}\n내용:\n{content}"
+                    )
+        else:
+            # Process flat list of articles (original format)
+            for article in articles:
                 title = article.get("title", "제목 없음")
                 url = article.get("url", "#")
                 content = article.get("content", "내용 없음")
                 articles_details.append(
                     f"기사 제목: {title}\nURL: {url}\n내용:\n{content}"
                 )
-    else:
-        # Process flat list of articles (original format)
-        for article in articles:
-            title = article.get("title", "제목 없음")
-            url = article.get("url", "#")
-            content = article.get("content", "내용 없음")
-            articles_details.append(f"기사 제목: {title}\nURL: {url}\n내용:\n{content}")
 
-    # Combine article details with newlines between each article
-    articles_text = "\n\n---\n\n".join(articles_details)
+        # Combine article details with newlines between each article
+        articles_text = "\n\n---\n\n".join(articles_details)
 
-    # Create the full prompt for Gemini Pro
-    prompt = f"키워드: {keyword_str}\n\n뉴스 기사 목록:\n\n{articles_text}"
+        # Create the full prompt for Gemini Pro
+        prompt = f"키워드: {keyword_str}\n\n뉴스 기사 목록:\n\n{articles_text}"
 
-    try:
-        # Generate the summary using Gemini Pro
-        response = model.generate_content([prompt])
-        if hasattr(response, "text"):
-            html_content = response.text
-            return html_content
-        else:
-            print("Error: Could not get text from Gemini response.")
-            return ""
+        try:
+            # Generate the summary using Gemini Pro
+            response = model.generate_content([prompt])
+            if hasattr(response, "text"):
+                html_content = response.text
+                return html_content
+            else:
+                print("Error: Could not get text from Gemini response.")
+                error_html = f"""
+                <html>
+                <body>
+                <h1>오류 발생</h1>
+                <p>키워드 '{", ".join(keywords) if keywords else "없음"}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: 응답에서 텍스트를 가져올 수 없습니다.</p>
+                </body>
+                </html>
+                """
+                return error_html
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
+            error_html = f"""
+            <html>
+            <body>
+            <h1>오류 발생</h1>
+            <p>키워드 '{", ".join(keywords) if keywords else "없음"}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: {str(e)}</p>
+            </body>
+            </html>
+            """
+            return error_html
     except Exception as e:
-        print(f"Error calling Gemini API: {e}")
-        return ""
+        print(f"General error in summarization process: {e}")
+        error_html = f"""
+        <html>
+        <body>
+        <h1>오류 발생</h1>
+        <p>뉴스레터 요약 시스템 오류: {str(e)}</p>
+        </body>
+        </html>
+        """
+        return error_html

@@ -16,8 +16,11 @@ from newsletter.collect import (
 
 class TestCollect(unittest.TestCase):
 
+    @patch("newsletter.collect.article_filter.remove_duplicate_articles")
     @patch("newsletter.collect.configure_default_sources")
-    def test_collect_articles_with_multiple_sources(self, mock_configure_sources):
+    def test_collect_articles_with_multiple_sources(
+        self, mock_configure_sources, mock_remove_duplicates
+    ):
         """다중 소스로부터 기사 수집 테스트"""
         # 모의 NewsSourceManager 생성
         mock_manager = MagicMock()
@@ -26,14 +29,16 @@ class TestCollect(unittest.TestCase):
             {"title": "Test Article 1", "url": "http://example.com/1"},
             {"title": "Test Article 2", "url": "http://example.com/2"},
         ]
-        mock_manager.remove_duplicates.return_value = [
+
+        # 중복 제거 함수의 반환값 설정
+        mock_remove_duplicates.return_value = [
             {"title": "Test Article 1", "url": "http://example.com/1"},
         ]
 
         mock_configure_sources.return_value = mock_manager
 
-        # 테스트 실행
-        result = collect_articles("test keyword")
+        # 테스트 실행 - 명시적으로 group_by_keywords=False 설정
+        result = collect_articles("test keyword", group_by_keywords=False)
 
         # 소스 구성 함수 호출 확인
         mock_configure_sources.assert_called_once()
@@ -41,8 +46,8 @@ class TestCollect(unittest.TestCase):
         # fetch_all_sources 호출 확인
         mock_manager.fetch_all_sources.assert_called_once()
 
-        # 중복 제거 호출 확인
-        mock_manager.remove_duplicates.assert_called_once()
+        # 중복 제거 함수 호출 확인
+        mock_remove_duplicates.assert_called_once()
 
         # 결과 검증
         self.assertEqual(len(result), 1)
