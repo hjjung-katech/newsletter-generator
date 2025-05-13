@@ -40,7 +40,7 @@ dependencies = [
 newsletter = "newsletter.cli:app"
 
 [project.optional-dependencies]
-_dev = [
+dev = [
     "black>=23.3.0",
 ]
 
