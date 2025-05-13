@@ -102,23 +102,26 @@ flowchart TD
         A2[newsletter run]
     end
     subgraph Core
-        C1[collect.py]\nREST Crawlers
-        C2[summarize.py]\nLangChain/LangGraph\nGemini Pro
-        C3[compose.py]\nJinja2
-        C4[deliver.py]\nEmail / Drive
+        C1["collect.py<br/>REST Crawlers"]
+        C2["summarize.py<br/>LangChain/LangGraph<br/>Gemini Pro"]
+        C3["compose.py<br/>Jinja2"]
+        C4["deliver.py<br/>Email / Drive"]
     end
     subgraph Storage
         S1[raw JSON]
         S2[SQLite meta]
-        S3[Chroma (Lv‑2)]
+        S3["Chroma (Lv-2)"]
     end
 
-    A2-->C1-->S1
-    C1-->C2-->S1
-    C2-->C3
-    C3-->C4
-    C4-->S2
-    S1-->S3
+    A2 --> C1
+    C1 --> S1
+    C1 --> C2
+    C2 --> S1
+%% summarize.py can also produce intermediate JSONs or read from it
+    C2 --> C3
+    C3 --> C4
+    C4 --> S2
+    S1 --> S3
 ```
 
 ---
