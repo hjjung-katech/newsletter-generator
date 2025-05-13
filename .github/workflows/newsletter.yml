@@ -8,6 +8,7 @@ on:
       - 'config.yml'
       - '.github/workflows/newsletter.yml'
       - 'newsletter/**/*.py' # Added to trigger on changes to Python files in the newsletter directory
+      - 'requirements.txt'   # Added to trigger on dependency changes
   schedule:
     # 한국 시간 기준 매일 오전 8시에 실행 (UTC 23:00)
     # You can adjust the schedule as needed.
@@ -35,7 +36,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install . # Install the project itself to make the CLI available
+          pip install -e . # Install the project in development mode for more reliable imports
+
+      - name: Ensure output directory exists
+        run: |
+          mkdir -p ./output
 
       - name: Generate Newsletter
         id: generate_newsletter
@@ -43,11 +48,20 @@ jobs:
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # 필요한 다른 API 키나 설정도 여기에 추가
-          # 예: NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
-          #     NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
+          NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: |
           # 프로젝트의 CLI를 사용하여 뉴스레터 생성
-          # pyproject.toml의 [project.scripts]에 정의된 "newsletter" 명령어 사용
+          # 환경변수 확인
+          echo "Checking configuration..."
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "Warning: GEMINI_API_KEY is not set. Newsletter generation may use fallback mode."
+          fi
+          if [ -z "$SERPER_API_KEY" ]; then
+            echo "Warning: SERPER_API_KEY is not set. News collection may be limited."
+          fi
+          
+          # Newsletter 생성 실행
           newsletter run --config config.yml
 
           # 스크립트가 config.yml에 지정된 output_directory에 파일을 생성한다고 가정합니다.
@@ -55,6 +69,19 @@ jobs:
           CONFIG_OUTPUT_DIR=$(python -c "import yaml; config=yaml.safe_load(open('config.yml')); print(config.get('newsletter_settings', {}).get('output_directory', './output'))")
           CONFIG_OUTPUT_FORMAT=$(python -c "import yaml; config=yaml.safe_load(open('config.yml')); print(config.get('newsletter_settings', {}).get('output_format', 'html'))")
           CONFIG_TITLE=$(python -c "import yaml; config=yaml.safe_load(open('config.yml')); print(config.get('newsletter_settings', {}).get('title', '오늘의 주요 뉴스 업데이트'))")
+
+          echo "Output directory: $CONFIG_OUTPUT_DIR"
+          echo "Output format: $CONFIG_OUTPUT_FORMAT"
+          
+          # 출력 파일 존재 확인
+          NEWSLETTER_FILE="$CONFIG_OUTPUT_DIR/newsletter.$CONFIG_OUTPUT_FORMAT"
+          if [ -f "$NEWSLETTER_FILE" ]; then
+            echo "Newsletter file generated successfully: $NEWSLETTER_FILE"
+          else
+            echo "Warning: Expected newsletter file not found at $NEWSLETTER_FILE"
+            # 대체 파일명 확인 (날짜 포함된 파일명 등)
+            ls -la $CONFIG_OUTPUT_DIR
+          fi
 
           echo "newsletter_html_path=$CONFIG_OUTPUT_DIR/newsletter.$CONFIG_OUTPUT_FORMAT" >> $GITHUB_OUTPUT
           # md 파일도 생성한다면 유사하게 추가 (필요한 경우)

@@ -86,28 +86,87 @@ def run(
     Run the newsletter generation and saving process.
     Can generate keywords from a domain or use provided keywords, or load from a config file.
     """
-    # Config file loading logic will go here
-    # For example:
-    # if config_file:
-    #     import yaml
-    #     try:
-    #         with open(config_file, 'r') as f:
-    #             config_data = yaml.safe_load(f)
-    #         # Extract settings from config_data and potentially override CLI options
-    #         # newsletter_settings = config_data.get('newsletter_settings', {})
-    #         # keywords = newsletter_settings.get('keywords', keywords) # Example
-    #         # domain = newsletter_settings.get('domain', domain)
-    #         # ... and so on for other relevant settings
-    #         console.print(f"[info]Loaded configuration from {config_file}[/info]")
-    #     except Exception as e:
-    #         console.print(f"[error]Failed to load or parse config file {config_file}: {e}[/error]")
-    #         # Decide if you want to exit or continue with other options
-
+    # 나머지 코드는 그대로 유지
     if not output_format and not drive:
         console.print(
             "[yellow]No output option selected. Defaulting to local HTML save.[/yellow]"
         )
         output_format = "html"  # Default to local html if no other option
+
+    # 기본 output_directory 설정
+    output_directory = "./output"  # 기본값
+
+    # config_file 처리
+    if config_file:
+        import yaml
+
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
+
+            # Extract settings from config_data
+            newsletter_settings = config_data.get("newsletter_settings", {})
+
+            # Override CLI options with config file values
+            config_keywords = newsletter_settings.get("keywords")
+            if config_keywords and not keywords:
+                if isinstance(config_keywords, list):
+                    keywords = ",".join(config_keywords)
+                    console.print(
+                        f"[green]Using keywords from config file: {keywords}[/green]"
+                    )
+                else:
+                    keywords = str(config_keywords)
+                    console.print(
+                        f"[yellow]Keywords in config file is not a list. Converted to string: {keywords}[/yellow]"
+                    )
+
+            config_domain = newsletter_settings.get("domain")
+            if config_domain and not domain:
+                domain = config_domain
+                console.print(f"[green]Using domain from config file: {domain}[/green]")
+
+            config_suggest_count = newsletter_settings.get("suggest_count")
+            if config_suggest_count:
+                suggest_count = config_suggest_count
+                console.print(
+                    f"[green]Using suggest_count from config file: {suggest_count}[/green]"
+                )
+
+            config_output_format = newsletter_settings.get("output_format")
+            if config_output_format and not output_format:
+                output_format = config_output_format
+                console.print(
+                    f"[green]Using output_format from config file: {output_format}[/green]"
+                )
+
+            # Extract and log output directory from config
+            output_directory = newsletter_settings.get(
+                "output_directory", output_directory
+            )
+            console.print(
+                f"[green]Output directory from config file: {output_directory}[/green]"
+            )
+
+            # If email distribution is enabled in config, set it up
+            distribution_settings = config_data.get("distribution", {})
+            if distribution_settings.get("send_email") and not to:
+                email_recipients = distribution_settings.get("email_recipients", [])
+                if email_recipients and isinstance(email_recipients, list):
+                    to = ",".join(email_recipients)
+                    console.print(
+                        f"[green]Using email recipients from config file[/green]"
+                    )
+
+            console.print(f"[info]Loaded configuration from {config_file}[/info]")
+        except Exception as e:
+            console.print(
+                f"[error]Failed to load or parse config file {config_file}: {e}[/error]"
+            )
+            # Continue with CLI options
+
+    # 디렉토리가 존재하는지 확인하고 생성
+    os.makedirs(output_directory, exist_ok=True)
 
     final_keywords_str = ""
     keyword_list = []
@@ -272,25 +331,38 @@ def run(
         console.print(
             f"\n[cyan]Step {step_num}: Saving newsletter locally as {output_format.upper()}...[/cyan]"
         )
-        if news_deliver.save_locally(html_content, filename_base, output_format):
-            console.print(f"Newsletter saved locally as {output_format.upper()}.")
+        save_path = os.path.join(output_directory, f"{filename_base}.{output_format}")
+        if news_deliver.save_locally(
+            html_content, filename_base, output_format, output_directory
+        ):
+            console.print(f"Newsletter saved locally as {save_path}.")
             saved_locally = True
         else:
             console.print(
-                f"[red]Failed to save newsletter locally as {output_format.upper()}.[/red]"
+                f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
             )
 
-        step_num += 1
+    step_num += 1
 
+    # 5. Upload to Google Drive
     if drive:
-        console.print(f"\n[cyan]Step {step_num}: Saving to Google Drive...[/cyan]")
-        if news_deliver.save_to_drive(html_content, filename_base):
-            console.print(f"Newsletter (HTML and Markdown) saved to Google Drive.")
+        console.print(f"\n[cyan]Step {step_num}: Uploading to Google Drive...[/cyan]")
+        if news_deliver.save_to_drive(html_content, filename_base, output_directory):
+            console.print(
+                "[green]Successfully uploaded newsletter to Google Drive.[/green]"
+            )
         else:
-            console.print("[red]Failed to save to Google Drive.[/red]")
+            console.print(
+                "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
+            )
 
     if not saved_locally and not drive:
-        console.print("[yellow]No output method was successful.[/yellow]")
+        console.print(
+            "\n[yellow]Warning: Newsletter was not saved locally or uploaded to Google Drive.[/yellow]"
+        )
+        console.print(
+            "[yellow]Use --output-format=html or --drive to save/upload the newsletter.[/yellow]"
+        )
 
     console.print("\n[bold green]Newsletter process completed.[/bold green]")
 

@@ -8,9 +8,11 @@ from typing import List, Dict, Any
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from newsletter import collect
-from newsletter import article_filter
-from newsletter import cli
+# 필요한 모듈을 패치
+with patch.dict("sys.modules", {"google.generativeai": MagicMock()}):
+    from newsletter import collect
+    from newsletter import article_filter
+    from newsletter import cli
 
 
 class TestArticleFilterIntegration(unittest.TestCase):

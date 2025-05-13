@@ -1,4 +1,8 @@
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None  # Gemini API 사용 불가 상태로 표시
+
 from . import config  # Import config module
 from typing import List, Union, Dict, Any
 
@@ -120,11 +124,26 @@ def summarize_articles(
         f"Summarizing {article_count} articles for keywords: {keyword_display} using Gemini Pro..."
     )
 
-    # Initialize Gemini Pro model
-    import google.generativeai as genai
-    from . import config
+    # Check if Gemini API is available
+    if genai is None:
+        print("ERROR: google.generativeai module is not available.")
+        error_html = """
+        <html>
+        <body>
+        <h1>오류: google.generativeai 모듈을 찾을 수 없습니다.</h1>
+        <p>뉴스레터를 생성하려면 google-generativeai 패키지가 설치되어 있어야 합니다.</p>
+        <p>설치 방법: pip install google-generativeai</p>
+        <p>키워드: {}</p>
+        <p>제공된 기사 수: {}</p>
+        </body>
+        </html>
+        """.format(
+            keyword_display,
+            article_count,
+        )
+        return error_html
 
-    # Set up the Gemini API key
+    # Check API key
     if not hasattr(config, "GEMINI_API_KEY") or not config.GEMINI_API_KEY:
         print("ERROR: GEMINI_API_KEY is not set. Cannot generate newsletter.")
         error_html = """
@@ -137,7 +156,7 @@ def summarize_articles(
         </body>
         </html>
         """.format(
-            ", ".join(keywords) if keywords else "없음",
+            keyword_display,
             article_count,
         )
         return error_html
@@ -199,7 +218,7 @@ def summarize_articles(
                 <html>
                 <body>
                 <h1>오류 발생</h1>
-                <p>키워드 '{", ".join(keywords) if keywords else "없음"}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: 응답에서 텍스트를 가져올 수 없습니다.</p>
+                <p>키워드 '{keyword_display}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: 응답에서 텍스트를 가져올 수 없습니다.</p>
                 </body>
                 </html>
                 """
@@ -210,7 +229,7 @@ def summarize_articles(
             <html>
             <body>
             <h1>오류 발생</h1>
-            <p>키워드 '{", ".join(keywords) if keywords else "없음"}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: {str(e)}</p>
+            <p>키워드 '{keyword_display}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: {str(e)}</p>
             </body>
             </html>
             """
