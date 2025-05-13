@@ -18,6 +18,11 @@ console = Console()
 
 @app.command()
 def run(
+    config_file: Optional[str] = typer.Option(
+        None,
+        "--config",
+        help="Path to the YAML configuration file. If provided, other options might be overridden.",
+    ),
     keywords: Optional[str] = typer.Option(
         None,
         help="Keywords to search for, comma-separated. Used if --domain is not provided.",
@@ -79,8 +84,25 @@ def run(
 ):
     """
     Run the newsletter generation and saving process.
-    Can generate keywords from a domain or use provided keywords.
+    Can generate keywords from a domain or use provided keywords, or load from a config file.
     """
+    # Config file loading logic will go here
+    # For example:
+    # if config_file:
+    #     import yaml
+    #     try:
+    #         with open(config_file, 'r') as f:
+    #             config_data = yaml.safe_load(f)
+    #         # Extract settings from config_data and potentially override CLI options
+    #         # newsletter_settings = config_data.get('newsletter_settings', {})
+    #         # keywords = newsletter_settings.get('keywords', keywords) # Example
+    #         # domain = newsletter_settings.get('domain', domain)
+    #         # ... and so on for other relevant settings
+    #         console.print(f"[info]Loaded configuration from {config_file}[/info]")
+    #     except Exception as e:
+    #         console.print(f"[error]Failed to load or parse config file {config_file}: {e}[/error]")
+    #         # Decide if you want to exit or continue with other options
+
     if not output_format and not drive:
         console.print(
             "[yellow]No output option selected. Defaulting to local HTML save.[/yellow]"
