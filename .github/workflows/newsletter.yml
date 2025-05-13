@@ -7,8 +7,7 @@ on:
     paths:
       - 'config.yml'
       - '.github/workflows/newsletter.yml'
-      # Add other paths that should trigger the workflow, e.g., script changes
-      # - 'newsletter_generator/**.py' 
+      - 'newsletter/**/*.py' # Added to trigger on changes to Python files in the newsletter directory
   schedule:
     # 한국 시간 기준 매일 오전 8시에 실행 (UTC 23:00)
     # You can adjust the schedule as needed.
@@ -53,9 +52,9 @@ jobs:
 
           # 스크립트가 config.yml에 지정된 output_directory에 파일을 생성한다고 가정합니다.
           # 아래 GITHUB_OUTPUT 설정은 config.yml을 읽어서 동적으로 설정합니다.
-          CONFIG_OUTPUT_DIR=$(python -c "import yaml; print(yaml.safe_load(open('config.yml'))['newsletter_settings']['output_directory'])")
-          CONFIG_OUTPUT_FORMAT=$(python -c "import yaml; print(yaml.safe_load(open('config.yml'))['newsletter_settings']['output_format'])")
-          CONFIG_TITLE=$(python -c "import yaml; print(yaml.safe_load(open('config.yml'))['newsletter_settings']['title'])")
+          CONFIG_OUTPUT_DIR=$(python -c "import yaml; config=yaml.safe_load(open('config.yml')); print(config.get('newsletter_settings', {}).get('output_directory', './output'))")
+          CONFIG_OUTPUT_FORMAT=$(python -c "import yaml; config=yaml.safe_load(open('config.yml')); print(config.get('newsletter_settings', {}).get('output_format', 'html'))")
+          CONFIG_TITLE=$(python -c "import yaml; config=yaml.safe_load(open('config.yml')); print(config.get('newsletter_settings', {}).get('title', '오늘의 주요 뉴스 업데이트'))")
 
           echo "newsletter_html_path=$CONFIG_OUTPUT_DIR/newsletter.$CONFIG_OUTPUT_FORMAT" >> $GITHUB_OUTPUT
           # md 파일도 생성한다면 유사하게 추가 (필요한 경우)
