@@ -58,6 +58,24 @@ def run(
     use_langgraph: bool = typer.Option(
         True, "--langgraph/--no-langgraph", help="Use LangGraph workflow (recommended)."
     ),
+    filter_duplicates: bool = typer.Option(
+        True,
+        "--filter-duplicates/--no-filter-duplicates",
+        help="Filter duplicate articles based on URL and title.",
+    ),
+    group_by_keywords: bool = typer.Option(
+        True,
+        "--group-by-keywords/--no-group-by-keywords",
+        help="Group articles by keywords for better organization.",
+    ),
+    use_major_sources: bool = typer.Option(
+        True,
+        "--use-major-sources/--no-major-sources",
+        help="Prioritize articles from major news sources.",
+    ),
+    max_per_source: int = typer.Option(
+        3, "--max-per-source", min=1, help="Maximum number of articles per source."
+    ),
 ):
     """
     Run the newsletter generation and saving process.
@@ -171,12 +189,26 @@ def run(
         # 1. Collect articles
         console.print("\n[cyan]Step 1: Collecting articles...[/cyan]")
         articles = news_collect.collect_articles(
-            final_keywords_str
+            final_keywords_str,
+            max_per_source=max_per_source,
+            filter_duplicates=filter_duplicates,
+            group_by_keywords=group_by_keywords,
+            use_major_sources_filter=use_major_sources,
         )  # Use final_keywords_str for collection
         if not articles:
             console.print("[yellow]No articles found. Exiting.[/yellow]")
             return
-        console.print(f"Collected {len(articles)} articles.")
+
+        # 그룹화된 결과인 경우 출력 형식 변경
+        if isinstance(articles, dict):
+            total_articles = sum(len(group) for group in articles.values())
+            console.print(
+                f"Collected {total_articles} articles grouped by {len(articles)} keywords."
+            )
+            for keyword, keyword_articles in articles.items():
+                console.print(f"- {keyword}: {len(keyword_articles)} articles")
+        else:
+            console.print(f"Collected {len(articles)} articles.")
 
         # 2. Summarize articles
         console.print("\n[cyan]Step 2: Summarizing articles...[/cyan]")
@@ -243,13 +275,83 @@ def run(
 
 # The 'collect' command can remain if it's used for other purposes or direct testing.
 @app.command()
-def collect(keywords: str):
+def collect(
+    keywords: str,
+    max_per_source: int = typer.Option(
+        3, "--max-per-source", help="Maximum number of articles per source."
+    ),
+    no_filter_duplicates: bool = typer.Option(
+        False, "--no-filter-duplicates", help="Don't filter duplicate articles."
+    ),
+    no_group_by_keywords: bool = typer.Option(
+        False, "--no-group-by-keywords", help="Don't group articles by keywords."
+    ),
+    no_major_sources_filter: bool = typer.Option(
+        False, "--no-major-sources-filter", help="Don't prioritize major news sources."
+    ),
+):
     """
-    Collect articles based on keywords.
+    Collect articles based on keywords with improved filtering and grouping.
     """
     console.print(f"Collecting articles for keywords: {keywords}")
-    # Placeholder
-    console.print("Article collection completed (simulated).")
+
+    # 기사 수집 및 처리
+    articles = news_collect.collect_articles(
+        keywords,
+        max_per_source=max_per_source,
+        filter_duplicates=not no_filter_duplicates,
+        group_by_keywords=not no_group_by_keywords,
+        use_major_sources_filter=not no_major_sources_filter,
+    )
+
+    # 결과 출력
+    if isinstance(articles, dict):  # 그룹화된 결과인 경우
+        console.print(
+            f"[green]Collected articles grouped by {len(articles)} keywords:[/green]"
+        )
+        for keyword, keyword_articles in articles.items():
+            console.print(
+                f"[bold cyan]Keyword: {keyword} - {len(keyword_articles)} articles[/bold cyan]"
+            )
+            for i, article in enumerate(keyword_articles, 1):
+                console.print(
+                    f"  {i}. {article.get('title', 'No title')} ({article.get('source', 'Unknown')})"
+                )
+    else:  # 그룹화되지 않은 결과인 경우
+        console.print(f"[green]Collected {len(articles)} articles:[/green]")
+        for i, article in enumerate(articles, 1):
+            console.print(
+                f"{i}. {article.get('title', 'No title')} ({article.get('source', 'Unknown')})"
+            )
+
+    # 생성 날짜 설정
+    current_date_str = datetime.now().strftime("%Y-%m-%d")
+    # 파일 이름 생성
+    filename_base = f"{current_date_str}_collected_articles_{keywords.replace(',', '_').replace(' ', '')}"
+
+    # 결과 저장
+    if isinstance(articles, dict):
+        # 그룹화된 결과를 JSON으로 저장
+        import json
+
+        output_dir = os.path.join(os.getcwd(), "output")
+        os.makedirs(output_dir, exist_ok=True)
+
+        output_path = os.path.join(output_dir, f"{filename_base}.json")
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(articles, f, ensure_ascii=False, indent=2)
+        console.print(f"[green]Results saved to {output_path}[/green]")
+    else:
+        # 단순한 기사 목록을 텍스트로 저장
+        import json
+
+        output_dir = os.path.join(os.getcwd(), "output")
+        os.makedirs(output_dir, exist_ok=True)
+
+        output_path = os.path.join(output_dir, f"{filename_base}.json")
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(articles, f, ensure_ascii=False, indent=2)
+        console.print(f"[green]Results saved to {output_path}[/green]")
 
 
 @app.command()

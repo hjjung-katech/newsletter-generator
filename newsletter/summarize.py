@@ -1,7 +1,8 @@
 import google.generativeai as genai
 from . import config  # Import config module
+from typing import List, Union, Dict, Any
 
-SYSTEM_PROMPT = """
+SYSTEM_INSTRUCTION = """
 Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
 
 Context: 독자들은 한국 첨단사업의 R&D 전략기획단 소속으로, 젊은 팀원들과 수석전문위원들로 구성되어 있습니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
@@ -68,7 +69,7 @@ HTML Template Structure:
 ```
 
 Task Breakdown:
-1.  **Categorization**: 입력된 뉴스 기사들을 내용에 따라 여러 카테고리로 분류합니다. (예: "전기차 시장 동향", "하이브리드차 동향" 등). 카테고리 제목과 번호를 부여합니다.
+1. **Categorization**: 입력된 뉴스 기사들을 내용에 따라 여러 카테고리로 분류합니다. (예: "전기차 시장 동향", "하이브리드차 동향" 등). 카테고리 제목과 번호를 부여합니다.
 2.  **Summarization per Category**: 각 카테고리별로 해당되는 기사들의 주요 내용을 종합하여 상세하게 설명하는 요약문을 작성합니다.
 3.  **Terminology Explanation ("이런 뜻이에요!")**: 각 카테고리 요약문에서 신입직원이 이해하기 어려울 수 있는 전문 용어나 개념이 있다면, 이를 선정하여 쉽고 간단하게 설명하는 목록을 만듭니다.
 4.  **News Links**: 각 카테고리별로 관련 뉴스 기사들의 원문 링크를 제목, 출처, 시간 정보와 함께 목록으로 제공합니다.
@@ -84,73 +85,89 @@ Instructions:
 """
 
 
-def summarize_articles(keywords: list[str], articles: list):
+def summarize_articles(
+    keywords: List[str],
+    articles: Union[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]],
+) -> str:
     """
-    Generates a newsletter HTML for the given keywords and articles using Gemini Pro.
+    Summarize articles using Gemini Pro.
+
+    Args:
+        keywords: List of keywords to create context for summarization
+        articles: Either a list of article dictionaries OR a dictionary of articles grouped by keywords
+                 Each article has 'title', 'url', and 'content' keys
+
+    Returns:
+        HTML string containing the summarized newsletter
     """
-    keyword_str = ", ".join(keywords) if keywords else "지정된 주제 없음"
+    # Check if we have any articles to summarize
+    if not articles:
+        print("No articles to summarize.")
+        return ""
+
     print(
-        f"Summarizing {len(articles)} articles for keywords: {keyword_str} using Gemini Pro..."
+        f"Summarizing {len(articles) if isinstance(articles, list) else sum(len(group) for group in articles.values())} articles for keywords: {', '.join(keywords)} using Gemini Pro..."
     )
 
-    if not config.GEMINI_API_KEY:
-        print("Error: GEMINI_API_KEY not found. Please set it in the .env file.")
-        # Fallback to placeholder HTML if API key is missing
-        return f"""<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>주간 산업 동향 뉴스 클리핑</title>
-</head>
-<body>
-    <h2>전략프로젝트팀 주간 산업 동향 뉴스 클리핑 ({keyword_str})</h2>
-    <p>오류: GEMINI_API_KEY가 설정되지 않았습니다. 실제 요약을 생성하려면 API 키를 설정해주세요.</p>
-    <p>제공된 기사 수: {len(articles)}</p>
-</body>
-</html>"""
+    # Initialize Gemini Pro model
+    import google.generativeai as genai
+    from . import config
+
+    # Set up the Gemini API key
+    if not hasattr(config, "GEMINI_API_KEY") or not config.GEMINI_API_KEY:
+        print("ERROR: GEMINI_API_KEY is not set. Cannot generate newsletter.")
+        return ""
 
     genai.configure(api_key=config.GEMINI_API_KEY)
+
+    # Create the model with system instructions
     model = genai.GenerativeModel(
-        model_name="gemini-1.5-pro-latest",  # Changed from 'gemini-pro'
-        system_instruction=SYSTEM_PROMPT,
+        model_name="models/gemini-1.5-pro-latest",
+        generation_config={},
+        safety_settings={},
+        system_instruction=SYSTEM_INSTRUCTION,
     )
+
+    # Convert keywords to comma-separated string for prompt
+    keyword_str = ", ".join(keywords)
 
     # Prepare content for LLM. Combine all articles and keywords into one prompt.
     articles_details = []
-    for article in articles:
-        title = article.get("title", "제목 없음")
-        url = article.get("url", "#")
-        content = article.get("content", "내용 없음")
-        articles_details.append(f"기사 제목: {title}\nURL: {url}\n내용:\n{content}")
 
-    articles_content_str = "\n\n---\n\n".join(articles_details)
+    # Handle different article formats
+    if isinstance(articles, dict):
+        # Process grouped articles (dictionary where keys are keywords and values are article lists)
+        for keyword, keyword_articles in articles.items():
+            for article in keyword_articles:
+                title = article.get("title", "제목 없음")
+                url = article.get("url", "#")
+                content = article.get("content", "내용 없음")
+                articles_details.append(
+                    f"기사 제목: {title}\nURL: {url}\n내용:\n{content}"
+                )
+    else:
+        # Process flat list of articles (original format)
+        for article in articles:
+            title = article.get("title", "제목 없음")
+            url = article.get("url", "#")
+            content = article.get("content", "내용 없음")
+            articles_details.append(f"기사 제목: {title}\nURL: {url}\n내용:\n{content}")
 
-    content_to_summarize = f"""
-다음 키워드에 대한 뉴스레터를 생성해주세요: {keyword_str}
+    # Combine article details with newlines between each article
+    articles_text = "\n\n---\n\n".join(articles_details)
 
-다음은 뉴스 기사 목록입니다 (각 기사는 제목, URL, 내용 순으로 제공되며 '---'로 구분됩니다):
-{articles_content_str}
-
-위 정보를 바탕으로 시스템 프롬프트에 명시된 HTML 템플릿에 따라 전체 뉴스레터 HTML을 생성해주세요.
-"""
+    # Create the full prompt for Gemini Pro
+    prompt = f"키워드: {keyword_str}\n\n뉴스 기사 목록:\n\n{articles_text}"
 
     try:
-        print(f"  Generating newsletter for keywords: {keyword_str}...")
-        response = model.generate_content(content_to_summarize)
-        # The response.text is expected to be the full HTML newsletter
-        return response.text
+        # Generate the summary using Gemini Pro
+        response = model.generate_content([prompt])
+        if hasattr(response, "text"):
+            html_content = response.text
+            return html_content
+        else:
+            print("Error: Could not get text from Gemini response.")
+            return ""
     except Exception as e:
-        print(
-            f"Error summarizing articles for keywords '{keyword_str}' with Gemini: {e}"
-        )
-        return f"""<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>오류 - 주간 산업 동향 뉴스 클리핑</title>
-</head>
-<body>
-    <h2>오류 발생</h2>
-    <p>키워드 '{keyword_str}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: {e}</p>
-</body>
-</html>"""
+        print(f"Error calling Gemini API: {e}")
+        return ""

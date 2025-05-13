@@ -4,12 +4,18 @@ from . import config
 from .sources import configure_default_sources, NewsSourceManager
 from typing import List, Dict, Any, Union
 from rich.console import Console
+from . import article_filter
 
 console = Console()
 
 
 def collect_articles(
-    keywords: Union[str, List[str]], num_results: int = 10
+    keywords: Union[str, List[str]],
+    num_results: int = 10,
+    max_per_source: int = 3,
+    filter_duplicates: bool = True,
+    group_by_keywords: bool = True,
+    use_major_sources_filter: bool = True,
 ) -> List[Dict[str, Any]]:
     """
     Collect news articles from multiple sources based on keywords.
@@ -22,9 +28,13 @@ def collect_articles(
     Args:
         keywords: String of comma-separated keywords OR list of keyword strings
         num_results: Number of results to return per keyword per source (default: 10)
+        max_per_source: Maximum number of articles per source (default: 3)
+        filter_duplicates: Whether to filter duplicate articles (default: True)
+        group_by_keywords: Whether to group articles by keywords (default: True)
+        use_major_sources_filter: Whether to prioritize major news sources (default: True)
 
     Returns:
-        List of article dictionaries with standardized format
+        List of article dictionaries with standardized format, or a dictionary of articles grouped by keywords
     """
     # 다양한 뉴스 소스를 관리하는 매니저 생성
     source_manager = configure_default_sources()
@@ -38,14 +48,61 @@ def collect_articles(
     # 모든 소스에서 뉴스 수집
     all_articles = source_manager.fetch_all_sources(keywords, num_results)
 
+    # 키워드 처리
+    if isinstance(keywords, str):
+        keywords_list = [k.strip() for k in keywords.split(",")]
+    else:
+        keywords_list = keywords
+
     # 중복 기사 제거
-    unique_articles = source_manager.remove_duplicates(all_articles)
+    if filter_duplicates:
+        unique_articles = article_filter.remove_duplicate_articles(all_articles)
+    else:
+        unique_articles = all_articles
 
     console.print(
-        f"[bold green]Final article count after deduplication: {len(unique_articles)}[/bold green]"
+        f"[bold green]Article count after initial processing: {len(unique_articles)}[/bold green]"
     )
 
-    return unique_articles
+    # 언론사 필터링
+    if use_major_sources_filter:
+        console.print("[bold cyan]Applying major news sources filter...[/bold cyan]")
+        # 키워드별 그룹 처리 시 각 키워드 그룹에서 필터링 적용
+        if group_by_keywords:
+            grouped_articles = article_filter.group_articles_by_keywords(
+                unique_articles, keywords_list
+            )
+
+            # 각 키워드 그룹에 필터 적용
+            filtered_grouped_articles = {}
+            for keyword, articles in grouped_articles.items():
+                # 도메인별 최대 기사 수 제한
+                domain_filtered = article_filter.filter_articles_by_domains(
+                    articles, max_per_domain=2
+                )
+                # 주요 언론사 필터 적용
+                filtered_grouped_articles[keyword] = (
+                    article_filter.filter_articles_by_major_sources(
+                        domain_filtered, max_per_topic=max_per_source
+                    )
+                )
+
+            return filtered_grouped_articles
+        else:
+            # 도메인별 최대 기사 수 제한
+            domain_filtered = article_filter.filter_articles_by_domains(
+                unique_articles, max_per_domain=2
+            )
+            # 주요 언론사 필터 적용
+            return article_filter.filter_articles_by_major_sources(
+                domain_filtered, max_per_topic=max_per_source
+            )
+    elif group_by_keywords:
+        # 언론사 필터 없이 그룹화만 적용
+        return article_filter.group_articles_by_keywords(unique_articles, keywords_list)
+    else:
+        # 아무 처리도 하지 않고 반환
+        return unique_articles
 
 
 def collect_articles_from_serper(keywords, num_results: int = 10):
