@@ -35,8 +35,9 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install -e . # Install the project in development mode for more reliable imports
+          pip install -r requirements.txt
+          # Install the package in development mode without dependencies (they're already installed from requirements.txt)
+          pip install -e . --no-deps
 
       - name: Ensure output directory exists
         run: |
