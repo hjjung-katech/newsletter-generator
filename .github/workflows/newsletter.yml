@@ -41,33 +41,28 @@ jobs:
 
       - name: Generate Newsletter
         id: generate_newsletter
+        env: # Python 스크립트에서 사용할 환경 변수 설정
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # 필요한 다른 API 키나 설정도 여기에 추가
+          # 예: NAVER_CLIENT_ID: ${{ secrets.NAVER_CLIENT_ID }}
+          #     NAVER_CLIENT_SECRET: ${{ secrets.NAVER_CLIENT_SECRET }}
         run: |
-          # Assuming your script is executable and takes config as an argument
-          # Or, if your script is a module: python -m newsletter_generator.main --config config.yml
-          # For this example, let's assume your main script is run.py or similar
-          # and it reads config.yml by default or via an argument.
-          # The script should output the newsletter to the path defined in config.yml (e.g., output/newsletter.html)
-          
-          # This is a placeholder for your actual script execution command.
-          # Replace 'python newsletter_generator/run.py --config config.yml' 
-          # with the actual command to run your newsletter generation.
-          # For now, we'll create a dummy output file for testing the workflow.
-          mkdir -p ./output
-          echo "<html><body><h1>Test Newsletter</h1><p>Generated on $(date)</p></body></html>" > ./output/newsletter.html
-          echo "Test Newsletter Content" > ./output/newsletter.md
+          # 프로젝트의 CLI를 사용하여 뉴스레터 생성
+          # pyproject.toml의 [project.scripts]에 정의된 "newsletter" 명령어 사용
+          newsletter run --config config.yml
 
-          # Extract output path and title from config.yml for later steps
-          # This requires a tool like yq or a small python script.
-          # For simplicity, we'll use fixed paths/values or assume script outputs them.
-          # Example: your script could write the actual path to a GITHUB_OUTPUT variable.
-          # python your_script.py --config config.yml --output-path-env NEWSLETTER_FILE_PATH
-          
-          echo "newsletter_html_path=output/newsletter.html" >> $GITHUB_OUTPUT
-          echo "newsletter_md_path=output/newsletter.md" >> $GITHUB_OUTPUT
-          echo "newsletter_output_dir=output" >> $GITHUB_OUTPUT
-          # Ideally, your script or a helper reads the title from config.yml
-          echo "newsletter_title=My Daily Newsletter" >> $GITHUB_OUTPUT
+          # 스크립트가 config.yml에 지정된 output_directory에 파일을 생성한다고 가정합니다.
+          # 아래 GITHUB_OUTPUT 설정은 config.yml을 읽어서 동적으로 설정합니다.
+          CONFIG_OUTPUT_DIR=$(python -c "import yaml; print(yaml.safe_load(open('config.yml'))['newsletter_settings']['output_directory'])")
+          CONFIG_OUTPUT_FORMAT=$(python -c "import yaml; print(yaml.safe_load(open('config.yml'))['newsletter_settings']['output_format'])")
+          CONFIG_TITLE=$(python -c "import yaml; print(yaml.safe_load(open('config.yml'))['newsletter_settings']['title'])")
 
+          echo "newsletter_html_path=$CONFIG_OUTPUT_DIR/newsletter.$CONFIG_OUTPUT_FORMAT" >> $GITHUB_OUTPUT
+          # md 파일도 생성한다면 유사하게 추가 (필요한 경우)
+          # echo "newsletter_md_path=$CONFIG_OUTPUT_DIR/newsletter.md" >> $GITHUB_OUTPUT 
+          echo "newsletter_output_dir=$CONFIG_OUTPUT_DIR" >> $GITHUB_OUTPUT
+          echo "newsletter_title=$CONFIG_TITLE" >> $GITHUB_OUTPUT
 
       # --- 옵션 1: 이메일로 뉴스레터 발송 ---
       - name: Send Newsletter Email
