@@ -17,7 +17,11 @@
 *   `--to`: 뉴스레터를 발송할 이메일 주소
 *   `--output-format`: 로컬 저장 시 파일 형식 (`html`, `md`, 기본값: `html`)
 *   `--drive`: Google Drive에 뉴스레터 저장 여부
-*   필터링 옵션: 중복 제거 (`--no-filter-duplicates`), 주요 소스 우선 처리 (`--no-major-sources-filter`) 등
+*   필터링 옵션: 
+    *   `--max-per-source INT`: 도메인별 최대 기사 수를 지정합니다.
+    *   `--no-filter-duplicates`: 중복 기사 필터링을 비활성화합니다.
+    *   `--no-major-sources-filter`: 주요 뉴스 소스 우선순위 지정을 비활성화합니다.
+    *   `--no-group-by-keywords`: 키워드별 기사 그룹화를 비활성화합니다.
 
 ### 1.2. 핵심 처리 (Core Engine - LangGraph 기반 워크플로우)
 
@@ -25,7 +29,7 @@
 
 *   **상태 관리 (`NewsletterState`):**
     *   뉴스레터 생성 전 과정의 상태를 TypedDict 형태로 관리합니다.
-    *   포함 정보: 입력 키워드, 뉴스 수집 기간, 수집된 기사 목록, 처리된 기사 목록, 기사 요약 결과, 최종 뉴스레터 HTML, 오류 정보, 현재 진행 상태 (예: 'collecting', 'processing', 'summarizing', 'complete', 'error')
+    *   포함 정보: 입력 키워드, 뉴스 수집 기간, 수집된 원본 기사 목록, **필터링 및 그룹화된 기사 목록**, 기사 요약 결과, 최종 뉴스레터 HTML, 오류 정보, 현재 진행 상태 (예: 'collecting', 'filtering', 'summarizing', 'complete', 'error')
 
 *   **워크플로우 그래프 (`newsletter.graph.create_newsletter_graph`):**
     *   **`collect_articles_node` (기사 수집):**
@@ -35,13 +39,16 @@
             *   RSS 피드 (예: 연합뉴스TV, 한겨레, 동아일보, 경향신문 등)
             *   Naver Search API (설정 시 사용 가능)
         *   수집된 원본 기사 데이터는 디버깅 및 추적을 위해 JSON 파일로 저장될 수 있습니다. (예: `output/intermediate_processing/{timestamp}_collected_articles_raw.json`)
-    *   **`process_articles_node` (기사 처리):**
+    *   **`process_articles_node` (기사 처리 및 필터링):**
         *   **날짜 필터링:** `news_period_days` 설정에 따라 지정된 기간 내의 최신 기사만 선택합니다.
         *   **중복 제거:** 기사 URL 및 제목의 유사도를 기반으로 중복된 기사를 식별하고 제거합니다.
-        *   **정렬:** 처리된 기사를 날짜 기준으로 최신순으로 정렬합니다.
-        *   처리 및 필터링된 기사 목록 또한 JSON 파일로 저장될 수 있습니다. (예: `output/intermediate_processing/{timestamp}_collected_articles_processed.json`)
+        *   **주요 뉴스 소스 우선순위 지정:** 신뢰할 수 있는 주요 뉴스 소스의 기사를 우선적으로 포함하도록 정렬하거나 가중치를 부여합니다.
+        *   **도메인 다양성 보장:** 특정 출처의 기사가 과도하게 포함되지 않도록 도메인별 기사 수를 제한합니다. (`--max-per-source` 옵션)
+        *   **키워드별 기사 그룹화:** 관련된 키워드를 가진 기사들을 그룹화하여 뉴스레터의 가독성과 주제별 집중도를 높입니다.
+        *   **정렬:** 처리된 기사를 날짜 기준으로 최신순으로 정렬합니다. (필터링 및 그룹화 이후 최종 정렬)
+        *   처리, 필터링 및 그룹화된 기사 목록 또한 JSON 파일로 저장될 수 있습니다. (예: `output/intermediate_processing/{timestamp}_collected_articles_processed_filtered_grouped.json`)
     *   **`summarize_articles_node` (기사 요약 및 뉴스레터 생성):**
-        *   처리된 기사 목록을 입력으로 받아 LLM(Google Gemini Pro)을 사용하여 뉴스레터 콘텐츠를 생성합니다.
+        *   필터링 및 그룹화된 기사 목록을 입력으로 받아 LLM(Google Gemini Pro)을 사용하여 뉴스레터 콘텐츠를 생성합니다.
         *   **LangChain (`newsletter.chains`) 활용:**
             *   **시스템 프롬프트 (`SYSTEM_PROMPT`):** LLM의 역할, 목표, 생성할 콘텐츠의 구조, 스타일, 언어 등을 상세하게 정의하여 일관되고 고품질의 결과물을 유도합니다.
                 *   **역할:** "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자.
@@ -101,8 +108,8 @@ flowchart TD
         B["상태 초기화 (NewsletterState)"] --> C1
         C1["collect_articles_node (기사 수집)"]
         C1 -- 수집된 기사 목록 --> C2
-        C2["process_articles_node (기사 처리: 필터링, 중복제거, 정렬)"]
-        C2 -- 처리된 기사 목록 --> C3
+        C2["process_articles_node (기사 처리: 필터링(중복, 주요소스, 도메인), 그룹화, 정렬)"]
+        C2 -- 필터링 및 그룹화된 기사 목록 --> C3
         C3["summarize_articles_node (LLM 요약 및 HTML 생성 - LangChain)"]
         C3 -- 생성된 HTML 뉴스레터 --> D
         C_ERR["handle_error (오류 처리)"]
@@ -157,6 +164,6 @@ flowchart TD
     *   **언어:** 모든 내용은 한국어 정중체(존댓말)로 작성하도록 합니다.
 
 *   **입력 데이터 형식 안내:**
-    *   LLM에게 전달될 사용자 메시지에는 뉴스레터 생성 대상 키워드와 함께, 처리된 뉴스 기사 목록(각 기사는 제목, URL, 원문 내용 또는 사전 요약된 내용으로 구성)이 제공됨을 명시합니다.
+    *   LLM에게 전달될 사용자 메시지에는 뉴스레터 생성 대상 키워드와 함께, 필터링 및 그룹화된 뉴스 기사 목록(각 기사는 제목, URL, 원문 내용 또는 사전 요약된 내용, 그룹 정보 등으로 구성)이 제공됨을 명시합니다.
 
 이러한 상세한 프롬프트 설계를 통해, LLM은 일관된 품질과 구조를 가진 맞춤형 뉴스레터를 효과적으로 생성할 수 있습니다.

@@ -118,24 +118,22 @@ newsletter run --keywords "메타버스,XR" --no-filter-duplicates --no-major-so
 
 **`newsletter run` 명령어 옵션:**
 
-| 옵션                        | 설명                                  | 기본값                                          |
-| --------------------------- | ------------------------------------- | ----------------------------------------------- |
-| **기본 옵션**               |                                       |                                                 |
-| `--keywords`                | 검색할 키워드 (쉼표로 구분)           | 없음 (필수 또는 `--domain` 사용)                |
-| `--domain`                  | 키워드를 생성할 분야                  | 없음 (필수 또는 `--keywords` 사용)              |
-| `--suggest-count`           | `--domain` 사용 시 생성할 키워드 개수 | 10                                              |
-| `--period`, `-p`            | 최신 뉴스 수집 기간(일 단위)          | 14                                              |
-| **출력 옵션**               |                                       |                                                 |
-| `--to`                      | 뉴스레터를 발송할 이메일 주소         | 없음 (이메일 발송 건너뜀)                       |
-| `--output-format`           | 로컬에 저장할 형식 (html 또는 md)     | html (또는 `--drive` 만 지정 시 Drive에만 저장) |
-| `--drive`                   | Google Drive에 저장 여부              | False                                           |
-| **필터링 옵션**             |                                       |                                                 |
-| `--max-per-source`          | 도메인별 최대 기사 수 제한            | 3                                               |
-| `--no-filter-duplicates`    | 중복 기사 필터링 비활성화             | False (기본 활성화)                             |
-| `--no-group-by-keywords`    | 키워드별 기사 그룹화 비활성화         | False (기본 활성화)                             |
-| `--no-major-sources-filter` | 주요 뉴스 소스 우선순위 비활성화      | False (기본 활성화)                             |
-| **기타 옵션**               |                                       |                                                 |
-| `--use-langgraph`           | LangGraph 워크플로우 사용 여부        | True                                            |
+| 옵션                        | 설명                                                                  | 기본값 (옵션 미지정 시 동작)                    |
+| --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------- |
+| **기본 옵션**               |                                                                       |                                                 |
+| `--keywords`                | 검색할 키워드 (쉼표로 구분)                                           | 없음 (필수 또는 `--domain` 사용)                |
+| `--domain`                  | 키워드를 생성할 분야                                                  | 없음 (필수 또는 `--keywords` 사용)              |
+| `--suggest-count`           | `--domain` 사용 시 생성할 키워드 개수                                 | 10                                              |
+| `--period`, `-p`            | 최신 뉴스 수집 기간(일 단위)                                          | 14                                              |
+| **출력 옵션**               |                                                                       |                                                 |
+| `--to`                      | 뉴스레터를 발송할 이메일 주소                                         | 없음 (이메일 발송 건너뜀)                       |
+| `--output-format`           | 로컬에 저장할 형식 (`html` 또는 `md`). `--drive` 사용 시에도 이 형식을 따름. | `html` (또는 `--drive`만 지정 시 Drive에만 저장)  |
+| `--drive`                   | Google Drive에 뉴스레터 저장 여부                                     | 저장 안 함                                      |
+| **필터링 옵션**             |                                                                       |                                                 |
+| `--max-per-source INT`      | 도메인별 최대 기사 수를 지정합니다.                                     | 모든 기사 포함                                  |
+| `--no-filter-duplicates`    | 지정 시, 중복 기사 필터링을 비활성화합니다.                             | 중복 기사 필터링 수행                           |
+| `--no-major-sources-filter` | 지정 시, 주요 뉴스 소스 우선순위 지정을 비활성화합니다.                 | 주요 뉴스 소스 우선순위 지정 수행               |
+| `--no-group-by-keywords`    | 지정 시, 키워드별 기사 그룹화를 비활성화합니다.                         | 키워드별 기사 그룹화 수행                       |
 
 **`newsletter suggest` 명령어 옵션:**
 
@@ -159,10 +157,10 @@ Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴
 2. **RSS 피드**
    - 국내 주요 언론사 RSS 피드를 통해 최신 뉴스를 수집합니다.
    - 기본 제공 피드:
-     - 연합뉴스TV: https://www.yonhapnewstv.co.kr/feed/
-     - 한겨레: https://www.hani.co.kr/rss/
-     - 동아일보: https://rss.donga.com/total.xml
-     - 경향신문: https://www.khan.co.kr/rss/rssdata/total_news.xml
+     - 연합뉴스TV: [https://www.yonhapnewstv.co.kr/feed/](https://www.yonhapnewstv.co.kr/feed/)
+     - 한겨레: [https://www.hani.co.kr/rss/](https://www.hani.co.kr/rss/)
+     - 동아일보: [https://rss.donga.com/total.xml](https://rss.donga.com/total.xml)
+     - 경향신문: [https://www.khan.co.kr/rss/rssdata/total_news.xml](https://www.khan.co.kr/rss/rssdata/total_news.xml)
    - 추가 피드 설정: `.env` 파일에 `ADDITIONAL_RSS_FEEDS` 값을 쉼표로 구분된 URL 목록으로 설정
 
 3. **네이버 뉴스 API**

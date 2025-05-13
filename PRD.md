@@ -33,11 +33,12 @@
 
 1. **CLI 도구(Typer)**
 2. 기사 수집(NewsAPI or Serper.dev or GDELT)
-3. **LLM 요약·편집 (LangChain, LangGraph, Google Gemini Pro)**
-4. 이메일 발송(SendGrid API 또는 Outlook Graph)
-5. Google Drive 파일 업로드(선택)
-6. 키워드 자동 추천(Trends API + LLM)
-7. 간단한 SQLite 메타DB(기사 URL 해시, 발송 로그)
+3. **기사 필터링 (중복 제거, 주요 소스 우선, 도메인 다양성, 키워드 그룹화)**
+4. **LLM 요약·편집 (LangChain, LangGraph, Google Gemini Pro)**
+5. 이메일 발송(SendGrid API 또는 Outlook Graph)
+6. Google Drive 파일 업로드(선택)
+7. 키워드 자동 추천(Trends API + LLM)
+8. 간단한 SQLite 메타DB(기사 URL 해시, 발송 로그)
 
 ### 4.2 제외
 
@@ -60,9 +61,9 @@
 
 | FR-ID | 기능                  | 상세 설명                                                                        |
 | ----- | ------------------- | ---------------------------------------------------------------------------- |
-| FR‑01 | 키워드 기반 기사 수집        | `newsletter collect --keywords "ADAS,LiDAR"` ⇢ 최근 24 시간 기사 ≤ 20건 JSON 반환     |
-| FR‑02 | 기사 요약               | LangChain/LangGraph 기반 Gemini Pro API 호출로 ①30자 제목 ②300자 요약 ③키워드 3개 JSON 생성                             |
-| FR‑03 | 뉴스레터 Compose        | Jinja2 템플릿으로 한국어 HTML 뉴스레터 합성                                                |
+| FR‑01 | 키워드 기반 기사 수집        | `newsletter collect --keywords "ADAS,LiDAR"` ⇢ 최근 24 시간 기사 ≤ 20건 JSON 반환. 수집된 기사는 중복 제거, 주요 소스 우선 처리, 도메인 다양성 확보, 키워드별 그룹화 등 필터링 과정을 거친다. |
+| FR‑02 | 기사 요약               | LangChain/LangGraph 기반 Gemini Pro API 호출로 ①30자 제목 ②300자 요약 ③키워드 3개 JSON 생성 (필터링 및 그룹화된 기사 기반)                             |
+| FR‑03 | 뉴스레터 Compose        | Jinja2 템플릿 또는 LLM 직접 생성을 통해 한국어 HTML 뉴스레터 합성 (필터링 및 그룹화된, 요약된 기사 기반)                                                |
 | FR‑04 | **이메일 발송**          | `newsletter send --to alice@corp.com` 또는 `newsletter run` 통합 ⇢ HTML 본문 메일 발송 |
 | FR‑05 | Google Drive 저장(옵션) | `/YYYY-MM-DD/newsletter.html` 업로드                                            |
 
