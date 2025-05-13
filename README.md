@@ -1,5 +1,16 @@
 # Newsletter Generator
 
+## 최근 업데이트: 필터링 기능 추가
+
+최근 시스템에 다음과 같은 필터링 기능이 추가되었습니다:
+
+- **중복 기사 감지 및 제거**: URL 및 제목 기반으로 중복 기사 필터링
+- **주요 뉴스 소스 우선순위**: 티어 시스템을 적용하여 신뢰할 수 있는 소스 우선 표시
+- **도메인 다양성 보장**: 특정 출처에 편중되지 않도록 도메인별 기사 수 제한
+- **키워드별 기사 그룹화**: 다양한 매칭 알고리즘을 적용한 효과적인 그룹화
+
+이러한 개선 사항은 뉴스레터의 품질과 관련성을 크게 향상시켰습니다.
+
 ## 개요
 
 Newsletter Generator는 내부 연구원이 입력(또는 자동 추천)한 키워드를 기반으로 **다양한 뉴스 소스**에서 최신 뉴스를 수집‧요약하여 이메일로 발송하고, 필요 시 Google Drive에 저장하는 Python CLI 도구입니다.
@@ -90,27 +101,41 @@ newsletter run --domain "머신러닝" --drive
 newsletter run --domain "반도체" --suggest-count 7 --to recipient@example.com --output-format html --drive
 ```
 
-**기존 방식: `--keywords` 옵션으로 직접 키워드 지정하여 뉴스레터 생성**
+**3. 직접 키워드 지정 및 필터링 옵션 활용**
 
 ```bash
 # 키워드로 뉴스 검색 및 뉴스레터 생성
 newsletter run --keywords "자율주행,ADAS" --output-format html
+
+# 필터링 옵션 적용 (중복 제거, 키워드별 그룹화, 주요 소스 우선 처리)
+newsletter run --keywords "AI반도체,HBM" --max-per-source 3 --output-format html 
+
+# 특정 필터링 기능 비활성화
+newsletter run --keywords "메타버스,XR" --no-filter-duplicates --no-major-sources-filter --output-format html
 ```
 
 ### 주요 명령어 옵션
 
 **`newsletter run` 명령어 옵션:**
 
-| 옵션              | 설명                                                                                                | 기본값                                                                    |
-| ----------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `--keywords`      | 검색할 키워드 (쉼표로 구분). `--domain`이 제공되지 않거나 키워드 생성 실패 시 사용됩니다.           | 없음                                                                      |
-| `--domain`        | 키워드를 생성할 분야. 이 옵션 사용 시 `--keywords`는 무시될 수 있습니다 (키워드 생성 실패 시 제외). | 없음                                                                      |
-| `--suggest-count` | `--domain` 사용 시 생성할 키워드 개수.                                                              | 10                                                                        |
-| `--period`, `-p`  | 최신 뉴스 수집 기간(일 단위)                                                                        | 14                                                                        |
-| `--to`            | 뉴스레터를 발송할 이메일 주소                                                                       | 없음 (이메일 발송 건너뜀)                                                 |
-| `--output-format` | 로컬에 저장할 형식 (html 또는 md)                                                                   | 지정하지 않으면 `--drive` 옵션 시 Drive에만 저장, 아니면 html로 로컬 저장 |
-| `--drive`         | Google Drive에 저장할지 여부                                                                        | False                                                                     |
-| `--use-langgraph` | LangGraph 워크플로우 사용 여부 (권장)                                                               | True                                                                      |
+| 옵션                        | 설명                                  | 기본값                                          |
+| --------------------------- | ------------------------------------- | ----------------------------------------------- |
+| **기본 옵션**               |                                       |                                                 |
+| `--keywords`                | 검색할 키워드 (쉼표로 구분)           | 없음 (필수 또는 `--domain` 사용)                |
+| `--domain`                  | 키워드를 생성할 분야                  | 없음 (필수 또는 `--keywords` 사용)              |
+| `--suggest-count`           | `--domain` 사용 시 생성할 키워드 개수 | 10                                              |
+| `--period`, `-p`            | 최신 뉴스 수집 기간(일 단위)          | 14                                              |
+| **출력 옵션**               |                                       |                                                 |
+| `--to`                      | 뉴스레터를 발송할 이메일 주소         | 없음 (이메일 발송 건너뜀)                       |
+| `--output-format`           | 로컬에 저장할 형식 (html 또는 md)     | html (또는 `--drive` 만 지정 시 Drive에만 저장) |
+| `--drive`                   | Google Drive에 저장 여부              | False                                           |
+| **필터링 옵션**             |                                       |                                                 |
+| `--max-per-source`          | 도메인별 최대 기사 수 제한            | 3                                               |
+| `--no-filter-duplicates`    | 중복 기사 필터링 비활성화             | False (기본 활성화)                             |
+| `--no-group-by-keywords`    | 키워드별 기사 그룹화 비활성화         | False (기본 활성화)                             |
+| `--no-major-sources-filter` | 주요 뉴스 소스 우선순위 비활성화      | False (기본 활성화)                             |
+| **기타 옵션**               |                                       |                                                 |
+| `--use-langgraph`           | LangGraph 워크플로우 사용 여부        | True                                            |
 
 **`newsletter suggest` 명령어 옵션:**
 
@@ -150,6 +175,25 @@ Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴
 - 중복된 기사는 URL과 제목을 기준으로 자동 제거됩니다.
 - 각 소스에서 최대 10개(기본값)의 기사를 수집하며, 명령줄 인수로 조정 가능합니다.
 
+## 핵심 기능 설명
+
+### 1. 기사 필터링 시스템
+
+- **중복 제거**: URL 및 제목을 기반으로 중복된 기사를 식별하고 제거합니다.
+- **주요 소스 우선순위**: 주요 언론사(조선일보, 중앙일보 등)와 기타 소스를 티어로 구분하여 신뢰할 수 있는 주요 소스의 기사를 우선적으로 표시합니다.
+- **도메인 다양성**: 특정 출처의 기사가 과도하게 많아지는 것을 방지하기 위해 도메인별 최대 기사 수를 제한합니다.
+
+### 2. 키워드 그룹화
+
+- **정확 일치**: 키워드와 정확히 일치하는 기사를 그룹화
+- **공백 무시 매칭**: 키워드 내 공백 유무와 관계없이 매칭 (예: "AI반도체" = "AI 반도체")
+- **부분 일치**: 복합 키워드의 경우 구성 단어들이 기사 내에 존재하는지 확인
+
+### 3. 자동 키워드 생성
+
+- Gemini Pro AI를 활용하여 특정 도메인에 대한 관련 키워드를 자동으로 생성합니다.
+- 생성된 키워드를 기반으로 뉴스를 수집하고 요약합니다.
+
 ---
 
 ## 개발 가이드
@@ -183,75 +227,44 @@ python run_tests.py --format --all
 
 프로젝트 테스트는 `tests` 디렉토리에 체계적으로 관리되며 다음과 같은 유형이 있습니다:
 
-1. **API 및 검색 테스트**
+1. **필터링 및 그룹화 테스트**
+   - `test_article_filter.py` - 기사 필터링 모듈 테스트
+   - `test_article_filter_integration.py` - 필터링 기능 통합 테스트
+
+2. **API 및 검색 테스트**
    - `test_serper_api.py` - Serper.dev API 통합 테스트
    - `test_serper_direct.py` - Serper.dev API 직접 호출 테스트
-   - `test_search_improved.py` - 개선된 검색 기능 테스트
-   - `test_news_integration.py` - 뉴스 수집 통합 테스트
    - `test_sources.py` - 다양한 뉴스 소스 모듈 테스트
 
-2. **핵심 기능 테스트**
+3. **핵심 기능 테스트**
    - `test_collect.py` - 기사 수집 기능 테스트
    - `test_summarize.py` - 요약 기능 테스트
-   - `test_template.py` - 템플릿 기능 테스트
    - `test_compose.py` - 뉴스레터 작성 기능 테스트
-   - `test_graph_date_parser.py` - 날짜 파싱 기능 테스트
 
-3. **종합 기능 테스트**
+4. **종합 기능 테스트**
    - `test_newsletter.py` - 뉴스레터 종합 기능 테스트
 
 ### 테스트 실행
 
-#### 테스트 자동화 스크립트 사용
-
-제공된 `run_tests.py` 스크립트로 쉽게 테스트를 실행할 수 있습니다:
+테스트 자동화 스크립트를 사용하여 쉽게 테스트를 실행할 수 있습니다:
 
 ```bash
 # 모든 테스트 실행
 python run_tests.py --all
 
+# 필터링 기능 테스트 실행
+python run_tests.py --test filter
+
 # 테스트 목록 확인
 python run_tests.py --list
 
-# 특정 테스트 파일 실행 (예: sources 테스트)
-python run_tests.py --test sources
-```
-
-#### pytest 사용하여 실행
-
-```bash
-# 모든 테스트 실행
-pytest tests/
-
 # 특정 테스트 파일 실행
-pytest tests/test_sources.py
-
-# 특정 테스트 클래스 실행
-pytest tests/test_sources.py::TestRSSFeedSource
-```
-
-#### unittest 사용하여 실행
-
-```bash
-# 모든 테스트 실행
-python -m unittest discover -s ./tests -p "test_*.py"
-
-# 특정 테스트 파일 실행
-python -m unittest tests.test_sources
+python run_tests.py --test article_filter
 ```
 
 자세한 테스트 정보는 [tests/README.md](tests/README.md) 파일을 참조하세요.
 
 ---
-
-### 문서 버전 기록
-
-| 버전 | 일자       | 작성자         | 변경 요약                                                       |
-| ---- | ---------- | -------------- | --------------------------------------------------------------- |
-| 0.4  | 2025‑05‑11 | Claude         | 다양한 뉴스 소스 통합 기능 반영 (RSS, 네이버 API)               |
-| 0.3  | 2025‑05‑09 | GitHub Copilot | LangChain/LangGraph 통합 반영, 관련 문서 업데이트               |
-| 0.2  | 2025‑05‑09 | ChatGPT        | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원 |
-| 0.1  | 2025‑05‑09 | ChatGPT        | 초기 초안                                                       |
 
 ## VS Code 개발 환경 설정
 
@@ -277,3 +290,30 @@ python -m unittest tests.test_sources
 
 1. Conda 환경 이름 변경: `.vscode/settings.json` 파일에서 `newsletter-env` 부분을 변경
 2. 가상 환경 경로 변경: 기본적으로 `.venv` 폴더를 사용하도록 설정되어 있으며, 필요시 변경
+
+## 향후 개선 사항
+
+1. **필터링 정확도 향상**
+   - 동의어 사전 추가로 다양한 표현 인식 개선
+   - 맥락 기반 매칭으로 연관성 높은 기사 선별
+   - NLP 기법을 활용한 의미론적 유사성 검출
+
+2. **성능 최적화**
+   - 대규모 기사 집합에 대한 문자열 매칭 알고리즘 개선
+   - 자주 액세스하는 주요 소스에 대한 캐싱 추가
+
+3. **언어 지원 강화**
+   - 다국어 콘텐츠 처리 확장
+   - 한국어/영어 혼합 콘텐츠 처리 개선
+
+---
+
+### 문서 버전 기록
+
+| 버전 | 일자       | 작성자         | 변경 요약                                                       |
+| ---- | ---------- | -------------- | --------------------------------------------------------------- |
+| 0.5  | 2025-05-13 | Claude         | 기사 필터링 및 그룹화 기능 추가                                 |
+| 0.4  | 2025‑05‑11 | Claude         | 다양한 뉴스 소스 통합 기능 반영 (RSS, 네이버 API)               |
+| 0.3  | 2025‑05‑09 | GitHub Copilot | LangChain/LangGraph 통합 반영, 관련 문서 업데이트               |
+| 0.2  | 2025‑05‑09 | ChatGPT        | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원 |
+| 0.1  | 2025‑05‑09 | ChatGPT        | 초기 초안                                                       |
