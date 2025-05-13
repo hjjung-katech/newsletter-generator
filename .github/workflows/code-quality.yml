@@ -29,10 +29,18 @@ jobs:
       run: |
         black --check newsletter
         black --check tests
+      continue-on-error: false
     
     - name: Run tests with pytest and coverage
       run: |
-        python -m pytest tests/ --cov=newsletter
+        python -m pytest tests/ --cov=newsletter --cov-report=xml --cov-report=term --cov-fail-under=50 --ignore=tests/_backup
       env:
         SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+        verbose: true
