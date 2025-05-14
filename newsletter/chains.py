@@ -8,11 +8,14 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains import LLMChain
 from langchain.chains import SequentialChain
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from . import config
 from langchain_core.messages import SystemMessage, HumanMessage
 import os
 import datetime
+import grpc
+from unittest.mock import MagicMock
+from newsletter.sources import NewsSourceManager
 
 
 # HTML 템플릿 파일 로딩
@@ -187,10 +190,16 @@ def get_llm():
     """구글 Gemini Pro 모델 인스턴스를 생성합니다."""
     if not config.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
+
+    # gRPC 메타데이터 관련 옵션 설정
+    transport = "rest"  # 기본적으로 REST API 사용 (gRPC 대신)
+
     return ChatGoogleGenerativeAI(
         model="gemini-1.5-pro-latest",
         google_api_key=config.GEMINI_API_KEY,
         temperature=0.3,
+        transport=transport,
+        convert_system_message_to_human=True,  # 시스템 메시지를 휴먼 메시지로 변환
     )
 
 
@@ -263,6 +272,6 @@ def get_summarization_chain():
         return [system_message, human_message]
 
     # 체인 정의
-    chain = create_messages | llm | StrOutputParser()
+    chain = RunnableLambda(create_messages) | llm | StrOutputParser()
 
     return chain

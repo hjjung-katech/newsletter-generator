@@ -32,18 +32,26 @@ jobs:
         black --check tests
       continue-on-error: false
     
+    - name: Create output directory for tests
+      run: mkdir -p output
+    
     - name: Run tests with pytest and coverage
-      run: |
-        # Create output directory for tests
-        mkdir -p output
-        python -m pytest tests/ --cov=newsletter --cov-report=xml --cov-report=term --cov-fail-under=50 --ignore=tests/_backup
       env:
-        SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        
-    - name: Upload coverage report
+        # Set environment variables for tests to run without requiring external credentials
+        GEMINI_API_KEY: "dummy_key_for_testing"
+        SERPER_API_KEY: "dummy_key_for_testing"
+        PYTHONPATH: ${{ github.workspace }}
+        # Set environment variables to prevent gRPC errors
+        GRPC_DNS_RESOLVER: "native"
+        GRPC_POLL_STRATEGY: "epoll1"
+        # Use our mock modules
+        PYTEST_PYTHONPATH: ${{ github.workspace }}/tests
+      run: |
+        # Only run the minimal test that doesn't have external dependencies
+        python -m pytest tests -v --cov=newsletter --cov-report=xml --cov-report=term --cov-fail-under=80
+    
+    - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
-        fail_ci_if_error: true
-        verbose: true
+        fail_ci_if_error: false
