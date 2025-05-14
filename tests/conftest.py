@@ -21,6 +21,8 @@ def patch_external_modules():
         "google.generativeai": sys.modules.get("tests.mock_google_generativeai"),
         "google.generativeai.caching": caching,
         "google.generativeai.types": types,
+        "google.genai": Mock(),  # Add google.genai mock
+        "grpc": Mock(),  # Add grpc mock
         "langchain_google_genai": sys.modules.get("tests.mock_langchain_google_genai"),
         "langchain_google_genai.chat_models": sys.modules.get(
             "tests.mock_langchain_google_genai"
