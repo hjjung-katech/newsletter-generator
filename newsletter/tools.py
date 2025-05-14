@@ -16,6 +16,7 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from . import config
 from rich.console import Console
+import re
 
 console = Console()
 
@@ -264,18 +265,21 @@ def save_newsletter_locally(
         raise ToolException("Format must be 'html' or 'md'")
 
     try:
+        # Clean HTML markers from content before saving
+        cleaned_html_content = clean_html_markers(html_content)
+
         # 출력 디렉토리 생성 (없는 경우)
         output_dir = os.path.join(os.getcwd(), "output")
-        os.makedirs(output_dir, exist=True)
+        os.makedirs(output_dir, exist_ok=True)
 
         # 파일 경로 생성
         file_path = os.path.join(output_dir, f"{filename_base}.{output_format}")
 
         # 마크다운으로 변환 (필요한 경우)
         if output_format == "md":
-            content = markdownify.markdownify(html_content, heading_style="ATX")
+            content = markdownify.markdownify(cleaned_html_content, heading_style="ATX")
         else:
-            content = html_content
+            content = cleaned_html_content
 
         # 파일 저장
         with open(file_path, "w", encoding="utf-8") as f:
@@ -286,13 +290,21 @@ def save_newsletter_locally(
         raise ToolException(f"Error saving newsletter locally: {e}")
 
 
-import re
-
-
 def clean_html_markers(html_content: str) -> str:
     """
-    Removes ```html and ``` markers and filepath comments from the beginning and end of an HTML string.
+    Removes code markup (```html, ```, ``` etc.) from the beginning and end of an HTML string,
+    as well as file path comments.
+
+    This handles various patterns including:
+    - ```html at the beginning
+    - ``` at the end
+    - ```lang syntax (for any language identifier)
+    - Filepath comments
+    - Multiple backticks (like ````html)
     """
+    if not html_content:
+        return ""
+
     content = html_content
 
     # 1. 파일 경로 주석 제거 (존재하는 경우)
@@ -303,20 +315,20 @@ def clean_html_markers(html_content: str) -> str:
         # 주석 및 주석 뒤 공백 이후의 문자열을 가져옴
         content = content[match_comment.end() :]
 
-    # 2. HTML 시작 마커 제거 (존재하는 경우)
-    # 패턴: (새로운) 문자열 시작의 공백 + "```html" + 뒤따르는 공백(개행 포함)
-    html_marker_pattern = r"^\s*```html\s*"
-    match_html_marker = re.match(
-        html_marker_pattern, content
-    )  # ```html은 대소문자 구분 없음 불필요
-    if match_html_marker:
-        # HTML 마커 및 마커 뒤 공백 이후의 문자열을 가져옴
-        content = content[match_html_marker.end() :]
+    # 2. 시작 부분의 코드 마커 제거 (다양한 언어 식별자 및 여러 개의 백틱 처리)
+    # 더 일반적인 패턴: (새로운) 문자열 시작의 공백 + 하나 이상의 백틱 + 선택적 언어 식별자 + 뒤따르는 공백(개행 포함)
+    start_marker_pattern = r"^\s*(`{1,4})([a-zA-Z]*)\s*"
+    match_start_marker = re.match(start_marker_pattern, content)
+    if match_start_marker:
+        # 코드 마커 및 마커 뒤 공백 이후의 문자열을 가져옴
+        content = content[match_start_marker.end() :]
 
-    # 3. 끝부분 ``` 마커 제거
+    # 3. 끝부분 코드 마커 제거 (여러 개의 백틱 처리)
     content = content.rstrip()  # 먼저 오른쪽 끝 공백 제거
-    if content.endswith("```"):
-        content = content[: -len("```")]
+    end_marker_pattern = r"`{1,4}\s*$"
+    match_end_marker = re.search(end_marker_pattern, content)
+    if match_end_marker:
+        content = content[: match_end_marker.start()]
 
     # 최종적으로 앞뒤 공백 제거
     return content.strip()
@@ -334,7 +346,7 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro-exp-03-25",
+            model="gemini-2.5-pro-preview-03-25",  # 기존 gemini-2.5-pro-exp-03-25 대신
             google_api_key=config.GEMINI_API_KEY,
             temperature=0.7,
             transport="rest",  # REST API 사용 (gRPC 대신)

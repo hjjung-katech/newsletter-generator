@@ -5,6 +5,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 import markdownify  # For HTML to Markdown conversion
 from . import config
+from .tools import clean_html_markers  # Import the clean_html_markers function
 
 
 def save_to_drive(
@@ -27,6 +28,9 @@ def save_to_drive(
         return False
 
     try:
+        # Clean HTML markers from content before saving
+        cleaned_html_content = clean_html_markers(html_content)
+
         creds = Credentials.from_service_account_file(
             config.GOOGLE_APPLICATION_CREDENTIALS,
             scopes=["https://www.googleapis.com/auth/drive.file"],
@@ -40,7 +44,7 @@ def save_to_drive(
         )  # Save locally first
         os.makedirs(output_directory, exist_ok=True)
         with open(temp_html_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
+            f.write(cleaned_html_content)
 
         file_metadata_html = {"name": html_filename}
         media_html = MediaFileUpload(temp_html_path, mimetype="text/html")
@@ -51,7 +55,7 @@ def save_to_drive(
         os.remove(temp_html_path)  # Clean up local temp file
 
         # 2. Convert to Markdown and save
-        md_content = markdownify.markdownify(html_content, heading_style="ATX")
+        md_content = markdownify.markdownify(cleaned_html_content, heading_style="ATX")
         md_filename = f"{filename_base}.md"
         temp_md_path = os.path.join(output_directory, md_filename)  # Save locally first
         with open(temp_md_path, "w", encoding="utf-8") as f:
@@ -90,14 +94,17 @@ def save_locally(
     """
     os.makedirs(output_directory, exist_ok=True)
 
+    # Clean HTML markers from content before saving
+    cleaned_html_content = clean_html_markers(html_content)
+
     if output_format == "html":
         filename = f"{filename_base}.html"
         output_path = os.path.join(output_directory, filename)
         with open(output_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
+            f.write(cleaned_html_content)
         print(f"Newsletter saved locally as {output_path}")
     elif output_format == "md":
-        md_content = markdownify.markdownify(html_content, heading_style="ATX")
+        md_content = markdownify.markdownify(cleaned_html_content, heading_style="ATX")
         filename = f"{filename_base}.md"
         output_path = os.path.join(output_directory, filename)
         with open(output_path, "w", encoding="utf-8") as f:
@@ -122,6 +129,9 @@ def send_email(to_email: str, subject: str, html_content: str):
     Returns:
         bool: 발송 성공 여부
     """
+    # Clean HTML markers before sending email
+    cleaned_html_content = clean_html_markers(html_content)
+
     if not config.SENDGRID_API_KEY:
         print("Warning: SENDGRID_API_KEY not found. Please set it in the .env file.")
         print("Email sending simulation complete (no actual email sent).")
@@ -130,7 +140,7 @@ def send_email(to_email: str, subject: str, html_content: str):
     # 실제 이메일 발송 로직은 SendGrid API 키가 설정된 경우에만 작동
     try:
         print(f"Would send email to {to_email} with subject: {subject}")
-        print("Email content is HTML with length:", len(html_content))
+        print("Email content is HTML with length:", len(cleaned_html_content))
         print("Email sending simulated successfully.")
         return True
     except Exception as e:
