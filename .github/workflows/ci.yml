@@ -25,10 +25,17 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install pytest pytest-cov pytest-mock
     
-    - name: Run minimal tests
+    - name: Run minimal test
+      env:
+        PYTHONPATH: ${{ github.workspace }}
       run: |
         # 외부 의존성 없이 실행 가능한 기본 테스트
         python -m pytest tests/test_minimal.py -v
+        
+  # 참고: code-quality.yml 워크플로우에서 코드 품질 검사(Black)를 실행합니다.
+  # 이 CI 워크플로우는 테스트에만 집중합니다.
+  
+  # 향후 안정화된 후 전체 테스트 추가 예정입니다.
   
   # 향후 다른 테스트를 추가할 경우를 위한 작업 예시
   # full_tests:
