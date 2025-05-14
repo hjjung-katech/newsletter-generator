@@ -1,6 +1,7 @@
 """
 Isolated test for tools module without external dependencies
 """
+
 import sys
 import os
 import unittest
@@ -17,9 +18,10 @@ mock_langchain_google_genai.ChatGoogleGenerativeAI = Mock()
 with patch.dict(sys.modules, {"langchain_google_genai": mock_langchain_google_genai}):
     from newsletter.tools import clean_html_markers
 
+
 class TestCleanHtmlMarkers(unittest.TestCase):
     """Test clean_html_markers function in isolation"""
-    
+
     def test_clean_html_markers_with_filepath_comment(self):
         html_with_comment = """<!-- filepath: c:\\path\\to\\file.html -->
 ```html
@@ -58,5 +60,6 @@ class TestCleanHtmlMarkers(unittest.TestCase):
 </html>"""
         self.assertEqual(clean_html_markers(html_content), html_content)
 
+
 if __name__ == "__main__":
-    unittest.main() 
+    unittest.main()

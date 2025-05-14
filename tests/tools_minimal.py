@@ -1,7 +1,9 @@
 """
 Minimal version of tools.py with only clean_html_markers function
 """
+
 import re
+
 
 def clean_html_markers(html_content: str) -> str:
     """
@@ -33,4 +35,4 @@ def clean_html_markers(html_content: str) -> str:
         content = content[: -len("```")]
 
     # 최종적으로 앞뒤 공백 제거
-    return content.strip() 
+    return content.strip()
