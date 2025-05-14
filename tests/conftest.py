@@ -8,40 +8,13 @@ from typing import List, Dict, Any, Union
 # Add project root to sys path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# Import local mock modules
+# test_minimal.py는 독립 실행 가능한 도구만 사용하므로 실제 의존성을 임포트할 필요 없음
+# tests/tools_minimal.py 파일은 독립형 함수만 포함하므로 다른 모듈에 의존하지 않음
+# 따라서 conftest.py 자체를 단순화할 수 있음
+
+# 필요한 경우를 위해 mock 라이브러리만 유지
 from tests.mock_google_generativeai import GenerativeModel, configure, types, caching
 from tests.mock_langchain_google_genai import MockChatGoogleGenerativeAI
-
-
-# Patch sys.modules to use our mock modules
-@pytest.fixture(autouse=True)
-def patch_external_modules():
-    """Mock external dependencies to avoid API calls and version conflicts"""
-    mods = {
-        "google.generativeai": sys.modules.get("tests.mock_google_generativeai"),
-        "google.generativeai.caching": caching,
-        "google.generativeai.types": types,
-        "google.genai": Mock(),  # Add google.genai mock
-        "grpc": Mock(),  # Add grpc mock
-        "langchain_google_genai": sys.modules.get("tests.mock_langchain_google_genai"),
-        "langchain_google_genai.chat_models": sys.modules.get(
-            "tests.mock_langchain_google_genai"
-        ),
-    }
-
-    with patch.dict(sys.modules, mods):
-        # Apply additional patches
-        with patch(
-            "newsletter.chains.ChatGoogleGenerativeAI", MockChatGoogleGenerativeAI
-        ):
-            with patch(
-                "newsletter.tools.ChatGoogleGenerativeAI", MockChatGoogleGenerativeAI
-            ):
-                with patch(
-                    "langchain_core.messages.AIMessage.__pydantic_init_subclass__",
-                    return_value=None,
-                ):
-                    yield
 
 
 @pytest.fixture
@@ -97,7 +70,12 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
 
         unique_articles.append(article)  # 고유한 기사 목록에 추가
 
-    console.print(
-        f"[cyan]Removed {len(articles) - len(unique_articles)} duplicate articles[/cyan]"
-    )
+    # console이 정의되지 않았을 수 있으므로 안전 처리
+    try:
+        console.print(
+            f"[cyan]Removed {len(articles) - len(unique_articles)} duplicate articles[/cyan]"
+        )
+    except NameError:
+        pass
+
     return unique_articles
