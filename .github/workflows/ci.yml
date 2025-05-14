@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Install the minimal requirements needed for the tests
+        python -m pip install pytest pytest-cov pytest-mock
+    
+    - name: Run minimal tests
+      run: |
+        # Run tests that don't require external dependencies
+        python -m pytest tests/test_minimal.py -v
+    
+    - name: Run tests with mocked dependencies
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+        GEMINI_API_KEY: "dummy_key_for_testing"
+        SERPER_API_KEY: "dummy_key_for_testing"
+      run: |
+        # Install the mock packages
+        python -c "import sys; from unittest.mock import Mock; sys.modules['google'] = Mock(); sys.modules['google.generativeai'] = Mock(); sys.modules['google.generativeai.caching'] = Mock(); sys.modules['langchain_google_genai'] = Mock(); sys.modules['langchain_google_genai.chat_models'] = Mock()"
+        
+        # Create output directory for tests that need it
+        mkdir -p output
+        
+        # Run the tests
+        python -m pytest tests/test_minimal.py -v 

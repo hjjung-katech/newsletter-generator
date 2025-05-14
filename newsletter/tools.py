@@ -337,6 +337,8 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
             model="gemini-2.5-pro-exp-03-25",
             google_api_key=config.GEMINI_API_KEY,
             temperature=0.7,
+            transport="rest",  # REST API 사용 (gRPC 대신)
+            convert_system_message_to_human=True,  # 시스템 메시지를 휴먼 메시지로 변환
         )  # 모델명 변경
 
         prompt_template = PromptTemplate.from_template(
