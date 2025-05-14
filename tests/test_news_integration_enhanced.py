@@ -8,6 +8,7 @@ import sys
 import os
 import json
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -15,16 +16,66 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # 필요한 모듈 임포트
 from newsletter.tools import search_news_articles
 from newsletter.collect import collect_articles
+from newsletter.sources import NewsSourceManager
+from newsletter import config
 
 
 class TestNewsIntegrationEnhanced(unittest.TestCase):
     """도구와 수집 모듈 간의 통합 테스트 케이스"""
 
-    def test_news_collection_integration(self):
+    def setUp(self):
+        self.original_serper_key = getattr(config, "SERPER_API_KEY", None)
+        config.SERPER_API_KEY = "dummy_test_key_news_integration"
+
+    def tearDown(self):
+        if self.original_serper_key is not None:
+            config.SERPER_API_KEY = self.original_serper_key
+        elif hasattr(config, "SERPER_API_KEY"):
+            del config.SERPER_API_KEY
+
+    @patch("newsletter.sources.NewsSourceManager.fetch_all_sources")
+    @patch("newsletter.tools.requests.request")
+    def test_news_collection_integration(
+        self, mock_tools_request, mock_collect_fetch_all
+    ):
         """tools.py와 collect.py의 뉴스 검색 기능을 통합 테스트합니다"""
         # 테스트할 키워드
         test_keywords = "인공지능,자율주행"
         results_per_keyword = 3
+
+        # --- 모의(mock) API 응답 설정 (newsletter.tools.requests.request 용) ---
+        mock_tools_response_ai = MagicMock()
+        mock_tools_response_ai.json.return_value = {
+            "news": [{"title": "Tool AI 1", "link": "http://tools.com/ai1"}]
+        }
+        mock_tools_response_ai.raise_for_status = MagicMock()
+
+        mock_tools_response_auto = MagicMock()
+        mock_tools_response_auto.json.return_value = {
+            "news": [{"title": "Tool Auto 1", "link": "http://tools.com/auto1"}]
+        }
+        mock_tools_response_auto.raise_for_status = MagicMock()
+        mock_tools_request.side_effect = [
+            mock_tools_response_ai,
+            mock_tools_response_auto,
+        ]
+
+        # --- 모의(mock) API 응답 설정 (NewsSourceManager.fetch_all_sources 용) ---
+        # collect_articles는 키워드별 그룹화된 딕셔너리를 직접 반환하지 않음. fetch_all_sources는 평탄화된 리스트를 반환.
+        mock_collect_fetch_all.return_value = [
+            {
+                "title": "Collect AI 1",
+                "url": "http://collect.com/ai1",
+                "source": "CollectSource",
+                "date": "2023-01-01",
+            },
+            {
+                "title": "Collect Auto 1",
+                "url": "http://collect.com/auto1",
+                "source": "CollectSource",
+                "date": "2023-01-02",
+            },
+        ]
 
         # 1. tools.py의 search_news_articles 함수 테스트
         articles_from_tools = search_news_articles.invoke(
@@ -104,10 +155,32 @@ class TestNewsIntegrationEnhanced(unittest.TestCase):
         except Exception as e:
             self.fail(f"collect_articles 함수 실행 중 예외 발생: {e}")
 
-    def test_results_format_compatibility(self):
+    @patch("newsletter.sources.NewsSourceManager.fetch_all_sources")
+    @patch("newsletter.tools.requests.request")
+    def test_results_format_compatibility(
+        self, mock_tools_request, mock_collect_fetch_all
+    ):
         """tools.py와 collect.py의 결과 형식 호환성을 테스트합니다"""
         test_keywords = "인공지능"
         results_per_keyword = 2
+
+        # --- 모의(mock) API 응답 설정 (newsletter.tools.requests.request 용) ---
+        mock_tools_response = MagicMock()
+        mock_tools_response.json.return_value = {
+            "news": [{"title": "Tool AI Comp 1", "link": "http://tools.com/comp_ai1"}]
+        }
+        mock_tools_response.raise_for_status = MagicMock()
+        mock_tools_request.return_value = mock_tools_response  # 여기서는 단일 키워드
+
+        # --- 모의(mock) API 응답 설정 (NewsSourceManager.fetch_all_sources 용) ---
+        mock_collect_fetch_all.return_value = [
+            {
+                "title": "Collect AI Comp 1",
+                "url": "http://collect.com/comp_ai1",
+                "source": "CollectSource",
+                "date": "2023-01-01",
+            }
+        ]
 
         # 두 함수 호출
         articles_from_tools = search_news_articles.invoke(
