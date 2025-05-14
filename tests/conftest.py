@@ -1,20 +1,14 @@
 import sys
 import os
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-import importlib.util
-from typing import List, Dict, Any, Union
+from typing import List, Dict, Any
 
 # Add project root to sys path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# test_minimal.py는 독립 실행 가능한 도구만 사용하므로 실제 의존성을 임포트할 필요 없음
-# tests/tools_minimal.py 파일은 독립형 함수만 포함하므로 다른 모듈에 의존하지 않음
-# 따라서 conftest.py 자체를 단순화할 수 있음
-
-# 필요한 경우를 위해 mock 라이브러리만 유지
-from tests.mock_google_generativeai import GenerativeModel, configure, types, caching
-from tests.mock_langchain_google_genai import MockChatGoogleGenerativeAI
+# 외부 의존성 임포트 제거 - test_minimal.py에는 필요하지 않음
+# from tests.mock_google_generativeai import GenerativeModel, configure, types, caching
+# from tests.mock_langchain_google_genai import MockChatGoogleGenerativeAI
 
 
 @pytest.fixture
