@@ -4,17 +4,16 @@ Newsletter Generator - LangChain Chains
 """
 
 from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import LLMChain
-from langchain.chains import SequentialChain
+from langchain.chains import LLMChain, SequentialChain
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from . import config
 from langchain_core.messages import SystemMessage, HumanMessage
 import os
 import datetime
-import grpc
-from unittest.mock import MagicMock
+import json
+from jinja2 import Template
 from newsletter.sources import NewsSourceManager
 
 
@@ -61,7 +60,116 @@ try:
 except Exception as e:
     print(f"디버그 파일 작성 중 오류: {e}")
 
-# 시스템 프롬프트 템플릿
+# 분류 시스템 프롬프트
+CATEGORIZATION_PROMPT = """
+당신은 뉴스들을 분석하고 분류하는 전문 편집자입니다.
+
+독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+
+다음 키워드에 관련된 뉴스 기사들을 분석하여, 의미있는 카테고리로 분류해주세요:
+{keywords}
+
+뉴스 기사 목록:
+{formatted_articles}
+
+뉴스 기사들을 분석하여 내용에 따라 여러 카테고리로 분류하세요. 예를 들어, "전기차 시장 동향", "하이브리드차 동향", "배터리 기술 발전" 등처럼 의미 있는 카테고리로 나누어야 합니다. 각 카테고리는 적절한 제목을 가져야 합니다.
+
+출력 형식은 다음과 같은 JSON 형식으로 작성해주세요:
+{{
+  "categories": [
+    {{
+      "title": "카테고리 제목",
+      "article_indices": [1, 2, 5]
+    }},
+    {{
+      "title": "카테고리 제목 2",
+      "article_indices": [3, 4, 6]
+    }}
+  ]
+}}
+
+하나의 기사는 여러 카테고리에 포함될 수 있지만, 모든 기사가 최소 하나의 카테고리에는 포함되어야 합니다.
+각 카테고리 제목은, 독자가 어떤 내용인지 한눈에 알 수 있도록 명확하고 구체적으로 작성해주세요.
+"""
+
+# 요약 시스템 프롬프트
+SUMMARIZATION_PROMPT = """
+당신은 뉴스들을 분석하고 요약하여 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
+
+독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+
+다음은 "{category_title}" 카테고리에 해당하는 뉴스 기사들입니다:
+{category_articles}
+
+위 기사들을 종합적으로 분석하여 다음 정보를 포함한 요약을 JSON 형식으로 만들어주세요:
+
+1. summary_paragraphs: 해당 카테고리의 주요 내용을 3-5개의 단락으로 요약 (각 단락은 배열의 항목)
+   - 요약문은 객관적이고 분석적이며, 전체 기사들의 맥락을 포괄해야 합니다.
+   - 정중한 존댓말을 사용합니다.
+
+2. definitions: 해당 카테고리에서 등장하는 중요 용어나 개념 설명 (최대 5개)
+   - 신입직원이 이해하기 어려울 수 있는 전문 용어나 개념을 선정하여 쉽고 간단하게 설명합니다.
+
+3. news_links: 원본 기사 링크 정보
+   - 각 카테고리별로 관련 뉴스 기사들의 원문 링크를 제목, 출처, 시간 정보와 함께 제공합니다.
+
+출력 형식:
+```json
+{{
+  "summary_paragraphs": ["첫 번째 단락", "두 번째 단락", "..."],
+  "definitions": [
+    {{"term": "용어1", "explanation": "용어1에 대한 설명"}},
+    {{"term": "용어2", "explanation": "용어2에 대한 설명"}}
+  ],
+  "news_links": [
+    {{"title": "기사 제목", "url": "기사 URL", "source_and_date": "출처 및 날짜"}}
+  ]
+}}
+```
+"""
+
+# 종합 구성 프롬프트
+COMPOSITION_PROMPT = """
+당신은 뉴스들을 분석하고 요약하여, HTML 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
+
+독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+
+이미 각 카테고리별로 상세 요약이 완료되었습니다. 이제 뉴스레터의 전체 구성을 완성해야 합니다.
+
+주제 키워드: {keywords}
+카테고리 요약:
+{category_summaries}
+
+다음 정보를 포함한 뉴스레터 구성 정보를 JSON 형식으로 반환해주세요:
+
+```json
+{{
+  "newsletter_topic": "뉴스레터 주제",
+  "generation_date": "{current_date}",
+  "recipient_greeting": "독자들을 위한 인사말",
+  "introduction_message": "뉴스레터 소개 문구",
+  "food_for_thought": {{
+    "quote": "관련 명언 (선택사항)",
+    "author": "명언 출처 (선택사항)",
+    "message": "독자들에게 생각해볼 만한 질문이나 제안"
+  }},
+  "closing_message": "마무리 문구",
+  "editor_signature": "편집자 서명",
+  "company_name": "회사명"
+}}
+```
+
+참고:
+- generation_date는 {current_date} 형식으로 유지해주세요.
+- newsletter_topic은 입력된 '키워드'를 뉴스레터의 전체 주제로 설정하고, 제목과 도입부에 반영합니다.
+- 각 항목은 한국어로 작성하며, 정중한 존댓말을 사용합니다.
+- introduction_message는 전체 뉴스레터의 주제와 주요 내용을 간략히 소개합니다.
+- food_for_thought는 전체 뉴스 내용을 바탕으로 독자들에게 생각해볼 만한 질문이나 영감을 줄 수 있는 메시지입니다.
+- closing_message는 뉴스레터를 마무리하는 문구입니다.
+"""
+
+# 하위 호환성을 위한 SYSTEM_PROMPT
+# 이전 버전의 코드에서 참조하던 SYSTEM_PROMPT 변수를 제공합니다.
 SYSTEM_PROMPT = f"""
 Role: 당신은 뉴스들을 분석하고 요약하여, HTML 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
 
@@ -74,27 +182,18 @@ Input:
 Output Requirements:
 -   **HTML 형식**: 최종 결과물은 다른 설명 없이 순수한 HTML 코드여야 합니다. API로 직접 전달될 예정입니다. 반드시 아래 제공된 HTML 템플릿을 사용해야 합니다.
 -   **언어**: 한국어, 정중한 존댓말을 사용합니다.
--   **구조**: 뉴스레터는 아래 제공된 HTML 템플릿을 기반으로 생성해야 합니다. 템플릿 내의 Jinja2와 유사한 구문들 (예: `{{{{ variable }}}}`, `{{% for item in items %}}`, `{{% if condition %}}`)은 실제 데이터로 대체되어야 합니다. 예를 들어, `{{% for section in sections %}}` 루프는 실제 뉴스 섹션들로 채워져야 하며, `{{{{ newsletter_topic }}}}` 같은 플레이스홀더는 해당 값으로 대체되어야 합니다. 템플릿의 모든 플레이스홀더를 이해하고, 가능한 경우 해당 데이터를 채워야 합니다. (예: `{{{{ newsletter_topic }}}}`, `{{{{ generation_date }}}}`, `{{{{ recipient_greeting }}}}`, `{{{{ introduction_message }}}}`, `{{{{ sections }}}}`, `{{{{ food_for_thought }}}}`, `{{{{ closing_message }}}}`, `{{{{ editor_signature }}}}`, `{{{{ company_name }}}}` 등).
-    제공된 템플릿에 있는 `{{% for i in range(29, 39) %}}` 와 같은 하드코딩된 루프 예시는 실제 뉴스 데이터에 기반한 내용으로 대체되어야 합니다.
+-   **구조**: 뉴스레터는 아래 제공된 HTML 템플릿을 기반으로 생성해야 합니다.
 
 ### 제공되는 HTML 템플릿:
 ```html
 {HTML_TEMPLATE}
 ```
 
-Task Breakdown:
-1.  **Data Extraction and Mapping**: 입력된 뉴스 기사들을 분석하여 위 HTML 템플릿의 각 섹션 (예: `sections`, `food_for_thought` 등)에 필요한 정보를 추출하고 매핑합니다.
-2.  **Categorization (if applicable)**: `sections` 부분에는 뉴스 기사들을 내용에 따라 여러 카테고리로 분류하고 (예: "전기차 시장 동향", "하이브리드차 동향" 등), 각 카테고리별로 제목(`section.title`), 요약문(`section.summary_paragraphs`), 전문 용어 설명(`section.definitions`), 관련 뉴스 링크(`section.news_links`)를 템플릿 구조에 맞게 구성합니다.
-3.  **Summarization per Category**: 각 카테고리별로 해당되는 기사들의 주요 내용을 종합하여 상세하게 설명하는 요약문을 `section.summary_paragraphs`에 작성합니다.
-4.  **Terminology Explanation**: 각 카테고리 요약문에서 신입직원이 이해하기 어려울 수 있는 전문 용어나 개념이 있다면, 이를 선정하여 `section.definitions` 형식에 맞게 쉽고 간단하게 설명하는 목록을 만듭니다.
-5.  **News Links**: 각 카테고리별로 관련 뉴스 기사들의 원문 링크를 제목, 출처, 시간 정보와 함께 `section.news_links` 형식에 맞게 목록으로 제공합니다.
-6.  **Theme Setting**: 입력된 '키워드'를 뉴스레터의 전체 주제(`newsletter_topic`)로 설정하고, 제목과 도입부(`introduction_message`)에 반영합니다.
-7.  **Concluding Remarks**: 전체 뉴스 내용을 바탕으로 독자들에게 생각해볼 만한 질문이나 영감을 줄 수 있는 메시지(`food_for_thought`, `closing_message`)를 작성합니다.
-8.  **Placeholder Filling**: 템플릿의 나머지 플레이스홀더 (`generation_date`, `recipient_greeting`, `editor_signature`, `company_name` 등)에 적절한 값을 채워줍니다. `generation_date`는 오늘 날짜 (예: {datetime.date.today().strftime('%Y-%m-%d')})로 설정합니다.
+주의: SYSTEM_PROMPT는 하위 호환성을 위해 유지되었습니다. 새로운 코드에서는 CATEGORIZATION_PROMPT, SUMMARIZATION_PROMPT, COMPOSITION_PROMPT를 사용하세요.
 """
 
 
-def get_llm():
+def get_llm(temperature=0.3):
     """구글 Gemini Pro 모델 인스턴스를 생성합니다."""
     if not config.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
@@ -105,81 +204,331 @@ def get_llm():
     return ChatGoogleGenerativeAI(
         model="gemini-1.5-pro-latest",
         google_api_key=config.GEMINI_API_KEY,
-        temperature=0.3,
+        temperature=temperature,
         transport=transport,
-        convert_system_message_to_human=True,  # 시스템 메시지를 휴먼 메시지로 변환
+        convert_system_message_to_human=False,  # 시스템 메시지를 시스템 메시지로 유지
     )
 
 
 # 기사 목록을 텍스트로 변환하는 함수
 def format_articles(data):
-    # 그룹화된 기사 또는 일반 기사 목록 처리
-    if "articles" in data:
-        # 일반 기사 목록
-        articles = data["articles"]
-        formatted_articles = []
+    """
+    기사 목록을 텍스트 형식으로 변환합니다.
 
-        for i, article in enumerate(articles):
-            title = article.get("title", "제목 없음")
-            url = article.get("url", "#")
-            content = article.get("content", "내용 없음")
-            source = article.get("source", "출처 없음")  # 추가
-            date = article.get("date", "날짜 없음")  # 추가
-            formatted_articles.append(
-                f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n"
-            )
+    Args:
+        data: 기사 데이터를 포함하는 딕셔너리
 
-        return "\n---\n".join(formatted_articles)
-
-    elif "grouped_articles" in data:
-        # 그룹화된 기사 목록
-        grouped_articles = data["grouped_articles"]
-        formatted_sections = []
-
-        for keyword, articles in grouped_articles.items():
-            # 각 키워드를 섹션으로 처리
-            section = f"## 키워드: {keyword}\n\n"
-
-            for i, article in enumerate(articles):
-                title = article.get("title", "제목 없음")
-                url = article.get("url", "#")
-                content = article.get("content", "내용 없음")
-                source = article.get("source", "출처 없음")
-                date = article.get("date", "날짜 없음")
-
-                section += f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n\n"
-
-            formatted_sections.append(section)
-
-        return "\n\n===\n\n".join(formatted_sections)
-
-    else:
+    Returns:
+        str: 포맷팅된 기사 텍스트
+    """
+    articles = data.get("articles", [])
+    if not articles:
         return "기사 데이터를 찾을 수 없습니다."
 
+    formatted_articles = []
+    for i, article in enumerate(articles):
+        title = article.get("title", "제목 없음")
+        url = article.get("url", "#")
+        content = article.get("content", "내용 없음")
+        source = article.get("source", "출처 없음")
+        date = article.get("date", "날짜 없음")
 
-def get_summarization_chain():
-    llm = get_llm()
+        formatted_articles.append(
+            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n"
+        )
+
+    return "\n---\n".join(formatted_articles)
+
+
+# 1. 분류 체인 생성 함수
+def create_categorization_chain():
+    llm = get_llm(temperature=0.2)
 
     # 메시지 생성 함수
     def create_messages(data):
-        # 시스템 메시지 생성
-        system_message = SystemMessage(content=SYSTEM_PROMPT)
+        try:
+            # 포맷팅 문자열에 중괄호가 있어 이스케이프 처리가 필요
+            prompt = CATEGORIZATION_PROMPT.format(
+                keywords=data.get("keywords", ""),
+                formatted_articles=format_articles(data),
+            )
 
-        # 사용자 메시지 생성
-        user_content = f"""다음 키워드에 대한 뉴스레터를 생성해주세요: {data['keywords']}
+            # 메시지를 HumanMessage로 변환 (Gemini는 시스템 메시지 지원이 불안정함)
+            return [HumanMessage(content=prompt)]
+        except Exception as e:
+            print(f"카테고리 메시지 생성 중 오류: {e}")
+            import traceback
 
-다음은 뉴스 기사 목록입니다 (각 기사는 제목, URL, 내용으로 구성됩니다):
-{format_articles(data)}
+            traceback.print_exc()
+            raise
 
-위 정보를 바탕으로 시스템 프롬프트에 명시된 HTML 형식 중 더 적합한 것을 선택하여 전체 뉴스레터 HTML을 생성해주세요.
-기사 수와 주제에 따라 "기본 형식"이나 "카테고리별 정리 형식" 중 알맞은 것을 선택해주세요.
-복잡한 주제나 여러 기사가 있는 경우 카테고리별로 정리하는 것이 좋습니다.
-"""
-        human_message = HumanMessage(content=user_content)
-
-        return [system_message, human_message]
-
-    # 체인 정의
+    # 체인 구성
     chain = RunnableLambda(create_messages) | llm | StrOutputParser()
 
+    # JSON 파싱 함수
+    def parse_json_response(text):
+        try:
+            # JSON 부분만 추출
+            import re
+
+            json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1).strip()
+            else:
+                json_str = text.strip()
+
+            # JSON 파싱
+            result = json.loads(json_str)
+            print(
+                f"카테고리 분류 결과: {json.dumps(result, ensure_ascii=False, indent=2)}"
+            )
+            return result
+        except Exception as e:
+            print(f"JSON 파싱 오류: {e}")
+            print(f"원본 텍스트: {text}")
+            # 기본 구조 반환
+            return {
+                "categories": [{"title": "기타", "article_indices": [1, 2, 3, 4, 5]}]
+            }
+
+    return chain | RunnableLambda(parse_json_response)
+
+
+# 2. 카테고리별 요약 체인 생성 함수
+def create_summarization_chain():
+    llm = get_llm(temperature=0.3)
+    parser = JsonOutputParser()
+
+    def process_categories(data):
+        categories_data = data["categories_data"]
+        articles_data = data["articles_data"]
+        results = []
+
+        print(f"처리할 카테고리 수: {len(categories_data.get('categories', []))}")
+
+        for category in categories_data.get("categories", []):
+            # 해당 카테고리에 속한 기사들 추출
+            category_articles = []
+            for idx in category.get("article_indices", []):
+                if 0 <= idx - 1 < len(articles_data.get("articles", [])):
+                    category_articles.append(articles_data["articles"][idx - 1])
+
+            print(
+                f"카테고리 '{category.get('title', '제목 없음')}' - 관련 기사 수: {len(category_articles)}"
+            )
+
+            # 카테고리 기사들을 포맷팅
+            formatted_articles = "\n---\n".join(
+                [
+                    f"기사 #{i+1}:\n제목: {article.get('title', '제목 없음')}\n"
+                    f"URL: {article.get('url', '#')}\n"
+                    f"출처: {article.get('source', '출처 없음')}\n"
+                    f"날짜: {article.get('date', '날짜 없음')}\n"
+                    f"내용:\n{article.get('content', '내용 없음')}"
+                    for i, article in enumerate(category_articles)
+                ]
+            )
+
+            # 요약 프롬프트 생성
+            prompt_content = SUMMARIZATION_PROMPT.format(
+                category_title=category.get("title", "제목 없음"),
+                category_articles=formatted_articles,
+            )
+
+            # LLM에 요청
+            messages = [HumanMessage(content=prompt_content)]
+            summary_result = llm.invoke(messages)
+            summary_text = summary_result.content
+
+            try:
+                # JSON 추출
+                import re
+
+                json_match = re.search(
+                    r"```(?:json)?\s*(.*?)```", summary_text, re.DOTALL
+                )
+                if json_match:
+                    json_str = json_match.group(1).strip()
+                else:
+                    json_str = summary_text.strip()
+
+                summary_json = json.loads(json_str)
+
+                # 카테고리 제목 추가
+                summary_json["title"] = category.get("title", "제목 없음")
+                results.append(summary_json)
+            except Exception as e:
+                print(
+                    f"카테고리 '{category.get('title', '제목 없음')}' 요약 파싱 오류: {e}"
+                )
+                # 오류 발생 시 기본 구조 제공
+                results.append(
+                    {
+                        "title": category.get("title", "제목 없음"),
+                        "summary_paragraphs": ["(요약 생성 중 오류가 발생했습니다)"],
+                        "definitions": [],
+                        "news_links": [],
+                    }
+                )
+
+        return {"sections": results}
+
+    return RunnableLambda(process_categories)
+
+
+# 3. 종합 구성 체인 생성 함수
+def create_composition_chain():
+    llm = get_llm(temperature=0.4)
+
+    def create_composition_prompt(data):
+        current_date = datetime.date.today().strftime("%Y-%m-%d")
+        sections_data = json.dumps(data["sections"], ensure_ascii=False, indent=2)
+
+        prompt_content = COMPOSITION_PROMPT.format(
+            keywords=data.get("keywords", ""),
+            category_summaries=sections_data,
+            current_date=current_date,
+        )
+
+        return [HumanMessage(content=prompt_content)]
+
+    # JSON 파싱 함수
+    def parse_json_response(text):
+        try:
+            # JSON 부분만 추출
+            import re
+
+            json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1).strip()
+            else:
+                json_str = text.strip()
+
+            # JSON 파싱
+            return json.loads(json_str)
+        except Exception as e:
+            print(f"종합 구성 JSON 파싱 오류: {e}")
+            print(f"원본 텍스트: {text}")
+            # 기본 구조 반환
+            return {
+                "newsletter_topic": "최신 산업 동향",
+                "generation_date": datetime.date.today().strftime("%Y-%m-%d"),
+                "recipient_greeting": "안녕하세요, 독자 여러분",
+                "introduction_message": "이번 뉴스레터에서는 주요 산업 동향을 살펴봅니다.",
+                "food_for_thought": {
+                    "message": "산업의 변화에 어떻게 대응해 나갈지 생각해 보시기 바랍니다."
+                },
+                "closing_message": "다음 뉴스레터에서 다시 만나뵙겠습니다.",
+                "editor_signature": "편집자 드림",
+                "company_name": "Tech Insights",
+            }
+
+    # 체인 구성
+    chain = (
+        RunnableLambda(create_composition_prompt)
+        | llm
+        | StrOutputParser()
+        | RunnableLambda(parse_json_response)
+    )
+
+    return chain
+
+
+# 4. 템플릿 렌더링 체인 생성 함수
+def create_rendering_chain():
+    def render_with_template(data):
+        # 뉴스레터 데이터와 섹션 데이터 병합
+        combined_data = {**data["composition"], **data["sections_data"]}
+
+        # 날짜 설정 (이미 composition에서 설정되어 있을 수 있음)
+        if "generation_date" not in combined_data:
+            combined_data["generation_date"] = datetime.date.today().strftime(
+                "%Y-%m-%d"
+            )
+
+        # Jinja2 템플릿 렌더링
+        template = Template(HTML_TEMPLATE)
+        rendered_html = template.render(**combined_data)
+
+        # 디버깅용 - 렌더링에 사용된 데이터 저장
+        try:
+            debug_dir = os.path.join("output", "intermediate_processing")
+            os.makedirs(debug_dir, exist_ok=True)
+            with open(
+                os.path.join(
+                    debug_dir,
+                    f"render_data_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                ),
+                "w",
+                encoding="utf-8",
+            ) as f:
+                json.dump(combined_data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"디버그 데이터 저장 중 오류: {e}")
+
+        return rendered_html
+
+    return RunnableLambda(render_with_template)
+
+
+# 전체 파이프라인 구성
+def get_newsletter_chain():
+    # 1. 분류 체인
+    categorization_chain = create_categorization_chain()
+
+    # 2. 요약 체인
+    summarization_chain = create_summarization_chain()
+
+    # 3. 종합 구성 체인
+    composition_chain = create_composition_chain()
+
+    # 4. 렌더링 체인
+    rendering_chain = create_rendering_chain()
+
+    # 데이터 흐름 관리 함수
+    def manage_data_flow(data):
+        try:
+            # 데이터 유효성 검증
+            if "articles" not in data:
+                raise ValueError("입력 데이터에 'articles' 필드가 없습니다.")
+
+            # 1. 분류 단계 실행
+            print("1단계: 뉴스 카테고리 분류 중...")
+            categories_data = categorization_chain.invoke(data)
+
+            # 2. 요약 단계 실행
+            print("2단계: 카테고리별 요약 생성 중...")
+            sections_data = summarization_chain.invoke(
+                {"categories_data": categories_data, "articles_data": data}
+            )
+
+            # 3. 종합 구성 단계 실행
+            print("3단계: 뉴스레터 종합 구성 중...")
+            composition = composition_chain.invoke(
+                {
+                    "keywords": data.get("keywords", ""),
+                    "sections": sections_data["sections"],
+                }
+            )
+
+            # 4. 렌더링 단계 실행
+            print("4단계: HTML 렌더링 중...")
+            final_html = rendering_chain.invoke(
+                {"composition": composition, "sections_data": sections_data}
+            )
+
+            print("뉴스레터 생성 완료!")
+            return final_html
+        except Exception as e:
+            print(f"뉴스레터 생성 중 오류 발생: {e}")
+            raise
+
+    # 최종 체인 반환
+    return RunnableLambda(manage_data_flow)
+
+
+# 기존 summarization_chain 유지 (하위 호환성)
+def get_summarization_chain():
+    chain = get_newsletter_chain()
+    print("이 함수는 곧 사라질 예정입니다. get_newsletter_chain()을 사용하세요.")
     return chain
