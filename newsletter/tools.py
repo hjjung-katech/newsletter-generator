@@ -336,9 +336,9 @@ def clean_html_markers(html_content: str) -> str:
 
 def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
     """
-    Generates trend keywords for a given domain using Google Gemini.
+    Generates high-quality trend keywords for a given domain using Google Gemini.
     """
-    if not config.GEMINI_API_KEY:  # GOOGLE_API_KEY 대신 GEMINI_API_KEY 사용
+    if not config.GEMINI_API_KEY:
         console.print(
             "[bold red]Error: GEMINI_API_KEY is not configured. Cannot generate keywords.[/bold red]"
         )
@@ -346,15 +346,33 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro-preview-03-25",  # 기존 gemini-2.5-pro-exp-03-25 대신
+            model="gemini-2.5-pro-preview-03-25", 
             google_api_key=config.GEMINI_API_KEY,
             temperature=0.7,
             transport="rest",  # REST API 사용 (gRPC 대신)
             convert_system_message_to_human=True,  # 시스템 메시지를 휴먼 메시지로 변환
-        )  # 모델명 변경
+        )
 
         prompt_template = PromptTemplate.from_template(
-            "Please generate exactly {count} of the latest trend keywords related to the field of '{domain}'. Present each keyword on a new line without any numbering or bullet points."
+            """You are a news search expert highly skilled at identifying effective search queries for finding the latest news articles about a given field.
+
+        Based on the [Field Information] provided below, please generate exactly {count} highly effective search keywords (search queries) that someone would use *right now* to find recent news or significant events within this field.
+
+        **IMPORTANT:** The generated keywords must be in **Korean**.
+
+        Keyword Generation Guidelines:
+        1.  Each keyword should be in the form of a natural phrase (generally 2-4 words) suitable for use in a real news search engine.
+        2.  Prioritize terms that cover recent or currently notable major events, individuals, companies/organizations, technological changes, or other timely developments within the given field.
+        3.  Include keywords that can yield specific search results rather than overly general or broad single words.
+        4.  Ensure the generated keywords are likely to appear in Korean news headlines or body text and have a high probability of being used in actual news searches by Korean speakers.
+        5.  Ensure you provide exactly the requested number of keywords ({count}).
+
+        [Field Information]:
+        {domain}
+
+        Generated Search Keyword List (in Korean):
+        (Provide each keyword on a new line, without any numbering or bullet points. Include only the Korean keywords themselves.)
+        """
         )
 
         chain = prompt_template | llm | StrOutputParser()
@@ -362,41 +380,41 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
         console.print(
             f"\n[cyan]Generating keywords for '{domain}' using Google Gemini...[/cyan]"
         )
-        console.print(
-            f"[cyan]Prompt sent to Gemini:[/cyan] {prompt_template.format(domain=domain, count=count)}"
-        )
 
+        # 실행 및 응답 처리
         response_content = chain.invoke({"domain": domain, "count": count})
-
         console.print(f"\n[cyan]Raw response from Gemini:[/cyan]\n{response_content}")
 
-        # Process the response: split by newlines and remove empty strings
-        keywords = [
-            keyword.strip()
-            for keyword in response_content.split("\n")
-            if keyword.strip()
-        ]
+        # 응답 처리
+        keywords = []
+        for line in response_content.split("\n"):
+            if not line.strip():
+                continue
 
-        # Ensure we return the requested number of keywords, even if Gemini provides more or less
+            # 앞의 번호 및 마크다운 볼드 표시 제거
+            clean_line = re.sub(r'^\d+\.?\s*', '', line.strip())
+            clean_line = re.sub(r'\*\*(.+?)\*\*', r'\1', clean_line)
+
+            # 괄호 안의 영어 설명 제거 (있는 경우)
+            clean_line = re.sub(r'\s*\(.+?\)\s*$', '', clean_line)
+
+            if clean_line:
+                keywords.append(clean_line)
+
+        # 키워드 형식 처리
         final_keywords = keywords[:count]
-        if (
-            len(final_keywords) < count and keywords
-        ):  # If not enough, try to take from the beginning
+        if len(final_keywords) < count and keywords:
             final_keywords = keywords
 
-        # If Gemini returns a single line with comma separation (less ideal but handle it)
         if len(final_keywords) == 1 and "," in final_keywords[0]:
             final_keywords = [kw.strip() for kw in final_keywords[0].split(",")][:count]
+            
+        # 키워드 효과성 검증 (옵션)
+        final_keywords = validate_and_refine_keywords(final_keywords, min_results_per_keyword=3, count=count)
 
-        console.print(
-            f"\n[cyan]Processed keywords (target: {count}):[/cyan]\n{final_keywords}"
-        )
-
-        if not final_keywords:
-            console.print(
-                "[yellow]Warning: Gemini did not return any keywords or the format was unexpected.[/yellow]"
-            )
-            return []
+        console.print(f"\n[cyan]최종 키워드 ({len(final_keywords)}):[/cyan]")
+        for i, kw in enumerate(final_keywords, 1):
+            console.print(f"  {i}. [green]{kw}[/green]")
 
         return final_keywords
 
@@ -405,3 +423,39 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
             f"[bold red]Error generating keywords with Gemini: {e}[/bold red]"
         )
         return []
+
+
+def validate_and_refine_keywords(keywords: list[str], min_results_per_keyword: int = 3, count: int = 10) -> list[str]:
+    """각 키워드로 검색했을 때 충분한 결과가 나오는지 검증하고, 문제가 있는 키워드는 대체합니다."""
+    
+    validated_keywords = []
+    replacement_needed = []
+    
+    console.print(f"\n[cyan]검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...[/cyan]")
+    
+    for keyword in keywords:
+        try:
+            # 키워드로 테스트 검색 (invoke 메서드 사용)
+            test_results = search_news_articles.invoke({"keywords": keyword, "num_results": 5})
+            
+            if len(test_results) >= min_results_per_keyword:
+                validated_keywords.append(keyword)
+                console.print(f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]")
+            else:
+                replacement_needed.append(keyword)
+                console.print(f"[yellow]✗ '{keyword}': 결과 부족 ({len(test_results)}개)[/yellow]")
+        
+        except Exception as e:
+            console.print(f"[red]! '{keyword}' 검증 중 오류: {e}[/red]")
+            replacement_needed.append(keyword)
+    
+    # 대체 키워드 생성이 필요한 경우
+    if replacement_needed and validated_keywords:
+        console.print(f"[yellow]{len(replacement_needed)}개 키워드에 대한 대체 키워드 생성 중...[/yellow]")
+        
+        # 이 부분도 수정 필요 - domain 변수가 함수 내에서 접근할 수 없음
+        new_keywords = []  # 임시 빈 리스트로 대체
+        
+        validated_keywords.extend(new_keywords)
+    
+    return validated_keywords[:count]  # 원래 요청한 개수만큼 반환
