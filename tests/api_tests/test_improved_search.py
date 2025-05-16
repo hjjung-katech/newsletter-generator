@@ -8,7 +8,7 @@ import os
 from unittest.mock import patch, MagicMock
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # 테스트할 모듈 임포트
 from newsletter.tools import search_news_articles

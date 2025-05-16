@@ -6,7 +6,7 @@ import argparse  # Add import for argparse
 from typing import List, Dict, Any
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # 필요한 모듈을 패치
 with patch.dict("sys.modules", {"google.generativeai": MagicMock()}):

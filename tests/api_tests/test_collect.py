@@ -2,8 +2,8 @@ import sys
 import os
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
-# 현재 파일의 디렉토리(tests)의 부모 디렉토리(프로젝트 루트)를 경로에 추가
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# 현재 파일의 디렉토리(tests/api_tests)의 조부모 디렉토리(프로젝트 루트)를 경로에 추가
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import unittest
 from unittest.mock import patch, MagicMock
