@@ -459,6 +459,9 @@ def create_composition_chain():
 
 # 4. 템플릿 렌더링 체인 생성 함수
 def create_rendering_chain():
+    # 템플릿 매니저 초기화
+    template_manager = TemplateManager()
+
     def render_with_template(data):
         # 뉴스레터 데이터와 섹션 데이터 병합
         combined_data = {**data["composition"], **data["sections_data"]}
