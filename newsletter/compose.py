@@ -2,12 +2,34 @@
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 from .date_utils import (
     format_date_for_display,
     extract_source_and_date,
     standardize_date,
 )
+import json
+
+
+def extract_test_config(data: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Extract test configuration from data if present.
+
+    Args:
+        data: Dictionary possibly containing embedded test configuration
+
+    Returns:
+        Tuple of (newsletter_data, test_config)
+    """
+    # Create a copy to avoid modifying the original
+    newsletter_data = data.copy()
+    test_config = {}
+
+    # Extract test config if present
+    if "_test_config" in newsletter_data:
+        test_config = newsletter_data.pop("_test_config")
+
+    return newsletter_data, test_config
 
 
 def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
@@ -19,6 +41,7 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
              If a dict is provided, expected keys include:
              - 'newsletter_topic': The main topic of the newsletter.
              - 'generation_date': The date the newsletter is generated.
+             - 'generation_timestamp': The timestamp when the newsletter is generated.
              - 'recipient_greeting': A greeting message for the recipient.
              - 'introduction_message': An introductory message for the newsletter.
              - 'sections': A list of sections, where each section is a dict with:
@@ -40,50 +63,47 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     Returns:
         str: The rendered HTML content of the newsletter.
     """
-    # 리스트로 제공된 경우, 딕셔너리 형태로 변환
+    # First extract any test configuration if present
+    if isinstance(data, dict):
+        data, test_config = extract_test_config(data)
+
     if isinstance(data, list):
-        # 기사 목록을 sections 형태로 변환
-        article_sections = []
-        for article in data:
-            title = article.get("title", "No Title")
-            url = article.get("url", "#")
-            # summary_text 또는 content 필드에서 내용 가져오기
-            content = article.get("summary_text", article.get("content", "No Content"))
-            source = article.get("source", "Unknown Source")
-            date = article.get("date", "")
-
-            # 소스에 날짜 정보가 포함되어 있는지 확인하고 분리
-            if not date and "," in source:
-                extracted_source, extracted_date = extract_source_and_date(source)
-                if extracted_date:
-                    source = extracted_source
-                    date = extracted_date
-
-            # 날짜 형식 포맷팅 (표시용)
-            formatted_date = format_date_for_display(date_str=date)
-            source_and_date = source
-            if formatted_date:
-                source_and_date = f"{source}, {formatted_date}"
-
-            article_sections.append(
-                {
-                    "title": title,
-                    "summary_paragraphs": [content],
-                    "news_links": [
-                        {
-                            "title": title,
-                            "url": url,
-                            "source_and_date": source_and_date,
-                        }
-                    ],
-                }
-            )
-
-        # 데이터 재구성
+        # 리스트 형태로 제공된 경우 구조화된 데이터로 변환
         newsletter_data = {
-            "newsletter_topic": "뉴스 요약",
-            "sections": article_sections,
+            "newsletter_topic": "주간 산업 동향",
+            "sections": [
+                {
+                    "title": "주요 기술 동향",
+                    "summary_paragraphs": [
+                        "다음은 지난 한 주간의 주요 기술 동향 요약입니다."
+                    ],
+                    "news_links": [],
+                }
+            ],
         }
+
+        for article in data:
+            article_title = article.get("title", "제목 없음")
+            article_url = article.get("url", "#")
+            article_source = article.get("source", "출처 미상")
+            article_date = article.get("date", "날짜 미상")
+
+            # 링크 정보 추가
+            link_info = {
+                "title": article_title,
+                "url": article_url,
+                "source_and_date": f"{article_source}, {article_date}",
+            }
+            newsletter_data["sections"][0]["news_links"].append(link_info)
+
+            # 첫 번째 기사 내용을 요약 본문으로 사용
+            if len(newsletter_data["sections"][0]["summary_paragraphs"]) == 1:
+                summary = article.get("summary_text") or article.get("content", "")
+                # 간단한 문단 나누기 (실제로는 더 정교한 처리가 필요할 수 있음)
+                paragraphs = summary.split("\n\n")
+                newsletter_data["sections"][0]["summary_paragraphs"] = paragraphs[
+                    :3
+                ]  # 최대 3개 문단
     else:
         # 이미 딕셔너리 형태로 제공된 경우
         newsletter_data = data
@@ -121,16 +141,21 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
         generation_date = os.environ.get(
             "GENERATION_DATE", datetime.now().strftime("%Y-%m-%d")
         )
+        generation_timestamp = datetime.now().strftime("%H:%M:%S")
     else:
         # 원래 딕셔너리인 경우 원래 로직 유지
         generation_date = data.get(
             "generation_date", datetime.now().strftime("%Y-%m-%d")
+        )
+        generation_timestamp = data.get(
+            "generation_timestamp", datetime.now().strftime("%H:%M:%S")
         )
 
     # Prepare a comprehensive context for rendering
     context = {
         "newsletter_topic": newsletter_data.get("newsletter_topic", "주간 산업 동향"),
         "generation_date": generation_date,
+        "generation_timestamp": generation_timestamp,
         "recipient_greeting": newsletter_data.get("recipient_greeting", "안녕하세요,"),
         "introduction_message": newsletter_data.get(
             "introduction_message", "지난 한 주간의 주요 산업 동향을 정리해 드립니다."
@@ -156,6 +181,33 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     return html_content
 
 
+def save_newsletter_with_config(
+    data: Dict[str, Any], config_data: Dict[str, Any], output_path: str
+) -> None:
+    """
+    Save the newsletter data with embedded test configuration.
+
+    Args:
+        data: Newsletter content data
+        config_data: Configuration data to embed
+        output_path: Path where to save the data
+    """
+    # Create a copy to avoid modifying the original
+    data_to_save = data.copy()
+
+    # Embed the configuration
+    data_to_save["_test_config"] = config_data
+
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Save the file
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, indent=2, ensure_ascii=False)
+
+    print(f"Saved newsletter data with embedded config to {output_path}")
+
+
 # Example usage (for testing purposes):
 if __name__ == "__main__":
     # This is a simplified example. In a real scenario,
@@ -163,6 +215,7 @@ if __name__ == "__main__":
     example_data = {
         "newsletter_topic": "AI 신약 개발, 디지털 치료제, 세포 유전자 치료제, 마이크로바이옴, 합성생물학",
         "generation_date": datetime.now().strftime("%Y-%m-%d"),
+        "generation_timestamp": datetime.now().strftime("%H:%M:%S"),
         "recipient_greeting": "안녕하세요, 전략프로젝트팀의 젊은 팀원과 수석전문위원 여러분.",
         "introduction_message": "지난 한 주간의 AI 신약 개발, 디지털 치료제, 세포 유전자 치료제, 마이크로바이옴, 합성생물학 산업 관련 주요 기술 동향 및 뉴스를 정리하여 보내드립니다. 함께 살펴보시고 R&D 전략 수립에 참고하시면 좋겠습니다.",
         "sections": [
@@ -221,6 +274,15 @@ if __name__ == "__main__":
         "company_name": "전략프로젝트팀",
     }
 
+    # Sample test config
+    example_config = {
+        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+        "keywords": ["AI", "신약", "디지털치료제", "마이크로바이옴", "합성생물학"],
+        "topic": "바이오 기술 동향",
+        "language": "ko",
+        "date_range": 7,
+    }
+
     # Define template directory and name (assuming this script is in newsletter/ and templates/ is a sibling)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(
@@ -240,17 +302,38 @@ if __name__ == "__main__":
         print(f"Template directory: {template_directory}")
         print(f"Template file: {template_file}")
         try:
+            # Combine data and config
+            example_data_with_config = example_data.copy()
+            example_data_with_config["_test_config"] = example_config
+
+            # Generate HTML
             html_output = compose_newsletter_html(
-                example_data, template_directory, template_file
+                example_data_with_config, template_directory, template_file
             )
+
+            # Save HTML
+            timestamp = example_config["timestamp"]
             output_filename = os.path.join(
                 project_root,
                 "output",
-                f"composed_newsletter_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html",
+                f"composed_newsletter_test_{timestamp}.html",
             )
             os.makedirs(os.path.join(project_root, "output"), exist_ok=True)
             with open(output_filename, "w", encoding="utf-8") as f:
                 f.write(html_output)
             print(f"Test newsletter saved to {output_filename}")
+
+            # Save data with config for testing
+            json_filename = os.path.join(
+                project_root,
+                "output/intermediate_processing",
+                f"render_data_{timestamp}_test.json",
+            )
+            os.makedirs(
+                os.path.join(project_root, "output/intermediate_processing"),
+                exist_ok=True,
+            )
+            save_newsletter_with_config(example_data, example_config, json_filename)
+
         except Exception as e:
             print(f"An error occurred during test composition: {e}")
