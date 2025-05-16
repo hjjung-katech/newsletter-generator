@@ -223,44 +223,71 @@ python run_tests.py --format --all
 
 ### 테스트 구조
 
-프로젝트 테스트는 `tests` 디렉토리에 체계적으로 관리되며 다음과 같은 유형이 있습니다:
+프로젝트 테스트는 `tests` 디렉토리에 체계적으로 관리되며 다음과 같은 구조로 되어 있습니다:
 
-1. **필터링 및 그룹화 테스트**
-   - `test_article_filter.py` - 기사 필터링 모듈 테스트
-   - `test_article_filter_integration.py` - 필터링 기능 통합 테스트
+1. **메인 테스트** (루트 디렉토리)
+   - 뉴스레터 생성, 필터링, 통합 기능에 대한 테스트
+   - 주요 파일: `test_newsletter.py`, `test_article_filter.py`, `test_compose.py` 등
 
-2. **API 및 검색 테스트**
-   - `test_serper_api.py` - Serper.dev API 통합 테스트
-   - `test_serper_direct.py` - Serper.dev API 직접 호출 테스트
-   - `test_sources.py` - 다양한 뉴스 소스 모듈 테스트
+2. **API 테스트** (`api_tests/` 디렉토리)
+   - API 키가 필요한, 외부 서비스 통합 테스트
+   - 주요 파일: `test_serper_direct.py`, `test_collect.py`, `test_summarize.py` 등
 
-3. **핵심 기능 테스트**
-   - `test_collect.py` - 기사 수집 기능 테스트
-   - `test_summarize.py` - 요약 기능 테스트
-   - `test_compose.py` - 뉴스레터 작성 기능 테스트
+3. **단위 테스트** (`unit_tests/` 디렉토리)
+   - 독립적인 기능의 단위 테스트 (API 키 불필요)
+   - 주요 파일: `test_date_utils.py`, `test_new_newsletter.py`, `test_weeks_ago.py` 등
 
-4. **종합 기능 테스트**
-   - `test_newsletter.py` - 뉴스레터 종합 기능 테스트
+4. **백업 테스트** (`_backup/` 디렉토리)
+   - 이전 버전 또는 보관용 테스트 파일
 
 ### 테스트 실행
 
 테스트 자동화 스크립트를 사용하여 쉽게 테스트를 실행할 수 있습니다:
 
 ```bash
-# 모든 테스트 실행
+# 모든 메인 테스트 실행 (백업 폴더 제외)
 python run_tests.py --all
 
-# 필터링 기능 테스트 실행
-python run_tests.py --test filter
+# API 테스트만 실행
+python run_tests.py --api
 
-# 테스트 목록 확인
+# 단위 테스트만 실행
+python run_tests.py --unit
+
+# 사용 가능한 테스트 목록 확인
 python run_tests.py --list
+
+# 모든 테스트 목록 확인 (단위/API/백업 테스트 포함)
+python run_tests.py --list-all
 
 # 특정 테스트 파일 실행
 python run_tests.py --test article_filter
+
+# 코드 포맷팅 후 테스트 실행
+python run_tests.py --format --all
 ```
 
-자세한 테스트 정보는 [tests/README.md](tests/README.md) 파일을 참조하세요.
+### 테스트 유형
+
+프로젝트는 다음과 같은 테스트 유형을 포함하고 있습니다:
+
+1. **필터링 및 그룹화 테스트**
+   - 중복 기사 감지, 키워드 그룹화, 소스 우선순위 지정 등 테스트
+   - 주요 파일: `test_article_filter.py`, `api_tests/test_article_filter_integration.py`
+
+2. **API 및 검색 테스트**
+   - 외부 API 연동 및 검색 기능 테스트
+   - 주요 파일: `test_serper_api.py`, `api_tests/test_serper_direct.py`, `api_tests/test_sources.py`
+
+3. **날짜 처리 테스트**
+   - 날짜 파싱, 포맷팅, 주 단위 계산 등 테스트
+   - 주요 파일: `test_graph_date_parser.py`, `unit_tests/test_date_utils.py`, `unit_tests/test_weeks_ago.py`
+
+4. **뉴스레터 생성 테스트**
+   - 전체 뉴스레터 생성 과정 테스트
+   - 주요 파일: `test_newsletter.py`, `unit_tests/test_new_newsletter.py`
+
+자세한 테스트 정보와 모든 테스트 파일 목록은 [tests/README.md](tests/README.md) 파일을 참조하세요.
 
 ---
 
