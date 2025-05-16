@@ -16,6 +16,8 @@ import json
 from jinja2 import Template
 from newsletter.sources import NewsSourceManager
 from . import tools  # 추가: tools 모듈 가져오기
+from .template_manager import TemplateManager
+from jinja2 import Environment, FileSystemLoader
 
 
 # HTML 템플릿 파일 로딩
@@ -248,10 +250,19 @@ def create_categorization_chain():
     # 메시지 생성 함수
     def create_messages(data):
         try:
-            # 포맷팅 문자열에 중괄호가 있어 이스케이프 처리가 필요
+            # 문자열 직접 포맷팅 대신 미리 처리된 값으로 포맷팅
+            keywords = data.get("keywords", "")
+            formatted_articles = format_articles(data)
+
+            # 중첩된 중괄호 이스케이프 처리
+            formatted_articles = formatted_articles.replace("{", "{{").replace(
+                "}", "}}"
+            )
+
+            # 포맷팅 진행
             prompt = CATEGORIZATION_PROMPT.format(
-                keywords=data.get("keywords", ""),
-                formatted_articles=format_articles(data),
+                keywords=keywords,
+                formatted_articles=formatted_articles,
             )
 
             # 메시지를 HumanMessage로 변환 (Gemini는 시스템 메시지 지원이 불안정함)
@@ -330,9 +341,15 @@ def create_summarization_chain():
                 ]
             )
 
+            # 중첩된 중괄호 이스케이프 처리
+            formatted_articles = formatted_articles.replace("{", "{{").replace(
+                "}", "}}"
+            )
+            category_title = category.get("title", "제목 없음")
+
             # 요약 프롬프트 생성
             prompt_content = SUMMARIZATION_PROMPT.format(
-                category_title=category.get("title", "제목 없음"),
+                category_title=category_title,
                 category_articles=formatted_articles,
             )
 
@@ -385,8 +402,13 @@ def create_composition_chain():
         current_date = datetime.date.today().strftime("%Y-%m-%d")
         sections_data = json.dumps(data["sections"], ensure_ascii=False, indent=2)
 
+        # JSON 데이터의 중괄호 이스케이프 처리
+        sections_data = sections_data.replace("{", "{{").replace("}", "}}")
+
+        keywords = data.get("keywords", "")
+
         prompt_content = COMPOSITION_PROMPT.format(
-            keywords=data.get("keywords", ""),
+            keywords=keywords,
             category_summaries=sections_data,
             current_date=current_date,
         )
@@ -478,7 +500,64 @@ def create_rendering_chain():
                 # 5. 기본값 - 단일 문자열 키워드
                 combined_data["newsletter_topic"] = keywords
 
+        # 기본 템플릿 설정 추가
+        combined_data["company_name"] = template_manager.get(
+            "company.name", "R&D 기획단"
+        )
+        combined_data["footer_disclaimer"] = template_manager.get(
+            "footer.disclaimer",
+            "이 뉴스레터는 정보 제공용으로만 사용되며, 투자 권유를 목적으로 하지 않습니다.",
+        )
+        combined_data["editor_signature"] = template_manager.get(
+            "editor.signature", "편집자 드림"
+        )
+
+        # 새로 추가된 필드들 적용
+        combined_data["copyright_year"] = template_manager.get(
+            "company.copyright_year", datetime.date.today().strftime("%Y")
+        )
+        combined_data["company_tagline"] = template_manager.get("company.tagline", "")
+        combined_data["footer_contact"] = template_manager.get(
+            "footer.contact_info", ""
+        )
+        combined_data["editor_name"] = template_manager.get("editor.name", "")
+        combined_data["editor_title"] = template_manager.get("editor.title", "")
+        combined_data["editor_email"] = template_manager.get("editor.email", "")
+        combined_data["title_prefix"] = template_manager.get(
+            "header.title_prefix", "주간 산업 동향 뉴스 클리핑"
+        )
+        combined_data["greeting_prefix"] = template_manager.get(
+            "header.greeting_prefix", "안녕하십니까, "
+        )
+        combined_data["audience_organization"] = template_manager.get(
+            "audience.organization", ""
+        )
+
+        # 스타일 설정 적용
+        combined_data["primary_color"] = template_manager.get(
+            "style.primary_color", "#3498db"
+        )
+        combined_data["secondary_color"] = template_manager.get(
+            "style.secondary_color", "#2c3e50"
+        )
+        combined_data["font_family"] = template_manager.get(
+            "style.font_family", "Malgun Gothic, sans-serif"
+        )
+
+        # 인사말이 없는 경우 기본 인사말 설정
+        if "recipient_greeting" not in combined_data or not combined_data.get(
+            "recipient_greeting"
+        ):
+            audience_desc = template_manager.get(
+                "audience.description", "귀하께서 여기 계시다니 영광입니다"
+            )
+            combined_data["recipient_greeting"] = (
+                f"{combined_data.get('greeting_prefix', '안녕하십니까, ')} {combined_data.get('company_name')} {audience_desc}."
+            )
+
         # Jinja2 템플릿 렌더링
+        from jinja2 import Template
+
         template = Template(HTML_TEMPLATE)
         rendered_html = template.render(**combined_data)
 
@@ -550,6 +629,7 @@ def get_newsletter_chain():
                     "composition": composition,
                     "sections_data": sections_data,
                     "keywords": data.get("keywords", ""),
+                    "domain": data.get("domain", ""),  # 도메인 정보 추가
                 }
             )
 
