@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from . import config
 from rich.console import Console
 import re
+from .date_utils import standardize_date, parse_date_string
 
 console = Console()
 
@@ -36,6 +37,19 @@ class NewsSource:
 
     def _standardize_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
         """각 소스별 기사 형식을 표준화"""
+        # 날짜 정보 추출
+        raw_date = article.get(
+            "date",
+            article.get("publishedAt", article.get("published", "날짜 없음")),
+        )
+
+        # 원래 날짜 형식 저장 (디버깅 및 데이터 보존 목적)
+        original_date = raw_date
+
+        # 날짜 형식 표준화 (YYYY-MM-DD)
+        standardized_date = standardize_date(raw_date)
+
+        # 반환할 기사 정보
         return {
             "title": article.get("title", "제목 없음"),
             "url": article.get("url", article.get("link", "#")),
@@ -45,10 +59,8 @@ class NewsSource:
                 article.get("description", article.get("content", "내용 없음")),
             ),
             "source": article.get("source", self.name),
-            "date": article.get(
-                "date",
-                article.get("publishedAt", article.get("published", "날짜 없음")),
-            ),
+            "date": standardized_date,  # 표준화된 날짜 사용
+            "original_date": original_date,  # 원래 날짜 형식 보존
             "source_type": self.name,  # 어떤 소스에서 수집되었는지 추적
         }
 

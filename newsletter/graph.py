@@ -11,6 +11,7 @@ import json
 import os  # Added import
 import re  # Added import for regex date parsing
 from datetime import datetime, timedelta, timezone  # Added imports
+from .date_utils import parse_date_string
 
 
 # State 정의
@@ -32,143 +33,18 @@ class NewsletterState(TypedDict):
 
 
 # Helper function to parse article dates
-def parse_article_date_for_graph(
-    date_str: Any,
-) -> Optional[datetime]:  # Changed type hint for initial check
-    if not isinstance(date_str, str) or not date_str.strip() or date_str == "날짜 없음":
-        return None
+def parse_article_date_for_graph(date_str: Any) -> Optional[datetime]:
+    """
+    다양한 형식의 날짜 문자열을 파싱하여 datetime 객체로 변환합니다.
+    date_utils 모듈의 parse_date_string 함수를 사용하여 일관된 날짜 처리를 지원합니다.
 
-    date_str = date_str.strip()
-    now = datetime.now(timezone.utc)  # Use timezone-aware now for relative dates
+    Args:
+        date_str: 변환할 날짜 문자열
 
-    # 1. Handle relative Korean dates
-    if isinstance(
-        date_str, str
-    ):  # Check if date_str is a string before calling .endswith()
-        if date_str.endswith("일 전"):  # "X일 전"
-            try:
-                days_ago = int(date_str.split("일")[0].strip())
-                return now - timedelta(days=days_ago)
-            except ValueError:
-                pass  # Fall through to other formats
-        elif date_str.endswith("시간 전"):  # "X시간 전"
-            try:
-                hours_ago = int(date_str.split("시간")[0].strip())
-                return now - timedelta(hours=hours_ago)
-            except ValueError:
-                pass
-        elif date_str.endswith("분 전"):  # "X분 전"
-            try:
-                minutes_ago = int(date_str.split("분")[0].strip())
-                return now - timedelta(minutes=minutes_ago)
-            except ValueError:
-                pass
-        elif date_str == "어제":
-            return now - timedelta(days=1)
-        elif date_str == "오늘":  # Less common for articles, but good to have
-            return now  # 2. Handle relative English dates (e.g., "X minutes ago", "X hours ago", "X days ago")
-    if isinstance(
-        date_str, str
-    ):  # Ensure it's a string for regex        # Handle both "X minute ago" (단수형) 및 "X minutes ago" (복수형)
-        match_minutes = re.match(r"(\d+)\s+minutes?\s+ago", date_str, re.IGNORECASE)
-        if match_minutes:
-            try:
-                minutes_ago = int(match_minutes.group(1))
-                return now - timedelta(minutes=minutes_ago)
-            except ValueError:
-                pass
-
-        # 영어 단수형 처리 - "X minute ago"
-        match_minute = re.match(r"(\d+)\s+minute\s+ago", date_str, re.IGNORECASE)
-        if match_minute:
-            try:
-                minutes_ago = int(match_minute.group(1))
-                return now - timedelta(minutes=minutes_ago)
-            except ValueError:
-                pass
-
-        match_hours = re.match(r"(\d+)\s+hours?\s+ago", date_str, re.IGNORECASE)
-        if match_hours:
-            try:
-                hours_ago = int(match_hours.group(1))
-                return now - timedelta(hours=hours_ago)
-            except ValueError:
-                pass
-
-        match_days = re.match(r"(\d+)\s+days?\s+ago", date_str, re.IGNORECASE)
-        if match_days:
-            try:
-                days_ago = int(match_days.group(1))
-                return now - timedelta(days=days_ago)
-            except ValueError:
-                pass
-
-        match_weeks = re.match(r"(\d+)\s+weeks?\s+ago", date_str, re.IGNORECASE)
-        if match_weeks:
-            try:
-                weeks_ago = int(match_weeks.group(1))
-                return now - timedelta(weeks=weeks_ago)
-            except ValueError:
-                pass
-
-        match_months = re.match(r"(\d+)\s+months?\s+ago", date_str, re.IGNORECASE)
-        if match_months:
-            try:
-                months_ago = int(match_months.group(1))
-                # timedelta doesn't directly support months, approximate as 30 days
-                return now - timedelta(days=months_ago * 30)
-            except ValueError:
-                pass
-
-    # 3. ISO 8601 format (with or without 'Z')
-    try:
-        if date_str.endswith("Z") and len(date_str) > 1:
-            dt = datetime.fromisoformat(date_str[:-1] + "+00:00")
-        else:
-            dt = datetime.fromisoformat(date_str)
-        # If parsed successfully but naive, make it timezone-aware (assume UTC)
-        if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt
-    except ValueError:
-        # 3. Try other common formats
-        common_formats = [
-            "%Y-%m-%dT%H:%M:%S.%f%z",  # ISO with microseconds and timezone
-            "%Y-%m-%dT%H:%M:%S%z",  # ISO with timezone
-            "%Y-%m-%dT%H:%M:%S",  # ISO without timezone
-            "%Y-%m-%d %H:%M:%S%z",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y.%m.%d. %H:%M:%S",  # Added dot after day, space before H:M:S
-            "%Y.%m.%d %H:%M:%S",  # Original
-            "%Y.%m.%d.",  # Format like "2024. 7. 3." (with trailing dot)
-            "%Y. %m. %d.",  # Format like "2024. 7. 3." (with spaces and trailing dot) - Primary target for Serper
-            "%Y.%m.%d",  # Original
-            "%Y-%m-%d",
-            "%Y년 %m월 %d일",  # Korean format "YYYY년 MM월 DD일"
-            # English formats
-            "%b %d, %Y",  # e.g., Apr 16, 2025
-            "%B %d, %Y",  # e.g., April 16, 2025
-            "%m/%d/%Y",  # e.g., 04/16/2025
-            "%d %b %Y",  # e.g., 16 Apr 2025
-            "%d %B %Y",  # e.g., 16 April 2025
-        ]
-        for fmt in common_formats:
-            try:
-                dt = datetime.strptime(date_str, fmt)
-                # If parsed successfully but naive, make it timezone-aware (assume UTC)
-                if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                return dt
-            except ValueError:
-                continue
-
-        # 4. Try to parse YYYY.MM.DD or YYYY.M.D without strict padding (more robust)
-        # This is a bit more complex, might need regex if strptime fails for unpadded single digits with spaces
-        # For now, relying on '%Y. %m. %d.' which should handle spaces if month/day are single/double digits.
-        # Let's test if '%Y. %m. %d.' correctly handles '2024. 7. 3.' and '2024. 12. 10.'
-
-        print(f"Warning: Could not parse date: '{date_str}' with any known format.")
-        return None
+    Returns:
+        datetime 객체 또는 변환 실패 시 None
+    """
+    return parse_date_string(date_str)
 
 
 # 노드 함수 정의

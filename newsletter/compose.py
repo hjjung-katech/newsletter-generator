@@ -2,6 +2,12 @@
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 from datetime import datetime
+from typing import Any, Dict, List
+from .date_utils import (
+    format_date_for_display,
+    extract_source_and_date,
+    standardize_date,
+)
 
 
 def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
@@ -46,6 +52,19 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
             source = article.get("source", "Unknown Source")
             date = article.get("date", "")
 
+            # 소스에 날짜 정보가 포함되어 있는지 확인하고 분리
+            if not date and "," in source:
+                extracted_source, extracted_date = extract_source_and_date(source)
+                if extracted_date:
+                    source = extracted_source
+                    date = extracted_date
+
+            # 날짜 형식 포맷팅 (표시용)
+            formatted_date = format_date_for_display(date_str=date)
+            source_and_date = source
+            if formatted_date:
+                source_and_date = f"{source}, {formatted_date}"
+
             article_sections.append(
                 {
                     "title": title,
@@ -54,7 +73,7 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
                         {
                             "title": title,
                             "url": url,
-                            "source_and_date": f"{source} {date}".strip(),
+                            "source_and_date": source_and_date,
                         }
                     ],
                 }
@@ -68,6 +87,24 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     else:
         # 이미 딕셔너리 형태로 제공된 경우
         newsletter_data = data
+
+        # 뉴스 링크의 날짜 형식 포맷팅
+        if "sections" in newsletter_data:
+            for section in newsletter_data["sections"]:
+                if "news_links" in section:
+                    for link in section["news_links"]:
+                        if "source_and_date" in link:
+                            source, date_str = extract_source_and_date(
+                                link["source_and_date"]
+                            )
+                            if date_str:
+                                formatted_date = format_date_for_display(
+                                    date_str=date_str
+                                )
+                                if formatted_date:
+                                    link["source_and_date"] = (
+                                        f"{source}, {formatted_date}"
+                                    )
 
     print(
         f"Composing newsletter for topic: {newsletter_data.get('newsletter_topic', 'N/A')}..."
