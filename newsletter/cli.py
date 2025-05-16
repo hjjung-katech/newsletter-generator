@@ -280,6 +280,53 @@ def run(
         safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
         filename_base = f"{current_date_str}_newsletter_{safe_topic}"
 
+        # 뉴스레터 파일 저장 (LangGraph 방식)
+        if output_format:
+            console.print(
+                f"\n[cyan]Saving newsletter locally as {output_format.upper()}...[/cyan]"
+            )
+            save_path = os.path.join(
+                output_directory, f"{filename_base}.{output_format}"
+            )
+            console.print(f"[info]Saving to: {save_path}[/info]")
+
+            if news_deliver.save_locally(
+                html_content, filename_base, output_format, output_directory
+            ):
+                console.print(
+                    f"[green]Newsletter saved locally as {save_path}.[/green]"
+                )
+                # 파일 존재 확인
+                if os.path.exists(save_path):
+                    file_size = os.path.getsize(save_path)
+                    console.print(
+                        f"[green]File created successfully - Size: {file_size} bytes[/green]"
+                    )
+                else:
+                    console.print(
+                        f"[bold red]Error: File was not created at {save_path}[/bold red]"
+                    )
+            else:
+                console.print(
+                    f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
+                )
+
+        # Google Drive에 저장(드라이브 옵션이 활성화된 경우)
+        if drive:
+            console.print(f"\n[cyan]Uploading to Google Drive...[/cyan]")
+            if news_deliver.save_to_drive(
+                html_content, filename_base, output_directory
+            ):
+                console.print(
+                    "[green]Successfully uploaded newsletter to Google Drive.[/green]"
+                )
+            else:
+                console.print(
+                    "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
+                )
+
+        console.print("\n[bold green]Newsletter process completed.[/bold green]")
+
     # 기존 방식 사용하는 경우
     else:
         # 1. Collect articles
