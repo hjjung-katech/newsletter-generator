@@ -135,30 +135,169 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
     Returns:
         Path to the generated HTML file
     """
+    # 실제 템플릿 렌더링을 위해 필요한 모듈 임포트
+    from ..compose import compose_newsletter_html
+    import os
+    import datetime
+
     # Load data file
     data = load_intermediate_data(data_file)
 
     # Extract config if present (we may not use it now, but it's ready if needed)
     content_data, config_data = extract_config_from_data(data)
 
-    # Determine generation timestamp
-    timestamp = (
-        config_data.get("timestamp", None)
-        or content_data.get("generation_timestamp", None)
-        or os.path.basename(data_file).split("_")[2]
-        if "_" in os.path.basename(data_file)
-        else None
-    )
+    # 타임스탬프 추출 로직 개선
+    timestamp = None
+    timestamp_format = "%Y%m%d_%H%M%S"
 
-    # Set output path
+    # 1. 파일명에서 타임스탬프 추출 시도
+    try:
+        file_basename = os.path.basename(data_file)
+        parts = file_basename.split("_")
+        if len(parts) >= 3 and parts[0] == "render" and parts[1] == "data":
+            # render_data_YYYYMMDD_HHMMSS 형식에서 추출
+            timestamp = parts[2]
+
+            # YYYYMMDD 형식이라면 시간 부분 추가 (기본값 000000)
+            if len(timestamp) == 8 and timestamp.isdigit():
+                timestamp = f"{timestamp}_000000"
+
+            logger.info(f"Extracted timestamp from filename: {timestamp}")
+    except Exception as e:
+        logger.warning(f"Failed to extract timestamp from filename: {e}")
+
+    # 2. 설정 데이터에서 타임스탬프 확인
+    if not timestamp and config_data.get("timestamp"):
+        timestamp = config_data.get("timestamp")
+        logger.info(f"Using timestamp from config: {timestamp}")
+
+    # 3. 콘텐츠 데이터에서 타임스탬프 확인
+    generation_timestamp = None
+    if not timestamp and content_data.get("generation_timestamp"):
+        generation_timestamp = content_data.get("generation_timestamp")
+        # HH:MM:SS 형식을 HHMMSS로 변환
+        if ":" in generation_timestamp:
+            hour, minute, second = generation_timestamp.split(":")
+            timestamp_time = f"{hour}{minute}{second}"
+            # 날짜 부분 추가 (YYYYMMDD)
+            generation_date = content_data.get(
+                "generation_date", datetime.datetime.now().strftime("%Y-%m-%d")
+            )
+            # 2025-05-16 형식을 20250516으로 변환
+            if "-" in generation_date:
+                year, month, day = generation_date.split("-")
+                timestamp_date = f"{year}{month}{day}"
+                timestamp = f"{timestamp_date}_{timestamp_time}"
+                logger.info(f"Created timestamp from date and time: {timestamp}")
+
+    # 4. 현재 시간으로 타임스탬프 생성 (기본값)
+    if not timestamp:
+        timestamp = datetime.datetime.now().strftime(timestamp_format)
+        logger.info(f"Using current time as timestamp: {timestamp}")
+
+    # 생성 날짜와 시간을 content_data에 설정
+    if "generation_date" not in content_data:
+        # 2025-05-16 형식으로 변환
+        if timestamp and len(timestamp) >= 8:
+            date_part = timestamp.split("_")[0] if "_" in timestamp else timestamp[:8]
+            if len(date_part) == 8:
+                content_data["generation_date"] = (
+                    f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
+                )
+
+        if "generation_date" not in content_data:
+            content_data["generation_date"] = datetime.datetime.now().strftime(
+                "%Y-%m-%d"
+            )
+
+    if "generation_timestamp" not in content_data:
+        # HH:MM:SS 형식으로 변환
+        if timestamp and "_" in timestamp:
+            time_part = timestamp.split("_")[1]
+            if len(time_part) >= 6:
+                content_data["generation_timestamp"] = (
+                    f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+                )
+
+        if "generation_timestamp" not in content_data:
+            content_data["generation_timestamp"] = datetime.datetime.now().strftime(
+                "%H:%M:%S"
+            )
+
+    # 템플릿 렌더링에 필요한 추가 데이터 설정
+    if "title_prefix" not in content_data:
+        content_data["title_prefix"] = "주간 산업 동향 뉴스 클리핑"
+
+    if "company_name" not in content_data:
+        content_data["company_name"] = "산업통상자원 R&D 전략기획단"
+
+    if "primary_color" not in content_data:
+        content_data["primary_color"] = "#3498db"
+
+    if "secondary_color" not in content_data:
+        content_data["secondary_color"] = "#2c3e50"
+
+    if "font_family" not in content_data:
+        content_data["font_family"] = "Malgun Gothic, sans-serif"
+
+    # Set output path with the improved timestamp
     if not output_html_path:
         output_html_path = generate_newsletter_filename(
             content_data.get("newsletter_topic", "test_newsletter"), timestamp
         )
 
-    # Here you would integrate with your HTML generation logic
-    # For now, we'll create a very basic HTML file as a placeholder
-    html_content = f"""<!DOCTYPE html>
+    # 템플릿 디렉토리 설정
+    current_dir = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    template_dir = os.path.join(current_dir, "templates")
+    template_name = "newsletter_template.html"
+
+    # 템플릿 디렉토리 존재 확인
+    if not os.path.exists(template_dir):
+        logger.warning(f"Template directory not found: {template_dir}")
+        os.makedirs(template_dir, exist_ok=True)
+
+    # 템플릿 파일 존재 확인
+    template_path = os.path.join(template_dir, template_name)
+    if not os.path.exists(template_path):
+        logger.warning(f"Template file not found: {template_path}")
+        # 기본 템플릿 생성
+        with open(template_path, "w", encoding="utf-8") as f:
+            f.write(
+                """<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title_prefix }} ({{ newsletter_topic }} - {{ generation_date }} {{ generation_timestamp }})</title>
+</head>
+<body>
+    <h1>{{ newsletter_topic }}</h1>
+    <p>Generated from test data: {{ data_file }}</p>
+    <p>Generated at: {{ generation_date }} {{ generation_timestamp }}</p>
+</body>
+</html>"""
+            )
+
+    # 실제 템플릿 렌더링 수행
+    try:
+        html_content = compose_newsletter_html(
+            content_data, template_dir, template_name
+        )
+
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_html_path), exist_ok=True)
+
+        # Write HTML content to file
+        with open(output_html_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        logger.info(f"Test mode completed. Generated newsletter at {output_html_path}")
+        return output_html_path
+    except Exception as e:
+        logger.error(f"Failed to render newsletter HTML: {e}")
+        # 예외 발생 시 기본 HTML 생성
+        basic_html = f"""<!DOCTYPE html>
 <html>
 <head>
     <title>{content_data.get('newsletter_topic', 'Test Newsletter')}</title>
@@ -167,15 +306,16 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
     <h1>{content_data.get('newsletter_topic', 'Test Newsletter')}</h1>
     <p>Generated from test data: {data_file}</p>
     <p>Generated at: {timestamp}</p>
+    <p>Error occurred during rendering: {str(e)}</p>
 </body>
 </html>"""
 
-    # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_html_path), exist_ok=True)
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_html_path), exist_ok=True)
 
-    # Write HTML content to file
-    with open(output_html_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
+        # Write basic HTML content to file
+        with open(output_html_path, "w", encoding="utf-8") as f:
+            f.write(basic_html)
 
-    logger.info(f"Test mode completed. Generated newsletter at {output_html_path}")
-    return output_html_path
+        logger.info(f"Fallback HTML generated at {output_html_path} due to error")
+        return output_html_path
