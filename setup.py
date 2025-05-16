@@ -2,11 +2,18 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="newsletter-generator",
+    name="newsletter",
     version="0.1.0",
-    description="Newsletter generator using LangChain and LangGraph",
-    author="Newsletter Generator Team",
-    author_email="example@corp.com",
+    description="Newsletter generation and testing tools",
+    author="Newsletter Team",
     packages=find_packages(),
-    python_requires=">=3.8",
-) 
+    include_package_data=True,
+    install_requires=[
+        "typer",
+        "rich",
+    ],
+    entry_points="""
+        [console_scripts]
+        newsletter=newsletter.cli:app
+    """,
+)

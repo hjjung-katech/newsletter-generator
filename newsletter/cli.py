@@ -581,5 +581,33 @@ def suggest(
         )
 
 
+@app.command()
+def test(
+    data_file: str = typer.Argument(
+        ..., help="Path to the render_data file to use for testing"
+    ),
+    output: Optional[str] = typer.Option(
+        None, "--output", help="Optional custom output path for the HTML file"
+    ),
+):
+    """
+    Generate a newsletter HTML directly from an existing render_data file.
+    Useful for testing template changes without re-collecting data.
+    """
+    from .utils.test_mode import run_in_test_mode
+
+    console.print(
+        f"[bold blue]Testing newsletter generation using data file: {data_file}[/bold blue]"
+    )
+    try:
+        output_path = run_in_test_mode(data_file, output)
+        console.print(
+            f"[bold green]Test completed successfully! Output saved to: {output_path}[/bold green]"
+        )
+    except Exception as e:
+        console.print(f"[bold red]Error during test: {e}[/bold red]")
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
