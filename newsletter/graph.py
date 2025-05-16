@@ -21,10 +21,12 @@ class NewsletterState(TypedDict):
     # 입력 값
     keywords: List[str]
     news_period_days: int  # Configurable days for news recency filter
+    domain: str  # Added domain field
     # 중간 결과물
     collected_articles: Optional[List[Dict]]  # Made Optional
     processed_articles: Optional[List[Dict]]  # New field
     article_summaries: Optional[Dict]  # Made Optional
+    newsletter_topic: Optional[str]  # 뉴스레터 주제 필드
     # 최종 결과물
     newsletter_html: Optional[str]  # Made Optional
     # 제어 및 메타데이터
@@ -324,6 +326,7 @@ def summarize_articles_node(
         chain_input = {
             "keywords": keyword_str,
             "articles": processed_articles,  # Use processed_articles
+            "domain": state.get("domain"),  # 도메인 정보 전달
         }
 
         result = summarization_chain.invoke(chain_input)
@@ -392,7 +395,7 @@ def create_newsletter_graph() -> StateGraph:
 
 # 뉴스레터 생성 함수
 def generate_newsletter(
-    keywords: List[str], news_period_days: int = 14
+    keywords: List[str], news_period_days: int = 14, domain: str = None
 ) -> Tuple[str, str]:
     """
     키워드를 기반으로 뉴스레터를 생성하는 메인 함수
@@ -400,14 +403,29 @@ def generate_newsletter(
     Args:
         keywords: 키워드 리스트
         news_period_days: 최신 뉴스 수집 기간(일 단위), 기본값 14일(2주)
+        domain: 키워드를 생성한 도메인 (있는 경우)
 
     Returns:
         (뉴스레터 HTML, 상태)
     """
+    # 뉴스레터 주제 결정 (도메인, 단일 키워드, 또는 공통 주제)
+    newsletter_topic = ""
+    if domain:
+        newsletter_topic = domain  # 도메인이 있으면 도메인 사용
+    elif len(keywords) == 1:
+        newsletter_topic = keywords[0]  # 단일 키워드면 해당 키워드 사용
+    else:
+        # 여러 키워드의 공통 주제 추출
+        from .tools import extract_common_theme_from_keywords
+
+        newsletter_topic = extract_common_theme_from_keywords(keywords)
+
     # 초기 상태 생성
     initial_state: NewsletterState = {  # Added type hint for clarity
         "keywords": keywords,
         "news_period_days": news_period_days,  # Propagate configurable period to state
+        "domain": domain,  # 도메인 정보 추가
+        "newsletter_topic": newsletter_topic,  # 뉴스레터 주제 추가
         "collected_articles": None,  # Initialize as None
         "processed_articles": None,  # Initialize as None
         "article_summaries": None,  # Initialize as None

@@ -15,6 +15,7 @@ import datetime
 import json
 from jinja2 import Template
 from newsletter.sources import NewsSourceManager
+from . import tools  # 추가: tools 모듈 가져오기
 
 
 # HTML 템플릿 파일 로딩
@@ -446,6 +447,37 @@ def create_rendering_chain():
                 "%Y-%m-%d"
             )
 
+        # 키워드 처리 및 뉴스레터 주제 설정
+        if "keywords" in data and data["keywords"]:
+            # 키워드를 문자열로 변환 (템플릿 표시용)
+            keywords = data["keywords"]
+            domain = data.get("domain", "")
+
+            # 검색 키워드 설정
+            if isinstance(keywords, list):
+                combined_data["search_keywords"] = ", ".join(keywords)
+            else:
+                combined_data["search_keywords"] = keywords
+
+            # newsletter_topic 설정 로직
+            if domain:
+                # 1. 도메인이 있으면 도메인 사용
+                combined_data["newsletter_topic"] = domain
+            elif isinstance(keywords, list) and len(keywords) == 1:
+                # 2. 단일 키워드는 그대로 사용
+                combined_data["newsletter_topic"] = keywords[0]
+            elif isinstance(keywords, list) and len(keywords) > 1:
+                # 3. 여러 키워드의 공통 주제 추출
+                common_theme = tools.extract_common_theme_from_keywords(keywords)
+                combined_data["newsletter_topic"] = common_theme
+            elif isinstance(keywords, str) and "," in keywords:
+                # 4. 콤마로 구분된 여러 키워드
+                common_theme = tools.extract_common_theme_from_keywords(keywords)
+                combined_data["newsletter_topic"] = common_theme
+            else:
+                # 5. 기본값 - 단일 문자열 키워드
+                combined_data["newsletter_topic"] = keywords
+
         # Jinja2 템플릿 렌더링
         template = Template(HTML_TEMPLATE)
         rendered_html = template.render(**combined_data)
@@ -514,7 +546,11 @@ def get_newsletter_chain():
             # 4. 렌더링 단계 실행
             print("4단계: HTML 렌더링 중...")
             final_html = rendering_chain.invoke(
-                {"composition": composition, "sections_data": sections_data}
+                {
+                    "composition": composition,
+                    "sections_data": sections_data,
+                    "keywords": data.get("keywords", ""),
+                }
             )
 
             print("뉴스레터 생성 완료!")

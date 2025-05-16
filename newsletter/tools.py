@@ -17,6 +17,7 @@ from langchain_core.output_parsers import StrOutputParser
 from . import config
 from rich.console import Console
 import re
+import time
 
 console = Console()
 
@@ -346,7 +347,7 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
 
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro-preview-03-25", 
+            model="gemini-2.5-pro-preview-03-25",
             google_api_key=config.GEMINI_API_KEY,
             temperature=0.7,
             transport="rest",  # REST API 사용 (gRPC 대신)
@@ -392,11 +393,11 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
                 continue
 
             # 앞의 번호 및 마크다운 볼드 표시 제거
-            clean_line = re.sub(r'^\d+\.?\s*', '', line.strip())
-            clean_line = re.sub(r'\*\*(.+?)\*\*', r'\1', clean_line)
+            clean_line = re.sub(r"^\d+\.?\s*", "", line.strip())
+            clean_line = re.sub(r"\*\*(.+?)\*\*", r"\1", clean_line)
 
             # 괄호 안의 영어 설명 제거 (있는 경우)
-            clean_line = re.sub(r'\s*\(.+?\)\s*$', '', clean_line)
+            clean_line = re.sub(r"\s*\(.+?\)\s*$", "", clean_line)
 
             if clean_line:
                 keywords.append(clean_line)
@@ -408,9 +409,11 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
 
         if len(final_keywords) == 1 and "," in final_keywords[0]:
             final_keywords = [kw.strip() for kw in final_keywords[0].split(",")][:count]
-            
+
         # 키워드 효과성 검증 (옵션)
-        final_keywords = validate_and_refine_keywords(final_keywords, min_results_per_keyword=3, count=count)
+        final_keywords = validate_and_refine_keywords(
+            final_keywords, min_results_per_keyword=3, count=count
+        )
 
         console.print(f"\n[cyan]최종 키워드 ({len(final_keywords)}):[/cyan]")
         for i, kw in enumerate(final_keywords, 1):
@@ -425,37 +428,196 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
         return []
 
 
-def validate_and_refine_keywords(keywords: list[str], min_results_per_keyword: int = 3, count: int = 10) -> list[str]:
+def validate_and_refine_keywords(
+    keywords: list[str], min_results_per_keyword: int = 3, count: int = 10
+) -> list[str]:
     """각 키워드로 검색했을 때 충분한 결과가 나오는지 검증하고, 문제가 있는 키워드는 대체합니다."""
-    
+
     validated_keywords = []
     replacement_needed = []
-    
-    console.print(f"\n[cyan]검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...[/cyan]")
-    
+
+    console.print(
+        f"\n[cyan]검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...[/cyan]"
+    )
+
     for keyword in keywords:
         try:
             # 키워드로 테스트 검색 (invoke 메서드 사용)
-            test_results = search_news_articles.invoke({"keywords": keyword, "num_results": 5})
-            
+            test_results = search_news_articles.invoke(
+                {"keywords": keyword, "num_results": 5}
+            )
+
             if len(test_results) >= min_results_per_keyword:
                 validated_keywords.append(keyword)
-                console.print(f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]")
+                console.print(
+                    f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]"
+                )
             else:
                 replacement_needed.append(keyword)
-                console.print(f"[yellow]✗ '{keyword}': 결과 부족 ({len(test_results)}개)[/yellow]")
-        
+                console.print(
+                    f"[yellow]✗ '{keyword}': 결과 부족 ({len(test_results)}개)[/yellow]"
+                )
+
         except Exception as e:
             console.print(f"[red]! '{keyword}' 검증 중 오류: {e}[/red]")
             replacement_needed.append(keyword)
-    
+
     # 대체 키워드 생성이 필요한 경우
     if replacement_needed and validated_keywords:
-        console.print(f"[yellow]{len(replacement_needed)}개 키워드에 대한 대체 키워드 생성 중...[/yellow]")
-        
+        console.print(
+            f"[yellow]{len(replacement_needed)}개 키워드에 대한 대체 키워드 생성 중...[/yellow]"
+        )
+
         # 이 부분도 수정 필요 - domain 변수가 함수 내에서 접근할 수 없음
         new_keywords = []  # 임시 빈 리스트로 대체
-        
+
         validated_keywords.extend(new_keywords)
-    
+
     return validated_keywords[:count]  # 원래 요청한 개수만큼 반환
+
+
+def extract_common_theme_from_keywords(keywords, api_key=None):
+    """
+    키워드 리스트에서 공통 주제/분야를 추출합니다.
+
+    Args:
+        keywords: 문자열 키워드 리스트 또는 콤마로 구분된 키워드 문자열
+        api_key: Gemini API 키 (None인 경우 config에서 가져옴)
+
+    Returns:
+        str: 추출된 공통 주제/분야
+    """
+    if not api_key:
+        # config.GEMINI_API_KEY 또는 환경 변수 GOOGLE_API_KEY 사용
+        api_key = config.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            print("Warning: API key not set, using fallback method")
+            return extract_common_theme_fallback(keywords)
+
+    # 키워드가 문자열인 경우 리스트로 변환
+    if isinstance(keywords, str):
+        keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+
+    # 키워드가 하나뿐이면 그대로 반환
+    if len(keywords) <= 1:
+        return keywords[0] if keywords else ""
+
+    try:
+        import google.generativeai as genai
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+
+        prompt = f"""
+        다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
+        {', '.join(keywords)}
+        
+        출력 형식:
+        - 공통 분야/주제만 간결하게 답변해 주세요 (3단어 이내)
+        - 설명이나 부가 정보는 포함하지 마세요
+        - 반드시 한국어로 답변해 주세요
+        """
+
+        response = model.generate_content(prompt)
+        extracted_theme = response.text.strip()
+
+        # 결과가 너무 길면 자르기
+        if len(extracted_theme) > 30:
+            extracted_theme = extracted_theme[:30]
+
+        return extracted_theme
+
+    except Exception as e:
+        print(f"Error extracting common theme with Gemini: {e}")
+        return extract_common_theme_fallback(keywords)
+
+
+def extract_common_theme_fallback(keywords):
+    """
+    AI API 없이 간단한 휴리스틱 방식으로 공통 주제 추출을 시도합니다.
+    """
+    if isinstance(keywords, str):
+        keywords = [k.strip() for k in keywords.split(",") if k.strip()]
+
+    if len(keywords) <= 1:
+        return keywords[0] if keywords else ""
+
+    # 단순하게 키워드 조합으로 반환
+    if len(keywords) <= 3:
+        return ", ".join(keywords)
+    else:
+        return f"{keywords[0]} 외 {len(keywords)-1}개 분야"
+
+
+def sanitize_filename(text):
+    """
+    파일명에 사용할 수 있도록 텍스트를 정리합니다.
+
+    Args:
+        text: 정리할 텍스트
+
+    Returns:
+        파일명에 적합한 문자열
+    """
+    if not text:
+        return "unknown"
+
+    # 1. 파일명에 허용되지 않는 특수 문자 제거 또는 대체
+    invalid_chars = r'[\\/*?:"<>|]'
+    text = re.sub(invalid_chars, "", text)
+
+    # 2. 괄호를 제거하고 내용만 유지
+    text = re.sub(r"\(([^)]*)\)", r"\1", text)
+
+    # 3. 공백을 언더스코어로 변경
+    text = text.replace(" ", "_")
+
+    # 4. 콤마, 마침표 등 추가 문자 처리
+    text = text.replace(",", "")
+    text = text.replace(".", "")
+
+    # 5. 연속된 언더스코어 처리
+    text = re.sub(r"_{2,}", "_", text)
+
+    # 6. 파일명 길이 제한 (최대 50자)
+    if len(text) > 50:
+        # 긴 내용 처리: 방법 1 - 단어 단위로 제한
+        words = text.split("_")
+        if len(words) > 3:
+            result = "_".join(words[:3]) + "_etc"
+            # 결과가 여전히 50자 초과인 경우
+            if len(result) > 50:
+                result = result[:46] + "_etc"
+            return result
+        else:
+            # 방법 2 - 글자 수 직접 제한
+            return text[:46] + "_etc"
+
+    return text
+
+
+def get_filename_safe_theme(keywords, domain=None):
+    """
+    키워드 또는 도메인에서 파일명에 안전한 테마 문자열을 생성합니다.
+
+    Args:
+        keywords: 키워드 리스트 또는 문자열
+        domain: 도메인 (있는 경우)
+
+    Returns:
+        파일명에 적합한 테마 문자열
+    """
+    # 1. 먼저 적절한 테마를 선택
+    if domain:
+        theme = domain
+    elif isinstance(keywords, list) and len(keywords) == 1:
+        theme = keywords[0]
+    elif (isinstance(keywords, list) and len(keywords) > 1) or (
+        isinstance(keywords, str) and "," in keywords
+    ):
+        theme = extract_common_theme_from_keywords(keywords)
+    else:
+        theme = keywords if isinstance(keywords, str) else ""
+
+    # 2. 테마를 파일명에 적합하게 정리
+    return sanitize_filename(theme)

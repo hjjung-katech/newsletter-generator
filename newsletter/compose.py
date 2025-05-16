@@ -144,6 +144,14 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
         "company_name": newsletter_data.get("company_name", "Your Newsletter Co."),
     }
 
+    # 검색 키워드 추가
+    if "search_keywords" in newsletter_data and newsletter_data["search_keywords"]:
+        # search_keywords가 리스트인 경우 문자열로 변환
+        if isinstance(newsletter_data["search_keywords"], list):
+            context["search_keywords"] = ", ".join(newsletter_data["search_keywords"])
+        else:
+            context["search_keywords"] = newsletter_data["search_keywords"]
+
     html_content = template.render(context)
     return html_content
 

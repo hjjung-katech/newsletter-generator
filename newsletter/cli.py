@@ -252,7 +252,7 @@ def run(
             "\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]"
         )  # LangGraph 워크플로우 실행
         html_content, status = graph.generate_newsletter(
-            keyword_list, news_period_days
+            keyword_list, news_period_days, domain=domain  # 도메인 정보 전달
         )  # Use the final keyword_list and news period
 
         if status == "error":
@@ -264,6 +264,21 @@ def run(
         console.print(
             "[green]Newsletter generated successfully using LangGraph.[/green]"
         )
+
+        # 뉴스레터 주제 및 파일명 설정
+        newsletter_topic = ""
+        if domain:
+            newsletter_topic = domain  # 도메인이 있으면 도메인 사용
+        elif len(keyword_list) == 1:
+            newsletter_topic = keyword_list[0]  # 단일 키워드면 해당 키워드 사용
+        else:
+            # 여러 키워드의 공통 주제 추출
+            newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
+
+        current_date_str = datetime.now().strftime("%Y-%m-%d")
+        # 파일 이름에 안전한 주제 문자열 생성
+        safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
+        filename_base = f"{current_date_str}_newsletter_{safe_topic}"
 
     # 기존 방식 사용하는 경우
     else:
@@ -304,67 +319,97 @@ def run(
             "\n[green]Newsletter generated successfully using legacy pipeline.[/green]"
         )
 
-    current_date_str = datetime.now().strftime("%Y-%m-%d")
-    filename_base = f"{current_date_str}_newsletter_{final_keywords_str.replace(',', '_').replace(' ', '')}"  # Use final_keywords_str
-
-    # 3. Send email
-    step_num = 3  # 현재 단계 번호 추적
-
-    if to:
-        console.print(f"\n[cyan]Step {step_num}: Sending email...[/cyan]")
-        email_subject = (
-            f"오늘의 뉴스레터: {final_keywords_str}"  # Use final_keywords_str
-        )
-        news_deliver.send_email(
-            to_email=to, subject=email_subject, html_content=html_content
-        )
-    else:
-        console.print(
-            f"\n[yellow]Step {step_num}: Email sending skipped as no recipient was provided.[/yellow]"
-        )
-
-    step_num += 1
-
-    # 4. Save or Upload
-    saved_locally = False
-    if output_format:
-        console.print(
-            f"\n[cyan]Step {step_num}: Saving newsletter locally as {output_format.upper()}...[/cyan]"
-        )
-        save_path = os.path.join(output_directory, f"{filename_base}.{output_format}")
-        if news_deliver.save_locally(
-            html_content, filename_base, output_format, output_directory
-        ):
-            console.print(f"Newsletter saved locally as {save_path}.")
-            saved_locally = True
+        # 뉴스레터 주제 및 파일명 설정
+        newsletter_topic = ""
+        if domain:
+            newsletter_topic = domain  # 도메인이 있으면 도메인 사용
+        elif len(keyword_list) == 1:
+            newsletter_topic = keyword_list[0]  # 단일 키워드면 해당 키워드 사용
         else:
-            console.print(
-                f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
-            )
+            # 여러 키워드의 공통 주제 추출
+            newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
 
-    step_num += 1
+        current_date_str = datetime.now().strftime("%Y-%m-%d")
+        # 파일 이름에 안전한 주제 문자열 생성
+        safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
+        filename_base = f"{current_date_str}_newsletter_{safe_topic}"
 
-    # 5. Upload to Google Drive
-    if drive:
-        console.print(f"\n[cyan]Step {step_num}: Uploading to Google Drive...[/cyan]")
-        if news_deliver.save_to_drive(html_content, filename_base, output_directory):
-            console.print(
-                "[green]Successfully uploaded newsletter to Google Drive.[/green]"
+        # 3. Send email
+        step_num = 3  # 현재 단계 번호 추적
+
+        if to:
+            console.print(f"\n[cyan]Step {step_num}: Sending email...[/cyan]")
+            email_subject = f"오늘의 뉴스레터: {newsletter_topic}"  # 이메일 제목에도 뉴스레터 주제 반영
+            news_deliver.send_email(
+                to_email=to, subject=email_subject, html_content=html_content
             )
         else:
             console.print(
-                "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
+                f"\n[yellow]Step {step_num}: Email sending skipped as no recipient was provided.[/yellow]"
             )
 
-    if not saved_locally and not drive:
-        console.print(
-            "\n[yellow]Warning: Newsletter was not saved locally or uploaded to Google Drive.[/yellow]"
-        )
-        console.print(
-            "[yellow]Use --output-format=html or --drive to save/upload the newsletter.[/yellow]"
-        )
+        step_num += 1
 
-    console.print("\n[bold green]Newsletter process completed.[/bold green]")
+        # 4. Save or Upload
+        saved_locally = False
+        if output_format:
+            console.print(
+                f"\n[cyan]Step {step_num}: Saving newsletter locally as {output_format.upper()}...[/cyan]"
+            )
+            save_path = os.path.join(
+                output_directory, f"{filename_base}.{output_format}"
+            )
+            console.print(f"[info]Saving to: {save_path}[/info]")
+
+            if news_deliver.save_locally(
+                html_content, filename_base, output_format, output_directory
+            ):
+                console.print(
+                    f"[green]Newsletter saved locally as {save_path}.[/green]"
+                )
+                # 파일 존재 확인
+                if os.path.exists(save_path):
+                    file_size = os.path.getsize(save_path)
+                    console.print(
+                        f"[green]File created successfully - Size: {file_size} bytes[/green]"
+                    )
+                else:
+                    console.print(
+                        f"[bold red]Error: File was not created at {save_path}[/bold red]"
+                    )
+                saved_locally = True
+            else:
+                console.print(
+                    f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
+                )
+
+        step_num += 1
+
+        # 5. Upload to Google Drive
+        if drive:
+            console.print(
+                f"\n[cyan]Step {step_num}: Uploading to Google Drive...[/cyan]"
+            )
+            if news_deliver.save_to_drive(
+                html_content, filename_base, output_directory
+            ):
+                console.print(
+                    "[green]Successfully uploaded newsletter to Google Drive.[/green]"
+                )
+            else:
+                console.print(
+                    "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
+                )
+
+        if not saved_locally and not drive:
+            console.print(
+                "\n[yellow]Warning: Newsletter was not saved locally or uploaded to Google Drive.[/yellow]"
+            )
+            console.print(
+                "[yellow]Use --output-format=html or --drive to save/upload the newsletter.[/yellow]"
+            )
+
+        console.print("\n[bold green]Newsletter process completed.[/bold green]")
 
 
 # The 'collect' command can remain if it's used for other purposes or direct testing.
