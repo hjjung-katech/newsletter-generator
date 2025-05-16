@@ -62,6 +62,39 @@ def run_api_tests():
     return subprocess.run(cmd, check=False)
 
 
+def run_unit_tests():
+    """
+    단위 테스트만 별도로 실행합니다.
+    tests/unit_tests 디렉토리의 모든 테스트를 실행합니다.
+    """
+    print("단위 테스트만 실행 중...")
+    unit_test_path = Path(__file__).parent / "tests" / "unit_tests"
+
+    if not unit_test_path.exists():
+        print(f"오류: {unit_test_path} 디렉토리가 존재하지 않습니다.")
+        return None
+
+    test_files = list(unit_test_path.glob("test_*.py"))
+
+    # 디버깅: 찾은 파일 출력
+    print("\n단위 테스트 디렉토리의 모든 테스트 파일:")
+    for f in sorted(test_files):
+        print(f"  - {f.name}")
+    print()
+
+    if not test_files:
+        print("실행할 단위 테스트 파일이 없습니다.")
+        return None
+
+    # 테스트 파일 목록 출력
+    print(f"실행할 단위 테스트 파일 수: {len(test_files)}")
+    for f in sorted(test_files):
+        print(f"  - {f.relative_to(Path(__file__).parent)}")
+
+    cmd = [sys.executable, "-m", "pytest"] + [str(f) for f in test_files]
+    return subprocess.run(cmd, check=False)
+
+
 def run_all_tests(include_backup=False):
     """
     tests 디렉토리의 모든 테스트를 실행합니다.
@@ -127,13 +160,14 @@ def run_specific_test(test_name, include_backup=False):
     return subprocess.run([sys.executable, "-m", "pytest", str(test_path)], check=False)
 
 
-def list_tests(include_backup=False, include_api=False):
+def list_tests(include_backup=False, include_api=False, include_unit=False):
     """
     사용 가능한 테스트 파일 목록을 출력합니다.
 
     Args:
         include_backup (bool): 백업 폴더의 테스트도 포함할지 여부
         include_api (bool): API 테스트도 포함할지 여부
+        include_unit (bool): 단위 테스트도 포함할지 여부
     """
     test_dir = Path(__file__).parent / "tests"
 
@@ -157,6 +191,13 @@ def list_tests(include_backup=False, include_api=False):
         if api_dir.exists():
             api_files = list(api_dir.glob("test_*.py"))
 
+    # 단위 테스트 수집
+    unit_files = []
+    if include_unit:
+        unit_dir = test_dir / "unit_tests"
+        if unit_dir.exists():
+            unit_files = list(unit_dir.glob("test_*.py"))
+
     print("\n사용 가능한 테스트 파일:")
     print("\n[메인 테스트]")
     for i, test_file in enumerate(sorted(test_files), 1):
@@ -166,6 +207,11 @@ def list_tests(include_backup=False, include_api=False):
         print("\n[API 테스트]")
         for i, test_file in enumerate(sorted(api_files), 1):
             print(f"{i:2d}. api_tests/{test_file.name}")
+
+    if include_unit and unit_files:
+        print("\n[단위 테스트]")
+        for i, test_file in enumerate(sorted(unit_files), 1):
+            print(f"{i:2d}. unit_tests/{test_file.name}")
 
     if include_backup and backup_files:
         print("\n[백업 테스트]")
@@ -197,6 +243,12 @@ def parse_arguments():
         help="API 키가 필요한 테스트만 실행 (tests/api_tests 디렉토리)",
     )
     parser.add_argument(
+        "--unit",
+        "-u",
+        action="store_true",
+        help="단위 테스트만 실행 (tests/unit_tests 디렉토리)",
+    )
+    parser.add_argument(
         "--list",
         "-l",
         action="store_true",
@@ -208,6 +260,9 @@ def parse_arguments():
         help="모든 테스트 목록 출력 (백업 테스트 포함)",
     )
     parser.add_argument("--list-api", action="store_true", help="API 테스트 목록 출력")
+    parser.add_argument(
+        "--list-unit", action="store_true", help="단위 테스트 목록 출력"
+    )
     parser.add_argument(
         "--test",
         "-t",
@@ -256,9 +311,11 @@ def main():
             return 1
 
     # 테스트 목록 출력
-    if args.list or args.list_all or args.list_api:
+    if args.list or args.list_all or args.list_api or args.list_unit:
         list_tests(
-            include_backup=args.list_all, include_api=args.list_api or args.list_all
+            include_backup=args.list_all,
+            include_api=args.list_api or args.list_all,
+            include_unit=args.list_unit or args.list_all,
         )
         return 0
 
@@ -272,6 +329,11 @@ def main():
         result = run_api_tests()
         return 0 if result and result.returncode == 0 else 1
 
+    # 단위 테스트만 실행
+    if args.unit:
+        result = run_unit_tests()
+        return 0 if result and result.returncode == 0 else 1
+
     # 모든 테스트 실행 (백업 포함 여부에 따라)
     if args.full:
         # 백업 폴더 포함한 모든 테스트 실행
@@ -283,7 +345,9 @@ def main():
         or args.test
         or args.format_only
         or args.list_api
+        or args.list_unit
         or args.api
+        or args.unit
     ):
         # 기본 동작: 메인 테스트만 실행
         result = run_all_tests(include_backup=False)
