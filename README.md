@@ -224,6 +224,17 @@ python run_tests.py --format-only
 python run_tests.py --format --all
 ```
 
+### Pre-commit 훅 사용하기
+
+개발 과정에서 자동으로 코드 포맷팅과 기본 테스트가 실행되도록 [pre-commit](https://pre-commit.com/) 설정을 제공합니다. 다음과 같이 설치하고 활성화할 수 있습니다.
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+이후 커밋할 때마다 Black 포맷터와 `tests/test_minimal.py`가 자동으로 실행되어 코드 품질을 유지할 수 있습니다.
+
 ## 테스트
 
 ### 테스트 구조

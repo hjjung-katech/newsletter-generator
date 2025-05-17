@@ -4,6 +4,7 @@ from typing import List
 try:
     from langchain.callbacks.base import BaseCallbackHandler
 except Exception:  # Fallback when langchain is not installed
+
     class BaseCallbackHandler:
         pass
 

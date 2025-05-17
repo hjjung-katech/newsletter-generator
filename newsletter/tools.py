@@ -335,7 +335,9 @@ def clean_html_markers(html_content: str) -> str:
     return content.strip()
 
 
-def generate_keywords_with_gemini(domain: str, count: int = 10, callbacks=None) -> list[str]:
+def generate_keywords_with_gemini(
+    domain: str, count: int = 10, callbacks=None
+) -> list[str]:
     """
     Generates high-quality trend keywords for a given domain using Google Gemini.
     """
