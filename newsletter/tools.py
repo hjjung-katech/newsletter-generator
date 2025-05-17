@@ -335,7 +335,7 @@ def clean_html_markers(html_content: str) -> str:
     return content.strip()
 
 
-def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
+def generate_keywords_with_gemini(domain: str, count: int = 10, callbacks=None) -> list[str]:
     """
     Generates high-quality trend keywords for a given domain using Google Gemini.
     """
@@ -346,12 +346,22 @@ def generate_keywords_with_gemini(domain: str, count: int = 10) -> list[str]:
         return []
 
     try:
+        if callbacks is None:
+            callbacks = []
+        if os.environ.get("ENABLE_COST_TRACKING"):
+            try:
+                from .cost_tracking import get_tracking_callbacks
+
+                callbacks += get_tracking_callbacks()
+            except Exception:
+                pass
         llm = ChatGoogleGenerativeAI(
             model="gemini-2.5-pro-preview-03-25",
             google_api_key=config.GEMINI_API_KEY,
             temperature=0.7,
             transport="rest",  # REST API 사용 (gRPC 대신)
             convert_system_message_to_human=True,  # 시스템 메시지를 휴먼 메시지로 변환
+            callbacks=callbacks,
         )
 
         prompt_template = PromptTemplate.from_template(
@@ -476,7 +486,7 @@ def validate_and_refine_keywords(
     return validated_keywords[:count]  # 원래 요청한 개수만큼 반환
 
 
-def extract_common_theme_from_keywords(keywords, api_key=None):
+def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
     """
     키워드 리스트에서 공통 주제/분야를 추출합니다.
 
@@ -487,6 +497,16 @@ def extract_common_theme_from_keywords(keywords, api_key=None):
     Returns:
         str: 추출된 공통 주제/분야
     """
+    if callbacks is None:
+        callbacks = []
+    if os.environ.get("ENABLE_COST_TRACKING"):
+        try:
+            from .cost_tracking import get_tracking_callbacks
+
+            callbacks += get_tracking_callbacks()
+        except Exception:
+            pass
+
     if not api_key:
         # config.GEMINI_API_KEY 또는 환경 변수 GOOGLE_API_KEY 사용
         api_key = config.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY")
@@ -519,6 +539,9 @@ def extract_common_theme_from_keywords(keywords, api_key=None):
         """
 
         response = model.generate_content(prompt)
+        for cb in callbacks:
+            if hasattr(cb, "on_llm_end"):
+                cb.on_llm_end(response)
         extracted_theme = response.text.strip()
 
         # 결과가 너무 길면 자르기

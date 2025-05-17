@@ -4,6 +4,7 @@ except ImportError:
     genai = None  # Gemini API 사용 불가 상태로 표시
 
 from . import config  # Import config module
+import os
 from typing import List, Union, Dict, Any
 
 SYSTEM_INSTRUCTION = """
@@ -92,6 +93,7 @@ Instructions:
 def summarize_articles(
     keywords: List[str],
     articles: Union[List[Dict[str, Any]], Dict[str, List[Dict[str, Any]]]],
+    callbacks=None,
 ) -> str:
     """
     Summarize articles using Gemini Pro.
@@ -104,6 +106,16 @@ def summarize_articles(
     Returns:
         HTML string containing the summarized newsletter
     """
+    if callbacks is None:
+        callbacks = []
+    if os.environ.get("ENABLE_COST_TRACKING"):
+        try:
+            from .cost_tracking import get_tracking_callbacks
+
+            callbacks += get_tracking_callbacks()
+        except Exception:
+            pass
+
     # Check if we have any articles to summarize
     if not articles:
         print("No articles to summarize.")
@@ -209,6 +221,9 @@ def summarize_articles(
         try:
             # Generate the summary using Gemini Pro
             response = model.generate_content([prompt])
+            for cb in callbacks:
+                if hasattr(cb, "on_llm_end"):
+                    cb.on_llm_end(response)
             if hasattr(response, "text"):
                 html_content = response.text
                 return html_content

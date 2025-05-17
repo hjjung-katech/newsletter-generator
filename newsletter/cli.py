@@ -78,6 +78,11 @@ def run(
         "--use-major-sources/--no-major-sources",
         help="Prioritize articles from major news sources.",
     ),
+    track_cost: bool = typer.Option(
+        False,
+        "--track-cost",
+        help="Enable LangSmith cost tracking during generation.",
+    ),
     max_per_source: int = typer.Option(
         3, "--max-per-source", min=1, help="Maximum number of articles per source."
     ),
@@ -92,6 +97,9 @@ def run(
             "[yellow]No output option selected. Defaulting to local HTML save.[/yellow]"
         )
         output_format = "html"  # Default to local html if no other option
+
+    if track_cost:
+        os.environ["ENABLE_COST_TRACKING"] = "1"
 
     # 기본 output_directory 설정
     output_directory = "./output"  # 기본값
