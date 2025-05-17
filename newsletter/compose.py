@@ -136,26 +136,25 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     )
     template = env.get_template(template_name)
 
-    # 환경 변수 GENERATION_DATE 확인 또는 현재 날짜 사용
-    if isinstance(data, list):
-        generation_date = os.environ.get(
-            "GENERATION_DATE", datetime.now().strftime("%Y-%m-%d")
-        )
-        generation_timestamp = datetime.now().strftime("%H:%M:%S")
-    else:
-        # 원래 딕셔너리인 경우 원래 로직 유지
-        generation_date = data.get(
-            "generation_date", datetime.now().strftime("%Y-%m-%d")
-        )
-        generation_timestamp = data.get(
-            "generation_timestamp", datetime.now().strftime("%H:%M:%S")
-        )
+    # 현재 날짜와 시간 가져오기
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.now().strftime("%H:%M:%S")
+
+    # 환경 변수 확인 또는 현재 날짜와 시간 사용
+    generation_date = os.environ.get("GENERATION_DATE", current_date)
+    generation_timestamp = os.environ.get("GENERATION_TIMESTAMP", current_time)
+
+    # 기존 로직을 아래 코드로 대체
+    if isinstance(data, dict):
+        # 딕셔너리 형태로 제공된 경우 해당 값 사용, 없으면 환경 변수나 현재 값 사용
+        generation_date = data.get("generation_date", generation_date)
+        generation_timestamp = data.get("generation_timestamp", generation_timestamp)
 
     # Prepare a comprehensive context for rendering
     context = {
         "newsletter_topic": newsletter_data.get("newsletter_topic", "주간 산업 동향"),
         "generation_date": generation_date,
-        "generation_timestamp": generation_timestamp,
+        "generation_timestamp": generation_timestamp,  # Now always included
         "recipient_greeting": newsletter_data.get("recipient_greeting", "안녕하세요,"),
         "introduction_message": newsletter_data.get(
             "introduction_message", "지난 한 주간의 주요 산업 동향을 정리해 드립니다."

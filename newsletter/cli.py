@@ -3,10 +3,13 @@ from rich.console import Console
 import os
 from datetime import datetime
 from typing import Optional, List
+import json
+import traceback
 
 from . import collect as news_collect
 from . import summarize as news_summarize
 from . import compose as news_compose
+from .compose import compose_newsletter_html
 from . import deliver as news_deliver
 from . import config
 from . import graph  # 새로운 LangGraph 모듈 임포트
@@ -240,8 +243,13 @@ def run(
     if drive:
         console.print(f"[bold green]Save to Google Drive: Enabled[/bold green]")
 
-    # 날짜 정보 설정
-    os.environ["GENERATION_DATE"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 날짜 및 시간 정보 설정
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.now().strftime("%H:%M:%S")
+    os.environ["GENERATION_DATE"] = current_date
+    os.environ["GENERATION_TIMESTAMP"] = current_time
+
+    console.print(f"[blue]Generation date: {current_date}, time: {current_time}[/blue]")
 
     html_content = ""
 
@@ -276,9 +284,10 @@ def run(
             newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
 
         current_date_str = datetime.now().strftime("%Y-%m-%d")
+        current_time_str = datetime.now().strftime("%H%M%S")  # Add time for filename
         # 파일 이름에 안전한 주제 문자열 생성
         safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
-        filename_base = f"{current_date_str}_newsletter_{safe_topic}"
+        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
 
         # 뉴스레터 파일 저장 (LangGraph 방식)
         if output_format:
@@ -377,9 +386,10 @@ def run(
             newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
 
         current_date_str = datetime.now().strftime("%Y-%m-%d")
+        current_time_str = datetime.now().strftime("%H%M%S")  # Add time for filename
         # 파일 이름에 안전한 주제 문자열 생성
         safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
-        filename_base = f"{current_date_str}_newsletter_{safe_topic}"
+        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
 
         # 3. Send email
         step_num = 3  # 현재 단계 번호 추적
@@ -518,8 +528,6 @@ def collect(
     # 결과 저장
     if isinstance(articles, dict):
         # 그룹화된 결과를 JSON으로 저장
-        import json
-
         output_dir = os.path.join(os.getcwd(), "output")
         os.makedirs(output_dir, exist_ok=True)
 
@@ -529,8 +537,6 @@ def collect(
         console.print(f"[green]Results saved to {output_path}[/green]")
     else:
         # 단순한 기사 목록을 텍스트로 저장
-        import json
-
         output_dir = os.path.join(os.getcwd(), "output")
         os.makedirs(output_dir, exist_ok=True)
 
@@ -591,22 +597,48 @@ def test(
     ),
 ):
     """
-    Generate a newsletter HTML directly from an existing render_data file.
-    Useful for testing template changes without re-collecting data.
+    테스트 데이터 파일로부터 뉴스레터를 렌더링합니다.
     """
-    from .utils.test_mode import run_in_test_mode
-
-    console.print(
-        f"[bold blue]Testing newsletter generation using data file: {data_file}[/bold blue]"
-    )
     try:
-        output_path = run_in_test_mode(data_file, output)
-        console.print(
-            f"[bold green]Test completed successfully! Output saved to: {output_path}[/bold green]"
+        # 데이터 파일 로드
+        console.print(f"[cyan]Loading test data from {data_file}...[/cyan]")
+        with open(data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # 템플릿 디렉토리 설정
+        template_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "templates"
         )
+        template_name = "newsletter_template.html"
+
+        # 현재 일시 설정
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H%M%S")
+        os.environ["GENERATION_DATE"] = current_date
+        os.environ["GENERATION_TIMESTAMP"] = datetime.now().strftime("%H:%M:%S")
+
+        # 뉴스레터 렌더링
+        console.print(
+            f"[cyan]Rendering newsletter using template: {template_name}...[/cyan]"
+        )
+        html_content = compose_newsletter_html(data, template_dir, template_name)
+
+        # 기본 출력 파일명 설정
+        if output is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output = f"output/test_newsletter_result_{timestamp}.html"
+
+        # 출력 디렉토리 생성
+        os.makedirs(os.path.dirname(output), exist_ok=True)
+
+        # HTML 저장
+        with open(output, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        console.print(f"[green]Newsletter rendered and saved to {output}[/green]")
     except Exception as e:
-        console.print(f"[bold red]Error during test: {e}[/bold red]")
-        raise typer.Exit(code=1)
+        console.print(f"[red]Error in test command: {e}[/red]")
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
