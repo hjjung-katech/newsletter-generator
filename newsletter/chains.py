@@ -196,8 +196,17 @@ Output Requirements:
 """
 
 
-def get_llm(temperature=0.3):
+def get_llm(temperature=0.3, callbacks=None):
     """구글 Gemini Pro 모델 인스턴스를 생성합니다."""
+    if callbacks is None:
+        callbacks = []
+    if os.environ.get("ENABLE_COST_TRACKING"):
+        try:
+            from .cost_tracking import get_tracking_callbacks
+
+            callbacks += get_tracking_callbacks()
+        except Exception:
+            pass
     if not config.GEMINI_API_KEY:
         raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
@@ -209,6 +218,7 @@ def get_llm(temperature=0.3):
         google_api_key=config.GEMINI_API_KEY,
         temperature=temperature,
         transport=transport,
+        callbacks=callbacks,
         convert_system_message_to_human=False,  # 시스템 메시지를 시스템 메시지로 유지
     )
 

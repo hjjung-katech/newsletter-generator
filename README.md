@@ -62,6 +62,10 @@ EMAIL_SENDER=sender@example.com
 # Google Drive 업로드용 (선택사항)
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# LangSmith 연동 (선택사항)
+LANGCHAIN_API_KEY=your_langsmith_api_key
+LANGCHAIN_TRACING_V2=1
 ```
 
 ### 사용 방법
@@ -129,6 +133,7 @@ newsletter run --keywords "메타버스,XR" --no-filter-duplicates --no-major-so
 | `--to`                      | 뉴스레터를 발송할 이메일 주소                                         | 없음 (이메일 발송 건너뜀)                       |
 | `--output-format`           | 로컬에 저장할 형식 (`html` 또는 `md`). `--drive` 사용 시에도 이 형식을 따름. | `html` (또는 `--drive`만 지정 시 Drive에만 저장)  |
 | `--drive`                   | Google Drive에 뉴스레터 저장 여부                                     | 저장 안 함                                      |
+| `--track-cost`              | LangSmith 비용 추적 활성화 여부 | 비활성화 |
 | **필터링 옵션**             |                                                                       |                                                 |
 | `--max-per-source INT`      | 도메인별 최대 기사 수를 지정합니다.                                     | 모든 기사 포함                                  |
 | `--no-filter-duplicates`    | 지정 시, 중복 기사 필터링을 비활성화합니다.                             | 중복 기사 필터링 수행                           |
@@ -218,6 +223,17 @@ python run_tests.py --format-only
 # 코드 포맷팅 후 테스트 실행
 python run_tests.py --format --all
 ```
+
+### Pre-commit 훅 사용하기
+
+개발 과정에서 자동으로 코드 포맷팅과 기본 테스트가 실행되도록 [pre-commit](https://pre-commit.com/) 설정을 제공합니다. 다음과 같이 설치하고 활성화할 수 있습니다.
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+이후 커밋할 때마다 Black 포맷터와 `tests/test_minimal.py`가 자동으로 실행되어 코드 품질을 유지할 수 있습니다.
 
 ## 테스트
 
