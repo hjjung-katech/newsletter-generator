@@ -126,6 +126,16 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
                                         f"{source}, {formatted_date}"
                                     )
 
+        # Format top_articles if provided
+        if "top_articles" in newsletter_data:
+            for art in newsletter_data["top_articles"]:
+                if "source_and_date" in art:
+                    src, d_str = extract_source_and_date(art["source_and_date"])
+                    if d_str:
+                        fmt = format_date_for_display(date_str=d_str)
+                        if fmt:
+                            art["source_and_date"] = f"{src}, {fmt}"
+
     print(
         f"Composing newsletter for topic: {newsletter_data.get('newsletter_topic', 'N/A')}..."
     )
@@ -175,6 +185,9 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
             context["search_keywords"] = ", ".join(newsletter_data["search_keywords"])
         else:
             context["search_keywords"] = newsletter_data["search_keywords"]
+
+    if "top_articles" in newsletter_data:
+        context["top_articles"] = newsletter_data["top_articles"]
 
     html_content = template.render(context)
     return html_content
