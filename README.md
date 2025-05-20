@@ -66,6 +66,7 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 # LangSmith 연동 (선택사항)
 LANGCHAIN_API_KEY=your_langsmith_api_key
 LANGCHAIN_TRACING_V2=1
+LANGCHAIN_PROJECT=your_project_name
 ```
 
 ### 사용 방법
@@ -103,6 +104,9 @@ newsletter run --domain "머신러닝" --drive
 
 # 모든 옵션 함께 사용
 newsletter run --domain "반도체" --suggest-count 7 --to recipient@example.com --output-format html --drive
+
+# 비용 추적 기능 활성화 (LangSmith 통합)
+newsletter run --domain "인공지능" --track-cost --output-format html
 ```
 
 **3. 직접 키워드 지정 및 필터링 옵션 활용**
@@ -200,6 +204,35 @@ Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴
 ---
 
 ## 개발 가이드
+
+### LangSmith 비용 추적 사용하기
+
+이 프로젝트는 LangChain 생태계의 LangSmith를 통한 토큰 사용량 및 비용 추적 기능을 제공합니다:
+
+1. **설정 방법**:
+   - `.env` 파일에 LangSmith API 키 설정:
+     ```
+     LANGCHAIN_API_KEY=your_langsmith_api_key
+     LANGCHAIN_TRACING_V2=1
+     LANGCHAIN_PROJECT=your_project_name
+     ```
+   - [LangSmith](https://smith.langchain.com/) 계정이 필요합니다.
+
+2. **비용 추적 활성화**:
+   - 명령줄에서 `--track-cost` 옵션 사용:
+     ```bash
+     newsletter run --domain "인공지능" --track-cost
+     ```
+   - 이 옵션은 내부적으로 `ENABLE_COST_TRACKING` 환경변수를 설정합니다.
+
+3. **추적되는 정보**:
+   - 프롬프트 토큰 수
+   - 응답 토큰 수
+   - 총 비용 추정치
+
+4. **주의사항**:
+   - LangSmith는 선택적 기능으로, 설정하지 않아도 뉴스레터 생성 기능은 정상 작동합니다.
+   - 대량의 뉴스레터를 생성할 경우 비용 추적을 통해 사용량을 모니터링하는 것이 좋습니다.
 
 ### 코드 포맷팅
 

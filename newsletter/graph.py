@@ -26,6 +26,7 @@ class NewsletterState(TypedDict):
     collected_articles: Optional[List[Dict]]  # Made Optional
     processed_articles: Optional[List[Dict]]  # New field
     article_summaries: Optional[Dict]  # Made Optional
+    category_summaries: Optional[Dict]  # 카테고리별 요약 결과
     newsletter_topic: Optional[str]  # 뉴스레터 주제 필드
     # 최종 결과물
     newsletter_html: Optional[str]  # Made Optional
@@ -308,6 +309,7 @@ def summarize_articles_node(
     수집된 기사를 요약하는 노드
     """
     from .chains import get_summarization_chain
+    import os
 
     print("\n[cyan]Step: Summarizing articles...[/cyan]")
 
@@ -321,22 +323,136 @@ def summarize_articles_node(
         }
 
     try:
-        summarization_chain = get_summarization_chain()
-        keyword_str = ", ".join(state["keywords"])
-        chain_input = {
-            "keywords": keyword_str,
-            "articles": processed_articles,  # Use processed_articles
-            "domain": state.get("domain"),  # 도메인 정보 전달
+        # 비용 추적 설정 (ENABLE_COST_TRACKING 환경 변수 설정된 경우에만)
+        callbacks = []
+
+        if os.environ.get("ENABLE_COST_TRACKING") or os.environ.get(
+            "LANGCHAIN_TRACING_V2"
+        ):
+            try:
+                from .cost_tracking import get_tracking_callbacks
+
+                callbacks = get_tracking_callbacks()
+            except Exception as e:
+                print(
+                    f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
+                )
+
+        # 요약 체인 가져오기 및 실행
+        summarization_chain = get_summarization_chain(callbacks=callbacks)
+
+        # 데이터 형식 맞추기: processed_articles를 'articles' 키를 가진 딕셔너리로 감싸기
+        input_data = {
+            "articles": processed_articles,
+            "keywords": state.get("keywords", ""),
         }
 
-        result = summarization_chain.invoke(chain_input)
+        category_summaries = summarization_chain.invoke(input_data)
 
-        return {**state, "newsletter_html": result, "status": "complete"}
-    except Exception as e:
-        print(f"[red]Error during article summarization: {e}[/red]")
+        if not category_summaries:
+            return {
+                **state,
+                "error": "카테고리 요약 생성에 실패했습니다.",
+                "status": "error",
+            }
+
+        # 결과 상태 업데이트 및 반환
         return {
             **state,
-            "error": f"기사 요약 중 오류 발생: {str(e)}",
+            "category_summaries": category_summaries,
+            "status": "composing",  # Changed to composing to indicate next step
+        }
+    except Exception as e:
+        import traceback
+
+        error_msg = f"기사 요약 중 오류가 발생했습니다: {str(e)}"
+        print(f"[bold red]Error in summarization: {str(e)}[/bold red]")
+        traceback.print_exc()
+        return {
+            **state,
+            "error": error_msg,
+            "status": "error",
+        }
+
+
+def compose_newsletter_node(
+    state: NewsletterState,
+) -> NewsletterState:
+    """
+    카테고리 요약에서 최종 뉴스레터 HTML을 생성하는 노드
+    """
+    from .chains import get_newsletter_chain
+    import os
+    from datetime import datetime  # Import datetime for timestamp
+
+    print("\n[cyan]Step: Composing final newsletter...[/cyan]")
+
+    category_summaries = state.get("category_summaries")
+    if not category_summaries:
+        print("[yellow]No category summaries to compose newsletter.[/yellow]")
+        return {
+            **state,
+            "error": "카테고리 요약이 없어 뉴스레터를 생성할 수 없습니다.",
+            "status": "error",
+        }
+
+    try:
+        # category_summaries는 이미 HTML 문자열임
+        # 따라서 직접 이를 newsletter_html로 사용
+        newsletter_html = category_summaries
+
+        # 뉴스레터 HTML 저장
+        def save_newsletter_html(html_content, topic):
+            """
+            생성된 뉴스레터 HTML을 파일로 저장합니다.
+
+            Args:
+                html_content: 저장할 HTML 내용
+                topic: 뉴스레터 주제 (파일명 생성에 사용)
+
+            Returns:
+                str: 저장된 파일 경로
+            """
+            # 주제에서 파일명 생성
+            from .tools import sanitize_filename
+
+            filename_base = sanitize_filename(topic)
+
+            # 폴더가 없으면 생성
+            output_dir = os.path.join(os.getcwd(), "output")
+            os.makedirs(output_dir, exist_ok=True)
+
+            # 날짜와 시간을 파일명에 추가
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{filename_base}_{timestamp}.html"
+            file_path = os.path.join(output_dir, filename)
+
+            # 파일 저장
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            print(f"[green]Newsletter saved to {file_path}[/green]")
+            return file_path
+
+        # 뉴스레터 저장
+        newsletter_topic = state.get("newsletter_topic", "뉴스레터")
+        save_path = save_newsletter_html(newsletter_html, newsletter_topic)
+
+        # 결과 상태 업데이트 및 반환
+        return {
+            **state,
+            "newsletter_html": newsletter_html,
+            "status": "complete",  # Final status
+        }
+    except Exception as e:
+        import traceback
+
+        error_msg = f"뉴스레터 생성 중 오류가 발생했습니다: {str(e)}"
+        print(f"[bold red]Error in newsletter composition: {str(e)}[/bold red]")
+        traceback.print_exc()
+        return {
+            **state,
+            "error": error_msg,
             "status": "error",
         }
 
@@ -360,6 +476,9 @@ def create_newsletter_graph() -> StateGraph:
     workflow.add_node("collect_articles", collect_articles_node)  # Use new name
     workflow.add_node("process_articles", process_articles_node)  # Add new node
     workflow.add_node("summarize_articles", summarize_articles_node)  # Use new name
+    workflow.add_node(
+        "compose_newsletter", compose_newsletter_node
+    )  # Add new node for final composition
     workflow.add_node("handle_error", handle_error)
 
     # 엣지 추가 (노드 간 전환)
@@ -383,6 +502,12 @@ def create_newsletter_graph() -> StateGraph:
     )
     workflow.add_conditional_edges(
         "summarize_articles",
+        lambda state: (
+            "handle_error" if state.get("status") == "error" else "compose_newsletter"
+        ),
+    )
+    workflow.add_conditional_edges(
+        "compose_newsletter",
         lambda state: "handle_error" if state.get("status") == "error" else END,
     )
     workflow.add_edge("handle_error", END)
@@ -429,6 +554,7 @@ def generate_newsletter(
         "collected_articles": None,  # Initialize as None
         "processed_articles": None,  # Initialize as None
         "article_summaries": None,  # Initialize as None
+        "category_summaries": None,  # Initialize as None
         "newsletter_html": None,  # Initialize as None
         "error": None,  # Initialize as None
         "status": "collecting",

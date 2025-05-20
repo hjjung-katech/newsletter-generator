@@ -214,12 +214,15 @@ def get_llm(temperature=0.3, callbacks=None):
     transport = "rest"  # 기본적으로 REST API 사용 (gRPC 대신)
 
     return ChatGoogleGenerativeAI(
-        model="gemini-1.5-pro-latest",
+        model="gemini-2.5-pro-preview-03-25",  # 최신 Gemini 2.5 Pro 모델 사용
         google_api_key=config.GEMINI_API_KEY,
         temperature=temperature,
         transport=transport,
         callbacks=callbacks,
-        convert_system_message_to_human=False,  # 시스템 메시지를 시스템 메시지로 유지
+        convert_system_message_to_human=False,
+        timeout=60,  # 타임아웃 60초
+        max_retries=2,  # 최대 2회 재시도
+        disable_streaming=False,  # 스트리밍 활성화 (streaming=True와 같음)
     )
 
 
@@ -657,7 +660,8 @@ def get_newsletter_chain():
 
 
 # 기존 summarization_chain 유지 (하위 호환성)
-def get_summarization_chain():
+def get_summarization_chain(callbacks=None):
+    """callbacks 매개변수를 지원하는 요약 체인 반환 함수"""
     chain = get_newsletter_chain()
     print("이 함수는 곧 사라질 예정입니다. get_newsletter_chain()을 사용하세요.")
     return chain

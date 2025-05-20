@@ -6,6 +6,7 @@ except ImportError:
 from . import config  # Import config module
 import os
 from typing import List, Union, Dict, Any
+import uuid
 
 SYSTEM_INSTRUCTION = """
 Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
@@ -120,6 +121,33 @@ def summarize_articles(
     if not articles:
         print("No articles to summarize.")
         # 비어있는 기사 목록에 대해 Gemini API를 호출하지 않고 즉시 결과 반환
+        # Ensure run_id is handled even if no articles are present, though callbacks might not be invoked.
+        run_id_no_articles = uuid.uuid4()
+        for cb in callbacks:
+            if hasattr(cb, "on_llm_start"):
+                try:
+                    cb.on_llm_start(
+                        serialized={}, prompts=[], run_id=run_id_no_articles
+                    )
+                except Exception as e_start:
+                    print(
+                        f"Warning: Callback on_llm_start (no articles) failed: {e_start}"
+                    )
+            if hasattr(cb, "on_llm_end"):  # or on_chain_end if it's a chain
+                try:
+                    # Create a minimal mock response if needed by callbacks
+                    mock_response_no_articles = type(
+                        "MockResponse",
+                        (),
+                        {
+                            "text": "No articles to summarize.",
+                            "response_metadata": {},
+                            "usage_metadata": {},
+                        },
+                    )()
+                    cb.on_llm_end(mock_response_no_articles, run_id=run_id_no_articles)
+                except Exception as e_end:
+                    print(f"Warning: Callback on_llm_end (no articles) failed: {e_end}")
         return "<html><body>No articles summary</body></html>"
 
     # 기사 수 계산
@@ -218,12 +246,41 @@ def summarize_articles(
         # Create the full prompt for Gemini Pro
         prompt = f"키워드: {keyword_str}\n\n뉴스 기사 목록:\n\n{articles_text}"
 
+        run_id = uuid.uuid4()  # Generate run_id
+        for cb in callbacks:
+            if hasattr(cb, "on_llm_start"):
+                try:
+                    # Attempt to call with common LangChainTracer arguments first
+                    cb.on_llm_start(
+                        serialized={},
+                        prompts=[prompt],
+                        run_id=run_id,
+                        name="summarize_articles_llm",
+                        run_type="llm",
+                        tags=[],
+                        metadata={},
+                        parent_run_id=None,
+                    )
+                except (
+                    TypeError
+                ):  # If that fails due to unexpected kwargs, try basic version
+                    try:
+                        cb.on_llm_start(serialized={}, prompts=[prompt], run_id=run_id)
+                    except Exception as e_start_fallback:
+                        print(
+                            f"Warning: Callback on_llm_start (fallback) failed: {e_start_fallback}"
+                        )
+                except Exception as e_start:
+                    print(f"Warning: Callback on_llm_start (initial) failed: {e_start}")
         try:
             # Generate the summary using Gemini Pro
             response = model.generate_content([prompt])
             for cb in callbacks:
                 if hasattr(cb, "on_llm_end"):
-                    cb.on_llm_end(response)
+                    try:
+                        cb.on_llm_end(response, run_id=run_id)  # Pass run_id
+                    except Exception as e_end:
+                        print(f"Warning: Callback on_llm_end failed: {e_end}")
             if hasattr(response, "text"):
                 html_content = response.text
                 return html_content
@@ -239,6 +296,13 @@ def summarize_articles(
                 """
                 return error_html
         except Exception as e:
+            for cb in callbacks:  # Call on_llm_error for each callback
+                if hasattr(cb, "on_llm_error"):
+                    try:
+                        cb.on_llm_error(e, run_id=run_id)  # Pass run_id
+                    except Exception as e_error:
+                        print(f"Warning: Callback on_llm_error failed: {e_error}")
+
             print(f"Error calling Gemini API: {e}")
             error_html = f"""
             <html>

@@ -6,6 +6,17 @@ from typing import Optional, List
 import json
 import traceback
 
+from dotenv import load_dotenv
+
+# Explicitly load .env from the project root
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+dotenv_path = os.path.join(project_root, ".env")
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path=dotenv_path)
+    print(f"[DEBUG_CLI] Loaded .env file from: {dotenv_path}")  # Debug print
+else:
+    print(f"[DEBUG_CLI] .env file not found at: {dotenv_path}")  # Debug print
+
 from . import collect as news_collect
 from . import summarize as news_summarize
 from . import compose as news_compose

@@ -14,10 +14,14 @@ from typing import Dict, List, Any, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.outputs import Generation, LLMResult
 from . import config
 from rich.console import Console
 import re
 import time
+import uuid
+import google.generativeai as genai
+from google.generativeai import types
 
 console = Console()
 
@@ -357,13 +361,17 @@ def generate_keywords_with_gemini(
                 callbacks += get_tracking_callbacks()
             except Exception:
                 pass
+
         llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro-preview-03-25",
+            model="gemini-2.5-pro-preview-03-25",  # 최신 Gemini 2.5 Pro 모델 사용
+            temperature=0.7,  # 원래 설정된 온도값 유지
             google_api_key=config.GEMINI_API_KEY,
-            temperature=0.7,
             transport="rest",  # REST API 사용 (gRPC 대신)
-            convert_system_message_to_human=True,  # 시스템 메시지를 휴먼 메시지로 변환
+            convert_system_message_to_human=True,  # 원래 설정으로 유지
             callbacks=callbacks,
+            timeout=60,  # 타임아웃 60초 (request_timeout 대신)
+            max_retries=2,  # 최대 2회 재시도
+            disable_streaming=False,  # 스트리밍 활성화 (streaming=True 대신)
         )
 
         prompt_template = PromptTemplate.from_template(
@@ -489,71 +497,90 @@ def validate_and_refine_keywords(
 
 
 def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
-    """
-    키워드 리스트에서 공통 주제/분야를 추출합니다.
-
-    Args:
-        keywords: 문자열 키워드 리스트 또는 콤마로 구분된 키워드 문자열
-        api_key: Gemini API 키 (None인 경우 config에서 가져옴)
-
-    Returns:
-        str: 추출된 공통 주제/분야
-    """
-    if callbacks is None:
-        callbacks = []
-    if os.environ.get("ENABLE_COST_TRACKING"):
-        try:
-            from .cost_tracking import get_tracking_callbacks
-
-            callbacks += get_tracking_callbacks()
-        except Exception:
-            pass
-
+    """Extracts a common theme from a list of keywords using Google Gemini."""
     if not api_key:
-        # config.GEMINI_API_KEY 또는 환경 변수 GOOGLE_API_KEY 사용
-        api_key = config.GEMINI_API_KEY or os.environ.get("GOOGLE_API_KEY")
-        if not api_key:
-            print("Warning: API key not set, using fallback method")
-            return extract_common_theme_fallback(keywords)
+        api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        print("GOOGLE_API_KEY not found. Skipping common theme extraction with Gemini.")
+        return extract_common_theme_fallback(keywords)
 
-    # 키워드가 문자열인 경우 리스트로 변환
-    if isinstance(keywords, str):
-        keywords = [k.strip() for k in keywords.split(",") if k.strip()]
-
-    # 키워드가 하나뿐이면 그대로 반환
-    if len(keywords) <= 1:
-        return keywords[0] if keywords else ""
+    if not keywords:
+        return "General News"
 
     try:
-        import google.generativeai as genai
-
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
-        prompt = f"""
-        다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
-        {', '.join(keywords)}
-        
-        출력 형식:
-        - 공통 분야/주제만 간결하게 답변해 주세요 (3단어 이내)
-        - 설명이나 부가 정보는 포함하지 마세요
-        - 반드시 한국어로 답변해 주세요
-        """
+        model_name = "gemini-1.5-flash-latest"  # Define the model name being used
 
-        response = model.generate_content(prompt)
-        for cb in callbacks:
-            if hasattr(cb, "on_llm_end"):
-                cb.on_llm_end(response)
+        final_prompt = f"""
+다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
+{', '.join(keywords)}
+
+출력 형식:
+- 공통 분야/주제만 간결하게 답변해 주세요 (3단어 이내)
+- 설명이나 부가 정보는 포함하지 마세요
+- 반드시 한국어로 답변해 주세요
+"""
+        run_id = uuid.uuid4()
+
+        if callbacks:
+            for cb in callbacks:
+                if hasattr(cb, "on_llm_start"):
+                    try:
+                        cb.on_llm_start(
+                            serialized={"model_name": model_name},
+                            prompts=[final_prompt],
+                            run_id=run_id,
+                        )
+                    except Exception as e_start:
+                        print(f"Warning: Callback on_llm_start failed: {e_start}")
+
+        genai_model = genai.GenerativeModel(model_name)
+        response = genai_model.generate_content(
+            final_prompt,
+            generation_config=genai.types.GenerationConfig(
+                candidate_count=1,
+                temperature=0.2,  # Kept original temperature for this specific task
+            ),
+            request_options={"timeout": 120},
+        )
+
         extracted_theme = response.text.strip()
-
-        # 결과가 너무 길면 자르기
-        if len(extracted_theme) > 30:
+        if len(extracted_theme) > 30:  # Keep the length check
             extracted_theme = extracted_theme[:30]
+
+        if callbacks:
+            llm_output_data = {
+                "token_usage": {
+                    "prompt_token_count": response.usage_metadata.prompt_token_count,
+                    "candidates_token_count": response.usage_metadata.candidates_token_count,
+                    "total_token_count": response.usage_metadata.total_token_count,
+                },
+                "model_name": model_name,
+            }
+            # Ensure 'text' is not None for Generation
+            gen_text = extracted_theme if extracted_theme is not None else ""
+            generations = [[Generation(text=gen_text, generation_info=llm_output_data)]]
+            llm_result = LLMResult(generations=generations, llm_output=llm_output_data)
+            for cb in callbacks:
+                if hasattr(cb, "on_llm_end"):
+                    try:
+                        cb.on_llm_end(llm_result, run_id=run_id)
+                    except Exception as e_cb:
+                        print(f"Warning: Callback on_llm_end failed: {e_cb}")
 
         return extracted_theme
 
     except Exception as e:
-        print(f"Error extracting common theme with Gemini: {e}")
+        run_id_error = run_id if "run_id" in locals() else uuid.uuid4()
+        if callbacks:
+            for cb in callbacks:
+                if hasattr(cb, "on_llm_error"):
+                    try:
+                        cb.on_llm_error(e, run_id=run_id_error)
+                    except Exception as e_err_cb:
+                        print(f"Warning: Callback on_llm_error failed: {e_err_cb}")
+        print(f"Error in extract_common_theme_from_keywords with Gemini: {e}")
         return extract_common_theme_fallback(keywords)
 
 
