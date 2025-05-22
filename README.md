@@ -1,5 +1,14 @@
 # Newsletter Generator
 
+## 최근 업데이트: 테스트 모드 기능 추가
+
+newsletter test 명령어가 추가되어 다음과 같은 기능을 제공합니다:
+
+- **Template 모드**: 기존 뉴스레터 데이터를 현재 HTML 템플릿으로 재렌더링
+- **Content 모드**: 이전에 수집된 기사 데이터를 사용하여 처리, 요약, 편집 등의 전체 후속 프로세스 재실행
+
+이를 통해 동일한 뉴스 수집 데이터로 여러 가지 뉴스레터 생성 테스트가 가능해졌습니다.
+
 ## 최근 업데이트: 필터링 기능 추가
 
 최근 시스템에 다음과 같은 필터링 기능이 추가되었습니다:
@@ -73,7 +82,7 @@ LANGCHAIN_PROJECT=your_project_name
 
 ### 사용 방법
 
-뉴스레터를 생성하는 방법은 두 가지가 있습니다.
+뉴스레터를 생성하는 방법은 여러 가지가 있습니다.
 
 **1. `suggest` 명령어로 키워드를 추천받고, 추천된 명령어로 뉴스레터 생성 (2단계)**
 
@@ -124,6 +133,22 @@ newsletter run --keywords "AI반도체,HBM" --max-per-source 3 --output-format h
 newsletter run --keywords "메타버스,XR" --no-filter-duplicates --no-major-sources-filter --output-format html
 ```
 
+**4. `test` 명령어로 기존 데이터를 활용한 테스트 수행**
+
+```bash
+# Template 모드: 기존 뉴스레터 데이터를 현재 HTML 템플릿으로 재렌더링
+newsletter test output\render_data_langgraph_20250522_143255.json --mode template
+
+# Content 모드: 이전에 수집된 기사 데이터로 전체 프로세스 재실행 (수집 단계 제외)
+newsletter test output\collected_articles_AI_빅데이터.json --mode content
+
+# 비용 추적 활성화
+newsletter test output\collected_articles_AI_빅데이터.json --mode content --track-cost
+
+# 커스텀 출력 파일 지정
+newsletter test output\collected_articles_AI_빅데이터.json --mode content --output custom_output.html
+```
+
 ### 주요 명령어 옵션
 
 **`newsletter run` 명령어 옵션:**
@@ -152,6 +177,21 @@ newsletter run --keywords "메타버스,XR" --no-filter-duplicates --no-major-so
 | ---------- | -------------------------------- | ------ |
 | `--domain` | 추천 키워드를 생성할 분야 (필수) | -      |
 | `--count`  | 생성할 키워드 개수               | 10     |
+
+**`newsletter test` 명령어 옵션:**
+
+| 옵션            | 설명                                     | 기본값                |
+| --------------- | ---------------------------------------- | --------------------- |
+| `data_file`     | 테스트에 사용할 데이터 파일 경로 (필수)  | -                     |
+| `--output`      | 생성된 뉴스레터의 출력 파일 경로         | 자동 생성 (output/ 디렉토리) |
+| `--mode`        | 실행 모드 (`template` 또는 `content`)    | `template`            |
+| `--track-cost`  | LangSmith 비용 추적 활성화 여부          | 비활성화              |
+
+**테스트 모드 설명:**
+
+1. **Template 모드**: 기존에 생성된 뉴스레터 데이터(render_data*.json)를 사용하여 현재 HTML 템플릿으로 재렌더링합니다. 템플릿 변경 테스트에 유용합니다.
+
+2. **Content 모드**: 이전에 수집된 기사 데이터(collected_articles*.json)를 사용하여 처리, 요약, 편집 등의 전체 후속 프로세스를 재실행합니다. 동일한 기사 데이터로 다양한 처리 방식을 테스트할 수 있습니다.
 
 ---
 
@@ -206,9 +246,36 @@ Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴
 - Gemini Pro AI를 활용하여 특정 도메인에 대한 관련 키워드를 자동으로 생성합니다.
 - 생성된 키워드를 기반으로 뉴스를 수집하고 요약합니다.
 
+### 5. 테스트 모드
+
+- **Template 모드**: HTML 템플릿 변경 테스트에 유용합니다. 기존 데이터를 새 템플릿으로 빠르게 재렌더링합니다.
+- **Content 모드**: 동일한 기사 데이터로 다양한 처리/요약 방식을 테스트할 수 있습니다. 기사 수집 단계를 건너뛰고 처리/요약 프로세스만 실행합니다.
+
 ---
 
 ## 개발 가이드
+
+### 테스트 모드 활용하기
+
+테스트 모드는 개발 및 테스트 과정에서 뉴스레터 생성 파이프라인의 일부분을 효율적으로 테스트하는 데 유용합니다:
+
+1. **데이터 파일 유형**:
+   - `render_data_langgraph_*.json`: 최종 렌더링 데이터 (Template 모드에 적합)
+   - `collected_articles_processed.json`: 필터링된 기사 데이터 (Content 모드에 최적)
+   - `collected_articles_raw.json`: 필터링 전 수집된 모든 기사 데이터 (Content 모드 사용 가능)
+   
+   **참고**: 수집된 기사 파일(raw, processed)에는 이제 기사 데이터뿐만 아니라 키워드, 도메인, 검색 기간과 같은 메타데이터도 포함되어 있어 테스트 모드에서 별도 지정 없이 사용 가능합니다.
+
+2. **Content 모드 워크플로우**:
+   - 기사 수집 단계를 건너뛰고 처리(process_articles) 단계부터 시작
+   - 그룹화, 요약, 편집, HTML 생성 등의 전체 후속 프로세스 실행
+   - 동일한 기사 데이터로 다양한 처리 알고리즘 테스트 가능
+
+3. **활용 사례**:
+   - 요약 프롬프트 개선 테스트
+   - 기사 처리 알고리즘 변경 효과 테스트
+   - 템플릿 디자인 변경 테스트
+   - LLM 모델 간 성능 비교 테스트
 
 ### LangSmith 비용 추적 사용하기
 
@@ -227,6 +294,7 @@ Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴
    - 명령줄에서 `--track-cost` 옵션 사용:
      ```bash
      newsletter run --domain "인공지능" --track-cost
+     newsletter test output\collected_articles_AI.json --mode content --track-cost
      ```
    - 이 옵션은 내부적으로 `ENABLE_COST_TRACKING` 환경변수를 설정합니다.
 
@@ -385,14 +453,20 @@ python run_tests.py --format --all
    - 다국어 콘텐츠 처리 확장
    - 한국어/영어 혼합 콘텐츠 처리 개선
 
+4. **테스트 모드 개선**
+   - 복수의 알고리즘 병렬 테스트 지원
+   - 결과 비교 시각화 도구 추가
+   - 테스트 결과 자동 저장 및 히스토리 관리
+
 ---
 
 ### 문서 버전 기록
 
 | 버전 | 일자       | 작성자         | 변경 요약                                                       |
 | ---- | ---------- | -------------- | --------------------------------------------------------------- |
-| 0.5  | 2025-05-13 | Hojung Jung     | 기사 필터링 및 그룹화 기능 추가                                 |
-| 0.4  | 2025‑05‑11 | Hojung Jung         | 다양한 뉴스 소스 통합 기능 반영 (RSS, 네이버 API)               |
-| 0.3  | 2025‑05‑09 | Hojung Jung | LangChain/LangGraph 통합 반영, 관련 문서 업데이트               |
-| 0.2  | 2025‑05‑09 | Hojung Jung        | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원 |
-| 0.1  | 2025‑05‑09 | Hojung Jung        | 초기 초안                                                       |
+| 0.6  | 2025-05-22 | Hojung Jung    | 테스트 모드 기능 추가 (template/content)                             |
+| 0.5  | 2025-05-13 | Hojung Jung    | 기사 필터링 및 그룹화 기능 추가                                     |
+| 0.4  | 2025‑05‑11 | Hojung Jung    | 다양한 뉴스 소스 통합 기능 반영 (RSS, 네이버 API)                    |
+| 0.3  | 2025‑05‑09 | Hojung Jung    | LangChain/LangGraph 통합 반영, 관련 문서 업데이트                   |
+| 0.2  | 2025‑05‑09 | Hojung Jung    | MVP 범위 이메일 발송 반영, LLM → Gemini Pro, 대상 → 내부 연구원      |
+| 0.1  | 2025‑05‑09 | Hojung Jung    | 초기 초안                                                        |
