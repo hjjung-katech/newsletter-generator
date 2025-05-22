@@ -74,9 +74,6 @@ def run(
         "--drive",
         help="Save the newsletter to Google Drive (HTML and Markdown).",
     ),
-    use_langgraph: bool = typer.Option(
-        True, "--langgraph/--no-langgraph", help="Use LangGraph workflow (recommended)."
-    ),
     filter_duplicates: bool = typer.Option(
         True,
         "--filter-duplicates/--no-filter-duplicates",
@@ -272,220 +269,100 @@ def run(
 
     html_content = ""
 
-    # LangGraph를 사용하는 경우
-    if use_langgraph:
-        console.print("\n[cyan]Using LangGraph workflow...[/cyan]")
-        console.print(
-            "\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]"
-        )  # LangGraph 워크플로우 실행
-        html_content, status = graph.generate_newsletter(
-            keyword_list, news_period_days, domain=domain  # 도메인 정보 전달
-        )  # Use the final keyword_list and news period
+    # LangGraph를 사용하는 것이 이제 기본이자 유일한 방식입니다.
+    console.print("\n[cyan]Using LangGraph workflow...[/cyan]")
+    console.print(
+        "\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]"
+    )  # LangGraph 워크플로우 실행
 
-        if status == "error":
-            console.print(
-                f"[yellow]Error in newsletter generation: {html_content}[/yellow]"
-            )
-            return
+    # graph.generate_newsletter는 내부적으로 chains.get_newsletter_chain()을 호출하고,
+    # chains.py의 변경으로 인해 render_data_langgraph...json 파일이 저장됩니다.
+    # generate_newsletter는 (html_content, status)를 반환합니다.
+    html_content, status = graph.generate_newsletter(
+        keyword_list, news_period_days, domain=domain  # 도메인 정보 전달
+    )
 
+    if status == "error":
         console.print(
-            "[green]Newsletter generated successfully using LangGraph.[/green]"
+            f"[yellow]Error in newsletter generation: {html_content}[/yellow]"
         )
+        return
 
-        # 뉴스레터 주제 및 파일명 설정
-        newsletter_topic = ""
-        if domain:
-            newsletter_topic = domain  # 도메인이 있으면 도메인 사용
-        elif len(keyword_list) == 1:
-            newsletter_topic = keyword_list[0]  # 단일 키워드면 해당 키워드 사용
-        else:
-            # 여러 키워드의 공통 주제 추출
-            newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
+    console.print("[green]Newsletter generated successfully using LangGraph.[/green]")
 
-        current_date_str = datetime.now().strftime("%Y-%m-%d")
-        current_time_str = datetime.now().strftime("%H%M%S")  # Add time for filename
-        # 파일 이름에 안전한 주제 문자열 생성
-        safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
-        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
-
-        # 뉴스레터 파일 저장 (LangGraph 방식)
-        if output_format:
-            console.print(
-                f"\n[cyan]Saving newsletter locally as {output_format.upper()}...[/cyan]"
-            )
-            save_path = os.path.join(
-                output_directory, f"{filename_base}.{output_format}"
-            )
-            console.print(f"[info]Saving to: {save_path}[/info]")
-
-            if news_deliver.save_locally(
-                html_content, filename_base, output_format, output_directory
-            ):
-                console.print(
-                    f"[green]Newsletter saved locally as {save_path}.[/green]"
-                )
-                # 파일 존재 확인
-                if os.path.exists(save_path):
-                    file_size = os.path.getsize(save_path)
-                    console.print(
-                        f"[green]File created successfully - Size: {file_size} bytes[/green]"
-                    )
-                else:
-                    console.print(
-                        f"[bold red]Error: File was not created at {save_path}[/bold red]"
-                    )
-            else:
-                console.print(
-                    f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
-                )
-
-        # Google Drive에 저장(드라이브 옵션이 활성화된 경우)
-        if drive:
-            console.print(f"\n[cyan]Uploading to Google Drive...[/cyan]")
-            if news_deliver.save_to_drive(
-                html_content, filename_base, output_directory
-            ):
-                console.print(
-                    "[green]Successfully uploaded newsletter to Google Drive.[/green]"
-                )
-            else:
-                console.print(
-                    "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
-                )
-
-        console.print("\n[bold green]Newsletter process completed.[/bold green]")
-
-    # 기존 방식 사용하는 경우
+    # 뉴스레터 주제 및 파일명 설정
+    newsletter_topic = ""
+    if domain:
+        newsletter_topic = domain  # 도메인이 있으면 도메인 사용
+    elif len(keyword_list) == 1:
+        newsletter_topic = keyword_list[0]  # 단일 키워드면 해당 키워드 사용
     else:
-        # 1. Collect articles
-        console.print("\n[cyan]Step 1: Collecting articles...[/cyan]")
-        articles = news_collect.collect_articles(
-            final_keywords_str,
-            max_per_source=max_per_source,
-            filter_duplicates=filter_duplicates,
-            group_by_keywords=group_by_keywords,
-            use_major_sources_filter=use_major_sources,
-        )  # Use final_keywords_str for collection
-        if not articles:
-            console.print("[yellow]No articles found. Exiting.[/yellow]")
-            return
+        # 여러 키워드의 공통 주제 추출
+        newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
 
-        # 그룹화된 결과인 경우 출력 형식 변경
-        if isinstance(articles, dict):
-            total_articles = sum(len(group) for group in articles.values())
-            console.print(
-                f"Collected {total_articles} articles grouped by {len(articles)} keywords."
-            )
-            for keyword, keyword_articles in articles.items():
-                console.print(f"- {keyword}: {len(keyword_articles)} articles")
-        else:
-            console.print(f"Collected {len(articles)} articles.")
+    current_date_str = datetime.now().strftime("%Y-%m-%d")
+    current_time_str = datetime.now().strftime("%H%M%S")  # Add time for filename
+    # 파일 이름에 안전한 주제 문자열 생성
+    safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
+    filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
 
-        # 2. Summarize articles
-        console.print("\n[cyan]Step 2: Summarizing articles...[/cyan]")
-        summaries = news_summarize.summarize_articles(
-            keyword_list, articles
-        )  # Use final keyword_list for summarization context
-        if not summaries:
-            console.print("[yellow]Failed to summarize articles. Exiting.[/yellow]")
-            return  # 이제 summaries는 HTML 문자열이므로 변수명을 변경
-        html_content = summaries
+    # 뉴스레터 파일 저장
+    if output_format:
         console.print(
-            "\n[green]Newsletter generated successfully using legacy pipeline.[/green]"
+            f"\n[cyan]Saving newsletter locally as {output_format.upper()}...[/cyan]"
+        )
+        save_path = os.path.join(output_directory, f"{filename_base}.{output_format}")
+        console.print(f"[info]Saving to: {save_path}[/info]")
+
+        if news_deliver.save_locally(
+            html_content, filename_base, output_format, output_directory
+        ):
+            console.print(f"[green]Newsletter saved locally as {save_path}.[/green]")
+            # 파일 존재 확인
+            if os.path.exists(save_path):
+                file_size = os.path.getsize(save_path)
+                console.print(
+                    f"[green]File created successfully - Size: {file_size} bytes[/green]"
+                )
+            else:
+                console.print(
+                    f"[bold red]Error: File was not created at {save_path}[/bold red]"
+                )
+        else:
+            console.print(
+                f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
+            )
+
+    # Google Drive에 저장(드라이브 옵션이 활성화된 경우)
+    if drive:
+        console.print(f"\n[cyan]Uploading to Google Drive...[/cyan]")
+        if news_deliver.save_to_drive(html_content, filename_base, output_directory):
+            console.print(
+                "[green]Successfully uploaded newsletter to Google Drive.[/green]"
+            )
+        else:
+            console.print(
+                "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
+            )
+
+    # 이메일 전송 로직 (LangGraph 경로에도 추가)
+    if to:
+        console.print(f"\n[cyan]Sending email to {to}...[/cyan]")
+        email_subject = (
+            f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
+        )
+        if news_deliver.send_email(
+            to_email=to, subject=email_subject, html_content=html_content
+        ):
+            console.print(f"[green]Email sent successfully to {to}.[/green]")
+        else:
+            console.print(f"[yellow]Failed to send email to {to}.[/yellow]")
+    else:
+        console.print(
+            "\n[yellow]Email sending skipped as no recipient was provided.[/yellow]"
         )
 
-        # 뉴스레터 주제 및 파일명 설정
-        newsletter_topic = ""
-        if domain:
-            newsletter_topic = domain  # 도메인이 있으면 도메인 사용
-        elif len(keyword_list) == 1:
-            newsletter_topic = keyword_list[0]  # 단일 키워드면 해당 키워드 사용
-        else:
-            # 여러 키워드의 공통 주제 추출
-            newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
-
-        current_date_str = datetime.now().strftime("%Y-%m-%d")
-        current_time_str = datetime.now().strftime("%H%M%S")  # Add time for filename
-        # 파일 이름에 안전한 주제 문자열 생성
-        safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
-        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
-
-        # 3. Send email
-        step_num = 3  # 현재 단계 번호 추적
-
-        if to:
-            console.print(f"\n[cyan]Step {step_num}: Sending email...[/cyan]")
-            email_subject = f"오늘의 뉴스레터: {newsletter_topic}"  # 이메일 제목에도 뉴스레터 주제 반영
-            news_deliver.send_email(
-                to_email=to, subject=email_subject, html_content=html_content
-            )
-        else:
-            console.print(
-                f"\n[yellow]Step {step_num}: Email sending skipped as no recipient was provided.[/yellow]"
-            )
-
-        step_num += 1
-
-        # 4. Save or Upload
-        saved_locally = False
-        if output_format:
-            console.print(
-                f"\n[cyan]Step {step_num}: Saving newsletter locally as {output_format.upper()}...[/cyan]"
-            )
-            save_path = os.path.join(
-                output_directory, f"{filename_base}.{output_format}"
-            )
-            console.print(f"[info]Saving to: {save_path}[/info]")
-
-            if news_deliver.save_locally(
-                html_content, filename_base, output_format, output_directory
-            ):
-                console.print(
-                    f"[green]Newsletter saved locally as {save_path}.[/green]"
-                )
-                # 파일 존재 확인
-                if os.path.exists(save_path):
-                    file_size = os.path.getsize(save_path)
-                    console.print(
-                        f"[green]File created successfully - Size: {file_size} bytes[/green]"
-                    )
-                else:
-                    console.print(
-                        f"[bold red]Error: File was not created at {save_path}[/bold red]"
-                    )
-                saved_locally = True
-            else:
-                console.print(
-                    f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
-                )
-
-        step_num += 1
-
-        # 5. Upload to Google Drive
-        if drive:
-            console.print(
-                f"\n[cyan]Step {step_num}: Uploading to Google Drive...[/cyan]"
-            )
-            if news_deliver.save_to_drive(
-                html_content, filename_base, output_directory
-            ):
-                console.print(
-                    "[green]Successfully uploaded newsletter to Google Drive.[/green]"
-                )
-            else:
-                console.print(
-                    "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
-                )
-
-        if not saved_locally and not drive:
-            console.print(
-                "\n[yellow]Warning: Newsletter was not saved locally or uploaded to Google Drive.[/yellow]"
-            )
-            console.print(
-                "[yellow]Use --output-format=html or --drive to save/upload the newsletter.[/yellow]"
-            )
-
-        console.print("\n[bold green]Newsletter process completed.[/bold green]")
+    console.print("\n[bold green]Newsletter process completed.[/bold green]")
 
 
 # The 'collect' command can remain if it's used for other purposes or direct testing.
@@ -609,52 +486,84 @@ def suggest(
 @app.command()
 def test(
     data_file: str = typer.Argument(
-        ..., help="Path to the render_data file to use for testing"
+        ..., help="Path to the render_data_langgraph_...json file to use for testing"
     ),
     output: Optional[str] = typer.Option(
         None, "--output", help="Optional custom output path for the HTML file"
     ),
 ):
     """
-    테스트 데이터 파일로부터 뉴스레터를 렌더링합니다.
+    Renders a newsletter from a LangGraph-generated intermediate data file.
     """
     try:
         # 데이터 파일 로드
         console.print(f"[cyan]Loading test data from {data_file}...[/cyan]")
         with open(data_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            render_data = json.load(f)
 
-        # 템플릿 디렉토리 설정
-        template_dir = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), "templates"
-        )
-        template_name = "newsletter_template.html"
+        # HTML 템플릿 직접 로드 (chains.py의 load_html_template 모방)
+        console.print("[cyan]Loading HTML template...[/cyan]")
+        from .chains import load_html_template
+        from jinja2 import Template
 
-        # 현재 일시 설정
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        current_time = datetime.now().strftime("%H%M%S")
-        os.environ["GENERATION_DATE"] = current_date
-        os.environ["GENERATION_TIMESTAMP"] = datetime.now().strftime("%H:%M:%S")
+        html_template_content = load_html_template()
+        if not html_template_content:
+            console.print("[red]Error: Failed to load HTML template.[/red]")
+            raise typer.Exit(code=1)
 
-        # 뉴스레터 렌더링
+        template = Template(html_template_content)
+
+        # 환경 변수 설정 (render_with_template에서 사용되는 것과 유사하게)
+        # GENERATION_DATE와 GENERATION_TIMESTAMP는 render_data에 이미 포함되어 있을 것으로 예상
+        # 하지만, 만약 템플릿이 직접 os.environ을 참조한다면 여기서 설정 필요
+        # render_data에 이미 'generation_date'와 'generation_timestamp'가 있다면 그것을 사용
+        # 여기서는 render_data에 필요한 모든 컨텍스트가 있다고 가정합니다.
+
         console.print(
-            f"[cyan]Rendering newsletter using template: {template_name}...[/cyan]"
+            f"[cyan]Rendering newsletter using loaded template and data...[/cyan]"
         )
-        html_content = compose_newsletter_html(data, template_dir, template_name)
+        # render_data 자체가 Jinja 템플릿에 전달될 딕셔너리여야 합니다.
+        html_content = template.render(**render_data)
 
         # 기본 출력 파일명 설정
         if output is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output = f"output/test_newsletter_result_{timestamp}.html"
+            # 입력 파일명에서 주제를 가져오려고 시도
+            base_name = os.path.basename(data_file)
+            topic_part = (
+                "_".join(base_name.split("_")[3:]).replace(".json", "")
+                if "render_data_langgraph" in base_name
+                else "test"
+            )
+            output_filename = f"test_newsletter_result_{timestamp}_{topic_part}.html"
+            output = os.path.join("output", output_filename)
 
         # 출력 디렉토리 생성
-        os.makedirs(os.path.dirname(output), exist_ok=True)
+        output_dir = os.path.dirname(output)
+        if (
+            output_dir
+        ):  # output_dir이 빈 문자열이 아닐 경우 (즉, 상대경로 또는 절대경로에 디렉토리가 지정된 경우)
+            os.makedirs(output_dir, exist_ok=True)
+        else:  # 파일만 지정된 경우 현재 디렉토리의 output 폴더를 기본으로 사용
+            os.makedirs("output", exist_ok=True)
+            output = os.path.join("output", os.path.basename(output))
 
         # HTML 저장
         with open(output, "w", encoding="utf-8") as f:
             f.write(html_content)
 
         console.print(f"[green]Newsletter rendered and saved to {output}[/green]")
+        # 파일 존재 및 크기 확인
+        if os.path.exists(output):
+            file_size = os.path.getsize(output)
+            console.print(
+                f"[green]File created: {output} (Size: {file_size} bytes)[/green]"
+            )
+        else:
+            console.print(
+                f"[bold red]Error: File was not created at {output}[/bold red]"
+            )
+
     except Exception as e:
         console.print(f"[red]Error in test command: {e}[/red]")
         traceback.print_exc()
