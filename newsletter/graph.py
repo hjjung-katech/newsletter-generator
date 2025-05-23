@@ -22,6 +22,7 @@ class NewsletterState(TypedDict):
     keywords: List[str]
     news_period_days: int  # Configurable days for news recency filter
     domain: str  # Added domain field
+    template_style: str  # Template style: 'compact' or 'detailed'
     # 중간 결과물
     collected_articles: Optional[List[Dict]]  # Made Optional
     processed_articles: Optional[List[Dict]]  # New field
@@ -375,7 +376,7 @@ def summarize_articles_node(
     """
     수집된 기사를 요약하는 노드
     """
-    from .chains import get_summarization_chain
+    from .chains import get_newsletter_chain
     import os
 
     print("\n[cyan]Step: Summarizing articles...[/cyan]")
@@ -390,6 +391,8 @@ def summarize_articles_node(
             "error": "요약할 기사가 없습니다.",
             "status": "error",
         }
+
+    template_style = state.get("template_style", "compact")
 
     try:
         # 비용 추적 설정 (ENABLE_COST_TRACKING 환경 변수 설정된 경우에만)
@@ -407,8 +410,20 @@ def summarize_articles_node(
                     f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
                 )
 
-        # 요약 체인 가져오기 및 실행
-        summarization_chain = get_summarization_chain(callbacks=callbacks)
+        # template_style에 따라 compact 또는 detailed 체인 사용
+        is_compact = template_style == "compact"
+
+        if is_compact:
+            print(
+                "[cyan]Using compact processing - running compact newsletter chain...[/cyan]"
+            )
+        else:
+            print(
+                "[cyan]Using detailed processing - running full summarization chain...[/cyan]"
+            )
+
+        # 통합된 체인 가져오기 및 실행
+        newsletter_chain = get_newsletter_chain(is_compact=is_compact)
 
         # 데이터 형식 맞추기: processed_articles를 'articles' 키를 가진 딕셔너리로 감싸기
         input_data = {
@@ -416,7 +431,7 @@ def summarize_articles_node(
             "keywords": state.get("keywords", ""),
         }
 
-        category_summaries = summarization_chain.invoke(input_data)
+        category_summaries = newsletter_chain.invoke(input_data)
 
         if not category_summaries:
             return {
@@ -451,6 +466,7 @@ def compose_newsletter_node(
     카테고리 요약에서 최종 뉴스레터 HTML을 생성하는 노드
     """
     from .chains import get_newsletter_chain
+    from .compose import compose_newsletter_html, compose_compact_newsletter_html
     import os
     from datetime import datetime  # Import datetime for timestamp
 
@@ -466,18 +482,53 @@ def compose_newsletter_node(
         }
 
     try:
-        # category_summaries는 이미 HTML 문자열임
-        # 따라서 직접 이를 newsletter_html로 사용
-        newsletter_html = category_summaries
+        template_style = state.get("template_style", "compact")
+
+        # category_summaries is the full newsletter data structure created by the rendering chain
+        if isinstance(category_summaries, str):
+            # If it's already HTML, just use it
+            newsletter_html = category_summaries
+        else:
+            # If it's structured data, render with appropriate template
+            template_dir = os.path.join(
+                os.path.dirname(os.path.dirname(__file__)), "templates"
+            )
+
+            if template_style == "compact":
+                print("[cyan]Using compact newsletter template...[/cyan]")
+                # compact 모드에서는 chains.py에서 이미 완전한 데이터 구조가 반환됨
+                # 다시 compose_compact_newsletter_html을 호출할 필요 없음
+                if hasattr(category_summaries, "get") and isinstance(
+                    category_summaries, dict
+                ):
+                    # category_summaries가 이미 완전한 compact 데이터 구조인 경우
+                    newsletter_html = compose_compact_newsletter_html(
+                        category_summaries,
+                        template_dir,
+                        "newsletter_template_compact.html",
+                    )
+                else:
+                    # 기존 방식 사용
+                    newsletter_html = compose_compact_newsletter_html(
+                        category_summaries,
+                        template_dir,
+                        "newsletter_template_compact.html",
+                    )
+            else:
+                print("[cyan]Using detailed newsletter template...[/cyan]")
+                newsletter_html = compose_newsletter_html(
+                    category_summaries, template_dir, "newsletter_template.html"
+                )
 
         # 뉴스레터 HTML 저장
-        def save_newsletter_html(html_content, topic):
+        def save_newsletter_html(html_content, topic, style):
             """
             생성된 뉴스레터 HTML을 파일로 저장합니다.
 
             Args:
                 html_content: 저장할 HTML 내용
                 topic: 뉴스레터 주제 (파일명 생성에 사용)
+                style: 템플릿 스타일 (파일명에 추가)
 
             Returns:
                 str: 저장된 파일 경로
@@ -493,7 +544,7 @@ def compose_newsletter_node(
 
             # 날짜와 시간을 파일명에 추가
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{filename_base}_{timestamp}.html"
+            filename = f"{filename_base}_{style}_{timestamp}.html"
             file_path = os.path.join(output_dir, filename)
 
             # 파일 저장
@@ -505,7 +556,9 @@ def compose_newsletter_node(
 
         # 뉴스레터 저장
         newsletter_topic = state.get("newsletter_topic", "뉴스레터")
-        save_path = save_newsletter_html(newsletter_html, newsletter_topic)
+        save_path = save_newsletter_html(
+            newsletter_html, newsletter_topic, template_style
+        )
 
         # 결과 상태 업데이트 및 반환
         return {
@@ -594,7 +647,10 @@ def create_newsletter_graph() -> StateGraph:
 
 # 뉴스레터 생성 함수
 def generate_newsletter(
-    keywords: List[str], news_period_days: int = 14, domain: str = None
+    keywords: List[str],
+    news_period_days: int = 14,
+    domain: str = None,
+    template_style: str = "compact",
 ) -> Tuple[str, str]:
     """
     키워드를 기반으로 뉴스레터를 생성하는 메인 함수
@@ -603,6 +659,7 @@ def generate_newsletter(
         keywords: 키워드 리스트
         news_period_days: 최신 뉴스 수집 기간(일 단위), 기본값 14일(2주)
         domain: 키워드를 생성한 도메인 (있는 경우)
+        template_style: 뉴스레터 템플릿 스타일 ('compact' 또는 'detailed')
 
     Returns:
         (뉴스레터 HTML, 상태)
@@ -624,6 +681,7 @@ def generate_newsletter(
         "keywords": keywords,
         "news_period_days": news_period_days,  # Propagate configurable period to state
         "domain": domain,  # 도메인 정보 추가
+        "template_style": template_style,  # Add template_style to state
         "newsletter_topic": newsletter_topic,  # 뉴스레터 주제 추가
         "collected_articles": None,  # Initialize as None
         "processed_articles": None,  # Initialize as None

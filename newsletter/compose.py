@@ -220,6 +220,328 @@ def save_newsletter_with_config(
     print(f"Saved newsletter data with embedded config to {output_path}")
 
 
+def compose_compact_newsletter_html(
+    data, template_dir: str, template_name: str = "newsletter_template_compact.html"
+) -> str:
+    """
+    간결한 버전의 뉴스레터를 생성합니다.
+    상위 중요기사 3개를 메인으로 하고, 나머지를 그룹별로 간략히 소개합니다.
+
+    Args:
+        data: Newsletter data containing sections and top_articles
+        template_dir: Template directory path
+        template_name: Template file name (defaults to newsletter_template_compact.html)
+
+    Returns:
+        str: The rendered HTML content of the compact newsletter.
+    """
+    # First extract any test configuration if present
+    if isinstance(data, dict):
+        data, test_config = extract_test_config(data)
+
+    newsletter_data = data if isinstance(data, dict) else {}
+
+    # 간결한 버전을 위한 데이터 처리
+    compact_data = process_compact_newsletter_data(newsletter_data)
+
+    print(
+        f"Composing compact newsletter for topic: {compact_data.get('newsletter_title', 'N/A')}..."
+    )
+
+    env = Environment(
+        loader=FileSystemLoader(template_dir),
+        autoescape=select_autoescape(["html", "xml"]),
+    )
+    template = env.get_template(template_name)
+
+    # 현재 날짜와 시간 가져오기
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_time = datetime.now().strftime("%H:%M:%S")
+
+    # 환경 변수 확인 또는 현재 날짜와 시간 사용
+    generation_date = os.environ.get("GENERATION_DATE", current_date)
+    generation_timestamp = os.environ.get("GENERATION_TIMESTAMP", current_time)
+
+    # 기존 로직을 아래 코드로 대체
+    if isinstance(data, dict):
+        # 딕셔너리 형태로 제공된 경우 해당 값 사용, 없으면 환경 변수나 현재 값 사용
+        generation_date = data.get("generation_date", generation_date)
+        generation_timestamp = data.get("generation_timestamp", generation_timestamp)
+
+    # Prepare context for compact template
+    context = {
+        "newsletter_title": compact_data.get(
+            "newsletter_title", "주간 산업 동향 브리프"
+        ),
+        "tagline": compact_data.get(
+            "tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."
+        ),
+        "generation_date": generation_date,
+        "issue_no": compact_data.get("issue_no"),
+        "top_articles": compact_data.get("top_articles", []),
+        "grouped_sections": compact_data.get("grouped_sections", []),
+        "food_for_thought": compact_data.get("food_for_thought"),
+        "copyright_year": generation_date.split("-")[0],
+        "publisher_name": compact_data.get("company_name", "Your Company"),
+        "company_name": compact_data.get("company_name", "Your Company"),
+    }
+
+    html_content = template.render(context)
+    return html_content
+
+
+def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    기존 뉴스레터 데이터를 간결한 버전으로 변환합니다.
+
+    Args:
+        newsletter_data: 원본 뉴스레터 데이터
+
+    Returns:
+        Dict: 간결한 버전용으로 변환된 데이터
+    """
+    print(
+        f"[DEBUG] process_compact_newsletter_data input keys: {list(newsletter_data.keys())}"
+    )
+
+    compact_data = {
+        "newsletter_title": newsletter_data.get(
+            "newsletter_topic", "주간 산업 동향 브리프"
+        ),
+        "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
+        "company_name": newsletter_data.get("company_name", "Your Company"),
+        "generation_date": newsletter_data.get("generation_date"),
+        "issue_no": newsletter_data.get("issue_no"),
+    }
+
+    # 상위 중요 기사 처리 (최대 3개)
+    top_articles = newsletter_data.get("top_articles", [])
+    print(f"[DEBUG] Found top_articles: {len(top_articles)}")
+
+    if not top_articles and "sections" in newsletter_data:
+        # top_articles가 없으면 각 섹션에서 첫 번째 기사들을 선택
+        print(f"[DEBUG] No top_articles, extracting from sections")
+        top_articles = extract_top_articles_from_sections(newsletter_data["sections"])
+
+    # 상위 3개로 제한하고 요약 추가
+    compact_data["top_articles"] = prepare_top_articles_for_compact(top_articles[:3])
+
+    # Check if grouped_sections already exist in the input data
+    if "grouped_sections" in newsletter_data:
+        print(
+            f"[DEBUG] Using existing grouped_sections: {len(newsletter_data['grouped_sections'])}"
+        )
+        compact_data["grouped_sections"] = newsletter_data["grouped_sections"]
+    else:
+        print(f"[DEBUG] Creating grouped_sections from sections")
+        # 나머지 기사들을 그룹별로 정리
+        compact_data["grouped_sections"] = prepare_grouped_sections_for_compact(
+            newsletter_data.get("sections", []),
+            top_articles[:3],  # 이미 선택된 상위 기사들 제외
+        )
+
+    # 용어 설명 처리 (최대 3개까지만)
+    if "definitions" in newsletter_data:
+        print(
+            f"[DEBUG] Using existing definitions: {len(newsletter_data['definitions'])}"
+        )
+        compact_data["definitions"] = newsletter_data["definitions"]
+    else:
+        print(f"[DEBUG] Creating definitions from sections")
+        compact_data["definitions"] = extract_key_definitions_for_compact(
+            newsletter_data.get("sections", [])
+        )
+
+    # 생각해볼 거리 처리
+    food_for_thought = newsletter_data.get("food_for_thought")
+    if food_for_thought:
+        if isinstance(food_for_thought, dict):
+            # 간결하게 메시지만 사용
+            compact_data["food_for_thought"] = food_for_thought.get(
+                "message", food_for_thought.get("quote", "")
+            )
+        else:
+            compact_data["food_for_thought"] = str(food_for_thought)
+
+    return compact_data
+
+
+def extract_top_articles_from_sections(
+    sections: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    각 섹션에서 첫 번째 뉴스 링크를 추출하여 상위 기사로 만듭니다.
+    """
+    top_articles = []
+
+    for section in sections[:3]:  # 최대 3개 섹션에서
+        news_links = section.get("news_links", [])
+        if news_links:
+            first_article = news_links[0]
+            # 요약 텍스트 생성 (섹션의 첫 번째 요약 문단 사용)
+            summary_paragraphs = section.get("summary_paragraphs", [])
+            snippet = summary_paragraphs[0] if summary_paragraphs else ""
+
+            top_article = {
+                "title": first_article.get("title", ""),
+                "url": first_article.get("url", "#"),
+                "snippet": snippet[:150] + "..." if len(snippet) > 150 else snippet,
+                "source_and_date": first_article.get("source_and_date", ""),
+            }
+            top_articles.append(top_article)
+
+    return top_articles
+
+
+def prepare_top_articles_for_compact(
+    top_articles: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    상위 기사들을 간결한 템플릿용으로 포맷팅합니다.
+    """
+    prepared_articles = []
+
+    for article in top_articles:
+        # 날짜 형식 포맷팅
+        source_and_date = article.get("source_and_date", "")
+        if source_and_date:
+            source, date_str = extract_source_and_date(source_and_date)
+            if date_str:
+                formatted_date = format_date_for_display(date_str=date_str)
+                if formatted_date:
+                    source_and_date = f"{source} · {formatted_date}"
+
+        prepared_article = {
+            "title": article.get("title", ""),
+            "url": article.get("url", "#"),
+            "snippet": article.get("snippet", article.get("summary_text", "")),
+            "source_and_date": source_and_date,
+        }
+        prepared_articles.append(prepared_article)
+
+    return prepared_articles
+
+
+def prepare_grouped_sections_for_compact(
+    sections: List[Dict[str, Any]], exclude_articles: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    섹션들을 간결한 템플릿용 그룹으로 변환합니다.
+    """
+    grouped_sections = []
+
+    # 이미 상위 기사로 선택된 기사들의 URL 추출
+    excluded_urls = {article.get("url", "") for article in exclude_articles}
+
+    for section in sections:
+        # compact 모드에서는 news_links 대신 articles를 사용
+        news_links = section.get("news_links", [])
+        articles = section.get("articles", [])
+
+        # news_links가 있으면 사용하고, 없으면 articles 사용
+        article_list = news_links if news_links else articles
+
+        remaining_articles = [
+            link for link in article_list if link.get("url", "") not in excluded_urls
+        ]
+
+        if remaining_articles:  # 남은 기사가 있을 때만 섹션 추가
+            # 그룹 제목에 이모지 추가
+            section_title = section.get("title", "")
+            group_heading = add_emoji_to_section_title(section_title)
+
+            # 간단한 소개 문구 생성 (첫 번째 요약 문단의 첫 문장 사용)
+            # compact 모드에서는 intro 필드 사용
+            intro = section.get("intro", "")
+            if not intro:
+                summary_paragraphs = section.get("summary_paragraphs", [])
+                if summary_paragraphs:
+                    first_paragraph = summary_paragraphs[0]
+                    sentences = first_paragraph.split(". ")
+                    intro = (
+                        sentences[0] + "."
+                        if sentences
+                        else first_paragraph[:100] + "..."
+                    )
+
+            grouped_section = {
+                "heading": group_heading,
+                "intro": intro,
+                "articles": [
+                    {
+                        "title": article.get("title", ""),
+                        "url": article.get("url", "#"),
+                        "source_and_date": format_compact_source_date(
+                            article.get("source_and_date", "")
+                        ),
+                    }
+                    for article in remaining_articles[:4]  # 최대 4개까지만
+                ],
+            }
+            grouped_sections.append(grouped_section)
+
+    return grouped_sections
+
+
+def add_emoji_to_section_title(title: str) -> str:
+    """
+    섹션 제목에 적절한 이모지를 추가합니다.
+    """
+    title_lower = title.lower()
+
+    if any(word in title_lower for word in ["투자", "펀딩", "자금", "ipo", "상장"]):
+        return f"🚀 {title}"
+    elif any(word in title_lower for word in ["정책", "규제", "법", "윤리"]):
+        return f"🏛️ {title}"
+    elif any(word in title_lower for word in ["연구", "기술", "개발", "특허"]):
+        return f"📊 {title}"
+    elif any(word in title_lower for word in ["시장", "수요", "트렌드", "소비"]):
+        return f"🌐 {title}"
+    else:
+        return f"📈 {title}"
+
+
+def format_compact_source_date(source_and_date: str) -> str:
+    """
+    간결한 템플릿용으로 출처와 날짜를 포맷팅합니다.
+    """
+    if not source_and_date:
+        return ""
+
+    source, date_str = extract_source_and_date(source_and_date)
+    if date_str:
+        formatted_date = format_date_for_display(date_str=date_str)
+        if formatted_date:
+            return f"{source} · {formatted_date}"
+
+    return source_and_date
+
+
+def extract_key_definitions_for_compact(
+    sections: List[Dict[str, Any]],
+) -> List[Dict[str, str]]:
+    """
+    각 섹션에서 핵심 용어 정의를 추출합니다. 최대 3개까지만 반환합니다.
+
+    Args:
+        sections: 뉴스레터 섹션 리스트
+
+    Returns:
+        List[Dict]: 용어와 설명을 포함한 딕셔너리 리스트
+    """
+    all_definitions = []
+
+    for section in sections:
+        definitions = section.get("definitions", [])
+        if definitions:
+            # 각 섹션에서 첫 번째 정의만 가져옴 (가장 중요한 용어로 간주)
+            if len(definitions) > 0:
+                all_definitions.append(definitions[0])
+
+    # 최대 3개까지만 반환 (가독성을 위해)
+    return all_definitions[:3]
+
+
 # Example usage (for testing purposes):
 if __name__ == "__main__":
     # This is a simplified example. In a real scenario,

@@ -67,6 +67,11 @@ def request_llm_scores(
 ) -> Dict[str, float]:
     if llm is None:
         llm = get_llm(temperature=0)
+
+    # domain이 None이거나 비어있을 때 기본값 사용
+    if not domain:
+        domain = "기술 및 산업 동향"
+
     prompt = SCORE_PROMPT.replace("<DOMAIN>", domain).format(
         title=article.get("title", ""),
         summary=article.get("content") or article.get("snippet", ""),

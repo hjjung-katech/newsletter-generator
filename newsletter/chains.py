@@ -18,6 +18,11 @@ from newsletter.sources import NewsSourceManager
 from . import tools  # 추가: tools 모듈 가져오기
 from .template_manager import TemplateManager
 from jinja2 import Environment, FileSystemLoader
+from .compose import (
+    prepare_grouped_sections_for_compact,
+    extract_key_definitions_for_compact,
+    compose_compact_newsletter_html,
+)
 
 
 # HTML 템플릿 파일 로딩
@@ -256,9 +261,31 @@ def format_articles(data):
     return "\n---\n".join(formatted_articles)
 
 
-# 1. 분류 체인 생성 함수
-def create_categorization_chain():
+# 1. 분류 체인 생성 함수 (compact 옵션 추가)
+def create_categorization_chain(is_compact=False):
     llm = get_llm(temperature=0.2)
+
+    # compact 버전용 간소화된 프롬프트
+    compact_prompt = """당신은 뉴스들을 간결하게 분류하는 전문 편집자입니다.
+
+다음 뉴스 기사들을 분석하여 2-3개의 주요 카테고리로 분류해주세요:
+{formatted_articles}
+
+출력 형식은 다음과 같은 JSON 형식으로 작성해주세요:
+{{
+  "categories": [
+    {{
+      "title": "카테고리 제목",
+      "article_indices": [1, 2, 5]
+    }},
+    {{
+      "title": "카테고리 제목 2",
+      "article_indices": [3, 4, 6]
+    }}
+  ]
+}}
+
+각 카테고리 제목은 독자가 어떤 내용인지 한눈에 알 수 있도록 명확하고 구체적으로 작성해주세요."""
 
     # 메시지 생성 함수
     def create_messages(data):
@@ -272,11 +299,15 @@ def create_categorization_chain():
                 "}", "}}"
             )
 
-            # 포맷팅 진행
-            prompt = CATEGORIZATION_PROMPT.format(
-                keywords=keywords,
-                formatted_articles=formatted_articles,
-            )
+            # compact 버전인지에 따라 프롬프트 선택
+            if is_compact:
+                prompt = compact_prompt.format(formatted_articles=formatted_articles)
+            else:
+                # 포맷팅 진행
+                prompt = CATEGORIZATION_PROMPT.format(
+                    keywords=keywords,
+                    formatted_articles=formatted_articles,
+                )
 
             # 메시지를 HumanMessage로 변환 (Gemini는 시스템 메시지 지원이 불안정함)
             return [HumanMessage(content=prompt)]
@@ -300,7 +331,15 @@ def create_categorization_chain():
             if json_match:
                 json_str = json_match.group(1).strip()
             else:
-                json_str = text.strip()
+                # compact 버전에서는 중괄호로 감싸진 JSON도 찾기
+                if is_compact:
+                    json_match = re.search(r"\{.*\}", text, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group()
+                    else:
+                        json_str = text.strip()
+                else:
+                    json_str = text.strip()
 
             # JSON 파싱
             result = json.loads(json_str)
@@ -312,17 +351,52 @@ def create_categorization_chain():
             print(f"JSON 파싱 오류: {e}")
             print(f"원본 텍스트: {text}")
             # 기본 구조 반환
-            return {
-                "categories": [{"title": "기타", "article_indices": [1, 2, 3, 4, 5]}]
-            }
+            if is_compact:
+                return {
+                    "categories": [
+                        {"title": "주요 동향", "article_indices": list(range(1, 11))}
+                    ]
+                }
+            else:
+                return {
+                    "categories": [
+                        {"title": "기타", "article_indices": [1, 2, 3, 4, 5]}
+                    ]
+                }
 
     return chain | RunnableLambda(parse_json_response)
 
 
-# 2. 카테고리별 요약 체인 생성 함수
-def create_summarization_chain():
+# 2. 카테고리별 요약 체인 생성 함수 (compact 옵션 추가)
+def create_summarization_chain(is_compact=False):
     llm = get_llm(temperature=0.3)
     parser = JsonOutputParser()
+
+    # compact 버전용 간소화된 프롬프트
+    compact_summary_prompt = """당신은 뉴스를 간결하게 요약하는 전문 편집자입니다.
+
+다음은 "{category_title}" 카테고리에 해당하는 뉴스 기사들입니다:
+{category_articles}
+
+위 기사들을 종합적으로 분석하여 다음 정보를 포함한 간단한 요약을 JSON 형식으로 만들어주세요:
+
+1. intro: 해당 카테고리의 주요 내용을 1-2문장으로 간단히 요약
+2. definitions: 중요 용어 2-3개만 선정하여 간단히 설명
+3. news_links: 원본 기사 링크 정보
+
+출력 형식:
+```json
+{{
+  "intro": "카테고리 소개 문구",
+  "definitions": [
+    {{"term": "용어1", "explanation": "용어1에 대한 간단한 설명"}},
+    {{"term": "용어2", "explanation": "용어2에 대한 간단한 설명"}}
+  ],
+  "news_links": [
+    {{"title": "기사 제목", "url": "기사 URL", "source_and_date": "출처 및 날짜"}}
+  ]
+}}
+```"""
 
     def process_categories(data):
         categories_data = data["categories_data"]
@@ -349,7 +423,7 @@ def create_summarization_chain():
                     f"URL: {article.get('url', '#')}\n"
                     f"출처: {article.get('source', '출처 없음')}\n"
                     f"날짜: {article.get('date', '날짜 없음')}\n"
-                    f"내용:\n{article.get('content', '내용 없음')}"
+                    f"내용:\n{article.get('content', article.get('snippet', '내용 없음'))}"
                     for i, article in enumerate(category_articles)
                 ]
             )
@@ -360,11 +434,18 @@ def create_summarization_chain():
             )
             category_title = category.get("title", "제목 없음")
 
-            # 요약 프롬프트 생성
-            prompt_content = SUMMARIZATION_PROMPT.format(
-                category_title=category_title,
-                category_articles=formatted_articles,
-            )
+            # compact 버전인지에 따라 프롬프트 선택
+            if is_compact:
+                prompt_content = compact_summary_prompt.format(
+                    category_title=category_title,
+                    category_articles=formatted_articles,
+                )
+            else:
+                # 요약 프롬프트 생성
+                prompt_content = SUMMARIZATION_PROMPT.format(
+                    category_title=category_title,
+                    category_articles=formatted_articles,
+                )
 
             # LLM에 요청
             messages = [HumanMessage(content=prompt_content)]
@@ -381,28 +462,90 @@ def create_summarization_chain():
                 if json_match:
                     json_str = json_match.group(1).strip()
                 else:
-                    json_str = summary_text.strip()
+                    # compact 버전에서는 중괄호로 감싸진 JSON도 찾기
+                    if is_compact:
+                        json_match = re.search(r"\{.*\}", summary_text, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group()
+                        else:
+                            json_str = summary_text.strip()
+                    else:
+                        json_str = summary_text.strip()
 
                 summary_json = json.loads(json_str)
 
                 # 카테고리 제목 추가
                 summary_json["title"] = category.get("title", "제목 없음")
-                results.append(summary_json)
+
+                # compact 버전에서는 간소화된 형태로 변환
+                if is_compact:
+                    # intro, definitions, news_links를 기본 형태로 변환
+                    compact_result = {
+                        "title": summary_json["title"],
+                        "intro": summary_json.get("intro", ""),
+                        "definitions": summary_json.get("definitions", []),
+                        "articles": [],
+                    }
+
+                    # news_links를 articles로 변환
+                    for link in summary_json.get("news_links", []):
+                        compact_result["articles"].append(
+                            {
+                                "title": link.get("title", ""),
+                                "url": link.get("url", "#"),
+                                "source_and_date": link.get("source_and_date", ""),
+                            }
+                        )
+
+                    results.append(compact_result)
+                else:
+                    results.append(summary_json)
+
             except Exception as e:
                 print(
                     f"카테고리 '{category.get('title', '제목 없음')}' 요약 파싱 오류: {e}"
                 )
                 # 오류 발생 시 기본 구조 제공
-                results.append(
-                    {
-                        "title": category.get("title", "제목 없음"),
-                        "summary_paragraphs": ["(요약 생성 중 오류가 발생했습니다)"],
-                        "definitions": [],
-                        "news_links": [],
-                    }
-                )
+                if is_compact:
+                    results.append(
+                        {
+                            "title": category.get("title", "제목 없음"),
+                            "intro": f"{category.get('title', '제목 없음')}에 대한 주요 동향입니다.",
+                            "definitions": [],
+                            "articles": [
+                                {
+                                    "title": article.get("title", ""),
+                                    "url": article.get("url", "#"),
+                                    "source_and_date": f"{article.get('source', 'Unknown')} · {article.get('date', 'Unknown date')}",
+                                }
+                                for article in category_articles
+                            ],
+                        }
+                    )
+                else:
+                    results.append(
+                        {
+                            "title": category.get("title", "제목 없음"),
+                            "summary_paragraphs": [
+                                "(요약 생성 중 오류가 발생했습니다)"
+                            ],
+                            "definitions": [],
+                            "news_links": [],
+                        }
+                    )
 
-        return {"sections": results}
+        # compact 버전에서는 추가 처리
+        if is_compact:
+            all_definitions = []
+            for result in results:
+                all_definitions.extend(result.get("definitions", []))
+
+            return {
+                "sections": results,
+                "all_definitions": all_definitions[:3],  # 최대 3개까지만
+            }
+        else:
+            return {"sections": results}
 
     return RunnableLambda(process_categories)
 
@@ -598,97 +741,191 @@ def create_rendering_chain():
     return RunnableLambda(render_with_template)
 
 
-# 전체 파이프라인 구성
-def get_newsletter_chain():
+# 전체 파이프라인 구성 (compact 옵션 추가)
+def get_newsletter_chain(is_compact=False):
     # 1. 분류 체인
-    categorization_chain = create_categorization_chain()
+    categorization_chain = create_categorization_chain(is_compact=is_compact)
 
     # 2. 요약 체인
-    summarization_chain = create_summarization_chain()
+    summarization_chain = create_summarization_chain(is_compact=is_compact)
 
-    # 3. 종합 구성 체인
-    composition_chain = create_composition_chain()
+    # 3. 종합 구성 체인 (detailed만 사용, compact는 건너뜀)
+    composition_chain = create_composition_chain() if not is_compact else None
 
-    # 4. 렌더링 체인
-    rendering_chain = create_rendering_chain()
+    # 4. 렌더링 체인 (detailed만 사용, compact는 건너뜀)
+    rendering_chain = create_rendering_chain() if not is_compact else None
 
     # 데이터 흐름 관리 함수
     def manage_data_flow(data):
+        print(f"[DEBUG] manage_data_flow 호출됨. is_compact={is_compact}")
         try:
             # 데이터 유효성 검증
             if "articles" not in data:
                 raise ValueError("입력 데이터에 'articles' 필드가 없습니다.")
 
             # 1. 분류 단계 실행
-            print("1단계: 뉴스 카테고리 분류 중...")
+            if is_compact:
+                print("Compact 1단계: 뉴스 카테고리 분류 중...")
+            else:
+                print("1단계: 뉴스 카테고리 분류 중...")
             categories_data = categorization_chain.invoke(data)
 
             # 2. 요약 단계 실행
-            print("2단계: 카테고리별 요약 생성 중...")
+            if is_compact:
+                print("Compact 2단계: 카테고리별 요약 생성 중...")
+            else:
+                print("2단계: 카테고리별 요약 생성 중...")
             sections_data = summarization_chain.invoke(
                 {"categories_data": categories_data, "articles_data": data}
             )
 
-            # 3. 종합 구성 단계 실행
-            print("3단계: 뉴스레터 종합 구성 중...")
-            composition = composition_chain.invoke(
-                {
-                    "keywords": data.get("keywords", ""),
-                    "sections": sections_data["sections"],
-                }
-            )
+            if is_compact:
+                # Compact 버전: 상위 3개 기사 선정 + 최종 데이터 구성
+                print("Compact 3단계: 상위 기사 선정 중...")
+                top_articles = []
+                for i, article in enumerate(data["articles"][:3]):
+                    top_article = {
+                        "title": article.get("title", ""),
+                        "url": article.get("url", "#"),
+                        "snippet": (
+                            article.get("snippet", "")[:200] + "..."
+                            if len(article.get("snippet", "")) > 200
+                            else article.get("snippet", "")
+                        ),
+                        "source_and_date": f"{article.get('source', 'Unknown')} · {article.get('date', 'Unknown date')}",
+                    }
+                    top_articles.append(top_article)
 
-            # 4. 렌더링 단계 실행
-            print("4단계: HTML 렌더링 중...")
-            final_html, final_data = rendering_chain.invoke(
-                {
-                    "composition": composition,
-                    "sections_data": sections_data,
-                    "keywords": data.get("keywords", ""),
-                    "domain": data.get("domain", ""),  # 도메인 정보 추가
-                }
-            )
+                # 생각해볼 거리 생성
+                keywords = data.get("keywords", [])
+                if isinstance(keywords, str):
+                    keywords = [keywords]
 
-            # render_data.json 파일 저장
-            try:
-                output_dir = os.path.join("output", "intermediate_processing")
-                os.makedirs(output_dir, exist_ok=True)
-                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                # 키워드나 도메인으로 파일명 보강 (옵션)
-                topic_slug = "general"
-                keywords_or_domain = data.get("domain") or data.get("keywords")
-                if keywords_or_domain:
-                    if isinstance(keywords_or_domain, list):
-                        topic_slug = tools.get_filename_safe_theme(
-                            keywords_or_domain, None
-                        )  # domain is already in keywords_or_domain if used
-                    else:  # string
-                        topic_slug = tools.get_filename_safe_theme(
-                            [keywords_or_domain], None
+                food_for_thought = f"{', '.join(keywords[:2])} 분야의 급속한 발전은 우리에게 어떤 새로운 기회와 도전을 제시할까요?"
+
+                # compose.py의 함수들을 사용하여 올바른 데이터 구조 생성
+                sections = sections_data.get("sections", [])
+
+                print(f"[DEBUG] sections 개수: {len(sections)}")
+                for i, section in enumerate(sections):
+                    print(
+                        f"[DEBUG] Section {i}: title='{section.get('title', 'NO_TITLE')}', news_links={len(section.get('news_links', []))}, articles={len(section.get('articles', []))}"
+                    )
+                    for j, link in enumerate(
+                        section.get("news_links", [])[:2]
+                    ):  # 처음 2개만 출력
+                        print(f"[DEBUG]   Link {j}: url='{link.get('url', 'NO_URL')}'")
+                    for j, article in enumerate(
+                        section.get("articles", [])[:2]
+                    ):  # 처음 2개만 출력
+                        print(
+                            f"[DEBUG]   Article {j}: url='{article.get('url', 'NO_URL')}'"
                         )
 
-                render_data_filename = (
-                    f"render_data_langgraph_{timestamp}_{topic_slug}.json"
+                print(f"[DEBUG] top_articles 개수: {len(top_articles)}")
+                for i, article in enumerate(top_articles):
+                    print(
+                        f"[DEBUG] Top Article {i}: url='{article.get('url', 'NO_URL')}')"
+                    )
+
+                grouped_sections = prepare_grouped_sections_for_compact(
+                    sections, top_articles[:3]
                 )
-                render_data_path = os.path.join(output_dir, render_data_filename)
+                definitions = extract_key_definitions_for_compact(sections)
 
-                with open(render_data_path, "w", encoding="utf-8") as f:
-                    json.dump(final_data, f, ensure_ascii=False, indent=2)
-                print(f"Render data saved to {render_data_path}")
-            except Exception as e:
-                print(f"Render data 저장 중 오류: {e}")
+                # 최종 데이터 구성
+                result_data = {
+                    "newsletter_title": f"{data.get('keywords', '기술 동향')} 주간 브리프",
+                    "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
+                    "generation_date": os.environ.get(
+                        "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
+                    ),
+                    "top_articles": top_articles,
+                    "grouped_sections": grouped_sections,
+                    "definitions": definitions,
+                    "food_for_thought": food_for_thought,
+                    "company_name": "Your Company",
+                }
 
-            print("뉴스레터 생성 완료!")
-            return final_html  # manage_data_flow는 최종 HTML만 반환
+                print(f"[DEBUG] Compact 최종 데이터 구조:")
+                print(f"  - top_articles: {len(result_data['top_articles'])}개")
+                print(f"  - grouped_sections: {len(result_data['grouped_sections'])}개")
+                print(f"  - definitions: {len(result_data['definitions'])}개")
+                print(f"  - grouped_sections 내용: {result_data['grouped_sections']}")
+                print(f"  - definitions 내용: {result_data['definitions']}")
+
+                # Compact 모드에서도 템플릿 렌더링 수행
+                print("Compact 4단계: HTML 템플릿 렌더링 중...")
+                newsletter_html = compose_compact_newsletter_html(
+                    result_data,
+                    os.path.join(
+                        os.path.dirname(os.path.dirname(__file__)), "templates"
+                    ),
+                    "newsletter_template_compact.html",
+                )
+
+                print("Compact 뉴스레터 생성 완료!")
+                return newsletter_html  # HTML 문자열 반환
+
+            else:
+                # Detailed 버전: 기존 로직 사용
+                # 3. 종합 구성 단계 실행
+                print("3단계: 뉴스레터 종합 구성 중...")
+                composition = composition_chain.invoke(
+                    {
+                        "keywords": data.get("keywords", ""),
+                        "sections": sections_data["sections"],
+                    }
+                )
+
+                # 4. 렌더링 단계 실행
+                print("4단계: HTML 렌더링 중...")
+                final_html, final_data = rendering_chain.invoke(
+                    {
+                        "composition": composition,
+                        "sections_data": sections_data,
+                        "keywords": data.get("keywords", ""),
+                        "domain": data.get("domain", ""),  # 도메인 정보 추가
+                    }
+                )
+
+                # render_data.json 파일 저장
+                try:
+                    output_dir = os.path.join("output", "intermediate_processing")
+                    os.makedirs(output_dir, exist_ok=True)
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    # 키워드나 도메인으로 파일명 보강 (옵션)
+                    topic_slug = "general"
+                    keywords_or_domain = data.get("domain") or data.get("keywords")
+                    if keywords_or_domain:
+                        if isinstance(keywords_or_domain, list):
+                            topic_slug = tools.get_filename_safe_theme(
+                                keywords_or_domain, None
+                            )  # domain is already in keywords_or_domain if used
+                        else:  # string
+                            topic_slug = tools.get_filename_safe_theme(
+                                [keywords_or_domain], None
+                            )
+
+                    render_data_filename = (
+                        f"render_data_langgraph_{timestamp}_{topic_slug}.json"
+                    )
+                    render_data_path = os.path.join(output_dir, render_data_filename)
+
+                    with open(render_data_path, "w", encoding="utf-8") as f:
+                        json.dump(final_data, f, ensure_ascii=False, indent=2)
+                    print(f"Render data saved to {render_data_path}")
+                except Exception as e:
+                    print(f"Render data 저장 중 오류: {e}")
+
+                print("뉴스레터 생성 완료!")
+                return final_html  # manage_data_flow는 최종 HTML만 반환
+
         except Exception as e:
             print(f"뉴스레터 생성 중 오류 발생: {e}")
             raise
 
     # 최종 체인 반환
-    # 이 RunnableLambda는 (html, data)를 반환하게 되므로, 외부에서 호출 시 주의 필요
-    # generate_newsletter에서는 html만 사용하므로, 여기서 html만 반환하도록 조정
-    # 또는 generate_newsletter에서 튜플을 받아 처리하도록 변경
-    # 여기서는 manage_data_flow가 html만 반환하도록 유지
     return RunnableLambda(manage_data_flow)
 
 
@@ -698,7 +935,7 @@ def get_summarization_chain(callbacks=None):
 
     # get_newsletter_chain()은 RunnableLambda(manage_data_flow)를 반환하고,
     # manage_data_flow는 이제 final_html만 반환합니다.
-    newsletter_chain_runnable = get_newsletter_chain()
+    newsletter_chain_runnable = get_newsletter_chain(is_compact=False)
 
     # 따라서 get_summarization_chain도 HTML 문자열을 직접 반환하게 됩니다.
     print("이 함수는 곧 사라질 예정입니다. get_newsletter_chain()을 사용하세요.")
