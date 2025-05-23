@@ -13,6 +13,11 @@ except Exception:  # Fallback when langchain is not installed
     Client = None
 
 
+# 글로벌 트레이서 인스턴스를 저장하는 변수들
+_global_tracer = None
+_tracer_initialized = False
+
+
 class GoogleGenAICostCB(BaseCallbackHandler):
     """Callback handler to track Google Generative AI token usage and costs."""
 
@@ -127,7 +132,21 @@ def get_tracking_callbacks():
 
     LangChain 0.3+ 버전에 맞게 구현됨
     """
+    global _global_tracer, _tracer_initialized
+
     callbacks = []
+
+    # 이미 초기화되었으면 캐시된 결과 반환
+    if _tracer_initialized:
+        if _global_tracer is not None:
+            callbacks.append(_global_tracer)
+        # Google GenAI 비용 추적은 매번 새로 생성 (상태 추적을 위해)
+        try:
+            callbacks.append(GoogleGenAICostCB())
+        except Exception as e:
+            # 첫 번째 초기화에서만 에러 메시지 출력
+            pass
+        return callbacks
 
     # LangChain 트레이싱 설정 (LANGCHAIN_TRACING_V2 환경 변수 사용)
     langchain_tracing_v2_env = os.environ.get("LANGCHAIN_TRACING_V2", "false").lower()
@@ -143,22 +162,18 @@ def get_tracking_callbacks():
         if "#" in cleaned_api_key:
             cleaned_api_key = cleaned_api_key.split("#", 1)[0].strip()
 
-        # Set the cleaned key back into the environment for LangSmith client
-        # This is a bit of a workaround; ideally, the client would handle this.
-        os.environ["LANGCHAIN_API_KEY_CLEANED_FOR_TRACER"] = cleaned_api_key
-        # LangChainTracer will pick up LANGCHAIN_API_KEY by default,
-        # but we ensure it uses the cleaned one if we pass it explicitly.
-
     api_key_set = bool(cleaned_api_key)
 
-    # More detailed debug print for the API key itself
-    print(
-        f"[DEBUG_COST_TRACKING] LANGCHAIN_API_KEY raw value: '{api_key_env}' (Type: {type(api_key_env)}, Length: {len(api_key_env) if api_key_env else 0})"
-    )
-    if cleaned_api_key != api_key_env:
+    # 디버그 정보 출력 (처음 초기화할 때만)
+    debug_mode = os.environ.get("DEBUG_COST_TRACKING")
+    if debug_mode:
         print(
-            f"[DEBUG_COST_TRACKING] LANGCHAIN_API_KEY cleaned value: '{cleaned_api_key}' (Used for LangSmith)"
+            f"[DEBUG_COST_TRACKING] LANGCHAIN_API_KEY raw value: '{api_key_env}' (Type: {type(api_key_env)}, Length: {len(api_key_env) if api_key_env else 0})"
         )
+        if cleaned_api_key != api_key_env:
+            print(
+                f"[DEBUG_COST_TRACKING] LANGCHAIN_API_KEY cleaned value: '{cleaned_api_key}' (Used for LangSmith)"
+            )
 
     if is_tracing_enabled and api_key_set:
         try:
@@ -168,44 +183,42 @@ def get_tracking_callbacks():
             from langchain.callbacks.tracers.langchain import LangChainTracer
 
             project_name = os.environ.get("LANGCHAIN_PROJECT", "default-project")
-            print(
-                f"[DEBUG] Initializing LangChainTracer for project: {project_name} with cleaned API key."
-            )  # 디버그 로그 추가
+            if debug_mode:
+                print(
+                    f"[DEBUG] Initializing LangChainTracer for project: {project_name} with cleaned API key."
+                )
 
-            # Pass the cleaned API key explicitly if the tracer doesn't automatically pick up the modified env var
-            # However, LangChainTracer typically uses os.environ.get("LANGCHAIN_API_KEY")
-            # So the os.environ["LANGCHAIN_API_KEY_CLEANED_FOR_TRACER"] might not be directly used by it unless we pass api_key=cleaned_api_key
-            # For now, let's assume it re-reads from os.environ or we modify the original LANGCHAIN_API_KEY.
-            # A safer approach is to temporarily set os.environ["LANGCHAIN_API_KEY"] to the cleaned key for the tracer's initialization.
-
+            # 임시로 환경 변수 설정
             original_api_key = os.environ.get("LANGCHAIN_API_KEY")
-            os.environ["LANGCHAIN_API_KEY"] = (
-                cleaned_api_key  # Temporarily override for tracer
-            )
+            os.environ["LANGCHAIN_API_KEY"] = cleaned_api_key
 
-            tracer = LangChainTracer(
-                project_name=project_name
-            )  # api_key can be passed here if needed
+            _global_tracer = LangChainTracer(project_name=project_name)
 
-            if original_api_key is not None:  # Restore original key if it existed
+            # 원래 API 키 복원
+            if original_api_key is not None:
                 os.environ["LANGCHAIN_API_KEY"] = original_api_key
-            else:  # If it was not set, remove our temporary one
+            else:
                 del os.environ["LANGCHAIN_API_KEY"]
 
-            # Remove the temporary cleaned key variable as well
-            if "LANGCHAIN_API_KEY_CLEANED_FOR_TRACER" in os.environ:
-                del os.environ["LANGCHAIN_API_KEY_CLEANED_FOR_TRACER"]
-
-            callbacks.append(tracer)
             print(f"LangSmith tracing enabled for project: {project_name}")
         except Exception as e:
             print(f"Warning: Failed to initialize LangSmith tracing: {e}")
+        finally:
+            _tracer_initialized = True
     else:
-        print("[DEBUG] LangSmith tracing not enabled or API key not set.")
-        print(f"  LANGCHAIN_TRACING_V2 value: {os.environ.get('LANGCHAIN_TRACING_V2')}")
-        print(f"  Evaluated as enabled: {is_tracing_enabled}")
-        print(f"  LANGCHAIN_API_KEY is set: {api_key_set}")
-        print(f"  LANGCHAIN_API_KEY actual value for check: '{api_key_env}'")
+        if debug_mode:
+            print("[DEBUG] LangSmith tracing not enabled or API key not set.")
+            print(
+                f"  LANGCHAIN_TRACING_V2 value: {os.environ.get('LANGCHAIN_TRACING_V2')}"
+            )
+            print(f"  Evaluated as enabled: {is_tracing_enabled}")
+            print(f"  LANGCHAIN_API_KEY is set: {api_key_set}")
+            print(f"  LANGCHAIN_API_KEY actual value for check: '{api_key_env}'")
+        _tracer_initialized = True
+
+    # 초기화된 트레이서가 있으면 추가
+    if _global_tracer is not None:
+        callbacks.append(_global_tracer)
 
     # Google GenAI 비용 추적
     try:

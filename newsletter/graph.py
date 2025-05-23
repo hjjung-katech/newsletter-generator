@@ -25,6 +25,7 @@ class NewsletterState(TypedDict):
     # 중간 결과물
     collected_articles: Optional[List[Dict]]  # Made Optional
     processed_articles: Optional[List[Dict]]  # New field
+    ranked_articles: Optional[List[Dict]]  # Articles scored and ranked
     article_summaries: Optional[Dict]  # Made Optional
     category_summaries: Optional[Dict]  # 카테고리별 요약 결과
     newsletter_topic: Optional[str]  # 뉴스레터 주제 필드
@@ -314,7 +315,57 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     return {
         **state,
         "processed_articles": processed_articles_sorted,
-        "status": "summarizing",  # Next status is summarizing
+        "status": "scoring",  # Next step is scoring
+    }
+
+
+def score_articles_node(state: NewsletterState) -> NewsletterState:
+    """Score articles using LLM to rank priority."""
+    from .scoring import score_articles
+
+    print("\n[cyan]Step: Scoring articles...[/cyan]")
+
+    processed = state.get("processed_articles") or []
+    if not processed:
+        print("[yellow]No articles to score.[/yellow]")
+        return {
+            **state,
+            "error": "기사 점수를 매길 데이터가 없습니다.",
+            "status": "error",
+        }
+
+    domain = state.get("domain", "")
+    keywords = state.get("keywords", [])
+    news_period_days = state.get("news_period_days", 14)
+
+    # Get full ranked list for saving; top 10 will be passed forward
+    ranked = score_articles(processed, domain, top_n=None)
+
+    output_dir = os.path.join(os.getcwd(), "output", "intermediate_processing")
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    scored_path = os.path.join(output_dir, f"{timestamp}_scored_articles.json")
+    try:
+        with open(scored_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "keywords": keywords,
+                    "domain": domain,
+                    "news_period_days": news_period_days,
+                    "articles": ranked,
+                },
+                f,
+                ensure_ascii=False,
+                indent=4,
+            )
+        print(f"Saved scored articles to {scored_path}")
+    except Exception as e:
+        print(f"[red]Error saving scored articles: {e}[/red]")
+
+    return {
+        **state,
+        "ranked_articles": ranked[:10],
+        "status": "summarizing",
     }
 
 
@@ -329,12 +380,14 @@ def summarize_articles_node(
 
     print("\n[cyan]Step: Summarizing articles...[/cyan]")
 
-    processed_articles = state.get("processed_articles")
-    if not processed_articles:  # Check processed_articles
-        print("[yellow]No processed articles to summarize.[/yellow]")
+    articles_for_summary = state.get("ranked_articles") or state.get(
+        "processed_articles"
+    )
+    if not articles_for_summary:
+        print("[yellow]No articles to summarize.[/yellow]")
         return {
             **state,
-            "error": "처리된 기사가 없어 요약을 진행할 수 없습니다.",  # More specific error
+            "error": "요약할 기사가 없습니다.",
             "status": "error",
         }
 
@@ -359,7 +412,7 @@ def summarize_articles_node(
 
         # 데이터 형식 맞추기: processed_articles를 'articles' 키를 가진 딕셔너리로 감싸기
         input_data = {
-            "articles": processed_articles,
+            "articles": articles_for_summary,
             "keywords": state.get("keywords", ""),
         }
 
@@ -491,6 +544,7 @@ def create_newsletter_graph() -> StateGraph:
     # 노드 추가
     workflow.add_node("collect_articles", collect_articles_node)  # Use new name
     workflow.add_node("process_articles", process_articles_node)  # Add new node
+    workflow.add_node("score_articles", score_articles_node)
     workflow.add_node("summarize_articles", summarize_articles_node)  # Use new name
     workflow.add_node(
         "compose_newsletter", compose_newsletter_node
@@ -510,10 +564,14 @@ def create_newsletter_graph() -> StateGraph:
             "handle_error"
             if state.get("status") == "error"
             else (
-                "summarize_articles"
-                if state.get("processed_articles")
-                else "handle_error"
+                "score_articles" if state.get("processed_articles") else "handle_error"
             )
+        ),
+    )
+    workflow.add_conditional_edges(
+        "score_articles",
+        lambda state: (
+            "handle_error" if state.get("status") == "error" else "summarize_articles"
         ),
     )
     workflow.add_conditional_edges(
@@ -569,6 +627,7 @@ def generate_newsletter(
         "newsletter_topic": newsletter_topic,  # 뉴스레터 주제 추가
         "collected_articles": None,  # Initialize as None
         "processed_articles": None,  # Initialize as None
+        "ranked_articles": None,  # Initialize as None
         "article_summaries": None,  # Initialize as None
         "category_summaries": None,  # Initialize as None
         "newsletter_html": None,  # Initialize as None
