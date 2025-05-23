@@ -169,3 +169,184 @@ newsletter test output/collected_articles_AI_빅데이터.json --mode content --
 - `keywords.json`: 테스트용 키워드 데이터
 - `mock_responses/`: 모의 API 응답 데이터
 - `templates/`: 테스트용 템플릿 파일
+
+# Newsletter Generator 테스트 가이드
+
+본 문서는 Newsletter Generator 프로젝트의 테스트 구조와 실행 방법을 설명합니다.
+
+## 📊 테스트 구조
+
+### 디렉토리 구조
+```
+tests/
+├── 📁 api_tests/                    # API 테스트 (외부 서비스 호출)
+│   ├── test_compact_newsletter_api.py   # Compact 뉴스레터 API 테스트
+│   ├── test_theme_extraction.py         # 테마 추출 API 테스트
+│   ├── test_search_improved.py          # 검색 API 테스트
+│   └── ... (기타 API 테스트들)
+├── 📁 unit_tests/                   # 단위 테스트
+│   ├── test_template_manager.py         # 템플릿 관리 테스트
+│   ├── test_date_utils.py               # 날짜 유틸리티 테스트
+│   └── ... (기타 단위 테스트들)
+├── 📄 test_compact_newsletter.py    # Compact 뉴스레터 단위 테스트
+├── 📄 test_compact.py               # Compact 체인 테스트 (Legacy)
+├── 📄 test_compose.py               # 컴포즈 기능 테스트
+├── 📄 test_newsletter.py            # 뉴스레터 통합 테스트
+└── 📄 TEST_REPORT_COMPACT_DEFINITIONS.md  # 테스트 보고서
+```
+
+## 🎯 테스트 분류
+
+### Pytest 마커
+- `@pytest.mark.unit`: 순수 단위 테스트 (API 호출 없음)
+- `@pytest.mark.api`: API를 사용하는 테스트
+- `@pytest.mark.integration`: 통합 테스트
+- `@pytest.mark.slow`: 실행 시간이 긴 테스트
+
+## 🚀 테스트 실행 방법
+
+### 1단계: 단위 테스트 (빠른 검증, < 5초)
+개발 중 빠른 피드백을 위한 테스트입니다.
+
+```bash
+# 모든 단위 테스트 실행
+python -m pytest -m unit -v
+
+# Compact 뉴스레터 단위 테스트만
+python -m pytest tests/test_compact_newsletter.py -v
+
+# 특정 단위 테스트 실행
+python -m pytest tests/test_compact_newsletter.py::TestCompactNewsletterUnit::test_compact_definitions_generation -v
+
+# 독립 실행
+python tests/test_compact_newsletter.py
+```
+
+### 2단계: API 테스트 (완전한 검증, 1-15분)
+외부 API를 사용하는 완전한 기능 테스트입니다.
+
+```bash
+# 모든 API 테스트 실행
+python -m pytest -m api -v
+
+# Compact 뉴스레터 API 테스트만
+python -m pytest tests/api_tests/test_compact_newsletter_api.py -v
+
+# 빠른 API 테스트만 (slow 제외)
+python -m pytest -m "api and not slow" -v
+
+# 독립 실행
+python tests/api_tests/test_compact_newsletter_api.py
+```
+
+### 3단계: 전체 테스트 (최종 검증, 15-20분)
+배포 전 완전한 검증을 위한 테스트입니다.
+
+```bash
+# 모든 테스트 실행
+python -m pytest tests/ -v
+
+# Compact 관련 모든 테스트
+python -m pytest tests/test_compact*.py tests/api_tests/test_compact*.py -v
+
+# 빠른 테스트만 (slow 제외)
+python -m pytest -m "not slow" -v
+```
+
+## 📈 Compact 뉴스레터 테스트
+
+### 단위 테스트 (`tests/test_compact_newsletter.py`)
+외부 API 없이 순수한 기능 테스트:
+
+| 테스트 | 설명 |
+|--------|------|
+| `test_compact_chain_creation` | 체인 생성 테스트 |
+| `test_compact_definitions_generation` | 정의 추출 테스트 |
+| `test_compact_template_rendering` | 템플릿 렌더링 테스트 |
+| `test_definitions_extraction_edge_cases` | 엣지 케이스 테스트 |
+| `test_template_data_validation` | 데이터 검증 테스트 |
+| `test_error_handling_unit` | 에러 처리 테스트 |
+| `test_definitions_content_validation` | 내용 검증 테스트 |
+
+### API 테스트 (`tests/api_tests/test_compact_newsletter_api.py`)
+실제 API를 사용하는 통합 테스트:
+
+| 테스트 | 설명 | 마커 |
+|--------|------|------|
+| `test_compact_newsletter_generation_full_integration` | 완전 통합 테스트 | `api`, `integration` |
+| `test_multiple_keywords_compact_api` | 여러 키워드 테스트 | `api`, `slow` |
+| `test_compact_chain_with_real_llm` | 실제 LLM 테스트 | `api` |
+| `test_fallback_definitions_with_mocked_llm` | 모킹 테스트 | `api`, `unit` |
+| `test_compact_newsletter_with_different_topics` | 다양한 주제 테스트 | `api`, `slow` |
+| `test_api_error_handling` | API 에러 처리 | `api` |
+
+## 💡 개발 워크플로우 권장사항
+
+### 개발 중
+```bash
+# 빠른 검증 (< 5초)
+python -m pytest -m unit
+```
+
+### 기능 확인 시
+```bash
+# 중간 검증 (1-3분)
+python -m pytest -m "api and not slow"
+```
+
+### PR 또는 배포 전
+```bash
+# 완전 검증 (15-20분)
+python -m pytest tests/
+```
+
+## 🔧 설정
+
+### pytest 설정 (setup.cfg)
+```ini
+[tool:pytest]
+markers =
+    integration: marks tests as integration tests
+    unit: marks tests as unit tests
+    slow: marks tests as slow running tests
+    api: marks tests that require API access
+```
+
+### 환경 변수
+테스트 실행을 위해 다음 환경 변수가 필요할 수 있습니다:
+- `GOOGLE_API_KEY`: Google AI API 키
+- `SERPER_API_KEY`: Serper 검색 API 키
+
+## 📝 테스트 작성 가이드
+
+### 새로운 테스트 추가 시
+1. **API 사용 여부 확인**: 외부 API를 사용하는가?
+   - Yes → `tests/api_tests/` 디렉토리에 추가
+   - No → `tests/` 디렉토리 또는 `tests/unit_tests/`에 추가
+
+2. **적절한 마커 추가**:
+   ```python
+   @pytest.mark.unit      # 단위 테스트
+   @pytest.mark.api       # API 테스트
+   @pytest.mark.slow      # 긴 실행 시간
+   @pytest.mark.integration  # 통합 테스트
+   ```
+
+3. **독립 실행 가능하게 작성**:
+   ```python
+   if __name__ == "__main__":
+       # 독립 실행 코드
+   ```
+
+## 📊 커버리지
+
+현재 테스트 커버리지는 `setup.cfg`에서 설정되어 있으며, 최소 10% 이상을 유지하도록 설정되어 있습니다.
+
+```bash
+# 커버리지 포함 테스트 실행
+python -m pytest --cov=newsletter tests/
+```
+
+---
+
+**더 자세한 정보는 `TEST_REPORT_COMPACT_DEFINITIONS.md`를 참조하세요.**
