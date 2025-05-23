@@ -12,6 +12,8 @@ from newsletter.article_filter import (
     group_articles_by_keywords,
     remove_duplicate_articles,
     filter_articles_by_domains,
+    remove_similar_articles,
+    select_top_articles,
     MAJOR_NEWS_SOURCES,
 )
 
@@ -347,6 +349,38 @@ class TestArticleFilter(unittest.TestCase):
             <= len(set([a.get("source") for a in self.test_articles])),
             "Number of articles should be limited by max_per_domain",
         )
+
+    @patch("newsletter.article_filter.console")
+    def test_remove_similar_articles(self, mock_console):
+        """Test removal of nearly identical articles by title."""
+        articles = [
+            {"title": "AI 에이전트 출시", "url": "https://a.com/1", "source": "A"},
+            {"title": "AI 에이전트 출시 소식", "url": "https://a.com/2", "source": "B"},
+            {"title": "완전히 다른 기사", "url": "https://a.com/3", "source": "C"},
+        ]
+
+        result = remove_similar_articles(articles, similarity_threshold=0.8)
+        self.assertEqual(len(result), 2, "Similar articles were not removed")
+        titles = {a["title"] for a in result}
+        self.assertIn("완전히 다른 기사", titles)
+
+    @patch("newsletter.article_filter.console")
+    def test_select_top_articles(self, mock_console):
+        """Test selection of top articles based on importance score."""
+        sample_articles = [
+            {"title": "t1", "source": "조선일보", "date": "2025-01-01", "url": "u1"},
+            {"title": "t2", "source": "뉴시스", "date": "2025-01-01", "url": "u2"},
+            {"title": "t3", "source": "블로그", "date": "2025-01-01", "url": "u3"},
+            {"title": "t4", "source": "중앙일보", "date": "2025-01-01", "url": "u4"},
+        ]
+
+        top = select_top_articles(sample_articles, top_n=3)
+        self.assertEqual(len(top), 3, "Did not select correct number of top articles")
+        top_sources = {a["source"] for a in top}
+        self.assertIn("조선일보", top_sources)
+        self.assertIn("중앙일보", top_sources)
+        self.assertIn("뉴시스", top_sources)
+        self.assertNotIn("블로그", top_sources)
 
 
 if __name__ == "__main__":

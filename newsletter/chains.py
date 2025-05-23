@@ -578,22 +578,22 @@ def create_rendering_chain():
         rendered_html = template.render(**combined_data)
 
         # 디버깅용 - 렌더링에 사용된 데이터 저장
-        try:
-            debug_dir = os.path.join("output", "intermediate_processing")
-            os.makedirs(debug_dir, exist_ok=True)
-            with open(
-                os.path.join(
-                    debug_dir,
-                    f"render_data_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                ),
-                "w",
-                encoding="utf-8",
-            ) as f:
-                json.dump(combined_data, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"디버그 데이터 저장 중 오류: {e}")
+        # try:
+        #     debug_dir = os.path.join("output", "intermediate_processing")
+        #     os.makedirs(debug_dir, exist_ok=True)
+        #     with open(
+        #         os.path.join(
+        #             debug_dir,
+        #             f"render_data_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+        #         ),
+        #         "w",
+        #         encoding="utf-8",
+        #     ) as f:
+        #         json.dump(combined_data, f, ensure_ascii=False, indent=2)
+        # except Exception as e:
+        #     print(f"디버그 데이터 저장 중 오류: {e}")
 
-        return rendered_html
+        return rendered_html, combined_data
 
     return RunnableLambda(render_with_template)
 
@@ -640,7 +640,7 @@ def get_newsletter_chain():
 
             # 4. 렌더링 단계 실행
             print("4단계: HTML 렌더링 중...")
-            final_html = rendering_chain.invoke(
+            final_html, final_data = rendering_chain.invoke(
                 {
                     "composition": composition,
                     "sections_data": sections_data,
@@ -649,19 +649,57 @@ def get_newsletter_chain():
                 }
             )
 
+            # render_data.json 파일 저장
+            try:
+                output_dir = os.path.join("output", "intermediate_processing")
+                os.makedirs(output_dir, exist_ok=True)
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                # 키워드나 도메인으로 파일명 보강 (옵션)
+                topic_slug = "general"
+                keywords_or_domain = data.get("domain") or data.get("keywords")
+                if keywords_or_domain:
+                    if isinstance(keywords_or_domain, list):
+                        topic_slug = tools.get_filename_safe_theme(
+                            keywords_or_domain, None
+                        )  # domain is already in keywords_or_domain if used
+                    else:  # string
+                        topic_slug = tools.get_filename_safe_theme(
+                            [keywords_or_domain], None
+                        )
+
+                render_data_filename = (
+                    f"render_data_langgraph_{timestamp}_{topic_slug}.json"
+                )
+                render_data_path = os.path.join(output_dir, render_data_filename)
+
+                with open(render_data_path, "w", encoding="utf-8") as f:
+                    json.dump(final_data, f, ensure_ascii=False, indent=2)
+                print(f"Render data saved to {render_data_path}")
+            except Exception as e:
+                print(f"Render data 저장 중 오류: {e}")
+
             print("뉴스레터 생성 완료!")
-            return final_html
+            return final_html  # manage_data_flow는 최종 HTML만 반환
         except Exception as e:
             print(f"뉴스레터 생성 중 오류 발생: {e}")
             raise
 
     # 최종 체인 반환
+    # 이 RunnableLambda는 (html, data)를 반환하게 되므로, 외부에서 호출 시 주의 필요
+    # generate_newsletter에서는 html만 사용하므로, 여기서 html만 반환하도록 조정
+    # 또는 generate_newsletter에서 튜플을 받아 처리하도록 변경
+    # 여기서는 manage_data_flow가 html만 반환하도록 유지
     return RunnableLambda(manage_data_flow)
 
 
 # 기존 summarization_chain 유지 (하위 호환성)
 def get_summarization_chain(callbacks=None):
     """callbacks 매개변수를 지원하는 요약 체인 반환 함수"""
-    chain = get_newsletter_chain()
+
+    # get_newsletter_chain()은 RunnableLambda(manage_data_flow)를 반환하고,
+    # manage_data_flow는 이제 final_html만 반환합니다.
+    newsletter_chain_runnable = get_newsletter_chain()
+
+    # 따라서 get_summarization_chain도 HTML 문자열을 직접 반환하게 됩니다.
     print("이 함수는 곧 사라질 예정입니다. get_newsletter_chain()을 사용하세요.")
-    return chain
+    return newsletter_chain_runnable

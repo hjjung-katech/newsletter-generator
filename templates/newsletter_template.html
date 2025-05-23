@@ -36,6 +36,11 @@
         .news-links-section ul li a:hover { text-decoration: underline; }
         .news-links-section ul li .source { font-size: 0.9em; color: #777; }
 
+        .top-articles { margin: 20px 0; padding: 15px; background-color: #fcf8e3; border: 1px solid #f0e6be; border-radius: 5px; }
+        .top-articles h3 { margin-top: 0; color: #d35400; font-size: 20px; }
+        .top-articles ol { padding-left: 20px; }
+        .top-articles li { margin-bottom: 8px; }
+
         .food-for-thought-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; }
         .food-for-thought-section h3 { font-size: 20px; font-weight: bold; color: {{ secondary_color | default('#2c3e50') }}; margin-bottom: 15px; }
         .food-for-thought .quote { font-style: italic; color: {{ secondary_color | default('#2c3e50') }}; font-size: 18px; margin-bottom: 10px; text-align: center;}
@@ -72,6 +77,22 @@
         {% if introduction_message %}
         <div class="introduction">
             {% for para in introduction_message.split('\n') %}<p>{{ para }}</p>{% endfor %}
+        </div>
+        {% endif %}
+
+        {% if top_articles %}
+        <div class="top-articles">
+            <h3>🔥 핵심 뉴스 TOP {{ top_articles|length }}</h3>
+            <ol>
+                {% for art in top_articles %}
+                <li>
+                    {% if art.url %}<a href="{{ art.url }}" target="_blank">{% endif %}
+                    {{ art.title }}
+                    {% if art.url %}</a>{% endif %}
+                    {% if art.source_and_date %} <span class="source">({{ art.source_and_date }})</span>{% endif %}
+                </li>
+                {% endfor %}
+            </ol>
         </div>
         {% endif %}
 

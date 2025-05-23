@@ -109,8 +109,16 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     raw_output_filename = f"{timestamp}_collected_articles_raw.json"
     raw_output_path = os.path.join(output_dir, raw_output_filename)
     try:
+        # Create a dictionary that includes metadata for raw articles too
+        raw_data_with_metadata = {
+            "keywords": state.get("keywords", []),
+            "domain": state.get("domain"),
+            "news_period_days": state.get("news_period_days", 14),
+            "articles": collected_articles,
+        }
+
         with open(raw_output_path, "w", encoding="utf-8") as f:
-            json.dump(collected_articles, f, ensure_ascii=False, indent=4)
+            json.dump(raw_data_with_metadata, f, ensure_ascii=False, indent=4)
         print(f"Saved raw collected articles to {raw_output_path}")
     except Exception as e:
         print(f"[red]Error saving raw articles: {e}[/red]")
@@ -289,9 +297,17 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     processed_output_filename = f"{timestamp}_collected_articles_processed.json"
     processed_output_path = os.path.join(output_dir, processed_output_filename)
     try:
+        # Create a dictionary that includes metadata
+        processed_data_with_metadata = {
+            "keywords": state.get("keywords", []),
+            "domain": state.get("domain"),
+            "news_period_days": state.get("news_period_days", 14),
+            "articles": processed_articles_sorted,
+        }
+
         with open(processed_output_path, "w", encoding="utf-8") as f:
-            json.dump(processed_articles_sorted, f, ensure_ascii=False, indent=4)
-        print(f"Saved processed articles to {processed_output_path}")
+            json.dump(processed_data_with_metadata, f, ensure_ascii=False, indent=4)
+        print(f"Saved processed articles with metadata to {processed_output_path}")
     except Exception as e:
         print(f"[red]Error saving processed articles: {e}[/red]")
 

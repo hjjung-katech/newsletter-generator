@@ -673,3 +673,147 @@ def get_filename_safe_theme(keywords, domain=None):
 
     # 2. 테마를 파일명에 적합하게 정리
     return sanitize_filename(theme)
+
+
+def regenerate_section_with_gemini(section_title: str, news_links: list) -> list:
+    """
+    Gemini API를 사용하여 뉴스 링크 목록으로부터 섹션 요약문을 재생성합니다.
+
+    Args:
+        section_title: 섹션 제목
+        news_links: 뉴스 링크 정보 목록 (title, url, source_and_date 포함)
+
+    Returns:
+        list: 생성된 요약문 문단 목록
+    """
+    from . import config
+    import google.generativeai as genai
+
+    if not config.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-pro")
+
+    # 뉴스 링크 정보를 문자열로 변환 - 수정된 형식으로
+    news_links_text = ""
+    for i, link in enumerate(news_links, 1):
+        title = str(link.get("title", "No Title")).replace("{", "{{").replace("}", "}}")
+        source = (
+            str(link.get("source_and_date", "Unknown Source"))
+            .replace("{", "{{")
+            .replace("}", "}}")
+        )
+        url = str(link.get("url", "#")).replace("{", "{{").replace("}", "}}")
+
+        news_links_text += f"기사 {i}:\n"
+        news_links_text += f"제목: {title}\n"
+        news_links_text += f"출처: {source}\n"
+        news_links_text += f"URL: {url}\n\n"
+
+    # 프롬프트 구성
+    prompt = f"""
+    다음은 '{section_title}'에 관련된 뉴스 기사 목록입니다:
+    
+    {news_links_text}
+    
+    위 뉴스 기사들을 바탕으로 '{section_title}'에 대한 종합적인 요약문을 작성해주세요.
+    
+    요구사항:
+    1. 3개의 문단으로 나누어 작성해주세요. 각 문단은 최소 3-4문장 이상으로 구성해주세요.
+    2. 첫 번째 문단은 주요 트렌드나 동향을 설명해주세요.
+    3. 두 번째 문단은 주요 이슈나 구체적인 사례를 다루어주세요.
+    4. 세 번째 문단은 시사점이나 전망을 제시해주세요.
+    5. 전문적이고 객관적인 톤으로 작성해주세요.
+    6. 한국어로 작성해주세요.
+    7. 각 문단은 별도의 문자열로 반환해주세요 (리스트 형태).
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+
+        # 문단으로 분리
+        paragraphs = [p.strip() for p in response_text.split("\n\n") if p.strip()]
+
+        # 최소 3개의 문단 확보
+        while len(paragraphs) < 3:
+            paragraphs.append("추가 정보가 필요합니다.")
+
+        # 최대 3개 문단으로 제한
+        return paragraphs[:3]
+
+    except Exception as e:
+        import traceback
+
+        print(f"Error generating content with Gemini: {e}")
+        print(f"Error details: {traceback.format_exc()}")
+        return [
+            "요약 생성 중 오류가 발생했습니다.",
+            "추가 정보가 필요합니다.",
+            "더 자세한 분석이 필요합니다.",
+        ]
+
+
+def generate_introduction_with_gemini(
+    newsletter_topic: str, section_titles: list
+) -> str:
+    """
+    Gemini API를 사용하여 뉴스레터 주제와 섹션 제목을 기반으로 소개 메시지를 생성합니다.
+
+    Args:
+        newsletter_topic: 뉴스레터 주제
+        section_titles: 섹션 제목 목록
+
+    Returns:
+        str: 생성된 소개 메시지
+    """
+    from . import config
+    import google.generativeai as genai
+
+    if not config.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-pro")
+
+    # 섹션 제목을 문자열로 변환
+    safe_topic = str(newsletter_topic).replace("{", "{{").replace("}", "}}")
+    section_titles_text = ""
+    for i, title in enumerate(section_titles, 1):
+        safe_title = str(title).replace("{", "{{").replace("}", "}}")
+        section_titles_text += f"- {safe_title}\n"
+
+    # 프롬프트 구성
+    prompt = f"""
+    다음은 뉴스레터의 주제와 포함된 섹션 제목들입니다:
+    
+    뉴스레터 주제: {safe_topic}
+    
+    섹션 제목:
+    {section_titles_text}
+    
+    위 정보를 바탕으로 뉴스레터의 소개 메시지를 작성해주세요.
+    
+    요구사항:
+    1. 전문적이고 친절한 톤으로 작성해주세요.
+    2. 2-3 문장으로 간결하게 작성해주세요.
+    3. 이번 뉴스레터의 가치와 중요성을 강조해주세요.
+    4. 한국어로 작성해주세요.
+    5. 각 섹션의 핵심 내용이 무엇인지 간략히 언급해주세요.
+    6. 'R&D 전략 수립' 또는 '의사결정'에 도움이 될 수 있다는 점을 언급해주세요.
+    
+    소개 메시지만 반환해 주세요.
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        introduction = response.text.strip()
+
+        return introduction
+    except Exception as e:
+        import traceback
+
+        print(f"Error generating introduction with Gemini: {e}")
+        print(f"Error details: {traceback.format_exc()}")
+        return f"금주 {safe_topic} 관련 최신 동향과 주요 뉴스를 정리하여 제공합니다. 본 뉴스레터가 업무에 도움이 되기를 바랍니다."

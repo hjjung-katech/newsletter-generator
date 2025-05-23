@@ -330,3 +330,76 @@ def filter_articles_by_domains(
     )
 
     return filtered_articles
+
+
+def _word_overlap_ratio(title1: str, title2: str) -> float:
+    """Compute overlap ratio between two titles based on unique word sets."""
+    tokens1 = set(re.split(r"[\W_]+", title1.lower())) - {""}
+    tokens2 = set(re.split(r"[\W_]+", title2.lower())) - {""}
+    if not tokens1 or not tokens2:
+        return 0.0
+    overlap = tokens1 & tokens2
+    return len(overlap) / min(len(tokens1), len(tokens2))
+
+
+def remove_similar_articles(
+    articles: List[Dict[str, Any]], similarity_threshold: float = 0.8
+) -> List[Dict[str, Any]]:
+    """Remove nearly identical articles based on title similarity."""
+    unique_articles: List[Dict[str, Any]] = []
+    for article in articles:
+        title = article.get("title", "")
+        if not title:
+            unique_articles.append(article)
+            continue
+        is_similar = False
+        for kept in unique_articles:
+            kept_title = kept.get("title", "")
+            if (
+                kept_title
+                and _word_overlap_ratio(title, kept_title) >= similarity_threshold
+            ):
+                is_similar = True
+                break
+        if not is_similar:
+            unique_articles.append(article)
+    console.print(
+        f"[cyan]Removed {len(articles) - len(unique_articles)} similar articles[/cyan]"
+    )
+    return unique_articles
+
+
+from datetime import datetime, timezone
+from .date_utils import parse_date_string
+
+
+def calculate_article_importance(article: Dict[str, Any]) -> float:
+    """Calculate a simple importance score for an article."""
+    score = 0.0
+    source = article.get("source", "")
+    if any(s.lower() in source.lower() for s in MAJOR_NEWS_SOURCES["tier1"]):
+        score += 2.0
+    elif any(s.lower() in source.lower() for s in MAJOR_NEWS_SOURCES["tier2"]):
+        score += 1.0
+
+    date_obj = parse_date_string(article.get("date"))
+    if date_obj:
+        if date_obj.tzinfo is None or date_obj.tzinfo.utcoffset(date_obj) is None:
+            date_obj = date_obj.replace(tzinfo=timezone.utc)
+        age_days = (datetime.now(timezone.utc) - date_obj).total_seconds() / 86400
+        recency = max(0.0, 30 - age_days) / 30
+    else:
+        recency = 0.0
+    score += recency
+    return score
+
+
+def select_top_articles(
+    articles: List[Dict[str, Any]], top_n: int = 3
+) -> List[Dict[str, Any]]:
+    """Select top N articles based on importance score."""
+    scored = [(a, calculate_article_importance(a)) for a in articles]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    for article, score in scored:
+        article["importance_score"] = round(score, 3)
+    return [a for a, _ in scored[:top_n]]
