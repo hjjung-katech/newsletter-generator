@@ -280,6 +280,7 @@ def compose_compact_newsletter_html(
         "issue_no": compact_data.get("issue_no"),
         "top_articles": compact_data.get("top_articles", []),
         "grouped_sections": compact_data.get("grouped_sections", []),
+        "definitions": compact_data.get("definitions", []),
         "food_for_thought": compact_data.get("food_for_thought"),
         "copyright_year": generation_date.split("-")[0],
         "publisher_name": compact_data.get("company_name", "Your Company"),

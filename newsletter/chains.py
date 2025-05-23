@@ -487,6 +487,44 @@ def create_summarization_chain(is_compact=False):
                         "articles": [],
                     }
 
+                    # definitions가 비어있다면 기본 definitions 생성
+                    if not compact_result["definitions"]:
+                        category_title = summary_json["title"]
+                        # 카테고리 제목을 바탕으로 기본 definition 생성
+                        if "자율주행" in category_title:
+                            compact_result["definitions"] = [
+                                {
+                                    "term": "자율주행",
+                                    "explanation": "운전자의 개입 없이 차량이 스스로 주행하는 기술로, 레벨 0부터 5까지 단계별로 구분됩니다.",
+                                }
+                            ]
+                        elif any(
+                            keyword in category_title for keyword in ["기술", "개발"]
+                        ):
+                            compact_result["definitions"] = [
+                                {
+                                    "term": "R&D",
+                                    "explanation": "연구개발(Research and Development)의 줄임말로, 새로운 기술이나 제품을 개발하는 활동입니다.",
+                                }
+                            ]
+                        elif any(
+                            keyword in category_title for keyword in ["정책", "규제"]
+                        ):
+                            compact_result["definitions"] = [
+                                {
+                                    "term": "산업정책",
+                                    "explanation": "정부가 특정 산업의 발전을 위해 수립하는 정책으로, 규제 완화, 지원책 등을 포함합니다.",
+                                }
+                            ]
+                        else:
+                            # 일반적인 기본 definition
+                            compact_result["definitions"] = [
+                                {
+                                    "term": "혁신기술",
+                                    "explanation": "기존 기술을 크게 개선하거나 완전히 새로운 방식의 기술로, 산업과 사회에 큰 변화를 가져올 수 있는 기술입니다.",
+                                }
+                            ]
+
                     # news_links를 articles로 변환
                     for link in summary_json.get("news_links", []):
                         compact_result["articles"].append(
@@ -507,11 +545,48 @@ def create_summarization_chain(is_compact=False):
                 )
                 # 오류 발생 시 기본 구조 제공
                 if is_compact:
+                    # 파싱 오류 시에도 기본 definitions 제공
+                    category_title = category.get("title", "제목 없음")
+                    fallback_definitions = []
+
+                    if "자율주행" in category_title:
+                        fallback_definitions = [
+                            {
+                                "term": "자율주행",
+                                "explanation": "운전자의 개입 없이 차량이 스스로 주행하는 기술로, 레벨 0부터 5까지 단계별로 구분됩니다.",
+                            },
+                            {
+                                "term": "레벨4",
+                                "explanation": "운전자가 없어도 특정 조건에서 완전 자율주행이 가능한 수준입니다.",
+                            },
+                        ]
+                    elif any(keyword in category_title for keyword in ["기술", "개발"]):
+                        fallback_definitions = [
+                            {
+                                "term": "R&D",
+                                "explanation": "연구개발(Research and Development)의 줄임말로, 새로운 기술이나 제품을 개발하는 활동입니다.",
+                            }
+                        ]
+                    elif any(keyword in category_title for keyword in ["정책", "규제"]):
+                        fallback_definitions = [
+                            {
+                                "term": "산업정책",
+                                "explanation": "정부가 특정 산업의 발전을 위해 수립하는 정책으로, 규제 완화, 지원책 등을 포함합니다.",
+                            }
+                        ]
+                    else:
+                        fallback_definitions = [
+                            {
+                                "term": "혁신기술",
+                                "explanation": "기존 기술을 크게 개선하거나 완전히 새로운 방식의 기술로, 산업과 사회에 큰 변화를 가져올 수 있는 기술입니다.",
+                            }
+                        ]
+
                     results.append(
                         {
-                            "title": category.get("title", "제목 없음"),
-                            "intro": f"{category.get('title', '제목 없음')}에 대한 주요 동향입니다.",
-                            "definitions": [],
+                            "title": category_title,
+                            "intro": f"{category_title}에 대한 주요 동향입니다.",
+                            "definitions": fallback_definitions,
                             "articles": [
                                 {
                                     "title": article.get("title", ""),
