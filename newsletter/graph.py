@@ -465,8 +465,7 @@ def compose_newsletter_node(
     """
     카테고리 요약에서 최종 뉴스레터 HTML을 생성하는 노드
     """
-    from .chains import get_newsletter_chain
-    from .compose import compose_newsletter_html, compose_compact_newsletter_html
+    from .compose import compose_newsletter
     import os
     from datetime import datetime  # Import datetime for timestamp
 
@@ -489,36 +488,15 @@ def compose_newsletter_node(
             # If it's already HTML, just use it
             newsletter_html = category_summaries
         else:
-            # If it's structured data, render with appropriate template
+            # If it's structured data, render with appropriate template using unified function
             template_dir = os.path.join(
                 os.path.dirname(os.path.dirname(__file__)), "templates"
             )
 
-            if template_style == "compact":
-                print("[cyan]Using compact newsletter template...[/cyan]")
-                # compact 모드에서는 chains.py에서 이미 완전한 데이터 구조가 반환됨
-                # 다시 compose_compact_newsletter_html을 호출할 필요 없음
-                if hasattr(category_summaries, "get") and isinstance(
-                    category_summaries, dict
-                ):
-                    # category_summaries가 이미 완전한 compact 데이터 구조인 경우
-                    newsletter_html = compose_compact_newsletter_html(
-                        category_summaries,
-                        template_dir,
-                        "newsletter_template_compact.html",
-                    )
-                else:
-                    # 기존 방식 사용
-                    newsletter_html = compose_compact_newsletter_html(
-                        category_summaries,
-                        template_dir,
-                        "newsletter_template_compact.html",
-                    )
-            else:
-                print("[cyan]Using detailed newsletter template...[/cyan]")
-                newsletter_html = compose_newsletter_html(
-                    category_summaries, template_dir, "newsletter_template.html"
-                )
+            print(f"[cyan]Using {template_style} newsletter template...[/cyan]")
+            newsletter_html = compose_newsletter(
+                category_summaries, template_dir, template_style
+            )
 
         # 뉴스레터 HTML 저장
         def save_newsletter_html(html_content, topic, style):

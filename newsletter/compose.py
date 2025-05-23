@@ -11,62 +11,53 @@ from .date_utils import (
 import json
 
 
-def extract_test_config(data: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+# 뉴스레터 스타일 설정
+class NewsletterConfig:
+    """뉴스레터 설정 클래스"""
+
+    @staticmethod
+    def get_config(style: str = "detailed") -> Dict[str, Any]:
+        """스타일별 뉴스레터 설정 반환"""
+        configs = {
+            "compact": {
+                "max_articles": 10,  # 총 기사 수
+                "top_articles_count": 3,  # 상위 기사 수
+                "max_groups": 3,  # 최대 그룹 수
+                "max_definitions": 3,  # 최대 용어 정의 수
+                "summary_style": "brief",  # 요약 스타일
+                "template_name": "newsletter_template_compact.html",
+                "title_default": "주간 산업 동향 브리프",
+            },
+            "detailed": {
+                "max_articles": None,  # 모든 필터된 기사
+                "top_articles_count": 3,  # 상위 기사 수
+                "max_groups": 6,  # 최대 그룹 수
+                "max_definitions": None,  # 그룹별 0-2개, 중복 없음
+                "summary_style": "detailed",  # 요약 스타일
+                "template_name": "newsletter_template.html",
+                "title_default": "주간 산업 동향 뉴스 클리핑",
+            },
+        }
+        return configs.get(style, configs["detailed"])
+
+
+def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") -> str:
     """
-    Extract test configuration from data if present.
+    뉴스레터를 생성하는 통합 함수 (compact와 detailed 공용)
 
     Args:
-        data: Dictionary possibly containing embedded test configuration
+        data: 뉴스레터 데이터 (딕셔너리 또는 리스트)
+        template_dir: 템플릿 디렉토리 경로
+        style: 뉴스레터 스타일 ("compact" 또는 "detailed")
 
     Returns:
-        Tuple of (newsletter_data, test_config)
+        str: 렌더링된 HTML 뉴스레터
     """
-    # Create a copy to avoid modifying the original
-    newsletter_data = data.copy()
-    test_config = {}
-
-    # Extract test config if present
-    if "_test_config" in newsletter_data:
-        test_config = newsletter_data.pop("_test_config")
-
-    return newsletter_data, test_config
-
-
-def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
-    """
-    Generates HTML newsletter content from structured data using a Jinja2 template.
-
-    Args:
-        data: Either a dictionary containing all newsletter data, or a list of article summaries.
-             If a dict is provided, expected keys include:
-             - 'newsletter_topic': The main topic of the newsletter.
-             - 'generation_date': The date the newsletter is generated.
-             - 'generation_timestamp': The timestamp when the newsletter is generated.
-             - 'recipient_greeting': A greeting message for the recipient.
-             - 'introduction_message': An introductory message for the newsletter.
-             - 'sections': A list of sections, where each section is a dict with:
-                 - 'title': The title of the section.
-                 - 'summary_paragraphs': A list of paragraphs for the summary.
-                 - 'definitions': (Optional) A list of term-definition pairs.
-                 - 'news_links': (Optional) A list of news links with title, url, and source.
-             - 'food_for_thought': (Optional) A dict with 'quote', 'author', and 'message'.
-             - 'closing_message': (Optional) A closing message.
-             - 'editor_signature': (Optional) The editor's signature.
-             - 'company_name': (Optional) The name of the company.
-             If a list is provided, it should contain article summary dictionaries, each with:
-             - 'title': Article title
-             - 'url': Article URL
-             - 'summary_text' or 'content': Article summary content
-        template_dir (str): The directory where the template file is located.
-        template_name (str): The name of the template file.
-
-    Returns:
-        str: The rendered HTML content of the newsletter.
-    """
-    # First extract any test configuration if present
+    # 테스트 설정 추출
     if isinstance(data, dict):
         data, test_config = extract_test_config(data)
 
+    # 리스트 형태의 데이터를 딕셔너리로 변환 (기존 호환성 유지)
     if isinstance(data, list):
         # 리스트 형태로 제공된 경우 구조화된 데이터로 변환
         newsletter_data = {
@@ -104,93 +95,329 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
                 newsletter_data["sections"][0]["summary_paragraphs"] = paragraphs[
                     :3
                 ]  # 최대 3개 문단
-    else:
-        # 이미 딕셔너리 형태로 제공된 경우
-        newsletter_data = data
 
-        # 뉴스 링크의 날짜 형식 포맷팅
-        if "sections" in newsletter_data:
-            for section in newsletter_data["sections"]:
-                if "news_links" in section:
-                    for link in section["news_links"]:
-                        if "source_and_date" in link:
-                            source, date_str = extract_source_and_date(
-                                link["source_and_date"]
-                            )
-                            if date_str:
-                                formatted_date = format_date_for_display(
-                                    date_str=date_str
-                                )
-                                if formatted_date:
-                                    link["source_and_date"] = (
-                                        f"{source}, {formatted_date}"
-                                    )
+        data = newsletter_data
 
-        # Format top_articles if provided
-        if "top_articles" in newsletter_data:
-            for art in newsletter_data["top_articles"]:
-                if "source_and_date" in art:
-                    src, d_str = extract_source_and_date(art["source_and_date"])
-                    if d_str:
-                        fmt = format_date_for_display(date_str=d_str)
-                        if fmt:
-                            art["source_and_date"] = f"{src}, {fmt}"
+    # 설정 가져오기
+    config = NewsletterConfig.get_config(style)
+
+    # 날짜 형식 포맷팅 처리 (기존 로직 유지)
+    if "sections" in data:
+        for section in data["sections"]:
+            if "news_links" in section:
+                for link in section["news_links"]:
+                    if "source_and_date" in link:
+                        source, date_str = extract_source_and_date(
+                            link["source_and_date"]
+                        )
+                        if date_str:
+                            formatted_date = format_date_for_display(date_str=date_str)
+                            if formatted_date:
+                                link["source_and_date"] = f"{source}, {formatted_date}"
+
+    # Format top_articles if provided
+    if "top_articles" in data:
+        for art in data["top_articles"]:
+            if "source_and_date" in art:
+                src, d_str = extract_source_and_date(art["source_and_date"])
+                if d_str:
+                    fmt = format_date_for_display(date_str=d_str)
+                    if fmt:
+                        art["source_and_date"] = f"{src}, {fmt}"
 
     print(
-        f"Composing newsletter for topic: {newsletter_data.get('newsletter_topic', 'N/A')}..."
+        f"Composing {style} newsletter for topic: {data.get('newsletter_topic', 'N/A')}..."
     )
+
+    # 1. 뉴스키워드 결정 - 이미 data에 포함됨
+
+    # 2. 뉴스 기사 검색 - 이미 완료됨
+
+    # 3. 뉴스기사 기간에 대한 필터 - process_articles_node에서 완료
+
+    # 4. 뉴스 기사의 점수 채점 - score_articles_node에서 완료
+
+    # 5. 상위 3개를 먼저 선별
+    top_articles = extract_and_prepare_top_articles(data, config["top_articles_count"])
+
+    # 6. 나머지 기사들의 주제 그룹핑
+    grouped_sections = create_grouped_sections(
+        data,
+        top_articles,
+        max_groups=config["max_groups"],
+        max_articles=config["max_articles"],
+    )
+
+    # 7. 그룹핑 뉴스내용 간단히 요약
+    # (이미 섹션에 요약이 포함되어 있음)
+
+    # 8. 이런 뜻이에요 용어 정의
+    definitions = extract_definitions(data, grouped_sections, config)
+
+    # 9. 생각해볼거리
+    food_for_thought = extract_food_for_thought(data)
+
+    # 10. 템플릿기반 최종 뉴스레터 생성
+    return render_newsletter_template(
+        data,
+        template_dir,
+        config,
+        top_articles,
+        grouped_sections,
+        definitions,
+        food_for_thought,
+    )
+
+
+def extract_and_prepare_top_articles(
+    data: Dict[str, Any], count: int = 3
+) -> List[Dict[str, Any]]:
+    """상위 기사들을 추출하고 템플릿용으로 준비"""
+
+    # 기존 top_articles가 있으면 사용
+    if "top_articles" in data:
+        top_articles = data["top_articles"][:count]
+    elif "sections" in data:
+        # sections에서 첫 번째 기사들 추출
+        top_articles = extract_top_articles_from_sections(data["sections"])[:count]
+    else:
+        top_articles = []
+
+    # 템플릿용 포맷팅
+    prepared_articles = []
+    for article in top_articles:
+        # 날짜 형식 포맷팅
+        source_and_date = article.get("source_and_date", "")
+        if source_and_date:
+            source, date_str = extract_source_and_date(source_and_date)
+            if date_str:
+                formatted_date = format_date_for_display(date_str=date_str)
+                if formatted_date:
+                    source_and_date = f"{source} · {formatted_date}"
+
+        prepared_article = {
+            "title": article.get("title", ""),
+            "url": article.get("url", "#"),
+            "snippet": article.get("snippet", article.get("summary_text", "")),
+            "source_and_date": source_and_date,
+        }
+        prepared_articles.append(prepared_article)
+
+    return prepared_articles
+
+
+def create_grouped_sections(
+    data: Dict[str, Any],
+    top_articles: List[Dict[str, Any]],
+    max_groups: int = 6,
+    max_articles: int = None,
+) -> List[Dict[str, Any]]:
+    """그룹화된 섹션들을 생성"""
+
+    # 기존 grouped_sections가 있으면 사용
+    if "grouped_sections" in data:
+        return data["grouped_sections"][:max_groups]
+
+    # sections에서 grouped_sections 생성
+    sections = data.get("sections", [])
+    if not sections:
+        return []
+
+    # 이미 선택된 상위 기사들의 URL 추출
+    excluded_urls = {article.get("url", "") for article in top_articles}
+
+    grouped_sections = []
+    article_count = 0
+
+    for section in sections[:max_groups]:
+        # 섹션의 기사 목록 가져오기
+        news_links = section.get("news_links", [])
+        articles = section.get("articles", [])
+        article_list = news_links if news_links else articles
+
+        # 상위 기사로 선택된 것들 제외
+        remaining_articles = [
+            link for link in article_list if link.get("url", "") not in excluded_urls
+        ]
+
+        # max_articles 제한 확인 (compact 모드용)
+        if max_articles and article_count + len(
+            remaining_articles
+        ) > max_articles - len(top_articles):
+            remaining_articles = remaining_articles[
+                : max_articles - len(top_articles) - article_count
+            ]
+
+        if remaining_articles:
+            # 이모지 추가된 섹션 제목
+            section_title = add_emoji_to_section_title(section.get("title", "기타"))
+
+            grouped_section = {
+                "heading": section_title,
+                "intro": (
+                    section.get("summary_paragraphs", [""])[0]
+                    if section.get("summary_paragraphs")
+                    else ""
+                ),
+                "articles": remaining_articles,
+            }
+            grouped_sections.append(grouped_section)
+            article_count += len(remaining_articles)
+
+            # max_articles 도달하면 중단
+            if max_articles and article_count >= max_articles - len(top_articles):
+                break
+
+    return grouped_sections
+
+
+def extract_definitions(
+    data: Dict[str, Any], grouped_sections: List[Dict[str, Any]], config: Dict[str, Any]
+) -> List[Dict[str, str]]:
+    """용어 정의들을 추출"""
+
+    # 기존 definitions가 있으면 사용
+    if "definitions" in data:
+        definitions = data["definitions"]
+        if config["max_definitions"]:
+            return definitions[: config["max_definitions"]]
+        return definitions
+
+    # sections에서 정의 추출
+    sections = data.get("sections", [])
+    return extract_key_definitions_for_compact(sections)[
+        : config["max_definitions"] or 999
+    ]
+
+
+def extract_food_for_thought(data: Dict[str, Any]) -> str:
+    """생각해볼 거리 추출"""
+    food_for_thought = data.get("food_for_thought")
+
+    if not food_for_thought:
+        return ""
+
+    if isinstance(food_for_thought, dict):
+        # detailed 버전용 딕셔너리 형태
+        return food_for_thought
+    else:
+        # compact 버전용 문자열 형태
+        return str(food_for_thought)
+
+
+def render_newsletter_template(
+    data: Dict[str, Any],
+    template_dir: str,
+    config: Dict[str, Any],
+    top_articles: List[Dict[str, Any]],
+    grouped_sections: List[Dict[str, Any]],
+    definitions: List[Dict[str, str]],
+    food_for_thought: Any,
+) -> str:
+    """템플릿을 렌더링하여 최종 HTML 생성"""
 
     env = Environment(
         loader=FileSystemLoader(template_dir),
         autoescape=select_autoescape(["html", "xml"]),
     )
-    template = env.get_template(template_name)
+    template = env.get_template(config["template_name"])
 
     # 현재 날짜와 시간 가져오기
     current_date = datetime.now().strftime("%Y-%m-%d")
     current_time = datetime.now().strftime("%H:%M:%S")
 
-    # 환경 변수 확인 또는 현재 날짜와 시간 사용
-    generation_date = os.environ.get("GENERATION_DATE", current_date)
-    generation_timestamp = os.environ.get("GENERATION_TIMESTAMP", current_time)
+    generation_date = data.get(
+        "generation_date", os.environ.get("GENERATION_DATE", current_date)
+    )
+    generation_timestamp = data.get(
+        "generation_timestamp", os.environ.get("GENERATION_TIMESTAMP", current_time)
+    )
 
-    # 기존 로직을 아래 코드로 대체
-    if isinstance(data, dict):
-        # 딕셔너리 형태로 제공된 경우 해당 값 사용, 없으면 환경 변수나 현재 값 사용
-        generation_date = data.get("generation_date", generation_date)
-        generation_timestamp = data.get("generation_timestamp", generation_timestamp)
+    # 스타일별 컨텍스트 준비
+    if config["template_name"] == "newsletter_template_compact.html":
+        # Compact 템플릿용 컨텍스트
+        context = {
+            "newsletter_title": data.get("newsletter_topic", config["title_default"]),
+            "tagline": data.get(
+                "tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."
+            ),
+            "generation_date": generation_date,
+            "issue_no": data.get("issue_no"),
+            "top_articles": top_articles,
+            "grouped_sections": grouped_sections,
+            "definitions": definitions,
+            "food_for_thought": food_for_thought,
+            "copyright_year": generation_date.split("-")[0],
+            "publisher_name": data.get("company_name", "Your Company"),
+            "company_name": data.get("company_name", "Your Company"),
+        }
+    else:
+        # Detailed 템플릿용 컨텍스트
+        context = {
+            "newsletter_topic": data.get("newsletter_topic", "주간 산업 동향"),
+            "generation_date": generation_date,
+            "generation_timestamp": generation_timestamp,
+            "recipient_greeting": data.get("recipient_greeting", "안녕하세요,"),
+            "introduction_message": data.get(
+                "introduction_message",
+                "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
+            ),
+            "sections": data.get("sections", []),
+            "food_for_thought": food_for_thought,
+            "closing_message": data.get(
+                "closing_message",
+                "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+            ),
+            "editor_signature": data.get("editor_signature", "편집자 드림"),
+            "company_name": data.get("company_name", "Your Newsletter Co."),
+        }
 
-    # Prepare a comprehensive context for rendering
-    context = {
-        "newsletter_topic": newsletter_data.get("newsletter_topic", "주간 산업 동향"),
-        "generation_date": generation_date,
-        "generation_timestamp": generation_timestamp,  # Now always included
-        "recipient_greeting": newsletter_data.get("recipient_greeting", "안녕하세요,"),
-        "introduction_message": newsletter_data.get(
-            "introduction_message", "지난 한 주간의 주요 산업 동향을 정리해 드립니다."
-        ),
-        "sections": newsletter_data.get("sections", []),
-        "food_for_thought": newsletter_data.get("food_for_thought"),  # Can be None
-        "closing_message": newsletter_data.get(
-            "closing_message", "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다."
-        ),
-        "editor_signature": newsletter_data.get("editor_signature", "편집자 드림"),
-        "company_name": newsletter_data.get("company_name", "Your Newsletter Co."),
-    }
+        # 검색 키워드 추가
+        if "search_keywords" in data and data["search_keywords"]:
+            if isinstance(data["search_keywords"], list):
+                context["search_keywords"] = ", ".join(data["search_keywords"])
+            else:
+                context["search_keywords"] = data["search_keywords"]
 
-    # 검색 키워드 추가
-    if "search_keywords" in newsletter_data and newsletter_data["search_keywords"]:
-        # search_keywords가 리스트인 경우 문자열로 변환
-        if isinstance(newsletter_data["search_keywords"], list):
-            context["search_keywords"] = ", ".join(newsletter_data["search_keywords"])
-        else:
-            context["search_keywords"] = newsletter_data["search_keywords"]
+        # top_articles 추가 (detailed에서도 표시 가능)
+        if "top_articles" in data or top_articles:
+            context["top_articles"] = data.get("top_articles", top_articles)
 
-    if "top_articles" in newsletter_data:
-        context["top_articles"] = newsletter_data["top_articles"]
+    return template.render(context)
 
-    html_content = template.render(context)
-    return html_content
+
+# 기존 함수들을 새로운 통합 함수로 래핑
+def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
+    """기존 detailed 뉴스레터 생성 함수 (호환성 유지)"""
+    return compose_newsletter(data, template_dir, "detailed")
+
+
+def compose_compact_newsletter_html(
+    data, template_dir: str, template_name: str = "newsletter_template_compact.html"
+) -> str:
+    """기존 compact 뉴스레터 생성 함수 (호환성 유지)"""
+    return compose_newsletter(data, template_dir, "compact")
+
+
+def extract_test_config(data: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Extract test configuration from data if present.
+
+    Args:
+        data: Dictionary possibly containing embedded test configuration
+
+    Returns:
+        Tuple of (newsletter_data, test_config)
+    """
+    # Create a copy to avoid modifying the original
+    newsletter_data = data.copy()
+    test_config = {}
+
+    # Extract test config if present
+    if "_test_config" in newsletter_data:
+        test_config = newsletter_data.pop("_test_config")
+
+    return newsletter_data, test_config
 
 
 def save_newsletter_with_config(
@@ -218,77 +445,6 @@ def save_newsletter_with_config(
         json.dump(data_to_save, f, indent=2, ensure_ascii=False)
 
     print(f"Saved newsletter data with embedded config to {output_path}")
-
-
-def compose_compact_newsletter_html(
-    data, template_dir: str, template_name: str = "newsletter_template_compact.html"
-) -> str:
-    """
-    간결한 버전의 뉴스레터를 생성합니다.
-    상위 중요기사 3개를 메인으로 하고, 나머지를 그룹별로 간략히 소개합니다.
-
-    Args:
-        data: Newsletter data containing sections and top_articles
-        template_dir: Template directory path
-        template_name: Template file name (defaults to newsletter_template_compact.html)
-
-    Returns:
-        str: The rendered HTML content of the compact newsletter.
-    """
-    # First extract any test configuration if present
-    if isinstance(data, dict):
-        data, test_config = extract_test_config(data)
-
-    newsletter_data = data if isinstance(data, dict) else {}
-
-    # 간결한 버전을 위한 데이터 처리
-    compact_data = process_compact_newsletter_data(newsletter_data)
-
-    print(
-        f"Composing compact newsletter for topic: {compact_data.get('newsletter_title', 'N/A')}..."
-    )
-
-    env = Environment(
-        loader=FileSystemLoader(template_dir),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
-    template = env.get_template(template_name)
-
-    # 현재 날짜와 시간 가져오기
-    current_date = datetime.now().strftime("%Y-%m-%d")
-    current_time = datetime.now().strftime("%H:%M:%S")
-
-    # 환경 변수 확인 또는 현재 날짜와 시간 사용
-    generation_date = os.environ.get("GENERATION_DATE", current_date)
-    generation_timestamp = os.environ.get("GENERATION_TIMESTAMP", current_time)
-
-    # 기존 로직을 아래 코드로 대체
-    if isinstance(data, dict):
-        # 딕셔너리 형태로 제공된 경우 해당 값 사용, 없으면 환경 변수나 현재 값 사용
-        generation_date = data.get("generation_date", generation_date)
-        generation_timestamp = data.get("generation_timestamp", generation_timestamp)
-
-    # Prepare context for compact template
-    context = {
-        "newsletter_title": compact_data.get(
-            "newsletter_title", "주간 산업 동향 브리프"
-        ),
-        "tagline": compact_data.get(
-            "tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."
-        ),
-        "generation_date": generation_date,
-        "issue_no": compact_data.get("issue_no"),
-        "top_articles": compact_data.get("top_articles", []),
-        "grouped_sections": compact_data.get("grouped_sections", []),
-        "definitions": compact_data.get("definitions", []),
-        "food_for_thought": compact_data.get("food_for_thought"),
-        "copyright_year": generation_date.split("-")[0],
-        "publisher_name": compact_data.get("company_name", "Your Company"),
-        "company_name": compact_data.get("company_name", "Your Company"),
-    }
-
-    html_content = template.render(context)
-    return html_content
 
 
 def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str, Any]:

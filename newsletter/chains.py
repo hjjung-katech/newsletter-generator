@@ -22,6 +22,7 @@ from .compose import (
     prepare_grouped_sections_for_compact,
     extract_key_definitions_for_compact,
     compose_compact_newsletter_html,
+    compose_newsletter,
 )
 
 
@@ -111,12 +112,14 @@ SUMMARIZATION_PROMPT = """
 
 위 기사들을 종합적으로 분석하여 다음 정보를 포함한 요약을 JSON 형식으로 만들어주세요:
 
-1. summary_paragraphs: 해당 카테고리의 주요 내용을 3-5개의 단락으로 요약 (각 단락은 배열의 항목)
+1. summary_paragraphs: 해당 카테고리의 주요 내용을 1개의 단락으로 요약 (각 단락은 배열의 항목)
    - 요약문은 객관적이고 분석적이며, 전체 기사들의 맥락을 포괄해야 합니다.
    - 정중한 존댓말을 사용합니다.
 
-2. definitions: 해당 카테고리에서 등장하는 중요 용어나 개념 설명 (최대 5개)
-   - 신입직원이 이해하기 어려울 수 있는 전문 용어나 개념을 선정하여 쉽고 간단하게 설명합니다.
+2. definitions: 해당 카테고리에서 등장하는 중요 용어나 개념 설명 (0-2개)
+   - 신입직원이 이해하기 어려울 수 있는 전문 용어나 개념 중 가장 핵심적인 것만 선정
+   - 다른 카테고리에서 이미 설명된 용어는 피하고, 해당 카테고리 특유의 용어를 우선 선정
+   - 꼭 필요한 경우가 아니면 1-2개로 제한하며, 명확한 용어가 없다면 0개도 가능
 
 3. news_links: 원본 기사 링크 정보
    - 각 카테고리별로 관련 뉴스 기사들의 원문 링크를 제목, 출처, 시간 정보와 함께 제공합니다.
@@ -931,56 +934,105 @@ def get_newsletter_chain(is_compact=False):
 
                 # Compact 모드에서도 템플릿 렌더링 수행
                 print("Compact 4단계: HTML 템플릿 렌더링 중...")
-                newsletter_html = compose_compact_newsletter_html(
+                newsletter_html = compose_newsletter(
                     result_data,
                     os.path.join(
                         os.path.dirname(os.path.dirname(__file__)), "templates"
                     ),
-                    "newsletter_template_compact.html",
+                    "compact",
                 )
 
                 print("Compact 뉴스레터 생성 완료!")
                 return newsletter_html  # HTML 문자열 반환
 
             else:
-                # Detailed 버전: 기존 로직 사용
-                # 3. 종합 구성 단계 실행
-                print("3단계: 뉴스레터 종합 구성 중...")
-                composition = composition_chain.invoke(
-                    {
-                        "keywords": data.get("keywords", ""),
-                        "sections": sections_data["sections"],
-                    }
-                )
+                # Detailed 버전: 통합 아키텍처 사용
+                print("3단계: Detailed 뉴스레터 데이터 구성 중...")
 
-                # 4. 렌더링 단계 실행
-                print("4단계: HTML 렌더링 중...")
-                final_html, final_data = rendering_chain.invoke(
-                    {
-                        "composition": composition,
-                        "sections_data": sections_data,
-                        "keywords": data.get("keywords", ""),
-                        "domain": data.get("domain", ""),  # 도메인 정보 추가
-                    }
-                )
+                # 템플릿 매니저로부터 메타데이터 가져오기
+                template_manager = TemplateManager()
+
+                # 키워드 및 주제 처리
+                keywords = data.get("keywords", [])
+                domain = data.get("domain", "")
+
+                # 뉴스레터 주제 결정
+                if domain:
+                    newsletter_topic = domain
+                elif isinstance(keywords, list) and len(keywords) == 1:
+                    newsletter_topic = keywords[0]
+                elif isinstance(keywords, list) and len(keywords) > 1:
+                    newsletter_topic = tools.extract_common_theme_from_keywords(
+                        keywords
+                    )
+                elif isinstance(keywords, str):
+                    newsletter_topic = keywords
+                else:
+                    newsletter_topic = "최신 산업 동향"
+
+                # 검색 키워드 문자열 생성
+                if isinstance(keywords, list):
+                    search_keywords = ", ".join(keywords)
+                else:
+                    search_keywords = keywords
+
+                # Detailed 뉴스레터 데이터 구성
+                detailed_data = {
+                    "newsletter_topic": newsletter_topic,
+                    "generation_date": os.environ.get(
+                        "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
+                    ),
+                    "generation_timestamp": os.environ.get(
+                        "GENERATION_TIMESTAMP",
+                        datetime.datetime.now().strftime("%H:%M:%S"),
+                    ),
+                    "search_keywords": search_keywords,
+                    "sections": sections_data.get("sections", []),
+                    # 템플릿 매니저에서 가져온 정보
+                    "company_name": template_manager.get(
+                        "company.name", "산업통상자원 R&D 전략기획단"
+                    ),
+                    "recipient_greeting": template_manager.get(
+                        "audience.description", "R&D 전략기획단 전문위원님들께"
+                    ),
+                    "introduction_message": f"안녕하십니까. 금주 '{newsletter_topic}' 관련 주요 산업 동향을 정리해 드립니다.",
+                    "food_for_thought": {
+                        "message": f"이번 주 {newsletter_topic} 분야의 뉴스를 종합해보면, 기술 혁신의 속도가 빨라지고 있으며 글로벌 경쟁이 더욱 치열해지고 있습니다. 특히 AI와의 융합, 공급망 재편, 새로운 규제 환경 등이 산업 전반에 큰 영향을 미치고 있습니다. 우리 R&D 전략기획단은 이러한 변화의 흐름 속에서 어떤 기술 분야에 우선순위를 두고 투자해야 할까요? 또한 국제 협력과 자체 기술 개발 사이에서 어떤 균형점을 찾아야 할까요? 이번 주 뉴스가 제시하는 시사점을 바탕으로 중장기 R&D 로드맵을 재검토해 보시기 바랍니다."
+                    },
+                    "closing_message": "이번 주 뉴스 클리핑이 위원님들의 연구 개발 활동과 전략 구상에 도움이 되었기를 바랍니다. 다음 주에도 더욱 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+                    "editor_signature": template_manager.get(
+                        "editor.signature", "OSP 뉴스레터 편집팀 드림"
+                    ),
+                    # 추가 템플릿 설정
+                    "copyright_year": template_manager.get(
+                        "company.copyright_year", datetime.date.today().strftime("%Y")
+                    ),
+                    "company_tagline": template_manager.get(
+                        "company.tagline", "최신 기술 동향을 한눈에"
+                    ),
+                    "footer_contact": template_manager.get(
+                        "footer.contact_info", "문의사항: hjjung2@osp.re.kr"
+                    ),
+                    "editor_name": template_manager.get("editor.name", "Google Gemini"),
+                    "editor_email": template_manager.get(
+                        "editor.email", "hjjung2@osp.re.kr"
+                    ),
+                    "footer_disclaimer": template_manager.get(
+                        "footer.disclaimer",
+                        "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+                    ),
+                }
 
                 # render_data.json 파일 저장
                 try:
                     output_dir = os.path.join("output", "intermediate_processing")
                     os.makedirs(output_dir, exist_ok=True)
                     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    # 키워드나 도메인으로 파일명 보강 (옵션)
-                    topic_slug = "general"
-                    keywords_or_domain = data.get("domain") or data.get("keywords")
-                    if keywords_or_domain:
-                        if isinstance(keywords_or_domain, list):
-                            topic_slug = tools.get_filename_safe_theme(
-                                keywords_or_domain, None
-                            )  # domain is already in keywords_or_domain if used
-                        else:  # string
-                            topic_slug = tools.get_filename_safe_theme(
-                                [keywords_or_domain], None
-                            )
+
+                    # 파일명에 사용할 안전한 주제 문자열 생성
+                    topic_slug = tools.get_filename_safe_theme(
+                        keywords if isinstance(keywords, list) else [keywords], domain
+                    )
 
                     render_data_filename = (
                         f"render_data_langgraph_{timestamp}_{topic_slug}.json"
@@ -988,13 +1040,23 @@ def get_newsletter_chain(is_compact=False):
                     render_data_path = os.path.join(output_dir, render_data_filename)
 
                     with open(render_data_path, "w", encoding="utf-8") as f:
-                        json.dump(final_data, f, ensure_ascii=False, indent=2)
+                        json.dump(detailed_data, f, ensure_ascii=False, indent=2)
                     print(f"Render data saved to {render_data_path}")
                 except Exception as e:
                     print(f"Render data 저장 중 오류: {e}")
 
-                print("뉴스레터 생성 완료!")
-                return final_html  # manage_data_flow는 최종 HTML만 반환
+                # 4단계: compose_newsletter 함수로 HTML 렌더링
+                print("4단계: HTML 템플릿 렌더링 중...")
+                template_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)), "templates"
+                )
+
+                newsletter_html = compose_newsletter(
+                    detailed_data, template_dir, "detailed"  # detailed 템플릿 사용
+                )
+
+                print("Detailed 뉴스레터 생성 완료!")
+                return newsletter_html  # HTML 문자열 반환
 
         except Exception as e:
             print(f"뉴스레터 생성 중 오류 발생: {e}")
