@@ -294,21 +294,23 @@ def test_compact_newsletter_unit_standalone():
         assert chain is not None, "체인 생성 실패"
 
         print("✅ 독립 단위 테스트 통과: Compact 체인이 정상적으로 생성되었습니다!")
-        return True
 
     except Exception as e:
         print(f"❌ 독립 단위 테스트 실패: {e}")
-        return False
+        pytest.fail(f"독립 단위 테스트 실패: {e}")
 
 
 if __name__ == "__main__":
     # 독립 실행 시 간단한 테스트 수행
-    success = test_compact_newsletter_unit_standalone()
-    if success:
+    try:
+        # 간단한 체인 생성 테스트
+        chain = get_newsletter_chain(is_compact=True)
+        assert chain is not None, "체인 생성 실패"
+
         print("\n🎉 모든 독립 단위 테스트가 통과했습니다!")
         print(
             "전체 단위 테스트를 실행하려면: python -m pytest tests/test_compact_newsletter.py -v"
         )
-    else:
-        print("\n❌ 일부 단위 테스트가 실패했습니다.")
+    except Exception as e:
+        print(f"\n❌ 일부 단위 테스트가 실패했습니다: {e}")
         sys.exit(1)
