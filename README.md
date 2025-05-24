@@ -31,7 +31,7 @@ detailed_html = compose_newsletter(data, template_dir, "detailed")
 | 4 | **뉴스 기사 점수 채점** | 중요도 기반 순위 매기기 | 동일 |
 | 5 | **상위 3개 기사 선별** | 가장 중요한 3개 기사 추출 | 동일 |
 | 6 | **주제 그룹핑** | **최대 3개 그룹** | **최대 6개 그룹** |
-| 7 | **내용 요약** | **간단한 요약** | **상세한 문단 요약** |
+| 7 | **내용 요약** | **간단한 요약** | **상세한 한문단 요약** |
 | 8 | **용어 정의** | **최대 3개** | **그룹별 0-2개, 중복 없음** |
 | 9 | **생각해볼거리 생성** | 간결한 메시지 | 상세한 인사이트 |
 | 10 | **템플릿 기반 최종 생성** | `newsletter_template_compact.html` | `newsletter_template.html` |
@@ -289,7 +289,7 @@ newsletter test output\collected_articles_AI_빅데이터.json --mode content --
 
 1. **Template 모드**: 기존에 생성된 뉴스레터 데이터(render_data*.json)를 사용하여 현재 HTML 템플릿으로 재렌더링합니다. 템플릿 변경 테스트에 유용합니다.
 
-2. **Content 모드**: 이전에 수집된 기사 데이터(collected_articles*.json)를 사용하여 처리, 요약, 편집 등의 전체 후속 프로세스를 재실행합니다. 동일한 기사 데이터로 다양한 처리 방식을 테스트할 수 있습니다.
+2. **Content 모드**: 동일한 기사 데이터로 다양한 처리/요약 방식을 테스트할 수 있습니다. 기사 수집 단계를 건너뛰고 처리/요약 프로세스만 실행합니다.
 
 ---
 
@@ -441,71 +441,147 @@ pre-commit install
 
 ## 테스트
 
-### 테스트 구조
+### 🎯 테스트 전략 개요
 
-프로젝트 테스트는 `tests` 디렉토리에 체계적으로 관리되며 다음과 같은 구조로 되어 있습니다:
+Newsletter Generator는 **환경별 테스트 전략**을 도입하여 개발 효율성과 품질을 동시에 확보합니다:
 
-1. **메인 테스트** (루트 디렉토리)
-   - 뉴스레터 생성, 필터링, 통합 기능에 대한 테스트
-   - 주요 파일: `test_newsletter.py`, `test_article_filter.py`, `test_compose.py` 등
+| 환경 | 목적 | 실행 대상 | API 할당량 | 실행 시간 |
+|------|------|-----------|------------|-----------|
+| **dev** | 개발 중 빠른 피드백 | Mock API + 핵심 단위 테스트 | 소모 없음 | ~20초 |
+| **ci** | CI/CD 파이프라인 | 전체 검증 (Real API 제외) | 소모 없음 | ~35초 |
+| **unit** | 순수 단위 테스트 | API 의존성 완전 배제 | 소모 없음 | ~21초 |
+| **integration** | 실제 환경 검증 | 모든 테스트 (Real API 포함) | 할당량 소모 | 상황에 따라 다름 |
 
-2. **API 테스트** (`api_tests/` 디렉토리)
-   - API 키가 필요한, 외부 서비스 통합 테스트
-   - 주요 파일: `test_serper_direct.py`, `test_collect.py`, `test_summarize.py` 등
+### 🚀 환경별 테스트 실행
 
-3. **단위 테스트** (`unit_tests/` 디렉토리)
-   - 독립적인 기능의 단위 테스트 (API 키 불필요)
-   - 주요 파일: `test_date_utils.py`, `test_new_newsletter.py`, `test_weeks_ago.py` 등
-
-4. **백업 테스트** (`_backup/` 디렉토리)
-   - 이전 버전 또는 보관용 테스트 파일
-
-### 테스트 실행
-
-테스트 자동화 스크립트를 사용하여 쉽게 테스트를 실행할 수 있습니다:
+**새로운 환경별 테스트 스크립트** (`run_tests.py`):
 
 ```bash
-# 모든 메인 테스트 실행 (백업 폴더 제외)
-python run_tests.py --all
+# 개발 환경: 빠른 피드백용 (Mock API + 핵심 테스트)
+python run_tests.py dev
 
+# CI/CD 환경: 전체 검증 (Real API 제외)  
+python run_tests.py ci
+
+# 단위 테스트만: 순수 로직 테스트
+python run_tests.py unit
+
+# 통합 테스트: 실제 API 포함 전체 검증 (API 키 필요)
+python run_tests.py integration
+
+# 상세 출력 모드
+python run_tests.py dev --verbose
+
+# 커버리지 리포트 생성
+python run_tests.py ci --coverage
+```
+
+**디렉토리별 테스트 실행**:
+
+```bash
 # API 테스트만 실행
 python run_tests.py --api
 
 # 단위 테스트만 실행
-python run_tests.py --unit
+python run_tests.py --unit-tests
 
 # 사용 가능한 테스트 목록 확인
 python run_tests.py --list
 
 # 모든 테스트 목록 확인 (단위/API/백업 테스트 포함)
-python run_tests.py --list-all
+python run_tests.py --list --all
 
 # 특정 테스트 파일 실행
-python run_tests.py --test article_filter
+python run_tests.py --test test_compose.py
 
-# 코드 포맷팅 후 테스트 실행
-python run_tests.py --format --all
+# 코드 포맷팅
+python run_tests.py --format
 ```
+
+### 🔧 Mock vs Real API 테스트
+
+시스템은 API 할당량을 보호하면서도 완전한 테스트 커버리지를 제공합니다:
+
+**Mock API 테스트** (`@pytest.mark.mock_api`):
+- 실제 API 응답을 시뮬레이션
+- 할당량 소모 없음
+- 빠른 실행 속도
+- 로직 검증에 집중
+
+**Real API 테스트** (`@pytest.mark.real_api`):
+- 실제 외부 서비스 호출
+- API 할당량 소모
+- 실제 환경 검증
+- integration 환경에서만 실행
+
+### 📊 테스트 구조
+
+```
+tests/
+├── 📁 api_tests/                    # API 테스트 (외부 서비스 호출)
+│   ├── test_compact_newsletter_api.py   # Compact 뉴스레터 API 테스트
+│   ├── test_theme_extraction.py         # 테마 추출 API 테스트
+│   ├── test_search_improved.py          # 검색 API 테스트
+│   └── ... (기타 API 테스트들)
+├── 📁 unit_tests/                   # 단위 테스트
+│   ├── test_template_manager.py         # 템플릿 관리 테스트
+│   ├── test_date_utils.py               # 날짜 유틸리티 테스트
+│   └── ... (기타 단위 테스트들)
+├── 📄 test_newsletter_mocked.py     # Mock 기반 통합 테스트
+├── 📄 test_compact_newsletter.py    # Compact 뉴스레터 단위 테스트
+├── 📄 test_compose.py               # 컴포즈 기능 테스트
+├── 📄 conftest.py                   # pytest 설정 및 픽스처
+└── 📄 README.md                     # 테스트 가이드
+```
+
+### 🎯 테스트 마커 시스템
+
+```python
+@pytest.mark.real_api        # 실제 API 호출 (할당량 소모)
+@pytest.mark.mock_api        # Mock API 사용 (할당량 보호)
+@pytest.mark.requires_quota  # API 할당량 필요 표시
+@pytest.mark.unit           # 순수 단위 테스트
+@pytest.mark.integration    # 통합 테스트
+```
+
+### ⚙️ 환경 변수 제어
+
+테스트 동작은 다음 환경 변수로 제어됩니다:
+
+```bash
+# Real API 테스트 활성화/비활성화
+export RUN_REAL_API_TESTS=1  # 1: 활성화, 0: 비활성화
+
+# Mock API 테스트 활성화/비활성화  
+export RUN_MOCK_API_TESTS=1  # 1: 활성화, 0: 비활성화
+
+# API 키 (Real API 테스트 필요시)
+export GOOGLE_API_KEY=your_key
+export SERPER_API_KEY=your_key
+```
+
+### 🔄 권장 워크플로우
+
+1. **일상적 개발**: `python run_tests.py dev`
+2. **Pull Request 전**: `python run_tests.py ci`
+3. **배포 전 최종 검증**: `python run_tests.py integration`
+4. **특정 로직 검증**: `python run_tests.py unit`
 
 ### 테스트 유형
 
 프로젝트는 다음과 같은 테스트 유형을 포함하고 있습니다:
 
 1. **필터링 및 그룹화 테스트**
-   - 중복 기사 감지, 키워드 그룹화, 소스 우선순위 지정 등 테스트
-   - 주요 파일: `test_article_filter.py`, `api_tests/test_article_filter_integration.py`
+- 중복 기사 감지, 키워드 그룹화, 소스 우선순위 지정 등 테스트
 
 2. **API 및 검색 테스트**
-   - 외부 API 연동 및 검색 기능 테스트
-   - 주요 파일: `test_serper_api.py`, `api_tests/test_serper_direct.py`, `api_tests/test_sources.py`
+- 외부 API 연동 및 검색 기능 테스트
 
 3. **날짜 처리 테스트**
-   - 날짜 파싱, 포맷팅, 주 단위 계산 등 테스트
-   - 주요 파일: `test_graph_date_parser.py`, `unit_tests/test_date_utils.py`, `unit_tests/test_weeks_ago.py`
+- 날짜 파싱, 포맷팅, 주 단위 계산 등 테스트
 
 4. **뉴스레터 생성 테스트**
-   - 전체 뉴스레터 생성 과정 테스트
-   - 주요 파일: `test_newsletter.py`, `unit_tests/test_new_newsletter.py`
+- 전체 뉴스레터 생성 과정 테스트
 
 자세한 테스트 정보와 모든 테스트 파일 목록은 [tests/README.md](tests/README.md) 파일을 참조하세요.
 
@@ -562,6 +638,7 @@ python run_tests.py --format --all
 
 | 버전 | 일자       | 작성자         | 변경 요약                                                       |
 | ---- | ---------- | -------------- | --------------------------------------------------------------- |
+| 0.7  | 2025-05-24 | Hojung Jung    | 환경별 테스트 전략 도입 및 통합 테스트 스크립트 구현                |
 | 0.6  | 2025-05-22 | Hojung Jung    | 테스트 모드 기능 추가 (template/content)                             |
 | 0.5  | 2025-05-13 | Hojung Jung    | 기사 필터링 및 그룹화 기능 추가                                     |
 | 0.4  | 2025‑05‑11 | Hojung Jung    | 다양한 뉴스 소스 통합 기능 반영 (RSS, 네이버 API)                    |
