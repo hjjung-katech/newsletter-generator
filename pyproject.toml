@@ -10,25 +10,157 @@ readme = "README.md"
 authors = [
     {name = "Newsletter Generator Team", email = "example@corp.com"},
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Communications :: Email",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: News/Diary",
 ]
-dependencies = []
+
+# Core runtime dependencies
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0",
+    "requests>=2.28.0",
+    "beautifulsoup4>=4.12.0",
+    "markdownify>=0.11.0",
+    "jinja2>=3.1.0",
+]
+
+[project.optional-dependencies]
+# Full AI/ML dependencies for production
+full = [
+    "langchain>=0.3.0",
+    "langchain-core>=0.3.59",
+    "langchain-google-genai>=2.1.0",
+    "google-genai>=1.10.0",
+    "langgraph>=0.4.0",
+    "faiss-cpu>=1.7.4",
+    "chromadb>=0.4.22,<0.5.0",
+    "google-api-python-client>=2.100.0",
+    "google-auth>=2.15.0",
+    "google-auth-httplib2>=0.1.0",
+    "google-auth-oauthlib>=1.0.0",
+    "grpcio>=1.60.0",
+    "protobuf>=3.20.0,<7.0.0",
+]
+
+# Development and testing dependencies
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.3.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+    "responses>=0.23.0",
+    "unittest-xml-reporting>=3.2.0",
+]
+
+# Minimal dependencies for CI testing
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "black>=23.3.0",
+]
 
 [project.scripts]
 newsletter = "newsletter.cli:app"
 
-[project.optional-dependencies]
-dev = [
-    "black>=23.3.0",
-]
+[project.urls]
+Homepage = "https://github.com/your-org/newsletter-generator"
+Repository = "https://github.com/your-org/newsletter-generator"
+Documentation = "https://github.com/your-org/newsletter-generator/blob/main/README.md"
+"Bug Tracker" = "https://github.com/your-org/newsletter-generator/issues"
 
 [tool.setuptools]
 packages = ["newsletter"]
 
+[tool.setuptools.package-data]
+newsletter = ["templates/*.html", "templates/*.txt"]
+
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["newsletter"]
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+no_implicit_optional = true
+strict_optional = false
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --tb=short"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.coverage.run]
+source = ["newsletter"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__init__.py",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

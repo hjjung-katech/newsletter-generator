@@ -1,5 +1,10 @@
 # Newsletter Generator
 
+[![CI](https://github.com/your-org/newsletter-generator/workflows/CI/badge.svg)](https://github.com/your-org/newsletter-generator/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/your-org/newsletter-generator/workflows/Code%20Quality/badge.svg)](https://github.com/your-org/newsletter-generator/actions/workflows/code-quality.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## 최근 업데이트: 통합 뉴스레터 생성 아키텍처
 
 뉴스레터 생성 시스템이 **공용 함수 기반의 통합 아키텍처**로 재구성되었습니다. 이제 Compact와 Detailed 버전이 동일한 핵심 로직을 공유하면서도 각각의 특성에 맞는 결과물을 생성합니다.
@@ -351,286 +356,121 @@ Newsletter Generator는 다양한 뉴스 소스를 통합하여 광범위한 뉴
 
 ---
 
-## 개발 가이드
+## 개발자를 위한 CI/CD 정보
 
-### 테스트 모드 활용하기
+### 🔄 GitHub Actions 워크플로우
 
-테스트 모드는 개발 및 테스트 과정에서 뉴스레터 생성 파이프라인의 일부분을 효율적으로 테스트하는 데 유용합니다:
+이 프로젝트는 다음과 같은 GitHub Actions 워크플로우를 사용합니다:
 
-1. **데이터 파일 유형**:
-   - `render_data_langgraph_*.json`: 최종 렌더링 데이터 (Template 모드에 적합)
-   - `collected_articles_processed.json`: 필터링된 기사 데이터 (Content 모드에 최적)
-   - `collected_articles_raw.json`: 필터링 전 수집된 모든 기사 데이터 (Content 모드 사용 가능)
-   
-   **참고**: 수집된 기사 파일(raw, processed)에는 이제 기사 데이터뿐만 아니라 키워드, 도메인, 검색 기간과 같은 메타데이터도 포함되어 있어 테스트 모드에서 별도 지정 없이 사용 가능합니다.
+#### 1. CI 워크플로우 (`.github/workflows/ci.yml`)
+- **트리거**: main 브랜치 push, Pull Request
+- **Python 버전**: 3.10, 3.11 매트릭스 테스트
+- **단계**:
+  - 최소 의존성으로 빠른 테스트 실행
+  - Black 코드 포맷팅 검사
+  - 외부 의존성 없는 기본 테스트 실행
+  - 통합 테스트 (mocked APIs)
 
-2. **Content 모드 워크플로우**:
-   - 기사 수집 단계를 건너뛰고 처리(process_articles) 단계부터 시작
-   - 그룹화, 요약, 편집, HTML 생성 등의 전체 후속 프로세스 실행
-   - 동일한 기사 데이터로 다양한 처리 알고리즘 테스트 가능
+#### 2. 코드 품질 워크플로우 (`.github/workflows/code-quality.yml`)
+- **트리거**: main 브랜치 push, Pull Request
+- **검사 항목**:
+  - Black 코드 포맷팅
+  - isort import 정렬
+  - flake8 린팅
+  - mypy 타입 검사 (선택적)
 
-3. **활용 사례**:
-   - 요약 프롬프트 개선 테스트
-   - 기사 처리 알고리즘 변경 효과 테스트
-   - 템플릿 디자인 변경 테스트
-   - LLM 모델 간 성능 비교 테스트
+#### 3. 도구 테스트 워크플로우 (`.github/workflows/test-tools.yml`)
+- **트리거**: 특정 파일 변경 시 (`newsletter/tools.py`, `tests/test_tools.py`, `requirements.txt`)
+- **기능**: 도구 모듈의 import 및 기본 기능 테스트
 
-### LangSmith 비용 추적 사용하기
+#### 4. 뉴스레터 생성 워크플로우 (`.github/workflows/newsletter.yml`)
+- **트리거**: 스케줄 (매일 UTC 23:00), 수동 실행
+- **기능**: 실제 뉴스레터 생성 및 GitHub Pages 배포
 
-이 프로젝트는 LangChain 생태계의 LangSmith를 통한 토큰 사용량 및 비용 추적 기능을 제공합니다:
+### 📦 의존성 관리
 
-1. **설정 방법**:
-   - `.env` 파일에 LangSmith API 키 설정:
-     ```
-     LANGCHAIN_API_KEY=your_langsmith_api_key
-     LANGCHAIN_TRACING_V2=1
-     LANGCHAIN_PROJECT=your_project_name
-     ```
-   - [LangSmith](https://smith.langchain.com/) 계정이 필요합니다.
+프로젝트는 다음과 같은 의존성 파일을 사용합니다:
 
-2. **비용 추적 활성화**:
-   - 명령줄에서 `--track-cost` 옵션 사용:
-     ```bash
-     newsletter run --domain "인공지능" --track-cost
-     newsletter test output\collected_articles_AI.json --mode content --track-cost
-     ```
-   - 이 옵션은 내부적으로 `ENABLE_COST_TRACKING` 환경변수를 설정합니다.
+- `requirements.txt`: 전체 프로덕션 의존성
+- `requirements-dev.txt`: 개발 및 테스트 도구
+- `requirements-minimal.txt`: CI에서 빠른 테스트를 위한 최소 의존성
+- `pyproject.toml`: 현대적인 Python 패키징 설정
 
-3. **추적되는 정보**:
-   - 프롬프트 토큰 수
-   - 응답 토큰 수
-   - 총 비용 추정치
-
-4. **주의사항**:
-   - LangSmith는 선택적 기능으로, 설정하지 않아도 뉴스레터 생성 기능은 정상 작동합니다.
-   - 대량의 뉴스레터를 생성할 경우 비용 추적을 통해 사용량을 모니터링하는 것이 좋습니다.
-
-### 코드 포맷팅
-
-이 프로젝트는 [Black](https://github.com/psf/black) 코드 포맷터를 사용하여 일관된 코드 스타일을 유지합니다:
+### 🧪 로컬 개발 환경 설정
 
 ```bash
-# Black 설치
-pip install black
+# 1. 저장소 클론
+git clone https://github.com/your-org/newsletter-generator.git
+cd newsletter-generator
 
-# 코드 포맷팅 실행
-black newsletter
-black tests
-```
+# 2. 가상환경 생성 및 활성화
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# 또는
+.venv\Scripts\activate     # Windows
 
-자동화된 포맷팅 검사를 위해 다음 명령어를 사용할 수 있습니다:
+# 3. 개발 의존성 설치
+pip install -r requirements-dev.txt
+pip install -e .
 
-```bash
-# 코드 포맷팅 검사 실행
-python run_tests.py --format-only
+# 4. 환경 변수 설정
+cp .env.example .env
+# .env 파일을 편집하여 API 키 설정
 
-# 코드 포맷팅 후 테스트 실행
-python run_tests.py --format --all
-```
-
-### Pre-commit 훅 사용하기
-
-개발 과정에서 자동으로 코드 포맷팅과 기본 테스트가 실행되도록 [pre-commit](https://pre-commit.com/) 설정을 제공합니다. 다음과 같이 설치하고 활성화할 수 있습니다.
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-이후 커밋할 때마다 Black 포맷터와 `tests/test_minimal.py`가 자동으로 실행되어 코드 품질을 유지할 수 있습니다.
-
-## 테스트
-
-### 🎯 테스트 전략 개요
-
-Newsletter Generator는 **환경별 테스트 전략**을 도입하여 개발 효율성과 품질을 동시에 확보합니다:
-
-| 환경 | 목적 | 실행 대상 | API 할당량 | 실행 시간 |
-|------|------|-----------|------------|-----------|
-| **dev** | 개발 중 빠른 피드백 | Mock API + 핵심 단위 테스트 | 소모 없음 | ~20초 |
-| **ci** | CI/CD 파이프라인 | 전체 검증 (Real API 제외) | 소모 없음 | ~35초 |
-| **unit** | 순수 단위 테스트 | API 의존성 완전 배제 | 소모 없음 | ~21초 |
-| **integration** | 실제 환경 검증 | 모든 테스트 (Real API 포함) | 할당량 소모 | 상황에 따라 다름 |
-
-### 🚀 환경별 테스트 실행
-
-**새로운 환경별 테스트 스크립트** (`run_tests.py`):
-
-```bash
-# 개발 환경: 빠른 피드백용 (Mock API + 핵심 테스트)
+# 5. 테스트 실행
 python run_tests.py dev
-
-# CI/CD 환경: 전체 검증 (Real API 제외)  
-python run_tests.py ci
-
-# 단위 테스트만: 순수 로직 테스트
-python run_tests.py unit
-
-# 통합 테스트: 실제 API 포함 전체 검증 (API 키 필요)
-python run_tests.py integration
-
-# 상세 출력 모드
-python run_tests.py dev --verbose
-
-# 커버리지 리포트 생성
-python run_tests.py ci --coverage
 ```
 
-**디렉토리별 테스트 실행**:
+### 🔧 코드 품질 도구
+
+프로젝트는 다음 도구들을 사용하여 코드 품질을 유지합니다:
 
 ```bash
-# API 테스트만 실행
-python run_tests.py --api
-
-# 단위 테스트만 실행
-python run_tests.py --unit-tests
-
-# 사용 가능한 테스트 목록 확인
-python run_tests.py --list
-
-# 모든 테스트 목록 확인 (단위/API/백업 테스트 포함)
-python run_tests.py --list --all
-
-# 특정 테스트 파일 실행
-python run_tests.py --test test_compose.py
-
 # 코드 포맷팅
-python run_tests.py --format
+black newsletter tests
+
+# Import 정렬
+isort newsletter tests
+
+# 린팅
+flake8 newsletter tests
+
+# 타입 검사
+mypy newsletter
 ```
 
-### 🔧 Mock vs Real API 테스트
+### 📋 Pull Request 체크리스트
 
-시스템은 API 할당량을 보호하면서도 완전한 테스트 커버리지를 제공합니다:
+Pull Request를 생성하기 전에 다음을 확인하세요:
 
-**Mock API 테스트** (`@pytest.mark.mock_api`):
-- 실제 API 응답을 시뮬레이션
-- 할당량 소모 없음
-- 빠른 실행 속도
-- 로직 검증에 집중
+- [ ] 모든 테스트가 통과하는지 확인: `python run_tests.py ci`
+- [ ] 코드 포맷팅이 올바른지 확인: `black --check newsletter tests`
+- [ ] 새로운 기능에 대한 테스트 추가
+- [ ] 문서 업데이트 (필요한 경우)
+- [ ] CHANGELOG.md 업데이트 (필요한 경우)
 
-**Real API 테스트** (`@pytest.mark.real_api`):
-- 실제 외부 서비스 호출
-- API 할당량 소모
-- 실제 환경 검증
-- integration 환경에서만 실행
+### 🚀 배포 프로세스
 
-### 📊 테스트 구조
+1. **개발**: feature 브랜치에서 개발
+2. **테스트**: `python run_tests.py ci`로 로컬 검증
+3. **Pull Request**: main 브랜치로 PR 생성
+4. **CI 검증**: GitHub Actions에서 자동 테스트 실행
+5. **코드 리뷰**: 팀원 리뷰 후 승인
+6. **병합**: main 브랜치로 병합
+7. **자동 배포**: GitHub Pages로 자동 배포
 
-```
-tests/
-├── 📁 api_tests/                    # API 테스트 (외부 서비스 호출)
-│   ├── test_compact_newsletter_api.py   # Compact 뉴스레터 API 테스트
-│   ├── test_theme_extraction.py         # 테마 추출 API 테스트
-│   ├── test_search_improved.py          # 검색 API 테스트
-│   └── ... (기타 API 테스트들)
-├── 📁 unit_tests/                   # 단위 테스트
-│   ├── test_template_manager.py         # 템플릿 관리 테스트
-│   ├── test_date_utils.py               # 날짜 유틸리티 테스트
-│   └── ... (기타 단위 테스트들)
-├── 📄 test_newsletter_mocked.py     # Mock 기반 통합 테스트
-├── 📄 test_compact_newsletter.py    # Compact 뉴스레터 단위 테스트
-├── 📄 test_compose.py               # 컴포즈 기능 테스트
-├── 📄 conftest.py                   # pytest 설정 및 픽스처
-└── 📄 README.md                     # 테스트 가이드
-```
+### 🔍 디버깅 및 문제 해결
 
-### 🎯 테스트 마커 시스템
+#### CI 실패 시 확인사항:
+1. 로컬에서 동일한 Python 버전으로 테스트
+2. 의존성 버전 충돌 확인
+3. 환경 변수 설정 확인
+4. 테스트 데이터 및 모킹 설정 확인
 
-```python
-@pytest.mark.real_api        # 실제 API 호출 (할당량 소모)
-@pytest.mark.mock_api        # Mock API 사용 (할당량 보호)
-@pytest.mark.requires_quota  # API 할당량 필요 표시
-@pytest.mark.unit           # 순수 단위 테스트
-@pytest.mark.integration    # 통합 테스트
-```
-
-### ⚙️ 환경 변수 제어
-
-테스트 동작은 다음 환경 변수로 제어됩니다:
-
-```bash
-# Real API 테스트 활성화/비활성화
-export RUN_REAL_API_TESTS=1  # 1: 활성화, 0: 비활성화
-
-# Mock API 테스트 활성화/비활성화  
-export RUN_MOCK_API_TESTS=1  # 1: 활성화, 0: 비활성화
-
-# API 키 (Real API 테스트 필요시)
-export GOOGLE_API_KEY=your_key
-export SERPER_API_KEY=your_key
-```
-
-### 🔄 권장 워크플로우
-
-1. **일상적 개발**: `python run_tests.py dev`
-2. **Pull Request 전**: `python run_tests.py ci`
-3. **배포 전 최종 검증**: `python run_tests.py integration`
-4. **특정 로직 검증**: `python run_tests.py unit`
-
-### 테스트 유형
-
-프로젝트는 다음과 같은 테스트 유형을 포함하고 있습니다:
-
-1. **필터링 및 그룹화 테스트**
-- 중복 기사 감지, 키워드 그룹화, 소스 우선순위 지정 등 테스트
-
-2. **API 및 검색 테스트**
-- 외부 API 연동 및 검색 기능 테스트
-
-3. **날짜 처리 테스트**
-- 날짜 파싱, 포맷팅, 주 단위 계산 등 테스트
-
-4. **뉴스레터 생성 테스트**
-- 전체 뉴스레터 생성 과정 테스트
-
-자세한 테스트 정보와 모든 테스트 파일 목록은 [tests/README.md](tests/README.md) 파일을 참조하세요.
-
----
-
-## VS Code 개발 환경 설정
-
-이 프로젝트는 Visual Studio Code를 위한 개발 환경 설정을 포함하고 있습니다. 설정 파일은 `.vscode` 폴더에 위치하며 다음과 같은 기능을 제공합니다:
-
-### 자동 환경 설정
-
-- `settings.json`: Python 인터프리터 설정과 Conda/가상환경 자동 활성화 등 설정
-- `launch.json`: 테스트 실행, 디버깅 구성 설정
-- `tasks.json`: 코드 포맷팅, 테스트 실행 등을 위한 작업 정의
-- `extensions.json`: 프로젝트에 권장되는 VS Code 확장 프로그램 목록
-
-### 사용 방법
-
-1. Visual Studio Code에서 프로젝트 폴더를 엽니다.
-2. 터미널은 자동으로 Python 가상환경을 활성화합니다.
-3. 디버그 패널(F5)에서 테스트 실행 구성을 선택할 수 있습니다.
-4. 명령 팔레트(Ctrl+Shift+P)에서 "Tasks: Run Task"를 선택하여 정의된 작업을 실행할 수 있습니다.
-
-### 환경 설정 커스터마이징
-
-각 개발자의 로컬 환경에 맞게 설정을 변경해야 할 경우:
-
-1. Conda 환경 이름 변경: `.vscode/settings.json` 파일에서 `newsletter-env` 부분을 변경
-2. 가상 환경 경로 변경: 기본적으로 `.venv` 폴더를 사용하도록 설정되어 있으며, 필요시 변경
-
-## 향후 개선 사항
-
-1. **필터링 정확도 향상**
-   - 동의어 사전 추가로 다양한 표현 인식 개선
-   - 맥락 기반 매칭으로 연관성 높은 기사 선별
-   - NLP 기법을 활용한 의미론적 유사성 검출
-
-2. **성능 최적화**
-   - 대규모 기사 집합에 대한 문자열 매칭 알고리즘 개선
-   - 자주 액세스하는 주요 소스에 대한 캐싱 추가
-
-3. **언어 지원 강화**
-   - 다국어 콘텐츠 처리 확장
-   - 한국어/영어 혼합 콘텐츠 처리 개선
-
-4. **테스트 모드 개선**
-   - 복수의 알고리즘 병렬 테스트 지원
-   - 결과 비교 시각화 도구 추가
-   - 테스트 결과 자동 저장 및 히스토리 관리
+#### 일반적인 문제:
+- **gRPC 오류**: 환경 변수 `GOOGLE_API_USE_REST=true` 설정
+- **의존성 충돌**: `pip install --upgrade pip` 후 재설치
+- **테스트 타임아웃**: 네트워크 연결 및 API 응답 시간 확인
 
 ---
 
