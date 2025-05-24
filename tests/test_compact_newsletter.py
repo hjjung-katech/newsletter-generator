@@ -190,7 +190,7 @@ class TestCompactNewsletterUnit:
 
         # 필수 필드가 누락된 데이터 테스트
         minimal_data = {
-            "newsletter_title": "테스트 뉴스레터",
+            "newsletter_topic": "테스트 뉴스레터",  # newsletter_title 대신 newsletter_topic 사용
             "generation_date": "2025-05-23",
             "definitions": [],
         }
@@ -207,7 +207,11 @@ class TestCompactNewsletterUnit:
                 html is not None and len(html) > 0
             ), "최소 데이터로 HTML이 생성되지 않았습니다"
             assert "<!DOCTYPE html>" in html, "유효한 HTML 형식이 아닙니다"
+            # compose_compact_newsletter_html은 newsletter_topic을 newsletter_title로 매핑함
             assert "테스트 뉴스레터" in html, "제목이 렌더링되지 않았습니다"
+            assert (
+                "이번 주, 주요 산업 동향을 미리 만나보세요" in html
+            ), "태그라인이 렌더링되지 않았습니다"
 
             print("✅ 템플릿 데이터 검증 테스트 통과!")
 
@@ -220,7 +224,7 @@ class TestCompactNewsletterUnit:
 
         # 잘못된 템플릿 파일 경로
         test_data = {
-            "newsletter_title": "테스트",
+            "newsletter_topic": "테스트",
             "generation_date": "2025-05-23",
             "definitions": [],
         }
@@ -228,15 +232,15 @@ class TestCompactNewsletterUnit:
         template_dir = os.path.join(project_root, "templates")
 
         try:
-            # 존재하지 않는 템플릿 파일
-            html = compose_compact_newsletter_html(
-                test_data, template_dir, "non_existent_template.html"
-            )
-            pytest.fail("존재하지 않는 템플릿으로 HTML이 생성되었습니다")
+            # 존재하지 않는 템플릿 파일 - 이제 예외가 발생해야 함
+            with pytest.raises(Exception):  # Jinja2 TemplateNotFound 예외 예상
+                html = compose_compact_newsletter_html(
+                    test_data, template_dir, "non_existent_template.html"
+                )
+            print("✅ 에러 처리 테스트 통과!")
 
         except Exception as e:
-            # 예상된 에러
-            print(f"✅ 예상된 에러 처리: {type(e).__name__}")
+            pytest.fail(f"에러 처리 테스트 실패: {e}")
 
     @pytest.mark.unit
     def test_definitions_content_validation(self):

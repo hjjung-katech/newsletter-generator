@@ -84,7 +84,7 @@ class TestCompose(unittest.TestCase):
                 "title": "Test Article 1",
                 "url": "http://example.com/1",
                 "summary_text": "Summary 1",
-            }  # 변경: 'summary' -> 'summary_text'
+            }
         ]
         template_dir = "c:\\Development\\newsletter-generator\\templates"
         template_name = "non_existent_template.html"

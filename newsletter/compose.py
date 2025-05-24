@@ -389,6 +389,27 @@ def render_newsletter_template(
 # 기존 함수들을 새로운 통합 함수로 래핑
 def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     """기존 detailed 뉴스레터 생성 함수 (호환성 유지)"""
+    # 템플릿 이름이 지정된 경우 사용, 아닌 경우 기본값 사용
+    if template_name and template_name != "newsletter_template.html":
+        # 사용자 정의 템플릿 처리
+        env = Environment(
+            loader=FileSystemLoader(template_dir),
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        template = env.get_template(
+            template_name
+        )  # 여기서 TemplateNotFound 예외 발생 가능
+
+        # 간단한 컨텍스트로 렌더링
+        context = {
+            "newsletter_topic": data.get("newsletter_topic", "주간 산업 동향"),
+            "generation_date": data.get(
+                "generation_date", datetime.now().strftime("%Y-%m-%d")
+            ),
+            "sections": data.get("sections", []),
+        }
+        return template.render(context)
+
     return compose_newsletter(data, template_dir, "detailed")
 
 
@@ -396,6 +417,28 @@ def compose_compact_newsletter_html(
     data, template_dir: str, template_name: str = "newsletter_template_compact.html"
 ) -> str:
     """기존 compact 뉴스레터 생성 함수 (호환성 유지)"""
+    # 템플릿 이름이 지정된 경우 직접 로딩해서 예외 확인
+    if template_name != "newsletter_template_compact.html":
+        # 사용자 정의 템플릿 처리 - 여기서 예외가 발생할 수 있음
+        env = Environment(
+            loader=FileSystemLoader(template_dir),
+            autoescape=select_autoescape(["html", "xml"]),
+        )
+        template = env.get_template(
+            template_name
+        )  # 여기서 TemplateNotFound 예외 발생 가능
+
+        # 간단한 컨텍스트로 렌더링
+        context = {
+            "newsletter_title": data.get("newsletter_topic", "주간 산업 동향 브리프"),
+            "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
+            "generation_date": data.get(
+                "generation_date", datetime.now().strftime("%Y-%m-%d")
+            ),
+            "definitions": data.get("definitions", []),
+        }
+        return template.render(context)
+
     return compose_newsletter(data, template_dir, "compact")
 
 
