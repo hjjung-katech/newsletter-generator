@@ -1,7 +1,15 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+pytest 설정 및 픽스처 정의
+"""
+
 import sys
 import os
 import pytest
 from typing import List, Dict, Any
+from pathlib import Path
+from unittest.mock import MagicMock
 
 # Add project root to sys path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -9,6 +17,64 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # 외부 의존성 임포트 제거 - test_minimal.py에는 필요하지 않음
 # from tests.mock_google_generativeai import GenerativeModel, configure, types, caching
 # from tests.mock_langchain_google_genai import MockChatGoogleGenerativeAI
+
+# 프로젝트 루트를 Python 경로에 추가
+project_root = str(Path(__file__).parent.parent)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+
+def pytest_configure(config):
+    """pytest 구성 설정"""
+    # 커스텀 마크 등록
+    config.addinivalue_line("markers", "real_api: tests that require real API calls")
+    config.addinivalue_line("markers", "mock_api: tests that use mocked API responses")
+    config.addinivalue_line("markers", "requires_quota: tests that consume API quota")
+
+
+def pytest_collection_modifyitems(config, items):
+    """테스트 수집 후 조건부 스킵 처리"""
+
+    # 환경 변수 확인
+    run_real_api = os.getenv("RUN_REAL_API_TESTS", "0") == "1"
+    run_mock_api = os.getenv("RUN_MOCK_API_TESTS", "1") == "1"
+
+    # API 키 존재 여부 확인
+    has_google_key = bool(os.getenv("GOOGLE_API_KEY"))
+    has_serper_key = bool(os.getenv("SERPER_API_KEY"))
+
+    for item in items:
+        # Real API 테스트 처리
+        if "real_api" in item.keywords:
+            if not run_real_api:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Real API tests disabled. Set RUN_REAL_API_TESTS=1 to enable"
+                    )
+                )
+            elif not (has_google_key and has_serper_key):
+                item.add_marker(
+                    pytest.mark.skip(reason="Missing API keys for real API tests")
+                )
+
+        # Mock API 테스트 처리
+        elif "mock_api" in item.keywords:
+            if not run_mock_api:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Mock API tests disabled. Set RUN_MOCK_API_TESTS=1 to enable"
+                    )
+                )
+
+        # Legacy API 마킹 처리 (기존 @pytest.mark.api)
+        elif "api" in item.keywords and "mock_api" not in item.keywords:
+            # 기존 API 테스트들을 real_api로 분류
+            if not run_real_api:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Legacy API test. Set RUN_REAL_API_TESTS=1 to enable or migrate to mock_api"
+                    )
+                )
 
 
 @pytest.fixture
@@ -73,3 +139,50 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
         pass
 
     return unique_articles
+
+
+@pytest.fixture
+def mock_google_ai():
+    """Google Generative AI Mock 픽스처"""
+    mock = MagicMock()
+    mock.generate_content.return_value.text = "Mocked AI response for testing"
+    return mock
+
+
+@pytest.fixture
+def mock_serper_api():
+    """Serper API Mock 픽스처"""
+    mock_response = {
+        "organic": [
+            {
+                "title": "Test Article Title",
+                "link": "https://example.com/test",
+                "snippet": "Test article snippet for unit testing",
+                "date": "2025-05-24",
+            }
+        ]
+    }
+    return mock_response
+
+
+@pytest.fixture
+def sample_articles():
+    """테스트용 샘플 기사 데이터"""
+    return [
+        {
+            "title": "AI 기술 발전 동향",
+            "url": "https://example.com/ai-trends",
+            "snippet": "인공지능 기술의 최신 발전 동향을 분석합니다.",
+            "source": "TechNews",
+            "date": "2025-05-24",
+            "content": "AI 기술이 빠르게 발전하고 있으며, 특히 자연어 처리 분야에서 큰 진전이 있었습니다.",
+        },
+        {
+            "title": "반도체 시장 전망",
+            "url": "https://example.com/semiconductor",
+            "snippet": "글로벌 반도체 시장의 향후 전망을 살펴봅니다.",
+            "source": "MarketWatch",
+            "date": "2025-05-23",
+            "content": "반도체 시장은 AI 칩 수요 증가로 인해 지속적인 성장이 예상됩니다.",
+        },
+    ]
