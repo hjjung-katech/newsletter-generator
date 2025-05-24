@@ -20,7 +20,7 @@ else:
 from . import collect as news_collect
 from . import summarize as news_summarize
 from . import compose as news_compose
-from .compose import compose_newsletter_html
+from .compose import compose_newsletter_html, compose_compact_newsletter_html
 from . import deliver as news_deliver
 from . import config
 from . import graph  # 새로운 LangGraph 모듈 임포트
@@ -68,6 +68,11 @@ def run(
         None,
         "--output-format",
         help="Format to save the newsletter locally (html or md). If not provided, saves to Drive if --drive is used, otherwise defaults to html.",
+    ),
+    template_style: str = typer.Option(
+        "compact",
+        "--template-style",
+        help="Newsletter template style: 'compact' (short, main news focused), 'detailed' (full length with all sections).",
     ),
     drive: bool = typer.Option(
         False,
@@ -158,6 +163,20 @@ def run(
                 console.print(
                     f"[green]Using output_format from config file: {output_format}[/green]"
                 )
+
+            # Template style from config
+            config_template_style = newsletter_settings.get("template_style")
+            if config_template_style:
+                # Only override if it's a valid option
+                if config_template_style in ["compact", "detailed"]:
+                    template_style = config_template_style
+                    console.print(
+                        f"[green]Using template_style from config file: {template_style}[/green]"
+                    )
+                else:
+                    console.print(
+                        f"[yellow]Invalid template_style in config file: {config_template_style}. Using default: {template_style}[/yellow]"
+                    )
 
             # Extract and log output directory from config
             output_directory = newsletter_settings.get(
@@ -279,7 +298,10 @@ def run(
     # chains.py의 변경으로 인해 render_data_langgraph...json 파일이 저장됩니다.
     # generate_newsletter는 (html_content, status)를 반환합니다.
     html_content, status = graph.generate_newsletter(
-        keyword_list, news_period_days, domain=domain  # 도메인 정보 전달
+        keyword_list,
+        news_period_days,
+        domain=domain,
+        template_style=template_style,  # 템플릿 스타일 추가
     )
 
     if status == "error":
@@ -288,7 +310,9 @@ def run(
         )
         return
 
-    console.print("[green]Newsletter generated successfully using LangGraph.[/green]")
+    console.print(
+        f"[green]Newsletter generated successfully using {template_style} template via LangGraph.[/green]"
+    )
 
     # 뉴스레터 주제 및 파일명 설정
     newsletter_topic = ""

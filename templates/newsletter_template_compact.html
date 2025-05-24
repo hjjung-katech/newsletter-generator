@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>{{ newsletter_title | default('주간 산업 동향 브리프') }} — {{ generation_date }}</title>
+<style>
+body{font-family:Arial, sans-serif; line-height:1.6; margin:0; padding:0; background:#f5f6fa;}
+.container{max-width:680px; margin:auto; background:#ffffff; padding:20px;}
+header{text-align:center; padding:10px 0;}
+.tagline{font-style:italic; color:#555;}
+.hero{background:#fff9e6; padding:20px; margin:20px 0;}
+.hero h2{margin-top:0;}
+.cards{display:grid; grid-template-columns:1fr; gap:1rem;}
+@media(min-width:600px){.cards{grid-template-columns:repeat(3,1fr);}}
+.card{background:#ffffff; border:1px solid #eee; padding:10px; border-radius:8px;}
+.card h3{margin-top:0; font-size:1.1em;}
+.summary{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:0.9em; color:#333;}
+.meta{font-size:0.8em; color:#777;}
+.group{margin:24px 0;}
+.group h3{margin-bottom:6px; color:#0d47a1;}
+.intro{font-size:0.9em; color:#333; margin:4px 0 10px 0;}
+.group ul{padding-left:20px;}
+.group li{margin-bottom:6px;}
+footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
+.issue-info{font-size:0.8em; color:#777; margin-top:5px;}
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+<h1>{{ newsletter_title | default('주간 산업 동향 브리프') }}</h1>
+<p class="tagline">{{ tagline | default('이번 주, 주요 산업 동향을 미리 만나보세요.') }}</p>
+<small>발행일: {{ generation_date }}{% if issue_no %} | 제 {{ issue_no }}호{% endif %}</small>
+</header>
+
+{% if top_articles %}
+<section class="hero">
+<h2>🔥 이번 주 꼭 봐야 할 {{ top_articles|length }}선</h2>
+<div class="cards">
+{% for art in top_articles %}
+<article class="card">
+<h3><a href="{{ art.url }}">{{ art.title }}</a></h3>
+<p class="summary">{{ art.snippet | default(art.summary_text | default('')) }}</p>
+<span class="meta">{{ art.source_and_date }}</span>
+</article>
+{% endfor %}
+</div>
+</section>
+{% endif %}
+
+{% for group in grouped_sections %}
+<section class="group">
+<h3>{{ group.heading }}</h3>
+{% if group.intro %}<p class="intro">{{ group.intro }}</p>{% endif %}
+<ul>
+{% for a in group.articles %}
+<li><a href="{{ a.url }}">{{ a.title }}</a> <span class="meta">{{ a.source_and_date }}</span></li>
+{% endfor %}
+</ul>
+</section>
+{% endfor %}
+
+{% if definitions %}
+<section class="group">
+<h3>💡 이런 뜻이에요</h3>
+<div style="background:#f8f9fa; padding:15px; border-radius:8px; border-left:4px solid #0d47a1;">
+{% for def in definitions %}
+<div style="margin-bottom:10px;">
+<strong style="color:#0d47a1;">{{ def.term }}</strong>: {{ def.explanation }}
+</div>
+{% endfor %}
+</div>
+</section>
+{% endif %}
+
+{% if food_for_thought %}
+<section class="group">
+<h3>💡 생각해 볼 거리</h3>
+<blockquote>{{ food_for_thought }}</blockquote>
+</section>
+{% endif %}
+
+<footer>
+<p>© {{ copyright_year | default(generation_date.split('-')[0]) }} {{ publisher_name | default(company_name | default('Your Company')) }}. All rights reserved.</p>
+</footer>
+</div>
+</body>
+</html> 

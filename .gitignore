@@ -246,3 +246,23 @@ collect.py.fixed
 search_test_results.txt
 serper_test_*.json
 test_date_parser.py
+
+# Project specific temporary files
+pip_install.log
+pip-*.log
+test_unified_architecture.py.bak
+UNIFIED_ARCHITECTURE_SUMMARY.md.bak
+
+# Environment and configuration backups
+config.yml.bak
+.env.bak
+*.bak
+
+# Temporary test files
+test_*.json.tmp
+temp_*.json
+
+# Runtime logs
+*.log
+debug_*.txt
+trace_*.txt

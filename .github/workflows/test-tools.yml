@@ -3,67 +3,114 @@ name: Test Tools and Dependencies
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'newsletter/tools.py'
+      - 'tests/test_tools.py'
+      - 'requirements.txt'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'newsletter/tools.py'
+      - 'tests/test_tools.py'
+      - 'requirements.txt'
   workflow_dispatch:
 
 jobs:
-  test-imports:
-    name: Test Module Imports
+  test-tools:
+    name: Test Tools Module
     runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
+        cache: 'pip'
     
-    - name: Install dependencies
+    - name: Install dependencies with timeout
+      timeout-minutes: 10
       run: |
         python -m pip install --upgrade pip
         python -m pip install -r requirements.txt
+        python -m pip install -e . --no-deps
     
-    - name: Debug module imports
-      run: |
-        # Create a script to test imports
-        cat > test_imports.py << 'EOL'
-        import sys
-        import os
-        
-        # Mock modules before imports
-        import unittest.mock
-        from unittest.mock import Mock, patch
-        
-        # Create mock modules
-        mock_modules = {
-            "google.generativeai": Mock(),
-            "google.generativeai.caching": Mock(),
-            "langchain_google_genai": Mock(),
-            "langchain_google_genai.chat_models": Mock(),
-        }
-        
-        # Patch sys.modules
-        with patch.dict(sys.modules, mock_modules):
-            print("Patched modules successfully")
-            try:
-                from newsletter.tools import clean_html_markers
-                print("Successfully imported clean_html_markers from newsletter.tools")
-            except ImportError as e:
-                print(f"Error importing from newsletter.tools: {e}")
-        
-        print("Test completed")
-        EOL
-        
-        # Run the test script
-        python test_imports.py
-        
-    - name: Run test_tools.py
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-        GEMINI_API_KEY: "dummy_key_for_testing"
-        SERPER_API_KEY: "dummy_key_for_testing"
+    - name: Create required directories
       run: |
         mkdir -p output
-        python -m pytest tests/test_tools.py -v 
+        mkdir -p config
+    
+    - name: Set up test environment variables
+      run: |
+        echo "GEMINI_API_KEY=dummy_key_for_testing" >> $GITHUB_ENV
+        echo "SERPER_API_KEY=dummy_key_for_testing" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+        echo "GRPC_DNS_RESOLVER=native" >> $GITHUB_ENV
+        echo "GRPC_POLL_STRATEGY=epoll1" >> $GITHUB_ENV
+        echo "GOOGLE_API_USE_REST=true" >> $GITHUB_ENV
+        echo "GRPC_ENABLE_FORK_SUPPORT=0" >> $GITHUB_ENV
+    
+    - name: Test module imports with proper mocking
+      run: |
+        cat > test_imports.py << 'EOF'
+        import sys
+        import os
+        from unittest.mock import Mock, patch
+
+        # Mock external dependencies before any imports
+        mock_modules = {
+            'google.generativeai': Mock(),
+            'google.generativeai.caching': Mock(),
+            'google.generativeai.types': Mock(),
+            'langchain_google_genai': Mock(),
+            'langchain_google_genai.chat_models': Mock(),
+        }
+
+        with patch.dict(sys.modules, mock_modules):
+            print('✓ Successfully patched external dependencies')
+            try:
+                from newsletter.tools import clean_html_markers
+                print('✓ Successfully imported clean_html_markers')
+                
+                # Test the function works
+                test_html = '''<!-- filepath: test.html -->
+        ```html
+        <h1>Test</h1>
+        ```'''
+                result = clean_html_markers(test_html)
+                assert '<h1>Test</h1>' in result
+                print('✓ Function test passed')
+                
+            except Exception as e:
+                print(f'✗ Import or test failed: {e}')
+                sys.exit(1)
+                
+        print('All import tests completed successfully')
+        EOF
+        python test_imports.py
+        
+    - name: Run tools tests with proper environment
+      run: |
+        python -m pytest tests/test_tools.py -v --tb=short --maxfail=5
+    
+    - name: Test basic functionality without external APIs
+      run: |
+        cat > test_basic.py << 'EOF'
+        from tests.tools_minimal import clean_html_markers
+
+        # Test basic functionality
+        test_cases = [
+            ('<!-- filepath: test.html -->```html\n<h1>Test</h1>\n```', '<h1>Test</h1>'),
+            ('```html\n<p>Hello</p>\n```', '<p>Hello</p>'),
+            ('<div>Already clean</div>', '<div>Already clean</div>')
+        ]
+
+        for input_html, expected in test_cases:
+            result = clean_html_markers(input_html)
+            assert result.strip() == expected.strip(), f'Expected: {expected}, Got: {result}'
+            print(f'✓ Test passed: {expected[:20]}...')
+
+        print('All basic functionality tests passed')
+        EOF
+        python test_basic.py 
