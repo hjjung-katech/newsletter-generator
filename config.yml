@@ -34,3 +34,11 @@ distribution:
 
   # GitHub Artifact settings
   upload_artifact: true # Set to true to upload the newsletter as a workflow artifact
+
+# Article scoring weights
+scoring:
+  relevance: 0.40
+  impact: 0.25
+  novelty: 0.15
+  source_tier: 0.10
+  recency: 0.10

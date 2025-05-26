@@ -51,9 +51,9 @@ MAJOR_NEWS_SOURCES = {
     ],
 }
 SYNONYMS: Dict[str, List[str]] = {
-    "AI반도체": ["AI 반도체", "인공지능 반도체", "ai semiconductor"],
-    "HBM": ["high bandwidth memory", "고대역폭 메모리"],
-    "CXL": ["compute express link"],
+    "AI반도체": ["AI반도체", "AI 반도체", "인공지능 반도체", "ai semiconductor"],
+    "HBM": ["HBM", "hbm", "high bandwidth memory", "고대역폭 메모리"],
+    "CXL": ["CXL", "cxl", "compute express link"],
 }
 
 
