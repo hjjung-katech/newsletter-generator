@@ -911,18 +911,68 @@ def get_newsletter_chain(is_compact=False):
                 )
                 definitions = extract_key_definitions_for_compact(sections)
 
+                # 템플릿 매니저로부터 메타데이터 가져오기
+                template_manager = TemplateManager()
+
+                # 키워드 및 주제 처리
+                keywords = data.get("keywords", [])
+                domain = data.get("domain", "")
+
+                # 뉴스레터 주제 결정
+                if domain:
+                    newsletter_topic = domain
+                elif isinstance(keywords, list) and len(keywords) == 1:
+                    newsletter_topic = keywords[0]
+                elif isinstance(keywords, list) and len(keywords) > 1:
+                    newsletter_topic = tools.extract_common_theme_from_keywords(
+                        keywords
+                    )
+                elif isinstance(keywords, str):
+                    newsletter_topic = keywords
+                else:
+                    newsletter_topic = "최신 산업 동향"
+
                 # 최종 데이터 구성
                 result_data = {
-                    "newsletter_title": f"{data.get('keywords', '기술 동향')} 주간 브리프",
+                    "newsletter_title": f"{newsletter_topic} 주간 브리프",
+                    "newsletter_topic": newsletter_topic,
                     "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
                     "generation_date": os.environ.get(
                         "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
+                    ),
+                    "generation_timestamp": os.environ.get(
+                        "GENERATION_TIMESTAMP",
+                        datetime.datetime.now().strftime("%H:%M:%S"),
                     ),
                     "top_articles": top_articles,
                     "grouped_sections": grouped_sections,
                     "definitions": definitions,
                     "food_for_thought": food_for_thought,
-                    "company_name": "Your Company",
+                    # 템플릿 매니저에서 가져온 정보
+                    "company_name": template_manager.get(
+                        "company.name", "산업통상자원 R&D 전략기획단"
+                    ),
+                    "publisher_name": template_manager.get(
+                        "company.name", "산업통상자원 R&D 전략기획단"
+                    ),
+                    "copyright_year": template_manager.get(
+                        "company.copyright_year", datetime.date.today().strftime("%Y")
+                    ),
+                    "company_tagline": template_manager.get(
+                        "company.tagline", "최신 기술 동향을 한눈에"
+                    ),
+                    "footer_contact": template_manager.get(
+                        "footer.contact_info", "문의사항: hjjung2@osp.re.kr"
+                    ),
+                    "editor_name": template_manager.get("editor.name", "Google Gemini"),
+                    "editor_email": template_manager.get(
+                        "editor.email", "hjjung2@osp.re.kr"
+                    ),
+                    "editor_title": template_manager.get("editor.title", "편집자"),
+                    "footer_disclaimer": template_manager.get(
+                        "footer.disclaimer",
+                        "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+                    ),
                 }
 
                 print(f"[DEBUG] Compact 최종 데이터 구조:")

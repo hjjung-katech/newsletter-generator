@@ -322,7 +322,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
 def score_articles_node(state: NewsletterState) -> NewsletterState:
     """Score articles using LLM to rank priority."""
-    from .scoring import score_articles
+    from .scoring import score_articles, load_scoring_weights_from_config
 
     print("\n[cyan]Step: Scoring articles...[/cyan]")
 
@@ -339,8 +339,12 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
     keywords = state.get("keywords", [])
     news_period_days = state.get("news_period_days", 14)
 
+    # Load scoring weights from config.yml
+    scoring_weights = load_scoring_weights_from_config()
+    print(f"[cyan]Using scoring weights: {scoring_weights}[/cyan]")
+
     # Get full ranked list for saving; top 10 will be passed forward
-    ranked = score_articles(processed, domain, top_n=None)
+    ranked = score_articles(processed, domain, top_n=None, weights=scoring_weights)
 
     output_dir = os.path.join(os.getcwd(), "output", "intermediate_processing")
     os.makedirs(output_dir, exist_ok=True)

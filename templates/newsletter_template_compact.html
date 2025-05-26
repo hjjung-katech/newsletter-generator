@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>{{ newsletter_title | default('주간 산업 동향 브리프') }} — {{ generation_date }}</title>
+<title>{{ newsletter_title | default('주간 산업 동향 브리프') }}{% if newsletter_topic %} - {{ newsletter_topic }}{% endif %} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
 <style>
 body{font-family:Arial, sans-serif; line-height:1.6; margin:0; padding:0; background:#f5f6fa;}
 .container{max-width:680px; margin:auto; background:#ffffff; padding:20px;}
@@ -30,7 +30,7 @@ footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 <header>
 <h1>{{ newsletter_title | default('주간 산업 동향 브리프') }}</h1>
 <p class="tagline">{{ tagline | default('이번 주, 주요 산업 동향을 미리 만나보세요.') }}</p>
-<small>발행일: {{ generation_date }}{% if issue_no %} | 제 {{ issue_no }}호{% endif %}</small>
+<small>발행일: {{ generation_date }}{% if issue_no %} | 제 {{ issue_no }}호{% endif %}{% if generation_timestamp %} | 생성시간: {{ generation_timestamp }}{% endif %}</small>
 </header>
 
 {% if top_articles %}
@@ -81,7 +81,11 @@ footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 {% endif %}
 
 <footer>
-<p>© {{ copyright_year | default(generation_date.split('-')[0]) }} {{ publisher_name | default(company_name | default('Your Company')) }}. All rights reserved.</p>
+<p>&copy; {{ copyright_year | default(generation_date.split('-')[0]) }} {{ publisher_name | default(company_name | default('Your Company')) }}. All rights reserved.</p>
+{% if footer_disclaimer %}<p>{{ footer_disclaimer }}</p>{% endif %}
+{% if company_tagline %}<p style="font-style:italic; margin-top:10px;">{{ company_tagline }}</p>{% endif %}
+{% if footer_contact %}<p>{{ footer_contact }}</p>{% endif %}
+{% if editor_name and editor_email %}<p>{{ editor_title | default('편집자') }}: {{ editor_name }} ({{ editor_email }})</p>{% endif %}
 </footer>
 </div>
 </body>

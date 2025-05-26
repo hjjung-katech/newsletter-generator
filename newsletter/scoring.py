@@ -24,6 +24,55 @@ DEFAULT_WEIGHTS = {
     "recency": 0.10,
 }
 
+
+def load_scoring_weights_from_config(
+    config_file: str = "config.yml",
+) -> Dict[str, float]:
+    """Load scoring weights from config.yml file.
+
+    Args:
+        config_file: Path to the config file
+
+    Returns:
+        Dict containing scoring weights, defaults to DEFAULT_WEIGHTS if file not found or invalid
+    """
+    try:
+        import yaml
+
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
+
+            scoring_config = config_data.get("scoring", {})
+            if scoring_config:
+                # Validate that all required keys exist and are numeric
+                required_keys = set(DEFAULT_WEIGHTS.keys())
+                config_keys = set(scoring_config.keys())
+
+                if required_keys.issubset(config_keys):
+                    # Ensure all values are numeric and sum to 1.0 (approximately)
+                    weights = {k: float(scoring_config[k]) for k in required_keys}
+                    total = sum(weights.values())
+
+                    if abs(total - 1.0) < 0.01:  # Allow small floating point errors
+                        return weights
+                    else:
+                        print(
+                            f"[yellow]Warning: Scoring weights sum to {total:.3f}, not 1.0. Using defaults.[/yellow]"
+                        )
+                else:
+                    missing_keys = required_keys - config_keys
+                    print(
+                        f"[yellow]Warning: Missing scoring weight keys: {missing_keys}. Using defaults.[/yellow]"
+                    )
+    except Exception as e:
+        print(
+            f"[yellow]Warning: Could not load scoring weights from {config_file}: {e}. Using defaults.[/yellow]"
+        )
+
+    return DEFAULT_WEIGHTS
+
+
 SCORE_PROMPT = """
 You are a professional news editor. Evaluate the article below for the newsletter topic <DOMAIN>.
 Return scores only as JSON in the format {{"relevance":1-5,"impact":1-5,"novelty":1-5}}.

@@ -29,7 +29,7 @@
 
 *   **상태 관리 (`NewsletterState`):**
     *   뉴스레터 생성 전 과정의 상태를 TypedDict 형태로 관리합니다.
-    *   포함 정보: 입력 키워드, 뉴스 수집 기간, 수집된 원본 기사 목록, **필터링 및 그룹화된 기사 목록**, 기사 요약 결과, 최종 뉴스레터 HTML, 오류 정보, 현재 진행 상태 (예: 'collecting', 'filtering', 'summarizing', 'complete', 'error')
+    *   포함 정보: 입력 키워드, 뉴스 수집 기간, 수집된 원본 기사 목록, **필터링 및 그룹화된 기사 목록**, **점수가 매겨진 상위 기사 목록 (`ranked_articles`)**, 기사 요약 결과, 최종 뉴스레터 HTML, 오류 정보, 현재 진행 상태 (예: 'collecting', 'processing', 'scoring', 'summarizing', 'composing', 'complete', 'error')
 
 *   **워크플로우 그래프 (`newsletter.graph.create_newsletter_graph`):**
     *   **`collect_articles_node` (기사 수집):**
@@ -47,6 +47,20 @@
         *   **키워드별 기사 그룹화:** 관련된 키워드를 가진 기사들을 그룹화하여 뉴스레터의 가독성과 주제별 집중도를 높입니다.
         *   **정렬:** 처리된 기사를 날짜 기준으로 최신순으로 정렬합니다. (필터링 및 그룹화 이후 최종 정렬)
         *   처리, 필터링 및 그룹화된 기사 목록 또한 JSON 파일로 저장될 수 있습니다. (예: `output/intermediate_processing/{timestamp}_collected_articles_processed_filtered_grouped.json`)
+    *   **`score_articles_node` (기사 점수 평가 및 우선순위 결정):**
+        *   **LLM 기반 다차원 평가:** Google Gemini Pro를 사용하여 각 기사를 다음 기준으로 1-5점 척도로 평가합니다:
+            *   **관련성(Relevance):** 뉴스레터 주제/도메인과의 연관성 (가중치: 40%)
+            *   **영향력(Impact):** 산업이나 사회에 미치는 영향의 크기 (가중치: 25%)
+            *   **참신성(Novelty):** 새로운 정보나 트렌드의 포함 정도 (가중치: 15%)
+        *   **소스 신뢰도 평가:** 뉴스 소스의 티어에 따른 가중치 부여 (가중치: 10%)
+            *   Tier 1 (주요 언론사): 1.0 가중치
+            *   Tier 2 (보조 언론사): 0.8 가중치
+            *   기타 소스: 0.6 가중치
+        *   **시간적 신선도:** 기사 발행일을 기준으로 한 시간 가중치 (가중치: 10%)
+            *   지수 감쇠 함수 사용: `exp(-days/14)` (14일 반감기)
+        *   **종합 우선순위 점수 계산:** 위 5개 요소의 가중 평균으로 0-100점 척도의 최종 점수 산출
+        *   **상위 기사 선별:** 점수 기준 내림차순 정렬 후 상위 10개 기사를 다음 단계로 전달
+        *   점수가 매겨진 전체 기사 목록은 JSON 파일로 저장됩니다. (예: `output/intermediate_processing/{timestamp}_scored_articles.json`)
     *   **`summarize_articles_node` (기사 요약 및 뉴스레터 생성):**
         *   필터링 및 그룹화된 기사 목록을 입력으로 받아 LLM(Google Gemini Pro)을 사용하여 뉴스레터 콘텐츠를 생성합니다.
         *   **LangChain (`newsletter.chains`) 활용:**
@@ -108,14 +122,17 @@ flowchart TD
         B["상태 초기화 (NewsletterState)"] --> C1
         C1["collect_articles_node (기사 수집)"]
         C1 -- 수집된 기사 목록 --> C2
-        C2["process_articles_node (기사 처리: 필터링(중복, 주요소스, 도메인), 그룹화, 정렬)"]
+        C2["process_articles_node (기사 처리: 필터링, 그룹화, 정렬)"]
         C2 -- 필터링 및 그룹화된 기사 목록 --> C3
-        C3["summarize_articles_node (LLM 요약 및 HTML 생성 - LangChain)"]
-        C3 -- 생성된 HTML 뉴스레터 --> D
+        C3["score_articles_node (AI 기반 점수 평가)"]
+        C3 -- 점수별 상위 10개 기사 --> C4
+        C4["summarize_articles_node (LLM 요약 및 HTML 생성)"]
+        C4 -- 생성된 HTML 뉴스레터 --> D
         C_ERR["handle_error (오류 처리)"]
         C1 --> C_ERR
         C2 --> C_ERR
         C3 --> C_ERR
+        C4 --> C_ERR
     end
 
     subgraph "출력 및 전달"

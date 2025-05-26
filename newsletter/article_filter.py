@@ -50,6 +50,11 @@ MAJOR_NEWS_SOURCES = {
         "디지털데일리",
     ],
 }
+SYNONYMS: Dict[str, List[str]] = {
+    "AI반도체": ["AI반도체", "AI 반도체", "인공지능 반도체", "ai semiconductor"],
+    "HBM": ["HBM", "hbm", "high bandwidth memory", "고대역폭 메모리"],
+    "CXL": ["CXL", "cxl", "compute express link"],
+}
 
 
 def filter_articles_by_major_sources(
@@ -124,98 +129,65 @@ def filter_articles_by_major_sources(
 def group_articles_by_keywords(
     articles: List[Dict[str, Any]], keywords: List[str]
 ) -> Dict[str, List[Dict[str, Any]]]:
-    """키워드별로 기사 그룹화
-
-    Args:
-        articles: 그룹화할 기사 목록
-        keywords: 키워드 리스트
-
-    Returns:
-        키워드별 기사 그룹 (키워드: 기사 목록)
-    """
-    # 디버깅 정보 출력
+    """키워드별로 기사 그룹화 (동의어 및 문맥 기반 매칭 지원)"""
     console.print(
         f"[bold cyan]DEBUG: Starting grouping of {len(articles)} articles by {len(keywords)} keywords[/bold cyan]"
     )
     console.print(f"[bold cyan]DEBUG: Keywords: {keywords}[/bold cyan]")
 
-    # 키워드별 빈 목록 초기화
     grouped_articles = {keyword: [] for keyword in keywords}
 
-    # 각 기사에 대해 일치하는 모든 키워드 찾기
-    for i, article in enumerate(articles):
-        title = article.get("title", "").lower()
-        content = article.get("content", "").lower()
+    def _tokenize(text: str) -> List[str]:
+        return re.findall(r"[가-힣a-zA-Z0-9]+", text.lower())
 
-        console.print(f"[grey]DEBUG: Processing article {i+1}: {title[:50]}...[/grey]")
+    def _tokens_in_context(
+        text_tokens: List[str], tokens: List[str], window: int = 5
+    ) -> bool:
+        if len(tokens) == 1:
+            return tokens[0] in text_tokens
+        positions = []
+        for token in tokens:
+            idxs = [i for i, t in enumerate(text_tokens) if t == token]
+            if not idxs:
+                return False
+            positions.append(idxs)
+        import itertools
+
+        for combo in itertools.product(*positions):
+            if max(combo) - min(combo) <= window:
+                return True
+        return False
+
+    for i, article in enumerate(articles):
+        full_text = f"{article.get('title', '')} {article.get('content', '')}".lower()
+        tokens = _tokenize(full_text)
+        console.print(
+            f"[grey]DEBUG: Processing article {i+1}: {full_text[:50]}...[/grey]"
+        )
 
         for keyword in keywords:
-            keyword_lower = keyword.lower()
-            keyword_no_space = keyword_lower.replace(" ", "")  # 공백 제거
-
-            # 영문/숫자 키워드는 단어 경계, 한글 등은 단순 포함
-            if re.fullmatch(r"[a-zA-Z0-9]+", keyword_lower):
-                keyword_pattern = r"\b" + re.escape(keyword_lower) + r"\b"
-                title_match = re.search(keyword_pattern, title)
-                content_match = re.search(keyword_pattern, content)
-                if title_match or content_match:
-                    grouped_articles[keyword].append(article)
-                    console.print(
-                        f"[cyan]DEBUG: Article {i+1} matched keyword '{keyword}' (word boundary)[/cyan]"
-                    )
-            else:
-                # 한글 키워드를 위한 다양한 일치 시도
-                # 1. 정확한 키워드 일치
-                if keyword_lower in title or keyword_lower in content:
-                    grouped_articles[keyword].append(article)
-                    console.print(
-                        f"[cyan]DEBUG: Article {i+1} matched keyword '{keyword}' (exact substring)[/cyan]"
-                    )
-                # 2. 공백 무시하고 일치
-                elif keyword_no_space and (
-                    keyword_no_space in title.replace(" ", "")
-                    or keyword_no_space in content.replace(" ", "")
+            variations = SYNONYMS.get(keyword, [keyword])
+            matched = False
+            for variant in variations:
+                v_text = variant.lower()
+                v_tokens = _tokenize(variant)
+                if v_text in full_text or v_text.replace(" ", "") in full_text.replace(
+                    " ", ""
                 ):
+                    matched = True
+                elif _tokens_in_context(tokens, v_tokens):
+                    matched = True
+                if matched:
                     grouped_articles[keyword].append(article)
                     console.print(
-                        f"[cyan]DEBUG: Article {i+1} matched keyword '{keyword}' (no spaces)[/cyan]"
+                        f"[cyan]DEBUG: Article {i+1} matched keyword '{keyword}' via variant '{variant}'[/cyan]"
                     )
-                # 3. 부분 키워드 일치 (예: 'AI반도체'는 'ai 반도체'와 일치)
-                else:
-                    # 부분 일치 허용(공백이나 다른 구분자로 분리되어 있을 수 있음)
-                    parts = re.split(r"[\s_\-]+", keyword_lower)
-                    if len(parts) > 1:
-                        parts_matched = all(
-                            part in title or part in content
-                            for part in parts
-                            if len(part) > 1
-                        )
-                        if parts_matched:
-                            grouped_articles[keyword].append(article)
-                            console.print(
-                                f"[cyan]DEBUG: Article {i+1} matched keyword '{keyword}' (parts matching)[/cyan]"
-                            )
-                            continue
+                    break
+            if not matched:
+                console.print(
+                    f"[grey]DEBUG: Article {i+1} did not match keyword '{keyword}'[/grey]"
+                )
 
-                    # 디버깅 출력
-                    console.print(
-                        f"[grey]DEBUG: Article {i+1} did not match keyword '{keyword}'[/grey]"
-                    )
-
-                    # 내용 일부만 출력해서 확인
-                    if len(title) > 100:
-                        console.print(f"[grey]DEBUG: Title: {title[:100]}...[/grey]")
-                    else:
-                        console.print(f"[grey]DEBUG: Title: {title}[/grey]")
-
-                    if len(content) > 100:
-                        console.print(
-                            f"[grey]DEBUG: Content excerpt: {content[:100]}...[/grey]"
-                        )
-                    else:
-                        console.print(f"[grey]DEBUG: Content excerpt: {content}[/grey]")
-
-    # 각 키워드 그룹 결과 출력
     for keyword in grouped_articles:
         console.print(
             f"[green]Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'[/green]"
