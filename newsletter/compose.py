@@ -337,18 +337,43 @@ def render_newsletter_template(
     # 설정 파일에서 뉴스레터 설정 로드
     newsletter_settings = load_newsletter_settings()
 
+    # 뉴스레터 제목 생성 로직 개선
+    newsletter_topic = data.get("newsletter_topic")
+    newsletter_title = data.get("newsletter_title")
+
+    # 제목이 명시적으로 설정되지 않은 경우 도메인 기반 제목 생성
+    if not newsletter_title and newsletter_topic:
+        # 도메인이 있거나 의미 있는 주제가 있는 경우 "도메인명 주간 산업동향 뉴스레터" 형식 사용
+        domain = data.get("domain")
+        if domain:
+            # 명시적 도메인이 있는 경우
+            newsletter_title = f"{domain} 주간 산업동향 뉴스레터"
+        elif newsletter_topic and newsletter_topic not in [
+            "최신 산업 동향",
+            "General News",
+        ]:
+            # 의미 있는 주제가 추출된 경우
+            # "외 N개 분야" 형식이면 첫 번째 키워드만 사용
+            if " 외 " in newsletter_topic and "개 분야" in newsletter_topic:
+                main_topic = newsletter_topic.split(" 외 ")[0]
+                newsletter_title = f"{main_topic} 주간 산업동향 뉴스레터"
+            else:
+                newsletter_title = f"{newsletter_topic} 주간 산업동향 뉴스레터"
+        else:
+            newsletter_title = newsletter_settings.get(
+                "newsletter_title", config["title_default"]
+            )
+    elif not newsletter_title:
+        newsletter_title = newsletter_settings.get(
+            "newsletter_title", config["title_default"]
+        )
+
     # 공통 컨텍스트 변수들 (설정 파일 값을 기본값으로 사용)
     common_context = {
         "generation_date": generation_date,
         "generation_timestamp": generation_timestamp,
-        "newsletter_topic": data.get("newsletter_topic"),
-        "newsletter_title": data.get(
-            "newsletter_title",
-            data.get(
-                "newsletter_topic",
-                newsletter_settings.get("newsletter_title", config["title_default"]),
-            ),
-        ),
+        "newsletter_topic": newsletter_topic,
+        "newsletter_title": newsletter_title,
         "issue_no": data.get("issue_no"),
         "top_articles": top_articles,
         "definitions": definitions,
@@ -607,24 +632,36 @@ def extract_top_articles_from_sections(
 ) -> List[Dict[str, Any]]:
     """
     각 섹션에서 첫 번째 뉴스 링크를 추출하여 상위 기사로 만듭니다.
+    중복 URL 제거 로직 포함.
     """
     top_articles = []
+    seen_urls = set()  # 중복 URL 추적
 
     for section in sections[:3]:  # 최대 3개 섹션에서
         news_links = section.get("news_links", [])
         if news_links:
-            first_article = news_links[0]
-            # 요약 텍스트 생성 (섹션의 첫 번째 요약 문단 사용)
-            summary_paragraphs = section.get("summary_paragraphs", [])
-            snippet = summary_paragraphs[0] if summary_paragraphs else ""
+            # 섹션의 모든 기사를 확인하여 중복되지 않은 첫 번째 기사 선택
+            for article in news_links:
+                article_url = article.get("url", "#")
 
-            top_article = {
-                "title": first_article.get("title", ""),
-                "url": first_article.get("url", "#"),
-                "snippet": snippet[:150] + "..." if len(snippet) > 150 else snippet,
-                "source_and_date": first_article.get("source_and_date", ""),
-            }
-            top_articles.append(top_article)
+                # URL이 이미 선택되었거나 유효하지 않으면 건너뛰기
+                if article_url in seen_urls or article_url == "#" or not article_url:
+                    continue
+
+                # 요약 텍스트 생성 (섹션의 첫 번째 요약 문단 사용)
+                summary_paragraphs = section.get("summary_paragraphs", [])
+                snippet = summary_paragraphs[0] if summary_paragraphs else ""
+
+                top_article = {
+                    "title": article.get("title", ""),
+                    "url": article_url,
+                    "snippet": snippet[:150] + "..." if len(snippet) > 150 else snippet,
+                    "source_and_date": article.get("source_and_date", ""),
+                }
+
+                top_articles.append(top_article)
+                seen_urls.add(article_url)
+                break  # 해당 섹션에서 하나만 선택하고 다음 섹션으로
 
     return top_articles
 

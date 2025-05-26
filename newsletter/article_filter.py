@@ -197,7 +197,7 @@ def group_articles_by_keywords(
 
 
 def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """중복된 기사 제거
+    """중복된 기사 제거 (URL 정규화 및 제목 유사성 검사 포함)
 
     Args:
         articles: 중복 제거할 기사 목록
@@ -209,6 +209,38 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
     seen_urls = set()
     seen_titles = set()
 
+    def normalize_url(url: str) -> str:
+        """URL을 정규화하여 중복 검사에 사용"""
+        if not url or url == "#":
+            return ""
+        # 쿼리 파라미터 제거, 프로토콜 통일, www 제거 등
+        import re
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            # 도메인 정규화 (www 제거, 소문자 변환)
+            domain = parsed.netloc.lower()
+            domain = re.sub(r"^www\.", "", domain)
+            # 경로 정규화 (끝의 / 제거)
+            path = parsed.path.rstrip("/")
+            # 정규화된 URL 생성 (쿼리 파라미터 제외)
+            normalized = f"{domain}{path}"
+            return normalized
+        except:
+            return url.lower()
+
+    def normalize_title(title: str) -> str:
+        """제목을 정규화하여 중복 검사에 사용"""
+        if not title:
+            return ""
+        # 특수문자 제거, 공백 정규화, 소문자 변환
+        import re
+
+        normalized = re.sub(r"[^\w\s가-힣]", "", title)
+        normalized = re.sub(r"\s+", " ", normalized).strip().lower()
+        return normalized
+
     for article in articles:
         url = article.get("url", "")
         title = article.get("title", "")
@@ -217,18 +249,38 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
         if not url and not title:
             continue
 
-        # URL 기반 중복 확인
-        if url and url in seen_urls:
+        # URL 정규화 및 중복 확인
+        normalized_url = normalize_url(url)
+        if normalized_url and normalized_url in seen_urls:
+            console.print(f"[yellow]Skipping duplicate URL: {url}[/yellow]")
             continue
 
-        # 제목 기반 중복 확인 (URL이 다르더라도)
-        if title and title in seen_titles:
+        # 제목 정규화 및 중복 확인
+        normalized_title = normalize_title(title)
+        if normalized_title and normalized_title in seen_titles:
+            console.print(f"[yellow]Skipping duplicate title: {title}[/yellow]")
             continue
 
-        if url:
-            seen_urls.add(url)
-        if title:
-            seen_titles.add(title)
+        # 제목 유사성 검사 (기존 기사들과 비교)
+        is_similar = False
+        if normalized_title:
+            for existing_title in seen_titles:
+                if (
+                    existing_title
+                    and _word_overlap_ratio(normalized_title, existing_title) >= 0.85
+                ):
+                    console.print(f"[yellow]Skipping similar title: {title}[/yellow]")
+                    is_similar = True
+                    break
+
+        if is_similar:
+            continue
+
+        # 중복이 아닌 경우 추가
+        if normalized_url:
+            seen_urls.add(normalized_url)
+        if normalized_title:
+            seen_titles.add(normalized_title)
 
         unique_articles.append(article)
 

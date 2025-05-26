@@ -594,11 +594,97 @@ def extract_common_theme_fallback(keywords):
     if len(keywords) <= 1:
         return keywords[0] if keywords else ""
 
-    # 단순하게 키워드 조합으로 반환
+    # 키워드에서 공통 도메인 추출 시도
+    common_terms = []
+
+    # 로봇 관련 키워드들
+    robot_terms = [
+        "로봇",
+        "로보틱스",
+        "자동화",
+        "AI 로봇",
+        "서비스 로봇",
+        "산업 로봇",
+        "협동로봇",
+        "휴머노이드",
+    ]
+    if any(any(term in keyword for term in robot_terms) for keyword in keywords):
+        return "로봇"
+
+    # AI 관련 키워드들
+    ai_terms = ["AI", "인공지능", "머신러닝", "딥러닝", "신경망", "자연어처리"]
+    if any(any(term in keyword for term in ai_terms) for keyword in keywords):
+        return "인공지능"
+
+    # 반도체 관련 키워드들
+    semiconductor_terms = [
+        "반도체",
+        "칩",
+        "메모리",
+        "프로세서",
+        "웨이퍼",
+        "팹",
+        "나노공정",
+    ]
+    if any(
+        any(term in keyword for term in semiconductor_terms) for keyword in keywords
+    ):
+        return "반도체"
+
+    # 배터리 관련 키워드들
+    battery_terms = ["배터리", "전지", "리튬", "충전", "에너지저장", "ESS"]
+    if any(any(term in keyword for term in battery_terms) for keyword in keywords):
+        return "배터리"
+
+    # 자동차 관련 키워드들
+    auto_terms = ["자동차", "전기차", "자율주행", "모빌리티", "ADAS", "EV"]
+    if any(any(term in keyword for term in auto_terms) for keyword in keywords):
+        return "자동차"
+
+    # 화학소재 관련 키워드들
+    chemical_terms = ["화학", "소재", "플라스틱", "폴리머", "촉매", "정밀화학"]
+    if any(any(term in keyword for term in chemical_terms) for keyword in keywords):
+        return "화학소재"
+
+    # 바이오 관련 키워드들
+    bio_terms = ["바이오", "생명공학", "의료", "신약", "유전자", "세포", "치료제"]
+    if any(any(term in keyword for term in bio_terms) for keyword in keywords):
+        return "바이오"
+
+    # 에너지 관련 키워드들
+    energy_terms = ["에너지", "태양광", "풍력", "수소", "신재생", "발전"]
+    if any(any(term in keyword for term in energy_terms) for keyword in keywords):
+        return "에너지"
+
+    # 공통 도메인을 찾지 못한 경우 - 더 지능적인 처리
     if len(keywords) <= 3:
         return ", ".join(keywords)
     else:
-        return f"{keywords[0]} 외 {len(keywords)-1}개 분야"
+        # 첫 번째 키워드에서 의미 있는 단어 추출 시도
+        first_keyword = keywords[0]
+        # 기술, 산업, 시장 등의 일반적인 단어 제거하고 핵심 도메인 추출
+        meaningful_words = []
+        skip_words = [
+            "기술",
+            "산업",
+            "시장",
+            "동향",
+            "개발",
+            "연구",
+            "분야",
+            "관련",
+            "전망",
+            "분석",
+        ]
+
+        for word in first_keyword.split():
+            if word not in skip_words and len(word) > 1:
+                meaningful_words.append(word)
+
+        if meaningful_words:
+            return meaningful_words[0]
+        else:
+            return f"{keywords[0]} 외 {len(keywords)-1}개 분야"
 
 
 def sanitize_filename(text):
