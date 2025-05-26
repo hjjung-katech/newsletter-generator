@@ -38,7 +38,7 @@
 | FR-01 | **키워드 기반 기사 수집** | ✅ | Serper API, RSS 피드, 네이버 API 통합 |
 | FR-02 | **AI 기사 요약** | ✅ | Google Gemini Pro 기반 요약 및 편집 |
 | FR-03 | **뉴스레터 생성** | ✅ | 통합 아키텍처로 Compact/Detailed 지원 |
-| FR-04 | **이메일 발송** | ✅ | SendGrid API 통합 |
+| FR-04 | **이메일 발송** | ✅ | Postmark API 통합 |
 | FR-05 | **Google Drive 저장** | ✅ | 자동 업로드 및 폴더 관리 |
 
 ### 4.2 고급 기능
@@ -71,7 +71,7 @@
 | **CLI** | Typer | 사용자 인터페이스 |
 | **LLM** | Google Gemini Pro, LangChain, LangGraph | AI 요약 및 워크플로우 |
 | **뉴스 수집** | Serper API, RSS (feedparser), 네이버 API | 다양한 소스 통합 |
-| **이메일** | SendGrid | 뉴스레터 발송 |
+| **이메일** | Postmark | 뉴스레터 발송 |
 | **저장소** | Google Drive API | 파일 저장 |
 | **템플릿** | Jinja2 | HTML 렌더링 |
 | **비용 추적** | LangSmith | AI 사용량 모니터링 |

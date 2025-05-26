@@ -6,7 +6,6 @@ load_dotenv()  # Load environment variables from .env file
 # 기존 API 키 설정
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # 통합된 API 키
-# SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY") # 주석 처리 또는 삭제
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv(
     "GOOGLE_APPLICATION_CREDENTIALS"
 )  # 새로 추가
@@ -19,8 +18,8 @@ ADDITIONAL_RSS_FEEDS = os.getenv(
     "ADDITIONAL_RSS_FEEDS", ""
 )  # 추가 RSS 피드 URL (쉼표로 구분)
 
-# 이메일 발송 설정
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+# 이메일 발송 설정 (Postmark)
+POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
 EMAIL_SENDER = os.getenv("EMAIL_SENDER", "newsletter@example.com")
 
 # Google Drive 설정
@@ -42,6 +41,12 @@ if not GEMINI_API_KEY:
 if not GOOGLE_APPLICATION_CREDENTIALS:
     print(
         "Warning: GOOGLE_APPLICATION_CREDENTIALS not found in .env file. Google Drive upload will not work."
+    )
+
+# Postmark 설정 경고
+if not POSTMARK_SERVER_TOKEN:
+    print(
+        "Warning: POSTMARK_SERVER_TOKEN not found in .env file. Email sending will not work."
     )
 
 # 새로 추가된 API 키에 대한 경고 (선택적)

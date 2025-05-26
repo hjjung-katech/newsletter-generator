@@ -11,7 +11,7 @@
 
 - 🔍 **다양한 뉴스 소스**: Serper API, RSS 피드, 네이버 뉴스 API 통합
 - 🤖 **AI 기반 요약**: Google Gemini Pro를 활용한 지능형 뉴스 요약
-- 📧 **자동 발송**: SendGrid를 통한 이메일 발송 및 Google Drive 저장
+- 📧 **자동 발송**: Postmark를 통한 이메일 발송 및 Google Drive 저장
 - 🎯 **스마트 필터링**: 중복 제거, 주요 소스 우선순위, 키워드별 그룹화
 - 📱 **두 가지 스타일**: Compact(간결) / Detailed(상세) 뉴스레터 지원
 
@@ -32,7 +32,7 @@ cp .env.example .env
 # .env 파일을 편집하여 API 키 설정
 ```
 
-필요한 API 키: Google Gemini Pro, Serper API, SendGrid, Google Drive API
+필요한 API 키: Google Gemini Pro, Serper API, Postmark, Google Drive API
 
 ### 기본 사용법
 

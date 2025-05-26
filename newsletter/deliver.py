@@ -1,5 +1,6 @@
 # Placeholder for delivery logic (email, Google Drive)
 import os
+import requests
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -117,9 +118,10 @@ def save_locally(
 
 
 def send_email(to_email: str, subject: str, html_content: str):
-    """
-    이메일 발송 기능 (기본적인 플레이스홀더 구현)
-    실제 이메일 발송은 config.SENDGRID_API_KEY가 설정된 경우에만 시도합니다.
+    """Send an email via Postmark.
+
+    If ``config.POSTMARK_SERVER_TOKEN`` is not set, the function simulates a
+    successful send so that tests do not fail in CI environments.
 
     Args:
         to_email: 수신자 이메일 주소
@@ -129,20 +131,36 @@ def send_email(to_email: str, subject: str, html_content: str):
     Returns:
         bool: 발송 성공 여부
     """
-    # Clean HTML markers before sending email
+
     cleaned_html_content = clean_html_markers(html_content)
 
-    if not config.SENDGRID_API_KEY:
-        print("Warning: SENDGRID_API_KEY not found. Please set it in the .env file.")
+    if not config.POSTMARK_SERVER_TOKEN:
+        print("Warning: POSTMARK_SERVER_TOKEN not found. Please set it in the .env file.")
         print("Email sending simulation complete (no actual email sent).")
         return True  # CI 환경에서는 성공으로 처리
 
-    # 실제 이메일 발송 로직은 SendGrid API 키가 설정된 경우에만 작동
     try:
-        print(f"Would send email to {to_email} with subject: {subject}")
-        print("Email content is HTML with length:", len(cleaned_html_content))
-        print("Email sending simulated successfully.")
-        return True
+        response = requests.post(
+            "https://api.postmarkapp.com/email",
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "X-Postmark-Server-Token": config.POSTMARK_SERVER_TOKEN,
+            },
+            json={
+                "From": config.EMAIL_SENDER,
+                "To": to_email,
+                "Subject": subject,
+                "HtmlBody": cleaned_html_content,
+            },
+            timeout=10,
+        )
+        if response.status_code == 200:
+            print("Email sent via Postmark.")
+            return True
+        else:
+            print(f"Error sending email: {response.status_code} {response.text}")
+            return False
     except Exception as e:
-        print(f"Error simulating email send: {e}")
+        print(f"Error sending email via Postmark: {e}")
         return False
