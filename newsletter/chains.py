@@ -934,8 +934,8 @@ def get_newsletter_chain(is_compact=False):
 
                 # 최종 데이터 구성
                 result_data = {
-                    "newsletter_title": f"{newsletter_topic} 주간 브리프",
                     "newsletter_topic": newsletter_topic,
+                    "domain": domain,  # 도메인 정보 추가
                     "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
                     "generation_date": os.environ.get(
                         "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
@@ -1029,6 +1029,7 @@ def get_newsletter_chain(is_compact=False):
                 # Detailed 뉴스레터 데이터 구성
                 detailed_data = {
                     "newsletter_topic": newsletter_topic,
+                    "domain": domain,  # 도메인 정보 추가
                     "generation_date": os.environ.get(
                         "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
                     ),
