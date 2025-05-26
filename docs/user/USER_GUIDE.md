@@ -219,6 +219,87 @@ newsletter test output/collected_articles_AI.json --mode content
 newsletter test output/collected_articles_AI.json --mode content --track-cost
 ```
 
+### 이메일 테스트 모드
+
+Newsletter Generator는 뉴스레터 생성 없이 이메일 발송 기능만 단독으로 테스트할 수 있는 기능을 제공합니다.
+
+### 기본 이메일 테스트
+
+간단한 테스트 메시지를 발송하여 Postmark 설정을 확인할 수 있습니다:
+
+```bash
+# Dry run 모드 (실제 발송 없음)
+newsletter test-email --to your-email@example.com --dry-run
+
+# 실제 테스트 이메일 발송
+newsletter test-email --to your-email@example.com
+```
+
+### 기존 뉴스레터 파일로 테스트
+
+이미 생성된 HTML 뉴스레터 파일을 사용하여 이메일 발송을 테스트할 수 있습니다:
+
+```bash
+# 특정 HTML 파일로 테스트
+newsletter test-email --to your-email@example.com --template output/newsletter.html --dry-run
+
+# 커스텀 제목으로 실제 발송
+newsletter test-email --to your-email@example.com --template output/newsletter.html --subject "뉴스레터 테스트"
+```
+
+### 통합 테스트 스크립트
+
+더 상세한 테스트를 위해 전용 통합 테스트 스크립트를 사용할 수 있습니다:
+
+```bash
+# 기본 통합 테스트 (dry-run)
+python tests/test_email_integration.py --to your-email@example.com
+
+# 실제 이메일 발송 테스트
+python tests/test_email_integration.py --to your-email@example.com --send-real
+
+# 특정 뉴스레터 파일로 테스트
+python tests/test_email_integration.py --to your-email@example.com --newsletter-file output/specific_newsletter.html
+```
+
+통합 테스트 스크립트는 다음 기능을 제공합니다:
+
+- 📧 **설정 검증**: Postmark 토큰과 발송자 이메일 설정 확인
+- 📁 **파일 검색**: 사용 가능한 뉴스레터 HTML 파일 자동 검색
+- 📤 **기본 테스트**: 간단한 테스트 이메일 발송
+- 📰 **뉴스레터 테스트**: 실제 뉴스레터 파일을 사용한 이메일 발송
+- 🎯 **결과 요약**: 테스트 결과와 다음 단계 안내
+
+### 이메일 테스트 옵션
+
+| 옵션 | 설명 | 예시 |
+|------|------|------|
+| `--to` | 수신자 이메일 주소 (필수) | `--to user@example.com` |
+| `--subject` | 커스텀 이메일 제목 | `--subject "테스트 이메일"` |
+| `--template` | 사용할 HTML 파일 경로 | `--template output/newsletter.html` |
+| `--dry-run` | 실제 발송 없이 설정만 확인 | `--dry-run` |
+
+### 문제 해결
+
+이메일 테스트 중 문제가 발생하면 다음을 확인하세요:
+
+1. **Postmark 설정 확인**:
+   ```bash
+   # 설정 상태 확인
+   newsletter test-email --to test@example.com --dry-run
+   ```
+
+2. **환경 변수 확인**:
+   - `POSTMARK_SERVER_TOKEN`: Postmark 서버 토큰
+   - `EMAIL_SENDER`: 발송자 이메일 주소 (Postmark에서 인증 필요)
+
+3. **Postmark 계정 상태**:
+   - 계정이 승인되었는지 확인
+   - 발송자 도메인이 인증되었는지 확인
+   - 계정 승인 대기 중인 경우 같은 도메인 내에서만 테스트 가능
+   - 수신자가 비활성화(inactive)된 경우: 하드 바운스, 스팸 신고, 수동 차단된 이메일 주소
+   - 오류 422 발생 시 다른 이메일 주소로 테스트 필요
+
 ## 출력 형식
 
 ### 로컬 저장

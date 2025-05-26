@@ -45,6 +45,15 @@ newsletter run --domain "자율주행" --to user@example.com
 
 # 간결한 스타일로 생성
 newsletter run --keywords "반도체" --template-style compact
+
+# 이메일 발송 기능 테스트
+newsletter test-email --to user@example.com --dry-run
+
+# 기존 뉴스레터 파일로 이메일 테스트
+newsletter test-email --to user@example.com --template output/newsletter.html
+
+# 통합 이메일 테스트 (상세한 검증)
+python tests/test_email_integration.py --to user@example.com
 ```
 
 ## 🏗️ 아키텍처 개요

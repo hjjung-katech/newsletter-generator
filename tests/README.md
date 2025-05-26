@@ -57,14 +57,22 @@ tests/
 ### 🎯 테스트 분류 (Pytest 마커)
 
 ```python
-@pytest.mark.unit         # 순수 단위 테스트 (API 호출 없음)
-@pytest.mark.api          # API를 사용하는 테스트  
-@pytest.mark.mock_api     # Mock API 테스트
-@pytest.mark.real_api     # 실제 API 테스트
-@pytest.mark.integration  # 통합 테스트
-@pytest.mark.slow         # 실행 시간이 긴 테스트
+@pytest.mark.unit           # 순수 단위 테스트 (외부 의존성 없음, GitHub Actions 안전)
+@pytest.mark.mock_api       # Mock API 테스트 (GitHub Actions 안전)
+@pytest.mark.real_api       # 실제 API 테스트 (API 키 필요)
+@pytest.mark.integration    # 통합 테스트 (실제 외부 서비스 호출)
+@pytest.mark.slow           # 실행 시간이 긴 테스트
 @pytest.mark.requires_quota # API 할당량이 필요한 테스트
 ```
+
+### 🔒 GitHub Actions 호환성
+
+| 마커 | GitHub Actions | 로컬 개발 | API 키 필요 | 할당량 소모 |
+|------|----------------|-----------|-------------|-------------|
+| `unit` | ✅ 안전 | ✅ 빠름 | ❌ 불필요 | ❌ 없음 |
+| `mock_api` | ✅ 안전 | ✅ 빠름 | ❌ 불필요 | ❌ 없음 |
+| `real_api` | ❌ 스킵 | ⚠️ 주의 | ✅ 필요 | ✅ 소모 |
+| `integration` | ❌ 스킵 | ⚠️ 주의 | ✅ 필요 | ✅ 소모 |
 
 ## 테스트 구조
 
@@ -184,6 +192,14 @@ newsletter test output/collected_articles_AI_빅데이터.json --mode content --
 | `test_newsletter_mocked.py` | **🆕** Mock 기반 뉴스레터 생성 테스트 | `mock_api` |
 | `test_compact_newsletter.py` | Compact 뉴스레터 단위 테스트 | `unit` |
 | `test_compose.py` | 뉴스레터 구성 및 렌더링 테스트 | `unit` |
+| `test_email_delivery.py` | **🆕** 이메일 발송 기능 테스트 (Mock 기반) | `unit`, `mock_api` |
+
+### 📧 이메일 테스트
+
+| 파일 이름 | 설명 | 마커 |
+|-----------|------|------|
+| `test_email_delivery.py` | Postmark 이메일 발송 단위/Mock 테스트 | `unit`, `mock_api` |
+| `api_tests/test_email_integration.py` | 실제 Postmark API 통합 테스트 | `integration` |
 
 ### 📡 API 테스트
 

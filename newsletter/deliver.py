@@ -135,8 +135,10 @@ def send_email(to_email: str, subject: str, html_content: str):
     cleaned_html_content = clean_html_markers(html_content)
 
     if not config.POSTMARK_SERVER_TOKEN:
-        print("Warning: POSTMARK_SERVER_TOKEN not found. Please set it in the .env file.")
-        print("Email sending simulation complete (no actual email sent).")
+        print(
+            "Warning: POSTMARK_SERVER_TOKEN not found. Please set it in the .env file."
+        )
+        print("Email sending skipped - no actual email sent.")
         return True  # CI 환경에서는 성공으로 처리
 
     try:
