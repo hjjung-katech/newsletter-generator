@@ -251,7 +251,7 @@ CLI에서 사용하는 주요 환경 변수들입니다.
 |--------|------|--------|
 | `NAVER_CLIENT_ID` | 네이버 뉴스 API 클라이언트 ID | - |
 | `NAVER_CLIENT_SECRET` | 네이버 뉴스 API 클라이언트 시크릿 | - |
-| `SENDGRID_API_KEY` | SendGrid 이메일 API 키 | - |
+| `POSTMARK_SERVER_TOKEN` | Postmark 서버 토큰 | - |
 | `EMAIL_SENDER` | 발송자 이메일 주소 | - |
 | `GOOGLE_CLIENT_ID` | Google Drive API 클라이언트 ID | - |
 | `GOOGLE_CLIENT_SECRET` | Google Drive API 클라이언트 시크릿 | - |

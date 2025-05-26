@@ -90,8 +90,8 @@
     *   생성된 뉴스레터(HTML 또는 Markdown 형식)를 로컬 파일 시스템에 저장합니다.
     *   파일명 규칙: `{현재날짜}_newsletter_{키워드목록}.{확장자}` (예: `2025-05-13_newsletter_AI_반도체.html`)
 *   **이메일 발송 (`newsletter.cli`에서 직접 처리, 과거 `newsletter.deliver.send_email`):**
-    *   SendGrid API를 사용하여 지정된 수신자(`--to` 옵션)에게 HTML 뉴스레터를 이메일로 발송합니다.
-    *   `.env` 파일에 `SENDGRID_API_KEY` 설정이 필요합니다.
+*   Postmark API를 사용하여 지정된 수신자(`--to` 옵션)에게 HTML 뉴스레터를 이메일로 발송합니다.
+*   `.env` 파일에 `POSTMARK_SERVER_TOKEN` 설정이 필요합니다.
 *   **Google Drive 업로드 (`newsletter.deliver.save_to_drive`):**
     *   Google Drive API를 사용하여 뉴스레터를 HTML 및 Markdown 형식으로 사용자의 Google Drive에 업로드합니다.
     *   Google Cloud Platform 프로젝트 설정 및 인증 정보 (`credentials.json` 또는 환경 변수)가 필요합니다.
@@ -107,7 +107,7 @@
 | **HTML 템플릿**     | `Jinja2`                                              | 동적 HTML 뉴스레터 생성 (LLM 직접 생성 방식과 병행) |
 | **API 키 관리**     | `python-dotenv` (`.env` 파일)                         | 민감한 API 키 및 설정 정보 관리             |
 | **Google API**      | `google-api-python-client`, `google-auth`             | Google Drive 연동                           |
-| **이메일 발송**     | `sendgrid` (과거)                                     | SendGrid API를 통한 이메일 발송             |
+| **이메일 발송**     | `postmark`                                            | Postmark API를 통한 이메일 발송             |
 
 ### 1.5. 아키텍처 다이어그램 (Mermaid)
 
@@ -138,7 +138,7 @@ flowchart TD
     subgraph "출력 및 전달"
         D["최종 뉴스레터 (HTML)"]
         D --> E1["로컬 파일 저장 (HTML/MD)"]
-        D --> E2["이메일 발송 (SendGrid)"]
+        D --> E2["이메일 발송 (Postmark)"]
         D --> E3["Google Drive 업로드"]
     end
 
@@ -148,7 +148,7 @@ flowchart TD
         S3["HTML 템플릿 (Jinja2 - LLM 직접 생성 시 참조)"]
         S4["API 키 (.env)"]
         S5["Google Drive API"]
-        S6["SendGrid API"]
+        S6["Postmark API"]
     end
 
     C1 --> S1

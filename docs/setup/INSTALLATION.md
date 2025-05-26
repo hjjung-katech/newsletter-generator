@@ -173,17 +173,16 @@ NAVER_CLIENT_ID=your_naver_client_id
 NAVER_CLIENT_SECRET=your_naver_client_secret
 ```
 
-#### 4. SendGrid API (이메일 발송용)
+#### 4. Postmark API (이메일 발송용)
 
 뉴스레터 이메일 발송에 사용됩니다.
 
-1. [SendGrid](https://sendgrid.com/)에 가입
-2. Settings → API Keys → Create API Key
-3. "Full Access" 권한으로 생성
-4. `.env` 파일에 추가:
+1. [Postmark](https://postmarkapp.com/)에 가입
+2. 서버(Server) 생성 후 **Server Token** 확인
+3. `.env` 파일에 다음과 같이 추가:
 
 ```bash
-SENDGRID_API_KEY=your_sendgrid_api_key
+POSTMARK_SERVER_TOKEN=your_postmark_server_token
 EMAIL_SENDER=your_verified_sender@example.com
 ```
 
