@@ -175,15 +175,25 @@ NAVER_CLIENT_SECRET=your_naver_client_secret
 
 #### 4. Postmark API (이메일 발송용)
 
-뉴스레터 이메일 발송에 사용됩니다.
+뉴스레터 이메일 발송에 사용됩니다. (기존 SendGrid에서 Postmark로 변경됨)
 
 1. [Postmark](https://postmarkapp.com/)에 가입
 2. 서버(Server) 생성 후 **Server Token** 확인
-3. `.env` 파일에 다음과 같이 추가:
+3. 발송자 이메일 주소를 Postmark에서 인증
+4. `.env` 파일에 다음과 같이 추가:
 
 ```bash
 POSTMARK_SERVER_TOKEN=your_postmark_server_token
 EMAIL_SENDER=your_verified_sender@example.com
+```
+
+**Postmark 설정 확인:**
+```bash
+# 이메일 발송 기능 테스트
+newsletter test-email --to your-email@example.com --dry-run
+
+# 실제 테스트 이메일 발송
+newsletter test-email --to your-email@example.com
 ```
 
 #### 5. Google Drive API (파일 저장용)
@@ -242,7 +252,10 @@ newsletter --help
 newsletter suggest --domain "AI" --count 5
 
 # 기본 뉴스레터 생성 테스트
-newsletter run --keywords "AI" --output-format html --max-per-source 2
+newsletter run --keywords "AI" --output-format html
+
+# 이메일 발송 기능 테스트
+newsletter test-email --to your-email@example.com --dry-run --max-per-source 2
 ```
 
 ### 3. 환경 변수 확인

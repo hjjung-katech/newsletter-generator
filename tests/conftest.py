@@ -27,9 +27,21 @@ if project_root not in sys.path:
 def pytest_configure(config):
     """pytest 구성 설정"""
     # 커스텀 마크 등록
+    config.addinivalue_line(
+        "markers", "unit: pure unit tests without external dependencies"
+    )
+    config.addinivalue_line(
+        "markers", "mock_api: tests that use mocked API responses (GitHub Actions safe)"
+    )
+    config.addinivalue_line(
+        "markers", "api: legacy API tests (being migrated to real_api or mock_api)"
+    )
     config.addinivalue_line("markers", "real_api: tests that require real API calls")
-    config.addinivalue_line("markers", "mock_api: tests that use mocked API responses")
+    config.addinivalue_line(
+        "markers", "integration: integration tests with external services"
+    )
     config.addinivalue_line("markers", "requires_quota: tests that consume API quota")
+    config.addinivalue_line("markers", "slow: tests that take a long time to run")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -38,26 +50,47 @@ def pytest_collection_modifyitems(config, items):
     # 환경 변수 확인
     run_real_api = os.getenv("RUN_REAL_API_TESTS", "0") == "1"
     run_mock_api = os.getenv("RUN_MOCK_API_TESTS", "1") == "1"
+    run_integration = os.getenv("RUN_INTEGRATION_TESTS", "0") == "1"
 
     # API 키 존재 여부 확인
-    has_google_key = bool(os.getenv("GOOGLE_API_KEY"))
+    has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
     has_serper_key = bool(os.getenv("SERPER_API_KEY"))
+    has_postmark_key = bool(os.getenv("POSTMARK_SERVER_TOKEN"))
 
     for item in items:
+        # Integration 테스트 처리 (실제 API 호출 포함)
+        if "integration" in item.keywords:
+            if not run_integration:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Integration tests disabled. Set RUN_INTEGRATION_TESTS=1 to enable"
+                    )
+                )
+            elif "email" in str(item.fspath) and not has_postmark_key:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Missing POSTMARK_SERVER_TOKEN for email integration tests"
+                    )
+                )
+            elif not (has_gemini_key and has_serper_key):
+                item.add_marker(
+                    pytest.mark.skip(reason="Missing API keys for integration tests")
+                )
+
         # Real API 테스트 처리
-        if "real_api" in item.keywords:
+        elif "real_api" in item.keywords:
             if not run_real_api:
                 item.add_marker(
                     pytest.mark.skip(
                         reason="Real API tests disabled. Set RUN_REAL_API_TESTS=1 to enable"
                     )
                 )
-            elif not (has_google_key and has_serper_key):
+            elif not (has_gemini_key and has_serper_key):
                 item.add_marker(
                     pytest.mark.skip(reason="Missing API keys for real API tests")
                 )
 
-        # Mock API 테스트 처리
+        # Mock API 테스트 처리 (GitHub Actions 안전)
         elif "mock_api" in item.keywords:
             if not run_mock_api:
                 item.add_marker(

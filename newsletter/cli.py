@@ -907,5 +907,230 @@ def test(
         traceback.print_exc()
 
 
+@app.command()
+def test_email(
+    to: str = typer.Option(
+        ...,
+        "--to",
+        help="Email address to send the test email to.",
+    ),
+    subject: Optional[str] = typer.Option(
+        None,
+        "--subject",
+        help="Custom subject for the test email. If not provided, a default test subject will be used.",
+    ),
+    template: Optional[str] = typer.Option(
+        None,
+        "--template",
+        help="Path to HTML file to use as email content. If not provided, a simple test message will be sent.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Perform a dry run without actually sending the email. Shows what would be sent.",
+    ),
+):
+    """
+    Test email sending functionality using Postmark.
+
+    This command allows you to test the email delivery system without generating a full newsletter.
+    You can send a simple test message or use an existing HTML file as the email content.
+    """
+    console.print(f"[bold blue]Testing email sending to: {to}[/bold blue]")
+
+    # Set default subject if not provided
+    if not subject:
+        subject = f"Newsletter Generator 이메일 테스트 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+    # Prepare email content
+    if template and os.path.exists(template):
+        console.print(f"[cyan]Using template file: {template}[/cyan]")
+        try:
+            with open(template, "r", encoding="utf-8") as f:
+                html_content = f.read()
+            console.print(
+                f"[green]Template loaded successfully ({len(html_content)} characters)[/green]"
+            )
+        except Exception as e:
+            console.print(f"[red]Error reading template file: {e}[/red]")
+            raise typer.Exit(code=1)
+    else:
+        if template:
+            console.print(f"[yellow]Template file not found: {template}[/yellow]")
+            console.print("[yellow]Using default test content instead[/yellow]")
+
+        # Default test content
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이메일 테스트</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }}
+        .container {{
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }}
+        .header {{
+            text-align: center;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }}
+        .content {{
+            margin-bottom: 30px;
+        }}
+        .footer {{
+            text-align: center;
+            font-size: 0.9em;
+            color: #666;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }}
+        .success {{
+            background-color: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #28a745;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Newsletter Generator 이메일 테스트</h1>
+        </div>
+        
+        <div class="content">
+            <div class="success">
+                <h2>✅ 이메일 발송 테스트 성공!</h2>
+                <p>이 이메일을 받으셨다면 Newsletter Generator의 Postmark 이메일 발송 기능이 정상적으로 작동하고 있습니다.</p>
+            </div>
+            
+            <h3>📋 테스트 정보</h3>
+            <ul>
+                <li><strong>발송 시간:</strong> {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분 %S초')}</li>
+                <li><strong>수신자:</strong> {to}</li>
+                <li><strong>이메일 서비스:</strong> Postmark API</li>
+                <li><strong>발송자:</strong> {config.EMAIL_SENDER}</li>
+            </ul>
+            
+            <h3>🔧 다음 단계</h3>
+            <p>이메일 테스트가 성공했다면 이제 실제 뉴스레터를 생성하고 발송할 수 있습니다:</p>
+            <pre style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
+newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
+            </pre>
+        </div>
+        
+        <div class="footer">
+            <p>이 메시지는 Newsletter Generator의 이메일 테스트 기능에 의해 자동으로 생성되었습니다.</p>
+            <p>문의사항이 있으시면 개발팀에 연락해 주세요.</p>
+        </div>
+    </div>
+</body>
+</html>
+        """
+
+    if dry_run:
+        console.print(
+            "\n[yellow]🔍 DRY RUN MODE - 실제 이메일은 발송되지 않습니다[/yellow]"
+        )
+        console.print(f"[cyan]수신자:[/cyan] {to}")
+        console.print(f"[cyan]제목:[/cyan] {subject}")
+        console.print(f"[cyan]내용 길이:[/cyan] {len(html_content)} 문자")
+        console.print(
+            f"[cyan]Postmark 토큰 설정 여부:[/cyan] {'✅ 설정됨' if config.POSTMARK_SERVER_TOKEN else '❌ 설정되지 않음'}"
+        )
+        console.print(f"[cyan]발송자 이메일:[/cyan] {config.EMAIL_SENDER}")
+
+        if not config.POSTMARK_SERVER_TOKEN:
+            console.print(
+                "\n[red]⚠️  POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]"
+            )
+            console.print(
+                "[yellow].env 파일에 POSTMARK_SERVER_TOKEN을 설정해주세요.[/yellow]"
+            )
+
+        console.print(
+            "\n[green]Dry run 완료. 실제 발송하려면 --dry-run 옵션을 제거하세요.[/green]"
+        )
+        return
+
+    # Check Postmark configuration
+    if not config.POSTMARK_SERVER_TOKEN:
+        console.print("\n[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
+        console.print(
+            "[yellow]이메일 발송을 위해 .env 파일에 다음을 설정해주세요:[/yellow]"
+        )
+        console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_server_token[/cyan]")
+        console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
+        raise typer.Exit(code=1)
+
+    if not config.EMAIL_SENDER:
+        console.print("\n[red]❌ EMAIL_SENDER가 설정되지 않았습니다.[/red]")
+        console.print("[yellow].env 파일에 EMAIL_SENDER를 설정해주세요:[/yellow]")
+        console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
+        raise typer.Exit(code=1)
+
+    # Send the test email
+    console.print(f"\n[cyan]📤 이메일 발송 중...[/cyan]")
+    console.print(f"[info]발송자: {config.EMAIL_SENDER}[/info]")
+    console.print(f"[info]수신자: {to}[/info]")
+    console.print(f"[info]제목: {subject}[/info]")
+
+    try:
+        success = news_deliver.send_email(
+            to_email=to, subject=subject, html_content=html_content
+        )
+
+        if success:
+            console.print(
+                f"\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]"
+            )
+            console.print(f"[green]수신자 {to}의 받은편지함을 확인해주세요.[/green]")
+
+            # Save test email content for reference
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_dir = "./output"
+            os.makedirs(output_dir, exist_ok=True)
+            test_file_path = os.path.join(output_dir, f"test_email_{timestamp}.html")
+
+            try:
+                with open(test_file_path, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                console.print(
+                    f"[info]테스트 이메일 내용이 저장되었습니다: {test_file_path}[/info]"
+                )
+            except Exception as e:
+                console.print(f"[yellow]테스트 파일 저장 실패: {e}[/yellow]")
+
+        else:
+            console.print(f"\n[bold red]❌ 이메일 발송에 실패했습니다.[/bold red]")
+            console.print(
+                "[yellow]Postmark 설정과 네트워크 연결을 확인해주세요.[/yellow]"
+            )
+            raise typer.Exit(code=1)
+
+    except Exception as e:
+        console.print(
+            f"\n[bold red]❌ 이메일 발송 중 오류가 발생했습니다: {e}[/bold red]"
+        )
+        console.print("[yellow]설정을 확인하고 다시 시도해주세요.[/yellow]")
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()

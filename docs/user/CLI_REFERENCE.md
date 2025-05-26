@@ -8,9 +8,10 @@ Newsletter Generator의 모든 CLI 명령어와 옵션에 대한 상세한 참�
 2. [newsletter run](#newsletter-run)
 3. [newsletter suggest](#newsletter-suggest)
 4. [newsletter test](#newsletter-test)
-5. [전역 옵션](#전역-옵션)
-6. [환경 변수](#환경-변수)
-7. [예시 모음](#예시-모음)
+5. [newsletter test-email](#newsletter-test-email)
+6. [전역 옵션](#전역-옵션)
+7. [환경 변수](#환경-변수)
+8. [예시 모음](#예시-모음)
 
 ## 기본 구조
 
@@ -25,6 +26,7 @@ newsletter [COMMAND] [OPTIONS]
 | `run` | 뉴스레터 생성 및 발송 |
 | `suggest` | 키워드 추천 |
 | `test` | 기존 데이터로 테스트 |
+| `test-email` | 이메일 발송 기능 테스트 |
 
 ## newsletter run
 
@@ -210,6 +212,181 @@ newsletter test output/collected_articles_AI.json --mode content --track-cost
 newsletter test data.json --mode template --output custom_newsletter.html
 ```
 
+## newsletter test-email
+
+이메일 발송 기능만 단독으로 테스트하는 명령어입니다. 뉴스레터 생성 없이 Postmark 이메일 발송 설정을 확인하고 테스트할 수 있습니다.
+
+### 기본 문법
+
+```bash
+newsletter test-email [OPTIONS]
+```
+
+### 필수 옵션
+
+| 옵션 | 타입 | 설명 |
+|------|------|------|
+| `--to` | TEXT | 테스트 이메일을 받을 이메일 주소 (필수) |
+
+### 선택적 옵션
+
+| 옵션 | 타입 | 기본값 | 설명 |
+|------|------|--------|------|
+| `--subject` | TEXT | 자동 생성 | 이메일 제목 (미지정 시 타임스탬프 포함 기본 제목) |
+| `--template` | PATH | - | 이메일 내용으로 사용할 HTML 파일 경로 |
+| `--dry-run` | FLAG | False | 실제 발송 없이 설정 확인만 수행 |
+
+### 기능 설명
+
+#### 기본 테스트 모드
+
+템플릿을 지정하지 않으면 기본 테스트 메시지를 발송합니다:
+
+- 📧 이메일 발송 성공 확인 메시지
+- 📋 테스트 정보 (발송 시간, 수신자, 서비스 정보)
+- 🔧 다음 단계 안내
+- 깔끔한 HTML 디자인
+
+#### 커스텀 템플릿 모드
+
+기존 HTML 파일을 이메일 내용으로 사용할 수 있습니다:
+
+- 생성된 뉴스레터 파일 테스트
+- 커스텀 HTML 템플릿 테스트
+- 이메일 렌더링 확인
+
+#### Dry Run 모드
+
+실제 이메일을 발송하지 않고 설정만 확인합니다:
+
+- Postmark 토큰 설정 확인
+- 발송자 이메일 설정 확인
+- 이메일 내용 길이 확인
+- 설정 문제 진단
+
+### 사용 예시
+
+#### 기본 테스트
+
+```bash
+# 기본 테스트 메시지 발송
+newsletter test-email --to user@example.com
+
+# 커스텀 제목으로 테스트
+newsletter test-email --to user@example.com --subject "내 이메일 테스트"
+```
+
+#### 템플릿 테스트
+
+```bash
+# 기존 뉴스레터 파일로 테스트
+newsletter test-email --to user@example.com --template output/newsletter.html
+
+# 커스텀 HTML 파일로 테스트
+newsletter test-email --to user@example.com --template my_template.html --subject "템플릿 테스트"
+```
+
+#### 설정 확인
+
+```bash
+# 실제 발송 없이 설정만 확인
+newsletter test-email --to user@example.com --dry-run
+
+# 템플릿과 함께 설정 확인
+newsletter test-email --to user@example.com --template newsletter.html --dry-run
+```
+
+### 출력 예시
+
+#### 성공적인 발송
+
+```
+Testing email sending to: user@example.com
+📤 이메일 발송 중...
+발송자: newsletter@company.com
+수신자: user@example.com
+제목: Newsletter Generator 이메일 테스트 - 2025-01-26 10:30:15
+
+✅ 이메일이 성공적으로 발송되었습니다!
+수신자 user@example.com의 받은편지함을 확인해주세요.
+테스트 이메일 내용이 저장되었습니다: output/test_email_20250126_103015.html
+```
+
+#### Dry Run 결과
+
+```
+🔍 DRY RUN MODE - 실제 이메일은 발송되지 않습니다
+수신자: user@example.com
+제목: Newsletter Generator 이메일 테스트 - 2025-01-26 10:30:15
+내용 길이: 2847 문자
+Postmark 토큰 설정 여부: ✅ 설정됨
+발송자 이메일: newsletter@company.com
+
+Dry run 완료. 실제 발송하려면 --dry-run 옵션을 제거하세요.
+```
+
+#### 설정 오류
+
+```
+❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.
+이메일 발송을 위해 .env 파일에 다음을 설정해주세요:
+POSTMARK_SERVER_TOKEN=your_postmark_server_token
+EMAIL_SENDER=your_verified_sender@example.com
+```
+
+### 문제 해결
+
+#### 1. Postmark 설정 확인
+
+```bash
+# 설정 상태 확인
+newsletter test-email --to test@example.com --dry-run
+
+# 환경 변수 확인
+echo "POSTMARK_SERVER_TOKEN: ${POSTMARK_SERVER_TOKEN:0:10}..."
+echo "EMAIL_SENDER: $EMAIL_SENDER"
+```
+
+#### 2. 템플릿 파일 문제
+
+```bash
+# 파일 존재 확인
+ls -la output/newsletter.html
+
+# 파일 내용 확인
+head -20 output/newsletter.html
+```
+
+#### 3. 네트워크 연결 확인
+
+```bash
+# Postmark API 연결 테스트
+curl -H "X-Postmark-Server-Token: YOUR_TOKEN" https://api.postmarkapp.com/server
+```
+
+#### 4. Postmark API 오류 해결
+
+**422 오류 (비활성 수신자)**
+```
+Error sending email: 422 {"ErrorCode":406,"Message":"You tried to send to recipient(s) that have been marked as inactive..."}
+```
+- 원인: 수신자가 하드 바운스, 스팸 신고, 수동 차단됨
+- 해결: 다른 이메일 주소로 테스트
+
+**401 오류 (인증 실패)**
+```
+Error sending email: 401 Unauthorized
+```
+- 원인: 잘못된 서버 토큰
+- 해결: Postmark 대시보드에서 토큰 재확인
+
+**403 오류 (권한 없음)**
+```
+Error sending email: 403 Forbidden
+```
+- 원인: 계정 승인 대기 중
+- 해결: 같은 도메인 내 이메일 주소로만 테스트 가능
+
 ## 전역 옵션
 
 모든 명령어에서 사용할 수 있는 옵션들입니다.
@@ -251,8 +428,8 @@ CLI에서 사용하는 주요 환경 변수들입니다.
 |--------|------|--------|
 | `NAVER_CLIENT_ID` | 네이버 뉴스 API 클라이언트 ID | - |
 | `NAVER_CLIENT_SECRET` | 네이버 뉴스 API 클라이언트 시크릿 | - |
-| `POSTMARK_SERVER_TOKEN` | Postmark 서버 토큰 | - |
-| `EMAIL_SENDER` | 발송자 이메일 주소 | - |
+| `POSTMARK_SERVER_TOKEN` | Postmark 서버 토큰 (이메일 발송용) | - |
+| `EMAIL_SENDER` | 발송자 이메일 주소 (Postmark에서 인증 필요) | - |
 | `GOOGLE_CLIENT_ID` | Google Drive API 클라이언트 ID | - |
 | `GOOGLE_CLIENT_SECRET` | Google Drive API 클라이언트 시크릿 | - |
 | `LANGCHAIN_API_KEY` | LangSmith API 키 | - |
@@ -350,6 +527,10 @@ newsletter run --keywords "AI" --verbose --save-intermediate
 
 # 기존 데이터로 템플릿 테스트
 newsletter test output/render_data_latest.json --mode template --output test.html
+
+# 이메일 발송 기능 테스트
+newsletter test-email --to admin@company.com --dry-run
+newsletter test-email --to admin@company.com --template output/newsletter.html
 ```
 
 #### 4. 커스터마이징된 필터링

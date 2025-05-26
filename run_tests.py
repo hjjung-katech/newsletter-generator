@@ -49,24 +49,28 @@ def setup_environment_variables(env_type):
     """환경 타입에 따른 환경 변수 설정"""
 
     if env_type == "dev":
-        # 개발 환경: Mock API만 실행
+        # 개발 환경: Mock API만 실행 (GitHub Actions 안전)
         os.environ["RUN_REAL_API_TESTS"] = "0"
         os.environ["RUN_MOCK_API_TESTS"] = "1"
+        os.environ["RUN_INTEGRATION_TESTS"] = "0"
 
     elif env_type == "ci":
-        # CI/CD 환경: Mock API + 단위 테스트
+        # CI/CD 환경: Mock API + 단위 테스트 (GitHub Actions 안전)
         os.environ["RUN_REAL_API_TESTS"] = "0"
         os.environ["RUN_MOCK_API_TESTS"] = "1"
+        os.environ["RUN_INTEGRATION_TESTS"] = "0"
 
     elif env_type == "integration":
-        # 통합 환경: 실제 API 테스트 (API 키 필요)
+        # 통합 환경: 실제 API 테스트 포함 (API 키 필요)
         os.environ["RUN_REAL_API_TESTS"] = "1"
         os.environ["RUN_MOCK_API_TESTS"] = "1"
+        os.environ["RUN_INTEGRATION_TESTS"] = "1"
 
     elif env_type == "unit":
         # 단위 테스트만: API 테스트 모두 비활성화
         os.environ["RUN_REAL_API_TESTS"] = "0"
         os.environ["RUN_MOCK_API_TESTS"] = "0"
+        os.environ["RUN_INTEGRATION_TESTS"] = "0"
 
 
 def run_code_formatting():

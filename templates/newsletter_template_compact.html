@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>{{ newsletter_title | default('주간 산업 동향 브리프') }}{% if newsletter_topic %} - {{ newsletter_topic }}{% endif %} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
+<title>{{ newsletter_title | default('주간 산업 동향 뉴스레터') }}{% if newsletter_topic %} - {{ newsletter_topic }}{% endif %} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
 <style>
 body{font-family:Arial, sans-serif; line-height:1.6; margin:0; padding:0; background:#f5f6fa;}
 .container{max-width:680px; margin:auto; background:#ffffff; padding:20px;}
@@ -28,7 +28,7 @@ footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 <body>
 <div class="container">
 <header>
-<h1>{{ newsletter_title | default('주간 산업 동향 브리프') }}</h1>
+<h1>{{ newsletter_title | default('주간 산업 동향 뉴스레터') }}</h1>
 <p class="tagline">{{ tagline | default('이번 주, 주요 산업 동향을 미리 만나보세요.') }}</p>
 <small>발행일: {{ generation_date }}{% if issue_no %} | 제 {{ issue_no }}호{% endif %}{% if generation_timestamp %} | 생성시간: {{ generation_timestamp }}{% endif %}</small>
 </header>
