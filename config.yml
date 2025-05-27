@@ -37,6 +37,100 @@ newsletter_settings:
   # The GitHub Actions workflow expects this path.
   output_directory: "./output" # The script should create newsletter.html or newsletter.md here
 
+# LLM Configuration - 기능별 LLM 모델 설정
+llm_settings:
+  # 기본 설정
+  default_provider: "gemini"  # 기본 LLM 제공자: gemini, openai, anthropic
+  
+  # 제공자별 API 키 설정 (환경변수 이름)
+  api_keys:
+    gemini: "GEMINI_API_KEY"
+    openai: "OPENAI_API_KEY"
+    anthropic: "ANTHROPIC_API_KEY"
+  
+  # 기능별 LLM 모델 설정 - 다양한 제공자 활용
+  models:
+    # 키워드 생성 (도메인 → 키워드) - 창의성이 중요하므로 Claude 사용
+    keyword_generation:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-latest"
+      temperature: 0.7
+      max_retries: 2
+      timeout: 60
+    
+    # 테마 추출 (키워드 → 공통 테마) - 빠른 분석이 중요하므로 Flash 모델 사용
+    theme_extraction:
+      provider: "gemini"
+      model: "gemini-2.5-flash-preview-05-20"
+      temperature: 0.2
+      max_retries: 2
+      timeout: 60
+    
+    # 뉴스 요약 (기사 → 요약) - 정확성이 중요하므로 최신 Gemini 모델 사용
+    news_summarization:
+      provider: "gemini"
+      model: "gemini-2.5-pro-preview-03-25"
+      temperature: 0.3
+      max_retries: 3
+      timeout: 120
+    
+    # 섹션 재생성 (뉴스 링크 → 섹션 요약) - 구조화된 작업이므로 Claude 사용
+    section_regeneration:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-latest"
+      temperature: 0.3
+      max_retries: 2
+      timeout: 120
+    
+    # 뉴스레터 소개 생성 - 자연스러운 글쓰기를 위해 Claude 사용
+    introduction_generation:
+      provider: "anthropic"
+      model: "claude-3-7-sonnet-latest"
+      temperature: 0.4
+      max_retries: 2
+      timeout: 60
+    
+    # HTML 생성 체인 (최종 뉴스레터 생성) - 복잡한 구조화 작업이므로 최신 Gemini 사용
+    html_generation:
+      provider: "gemini"
+      model: "gemini-2.5-pro-preview-03-25"
+      temperature: 0.2
+      max_retries: 3
+      timeout: 180
+    
+    # 기사 점수 매기기 - 빠른 판단이 중요하므로 Flash 모델 사용
+    article_scoring:
+      provider: "gemini"
+      model: "gemini-2.5-flash-preview-05-20"
+      temperature: 0.1
+      max_retries: 2
+      timeout: 30
+    
+    # 번역 작업 - 정확성이 중요하므로 Gemini Pro 사용
+    translation:
+      provider: "gemini"
+      model: "gemini-2.5-pro-preview-03-25"
+      temperature: 0.1
+      max_retries: 2
+      timeout: 60
+  
+  # 제공자별 모델 설정
+  provider_models:
+    gemini:
+      fast: "gemini-2.5-flash-preview-05-20"
+      standard: "gemini-1.5-pro"
+      advanced: "gemini-2.5-pro-preview-03-25"
+    
+    openai:
+      fast: "gpt-4o-mini"
+      standard: "gpt-4o"
+      advanced: "gpt-4o"
+    
+    anthropic:
+      fast: "claude-3-5-haiku-latest"
+      standard: "claude-3-7-sonnet-latest"
+      advanced: "claude-sonnet-4-20250514"
+
 # Distribution settings for GitHub Actions
 distribution:
   # Email settings

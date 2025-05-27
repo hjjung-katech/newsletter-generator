@@ -265,13 +265,39 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
         is_similar = False
         if normalized_title:
             for existing_title in seen_titles:
-                if (
-                    existing_title
-                    and _word_overlap_ratio(normalized_title, existing_title) >= 0.85
-                ):
-                    console.print(f"[yellow]Skipping similar title: {title}[/yellow]")
-                    is_similar = True
-                    break
+                if existing_title:
+                    overlap_ratio = _word_overlap_ratio(
+                        normalized_title, existing_title
+                    )
+
+                    # 겹침 비율이 높더라도 중요한 차별화 단어가 있으면 다른 기사로 처리
+                    differentiating_words = [
+                        "계획",
+                        "발표",
+                        "예정",
+                        "준비",
+                        "검토",
+                        "추진",
+                        "시작",
+                        "완료",
+                        "종료",
+                        "중단",
+                    ]
+                    title_words = set(normalized_title.split())
+                    existing_words = set(existing_title.split())
+
+                    has_differentiating_word = any(
+                        word in title_words or word in existing_words
+                        for word in differentiating_words
+                    )
+
+                    # 겹침 비율이 매우 높고 차별화 단어가 없는 경우에만 중복으로 처리
+                    if overlap_ratio >= 0.99 and not has_differentiating_word:
+                        console.print(
+                            f"[yellow]Skipping similar title: {title}[/yellow]"
+                        )
+                        is_similar = True
+                        break
 
         if is_similar:
             continue

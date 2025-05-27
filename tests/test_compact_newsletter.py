@@ -151,7 +151,7 @@ class TestCompactNewsletterUnit:
 
         # 검증 - 실제 렌더링되는 제목으로 수정
         assert html is not None and len(html) > 0, "HTML이 생성되지 않았습니다"
-        assert "주간 산업 동향 브리프" in html, "제목이 렌더링되지 않았습니다"
+        assert "자율주행 주간 브리프" in html, "제목이 렌더링되지 않았습니다"
         assert "💡 이런 뜻이에요" in html, "정의 섹션이 렌더링되지 않았습니다"
         assert "테스트용어" in html, "용어가 렌더링되지 않았습니다"
         assert "테스트를 위한 용어입니다" in html, "용어 설명이 렌더링되지 않았습니다"

@@ -1,17 +1,12 @@
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None  # Gemini API 사용 불가 상태로 표시
-
 from . import config  # Import config module
 import os
 from typing import List, Union, Dict, Any
 import uuid
 
 SYSTEM_INSTRUCTION = """
-Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
+Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업동향 뉴스레터"를 작성하는 전문 편집자입니다.
 
-Context: 독자들은 한국 첨단사업의 R&D 전략기획단 소속으로, 젊은 팀원들과 수석전문위원들로 구성되어 있습니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+Context: 독자들은 한국 첨단사업의 R&D 전략기획단 소속으로, 전문위원들로 구성되어 있습니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 Input:
 1.  하나 이상의 '키워드' (예: "친환경 자동차", "AI 반도체"). 이 키워드는 뉴스레터의 주된 주제가 됩니다.
@@ -28,11 +23,11 @@ HTML Template Structure:
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>주간 산업 동향 뉴스 클리핑</title>
+    <title>주간 산업동향 뉴스레터</title>
 </head>
 <body>
-    <h2>전략프로젝트팀 주간 산업 동향 뉴스 클리핑 ([주제 키워드 삽입])</h2>
-    <p>안녕하세요, 전략프로젝트팀의 젊은 팀원과 수석전문위원 여러분.</p>
+    <h2>전략프로젝트팀 주간 산업동향 뉴스레터 ([주제 키워드 삽입])</h2>
+    <p>안녕하세요, 전략프로젝트팀의 전문위원 여러분.</p>
     <p>지난 한 주간의 [주제 키워드 삽입] 산업 관련 주요 기술 동향 및 뉴스를 정리하여 보내드립니다. 함께 살펴보시고 R&D 전략 수립에 참고하시면 좋겠습니다.</p>
     <hr>
 
@@ -107,6 +102,11 @@ def summarize_articles(
     Returns:
         HTML string containing the summarized newsletter
     """
+    try:
+        import google.generativeai as genai
+    except ImportError:
+        genai = None  # Gemini API 사용 불가 상태로 표시
+
     if callbacks is None:
         callbacks = []
     if os.environ.get("ENABLE_COST_TRACKING"):
@@ -202,13 +202,23 @@ def summarize_articles(
         return error_html
 
     try:
-        genai.configure(api_key=config.GEMINI_API_KEY)
+        # LLM 팩토리를 사용하여 뉴스 요약에 최적화된 모델 사용
+        try:
+            from .llm_factory import get_llm_for_task
+            from langchain_core.messages import HumanMessage, SystemMessage
 
-        # Create the model with system instructions
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-pro-latest",
-            system_instruction=SYSTEM_INSTRUCTION,
-        )
+            llm = get_llm_for_task("news_summarization", callbacks)
+            system_prompt = SYSTEM_INSTRUCTION
+        except (ImportError, AttributeError) as e:
+            print(
+                f"Warning: LLM factory failed for news summarization, using fallback: {e}"
+            )
+            # Fallback to original Gemini implementation
+            genai.configure(api_key=config.GEMINI_API_KEY)
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-pro-latest",
+                system_instruction=SYSTEM_INSTRUCTION,
+            )
 
         # Convert keywords to comma-separated string for prompt
         if not keywords:
@@ -243,67 +253,81 @@ def summarize_articles(
         # Combine article details with newlines between each article
         articles_text = "\n\n---\n\n".join(articles_details)
 
-        # Create the full prompt for Gemini Pro
+        # Create the full prompt
         prompt = f"키워드: {keyword_str}\n\n뉴스 기사 목록:\n\n{articles_text}"
 
-        run_id = uuid.uuid4()  # Generate run_id
-        for cb in callbacks:
-            if hasattr(cb, "on_llm_start"):
-                try:
-                    # Attempt to call with common LangChainTracer arguments first
-                    cb.on_llm_start(
-                        serialized={},
-                        prompts=[prompt],
-                        run_id=run_id,
-                        name="summarize_articles_llm",
-                        run_type="llm",
-                        tags=[],
-                        metadata={},
-                        parent_run_id=None,
-                    )
-                except (
-                    TypeError
-                ):  # If that fails due to unexpected kwargs, try basic version
-                    try:
-                        cb.on_llm_start(serialized={}, prompts=[prompt], run_id=run_id)
-                    except Exception as e_start_fallback:
-                        print(
-                            f"Warning: Callback on_llm_start (fallback) failed: {e_start_fallback}"
-                        )
-                except Exception as e_start:
-                    print(f"Warning: Callback on_llm_start (initial) failed: {e_start}")
         try:
-            # Generate the summary using Gemini Pro
-            response = model.generate_content([prompt])
-            for cb in callbacks:
-                if hasattr(cb, "on_llm_end"):
-                    try:
-                        cb.on_llm_end(response, run_id=run_id)  # Pass run_id
-                    except Exception as e_end:
-                        print(f"Warning: Callback on_llm_end failed: {e_end}")
-            if hasattr(response, "text"):
-                html_content = response.text
+            # LLM 팩토리를 사용하는 경우의 처리 로직
+            if "llm" in locals():
+                # 시스템 프롬프트와 사용자 프롬프트를 결합
+                full_prompt = f"{system_prompt}\n\n{prompt}"
+                response = llm.invoke([HumanMessage(content=full_prompt)])
+                html_content = response.content
                 return html_content
             else:
-                print("Error: Could not get text from Gemini response.")
-                error_html = f"""
-                <html>
-                <body>
-                <h1>오류 발생</h1>
-                <p>키워드 '{keyword_display}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: 응답에서 텍스트를 가져올 수 없습니다.</p>
-                </body>
-                </html>
-                """
-                return error_html
-        except Exception as e:
-            for cb in callbacks:  # Call on_llm_error for each callback
-                if hasattr(cb, "on_llm_error"):
-                    try:
-                        cb.on_llm_error(e, run_id=run_id)  # Pass run_id
-                    except Exception as e_error:
-                        print(f"Warning: Callback on_llm_error failed: {e_error}")
+                # 기존 Gemini 방식 사용
+                run_id = uuid.uuid4()
+                for cb in callbacks:
+                    if hasattr(cb, "on_llm_start"):
+                        try:
+                            cb.on_llm_start(
+                                serialized={},
+                                prompts=[prompt],
+                                run_id=run_id,
+                                name="summarize_articles_llm",
+                                run_type="llm",
+                                tags=[],
+                                metadata={},
+                                parent_run_id=None,
+                            )
+                        except TypeError:
+                            try:
+                                cb.on_llm_start(
+                                    serialized={}, prompts=[prompt], run_id=run_id
+                                )
+                            except Exception as e_start_fallback:
+                                print(
+                                    f"Warning: Callback on_llm_start (fallback) failed: {e_start_fallback}"
+                                )
+                        except Exception as e_start:
+                            print(
+                                f"Warning: Callback on_llm_start (initial) failed: {e_start}"
+                            )
 
-            print(f"Error calling Gemini API: {e}")
+                # Generate the summary using Gemini Pro
+                response = model.generate_content([prompt])
+                for cb in callbacks:
+                    if hasattr(cb, "on_llm_end"):
+                        try:
+                            cb.on_llm_end(response, run_id=run_id)
+                        except Exception as e_end:
+                            print(f"Warning: Callback on_llm_end failed: {e_end}")
+
+                if hasattr(response, "text"):
+                    html_content = response.text
+                    return html_content
+                else:
+                    print("Error: Could not get text from Gemini response.")
+                    error_html = f"""
+                    <html>
+                    <body>
+                    <h1>오류 발생</h1>
+                    <p>키워드 '{keyword_display}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: 응답에서 텍스트를 가져올 수 없습니다.</p>
+                    </body>
+                    </html>
+                    """
+                    return error_html
+
+        except Exception as e:
+            if "run_id" in locals():
+                for cb in callbacks:
+                    if hasattr(cb, "on_llm_error"):
+                        try:
+                            cb.on_llm_error(e, run_id=run_id)
+                        except Exception as e_error:
+                            print(f"Warning: Callback on_llm_error failed: {e_error}")
+
+            print(f"Error calling LLM API: {e}")
             error_html = f"""
             <html>
             <body>

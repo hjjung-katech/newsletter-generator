@@ -31,6 +31,7 @@ class GoogleGenAICostCB(BaseCallbackHandler):
         self.completion_tokens = 0
         self.total_cost = 0.0
         self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.provider = "gemini"
 
     def on_llm_start(
         self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
@@ -98,12 +99,166 @@ class GoogleGenAICostCB(BaseCallbackHandler):
     def get_summary(self) -> Dict[str, Any]:
         """Return a summary of token usage and costs."""
         return {
+            "provider": self.provider,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.prompt_tokens + self.completion_tokens,
             "total_cost_usd": self.total_cost,
             "timestamp": self.timestamp,
         }
+
+
+class OpenAICostCB(BaseCallbackHandler):
+    """Callback handler to track OpenAI token usage and costs."""
+
+    # OpenAI 가격 (2025년 5월 기준)
+    # GPT-4o: $5.00 / 1M input tokens, $15.00 / 1M output tokens
+    # GPT-4o-mini: $0.150 / 1M input tokens, $0.600 / 1M output tokens
+    MODEL_PRICES = {
+        "gpt-4o": {"input": 5.00 / 1000, "output": 15.00 / 1000},  # per 1K tokens
+        "gpt-4o-mini": {"input": 0.150 / 1000, "output": 0.600 / 1000},  # per 1K tokens
+        "gpt-4": {"input": 30.00 / 1000, "output": 60.00 / 1000},  # per 1K tokens
+        "gpt-3.5-turbo": {"input": 0.50 / 1000, "output": 1.50 / 1000},  # per 1K tokens
+    }
+
+    def __init__(self):
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_cost = 0.0
+        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.provider = "openai"
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        """Run when LLM starts running."""
+        pass
+
+    def on_llm_end(self, response, **kwargs):
+        """Run when LLM ends running."""
+        # OpenAI LangChain 응답 처리
+        if hasattr(response, "llm_output") and response.llm_output:
+            token_usage = response.llm_output.get("token_usage")
+            model_name = response.llm_output.get("model_name", "gpt-4o")
+
+            if token_usage:
+                in_tok = token_usage.get("prompt_tokens", 0)
+                out_tok = token_usage.get("completion_tokens", 0)
+
+                self.prompt_tokens += in_tok
+                self.completion_tokens += out_tok
+
+                # 모델별 가격 적용
+                prices = self.MODEL_PRICES.get(model_name, self.MODEL_PRICES["gpt-4o"])
+                input_cost = (in_tok * prices["input"]) / 1000
+                output_cost = (out_tok * prices["output"]) / 1000
+                this_cost = input_cost + output_cost
+                self.total_cost += this_cost
+
+                if os.environ.get("DEBUG_COST_TRACKING"):
+                    print(
+                        f"[Token Usage - {model_name}] Input: {in_tok}, Output: {out_tok}, Cost: ${this_cost:.6f}"
+                    )
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Return a summary of token usage and costs."""
+        return {
+            "provider": self.provider,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.prompt_tokens + self.completion_tokens,
+            "total_cost_usd": self.total_cost,
+            "timestamp": self.timestamp,
+        }
+
+
+class AnthropicCostCB(BaseCallbackHandler):
+    """Callback handler to track Anthropic Claude token usage and costs."""
+
+    # Anthropic Claude 가격 (2025년 5월 기준)
+    # Claude 3.5 Sonnet: $3.00 / 1M input tokens, $15.00 / 1M output tokens
+    # Claude 3 Sonnet: $3.00 / 1M input tokens, $15.00 / 1M output tokens
+    # Claude 3 Haiku: $0.25 / 1M input tokens, $1.25 / 1M output tokens
+    MODEL_PRICES = {
+        "claude-3-5-sonnet-20241022": {
+            "input": 3.00 / 1000,
+            "output": 15.00 / 1000,
+        },  # per 1K tokens
+        "claude-3-sonnet-20240229": {
+            "input": 3.00 / 1000,
+            "output": 15.00 / 1000,
+        },  # per 1K tokens
+        "claude-3-haiku-20240307": {
+            "input": 0.25 / 1000,
+            "output": 1.25 / 1000,
+        },  # per 1K tokens
+    }
+
+    def __init__(self):
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.total_cost = 0.0
+        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.provider = "anthropic"
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        """Run when LLM starts running."""
+        pass
+
+    def on_llm_end(self, response, **kwargs):
+        """Run when LLM ends running."""
+        # Anthropic LangChain 응답 처리
+        if hasattr(response, "llm_output") and response.llm_output:
+            token_usage = response.llm_output.get("token_usage")
+            model_name = response.llm_output.get(
+                "model_name", "claude-3-sonnet-20240229"
+            )
+
+            if token_usage:
+                in_tok = token_usage.get("input_tokens", 0)
+                out_tok = token_usage.get("output_tokens", 0)
+
+                self.prompt_tokens += in_tok
+                self.completion_tokens += out_tok
+
+                # 모델별 가격 적용
+                prices = self.MODEL_PRICES.get(
+                    model_name, self.MODEL_PRICES["claude-3-sonnet-20240229"]
+                )
+                input_cost = (in_tok * prices["input"]) / 1000
+                output_cost = (out_tok * prices["output"]) / 1000
+                this_cost = input_cost + output_cost
+                self.total_cost += this_cost
+
+                if os.environ.get("DEBUG_COST_TRACKING"):
+                    print(
+                        f"[Token Usage - {model_name}] Input: {in_tok}, Output: {out_tok}, Cost: ${this_cost:.6f}"
+                    )
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Return a summary of token usage and costs."""
+        return {
+            "provider": self.provider,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.prompt_tokens + self.completion_tokens,
+            "total_cost_usd": self.total_cost,
+            "timestamp": self.timestamp,
+        }
+
+
+def get_cost_callback_for_provider(provider: str) -> BaseCallbackHandler:
+    """제공자별 비용 추적 콜백을 반환합니다."""
+    callbacks_map = {
+        "gemini": GoogleGenAICostCB,
+        "openai": OpenAICostCB,
+        "anthropic": AnthropicCostCB,
+    }
+
+    callback_class = callbacks_map.get(provider, GoogleGenAICostCB)  # 기본값: Gemini
+    return callback_class()
 
 
 # Legacy callback handler for compatibility
@@ -140,9 +295,11 @@ def get_tracking_callbacks():
     if _tracer_initialized:
         if _global_tracer is not None:
             callbacks.append(_global_tracer)
-        # Google GenAI 비용 추적은 매번 새로 생성 (상태 추적을 위해)
+        # 제공자별 비용 추적 콜백 추가 (상태 추적을 위해 매번 새로 생성)
         try:
+            # 기본적으로 Gemini 콜백을 추가하지만, 향후 동적으로 제공자 감지 가능
             callbacks.append(GoogleGenAICostCB())
+            # 다른 제공자들도 필요에 따라 추가할 수 있음
         except Exception as e:
             # 첫 번째 초기화에서만 에러 메시지 출력
             pass

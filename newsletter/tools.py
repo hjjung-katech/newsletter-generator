@@ -343,14 +343,8 @@ def generate_keywords_with_gemini(
     domain: str, count: int = 10, callbacks=None
 ) -> list[str]:
     """
-    Generates high-quality trend keywords for a given domain using Google Gemini.
+    Generates high-quality trend keywords for a given domain using configured LLM.
     """
-    if not config.GEMINI_API_KEY:
-        console.print(
-            "[bold red]Error: GEMINI_API_KEY is not configured. Cannot generate keywords.[/bold red]"
-        )
-        return []
-
     try:
         if callbacks is None:
             callbacks = []
@@ -362,17 +356,33 @@ def generate_keywords_with_gemini(
             except Exception:
                 pass
 
-        llm = ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro-preview-03-25",  # 최신 Gemini 2.5 Pro 모델 사용
-            temperature=0.7,  # 원래 설정된 온도값 유지
-            google_api_key=config.GEMINI_API_KEY,
-            transport="rest",  # REST API 사용 (gRPC 대신)
-            convert_system_message_to_human=True,  # 원래 설정으로 유지
-            callbacks=callbacks,
-            timeout=60,  # 타임아웃 60초 (request_timeout 대신)
-            max_retries=2,  # 최대 2회 재시도
-            disable_streaming=False,  # 스트리밍 활성화 (streaming=True 대신)
-        )
+        # LLM 팩토리를 사용하여 키워드 생성에 최적화된 모델 사용
+        try:
+            from .llm_factory import get_llm_for_task
+
+            llm = get_llm_for_task("keyword_generation", callbacks)
+        except Exception as e:
+            console.print(
+                f"[yellow]Warning: LLM factory failed, using fallback: {e}[/yellow]"
+            )
+            # Fallback to Gemini if factory fails
+            if not config.GEMINI_API_KEY:
+                console.print(
+                    "[bold red]Error: GEMINI_API_KEY is not configured. Cannot generate keywords.[/bold red]"
+                )
+                return []
+
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-2.5-pro-preview-03-25",
+                temperature=0.7,
+                google_api_key=config.GEMINI_API_KEY,
+                transport="rest",
+                convert_system_message_to_human=True,
+                callbacks=callbacks,
+                timeout=60,
+                max_retries=2,
+                disable_streaming=False,
+            )
 
         prompt_template = PromptTemplate.from_template(
             """You are a news search expert highly skilled at identifying effective search queries for finding the latest news articles about a given field.
@@ -497,20 +507,77 @@ def validate_and_refine_keywords(
 
 
 def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
-    """Extracts a common theme from a list of keywords using Google Gemini."""
-    if not api_key:
-        api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("GOOGLE_API_KEY not found. Skipping common theme extraction with Gemini.")
-        return extract_common_theme_fallback(keywords)
-
+    """Extracts a common theme from a list of keywords using configured LLM."""
     if not keywords:
         return "General News"
 
-    try:
-        genai.configure(api_key=api_key)
+    # Check if any API keys are available before attempting LLM calls
+    if not api_key:
+        api_key = config.GEMINI_API_KEY
 
-        model_name = "gemini-1.5-flash-latest"  # Define the model name being used
+    # Also check for other API keys that might be used by LLM factory
+    has_any_api_key = (
+        api_key
+        or getattr(config, "OPENAI_API_KEY", None)
+        or getattr(config, "ANTHROPIC_API_KEY", None)
+    )
+
+    if not has_any_api_key:
+        print("No API keys available. Using simple fallback for theme extraction.")
+        return extract_common_theme_fallback(keywords)
+
+    try:
+        # LLM 팩토리를 사용하여 테마 추출에 최적화된 모델 사용
+        try:
+            from .llm_factory import get_llm_for_task
+            from langchain_core.messages import HumanMessage
+            from langchain_core.output_parsers import StrOutputParser
+            from langchain_core.prompts import PromptTemplate
+
+            if callbacks is None:
+                callbacks = []
+            if os.environ.get("ENABLE_COST_TRACKING"):
+                try:
+                    from .cost_tracking import get_tracking_callbacks
+
+                    callbacks += get_tracking_callbacks()
+                except Exception:
+                    pass
+
+            llm = get_llm_for_task("theme_extraction", callbacks)
+
+            prompt_template = PromptTemplate.from_template(
+                """다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
+                {keywords}
+
+                출력 형식:
+                - 공통 분야/주제만 간결하게 답변해 주세요 (3단어 이내)
+                - 설명이나 부가 정보는 포함하지 마세요
+                - 반드시 한국어로 답변해 주세요"""
+            )
+
+            chain = prompt_template | llm | StrOutputParser()
+            extracted_theme = chain.invoke({"keywords": ", ".join(keywords)})
+
+            if len(extracted_theme) > 30:
+                extracted_theme = extracted_theme[:30]
+
+            return extracted_theme.strip()
+
+        except Exception as e:
+            print(
+                f"Warning: LLM factory failed for theme extraction, using fallback: {e}"
+            )
+            # Check if API key is available before trying Gemini fallback
+            if not api_key:
+                print(
+                    "GEMINI_API_KEY not found. Using simple fallback for theme extraction."
+                )
+                return extract_common_theme_fallback(keywords)
+
+        # Fallback to original implementation only if API key is available
+        genai.configure(api_key=api_key)
+        model_name = "gemini-1.5-flash-latest"
 
         final_prompt = f"""
 다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
@@ -594,97 +661,12 @@ def extract_common_theme_fallback(keywords):
     if len(keywords) <= 1:
         return keywords[0] if keywords else ""
 
-    # 키워드에서 공통 도메인 추출 시도
-    common_terms = []
-
-    # 로봇 관련 키워드들
-    robot_terms = [
-        "로봇",
-        "로보틱스",
-        "자동화",
-        "AI 로봇",
-        "서비스 로봇",
-        "산업 로봇",
-        "협동로봇",
-        "휴머노이드",
-    ]
-    if any(any(term in keyword for term in robot_terms) for keyword in keywords):
-        return "로봇"
-
-    # AI 관련 키워드들
-    ai_terms = ["AI", "인공지능", "머신러닝", "딥러닝", "신경망", "자연어처리"]
-    if any(any(term in keyword for term in ai_terms) for keyword in keywords):
-        return "인공지능"
-
-    # 반도체 관련 키워드들
-    semiconductor_terms = [
-        "반도체",
-        "칩",
-        "메모리",
-        "프로세서",
-        "웨이퍼",
-        "팹",
-        "나노공정",
-    ]
-    if any(
-        any(term in keyword for term in semiconductor_terms) for keyword in keywords
-    ):
-        return "반도체"
-
-    # 배터리 관련 키워드들
-    battery_terms = ["배터리", "전지", "리튬", "충전", "에너지저장", "ESS"]
-    if any(any(term in keyword for term in battery_terms) for keyword in keywords):
-        return "배터리"
-
-    # 자동차 관련 키워드들
-    auto_terms = ["자동차", "전기차", "자율주행", "모빌리티", "ADAS", "EV"]
-    if any(any(term in keyword for term in auto_terms) for keyword in keywords):
-        return "자동차"
-
-    # 화학소재 관련 키워드들
-    chemical_terms = ["화학", "소재", "플라스틱", "폴리머", "촉매", "정밀화학"]
-    if any(any(term in keyword for term in chemical_terms) for keyword in keywords):
-        return "화학소재"
-
-    # 바이오 관련 키워드들
-    bio_terms = ["바이오", "생명공학", "의료", "신약", "유전자", "세포", "치료제"]
-    if any(any(term in keyword for term in bio_terms) for keyword in keywords):
-        return "바이오"
-
-    # 에너지 관련 키워드들
-    energy_terms = ["에너지", "태양광", "풍력", "수소", "신재생", "발전"]
-    if any(any(term in keyword for term in energy_terms) for keyword in keywords):
-        return "에너지"
-
-    # 공통 도메인을 찾지 못한 경우 - 더 지능적인 처리
+    # 공통 도메인을 찾지 못한 경우 - 단순한 키워드 조합 우선
     if len(keywords) <= 3:
         return ", ".join(keywords)
     else:
-        # 첫 번째 키워드에서 의미 있는 단어 추출 시도
-        first_keyword = keywords[0]
-        # 기술, 산업, 시장 등의 일반적인 단어 제거하고 핵심 도메인 추출
-        meaningful_words = []
-        skip_words = [
-            "기술",
-            "산업",
-            "시장",
-            "동향",
-            "개발",
-            "연구",
-            "분야",
-            "관련",
-            "전망",
-            "분석",
-        ]
-
-        for word in first_keyword.split():
-            if word not in skip_words and len(word) > 1:
-                meaningful_words.append(word)
-
-        if meaningful_words:
-            return meaningful_words[0]
-        else:
-            return f"{keywords[0]} 외 {len(keywords)-1}개 분야"
+        # 4개 이상일 때는 "첫번째키워드 외 (총개수-1)개 분야" 형식
+        return f"{keywords[0]} 외 {len(keywords)-1}개 분야"
 
 
 def sanitize_filename(text):
@@ -763,7 +745,7 @@ def get_filename_safe_theme(keywords, domain=None):
 
 def regenerate_section_with_gemini(section_title: str, news_links: list) -> list:
     """
-    Gemini API를 사용하여 뉴스 링크 목록으로부터 섹션 요약문을 재생성합니다.
+    구성된 LLM을 사용하여 뉴스 링크 목록으로부터 섹션 요약문을 재생성합니다.
 
     Args:
         section_title: 섹션 제목
@@ -773,13 +755,72 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
         list: 생성된 요약문 문단 목록
     """
     from . import config
-    import google.generativeai as genai
 
-    if not config.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+    # LLM 팩토리를 사용하여 섹션 재생성에 최적화된 모델 사용
+    try:
+        from .llm_factory import get_llm_for_task
+        from langchain_core.messages import HumanMessage
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-pro")
+        llm = get_llm_for_task("section_regeneration")
+
+        # 뉴스 링크 정보를 문자열로 변환
+        news_links_text = ""
+        for i, link in enumerate(news_links, 1):
+            title = (
+                str(link.get("title", "No Title")).replace("{", "{{").replace("}", "}}")
+            )
+            source = (
+                str(link.get("source_and_date", "Unknown Source"))
+                .replace("{", "{{")
+                .replace("}", "}}")
+            )
+            url = str(link.get("url", "#")).replace("{", "{{").replace("}", "}}")
+
+            news_links_text += f"기사 {i}:\n"
+            news_links_text += f"제목: {title}\n"
+            news_links_text += f"출처: {source}\n"
+            news_links_text += f"URL: {url}\n\n"
+
+        prompt = f"""
+        다음은 '{section_title}'에 관련된 뉴스 기사 목록입니다:
+        
+        {news_links_text}
+        
+        위 뉴스 기사들을 바탕으로 '{section_title}'에 대한 종합적인 요약문을 작성해주세요.
+        
+        요구사항:
+        1. 1개의 문단으로 나누어 작성해주세요. 각 문단은 최소 3-4문장 이상으로 구성해주세요.
+        2. 문단은 주요 트렌드나 동향을 설명해주세요.
+        5. 전문적이고 객관적인 톤으로 작성해주세요.
+        6. 한국어로 작성해주세요.
+        7. 각 문단은 별도의 문자열로 반환해주세요 (리스트 형태).
+        """
+
+        response = llm.invoke([HumanMessage(content=prompt)])
+        response_text = response.content.strip()
+
+        # 문단으로 분리
+        paragraphs = [p.strip() for p in response_text.split("\n\n") if p.strip()]
+
+        # 최소 3개의 문단 확보
+        while len(paragraphs) < 3:
+            paragraphs.append("추가 정보가 필요합니다.")
+
+        # 최대 3개 문단으로 제한
+        return paragraphs[:3]
+
+    except Exception as e:
+        print(
+            f"Warning: LLM factory failed for section regeneration, using fallback: {e}"
+        )
+        # Fallback to original Gemini implementation
+        import google.generativeai as genai
+
+        if not config.GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-pro")
 
     # 뉴스 링크 정보를 문자열로 변환 - 수정된 형식으로
     news_links_text = ""
@@ -845,7 +886,7 @@ def generate_introduction_with_gemini(
     newsletter_topic: str, section_titles: list
 ) -> str:
     """
-    Gemini API를 사용하여 뉴스레터 주제와 섹션 제목을 기반으로 소개 메시지를 생성합니다.
+    구성된 LLM을 사용하여 뉴스레터 주제와 섹션 제목을 기반으로 소개 메시지를 생성합니다.
 
     Args:
         newsletter_topic: 뉴스레터 주제
@@ -855,13 +896,57 @@ def generate_introduction_with_gemini(
         str: 생성된 소개 메시지
     """
     from . import config
-    import google.generativeai as genai
 
-    if not config.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+    # LLM 팩토리를 사용하여 소개 생성에 최적화된 모델 사용
+    try:
+        from .llm_factory import get_llm_for_task
+        from langchain_core.messages import HumanMessage
 
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-pro")
+        llm = get_llm_for_task("introduction_generation")
+
+        # 섹션 제목을 문자열로 변환
+        safe_topic = str(newsletter_topic).replace("{", "{{").replace("}", "}}")
+        section_titles_text = ""
+        for i, title in enumerate(section_titles, 1):
+            safe_title = str(title).replace("{", "{{").replace("}", "}}")
+            section_titles_text += f"- {safe_title}\n"
+
+        prompt = f"""
+        다음은 뉴스레터의 주제와 포함된 섹션 제목들입니다:
+        
+        뉴스레터 주제: {safe_topic}
+        
+        섹션 제목:
+        {section_titles_text}
+        
+        위 정보를 바탕으로 뉴스레터의 소개 메시지를 작성해주세요.
+        
+        요구사항:
+        1. 전문적이고 친절한 톤으로 작성해주세요.
+        2. 2-3 문장으로 간결하게 작성해주세요.
+        3. 이번 뉴스레터의 가치와 중요성을 강조해주세요.
+        4. 한국어로 작성해주세요.
+        5. 각 섹션의 핵심 내용이 무엇인지 간략히 언급해주세요.
+        6. 'R&D 전략 수립' 또는 '의사결정'에 도움이 될 수 있다는 점을 언급해주세요.
+        
+        소개 메시지만 반환해 주세요.
+        """
+
+        response = llm.invoke([HumanMessage(content=prompt)])
+        return response.content.strip()
+
+    except Exception as e:
+        print(
+            f"Warning: LLM factory failed for introduction generation, using fallback: {e}"
+        )
+        # Fallback to original Gemini implementation
+        import google.generativeai as genai
+
+        if not config.GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        model = genai.GenerativeModel("gemini-1.5-pro")
 
     # 섹션 제목을 문자열로 변환
     safe_topic = str(newsletter_topic).replace("{", "{{").replace("}", "}}")

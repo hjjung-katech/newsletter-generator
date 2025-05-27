@@ -10,10 +10,12 @@
 ## ✨ 주요 기능
 
 - 🔍 **다양한 뉴스 소스**: Serper API, RSS 피드, 네이버 뉴스 API 통합
-- 🤖 **AI 기반 요약**: Google Gemini Pro를 활용한 지능형 뉴스 요약
+- 🤖 **멀티 LLM 지원**: Google Gemini, OpenAI GPT, Anthropic Claude 모델 통합 지원
+- 🎛️ **기능별 LLM 설정**: 키워드 생성, 요약, HTML 생성 등 기능별로 다른 LLM 모델 사용 가능
 - 📧 **자동 발송**: Postmark를 통한 이메일 발송 및 Google Drive 저장
 - 🎯 **스마트 필터링**: 중복 제거, 주요 소스 우선순위, 키워드별 그룹화
 - 📱 **두 가지 스타일**: Compact(간결) / Detailed(상세) 뉴스레터 지원
+- 💰 **비용 추적**: 제공자별 토큰 사용량 및 비용 자동 추적
 
 ## 🚀 빠른 시작
 
@@ -32,7 +34,10 @@ cp .env.example .env
 # .env 파일을 편집하여 API 키 설정
 ```
 
-필요한 API 키: Google Gemini Pro, Serper API, Postmark, Google Drive API
+필요한 API 키: 
+- **필수**: Google Gemini API (기본 LLM), Serper API (뉴스 검색)
+- **멀티 LLM**: OpenAI API (GPT 모델), Anthropic API (Claude 모델)
+- **기타**: Postmark (이메일), Google Drive API (저장)
 
 ### 기본 사용법
 
@@ -54,6 +59,9 @@ newsletter test-email --to user@example.com --template output/newsletter.html
 
 # 통합 이메일 테스트 (상세한 검증)
 python tests/test_email_integration.py --to user@example.com
+
+# LLM 제공자 정보 확인
+newsletter list-providers
 ```
 
 ## 🏗️ 아키텍처 개요
@@ -77,7 +85,8 @@ flowchart LR
 - **[⚡ CLI 참조](docs/user/CLI_REFERENCE.md)** - 모든 명령어 및 옵션
 - **[🔧 설치 가이드](docs/setup/INSTALLATION.md)** - 상세한 설치 및 설정 방법
 
-### 개발자 문서
+### 기술 문서
+- **[🤖 LLM 설정 가이드](docs/technical/LLM_CONFIGURATION.md)** - 다양한 LLM 제공자 설정 및 최적화
 - **[👨‍💻 개발자 가이드](docs/dev/DEVELOPMENT_GUIDE.md)** - 개발 환경 설정 및 기여 방법
 - **[🏗️ 시스템 아키텍처](docs/ARCHITECTURE.md)** - 전체 시스템 구조 및 설계
 - **[📋 프로젝트 요구사항](docs/PRD.md)** - 프로젝트 목표 및 요구사항

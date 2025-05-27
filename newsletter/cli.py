@@ -908,6 +908,61 @@ def test(
 
 
 @app.command()
+def list_providers():
+    """사용 가능한 LLM 제공자와 모델 정보를 표시합니다."""
+    try:
+        from .llm_factory import get_provider_info, get_available_providers
+        from . import config
+
+        console.print("\n[bold cyan]LLM 제공자 정보[/bold cyan]")
+        console.print("=" * 50)
+
+        # 사용 가능한 제공자 목록 표시
+        available_providers = get_available_providers()
+        console.print(
+            f"\n[green]사용 가능한 제공자:[/green] {', '.join(available_providers) if available_providers else '없음'}"
+        )
+
+        # 기본 제공자 표시
+        default_provider = config.LLM_CONFIG.get("default_provider", "gemini")
+        console.print(f"[blue]기본 제공자:[/blue] {default_provider}")
+
+        # 각 제공자의 상세 정보 표시
+        provider_info = get_provider_info()
+        for provider_name, info in provider_info.items():
+            status = "[green]✓[/green]" if info["available"] else "[red]✗[/red]"
+            console.print(f"\n{status} [bold]{provider_name.upper()}[/bold]")
+
+            if info["available"]:
+                models = info.get("models", {})
+                if models:
+                    console.print(f"  Fast: {models.get('fast', 'N/A')}")
+                    console.print(f"  Standard: {models.get('standard', 'N/A')}")
+                    console.print(f"  Advanced: {models.get('advanced', 'N/A')}")
+            else:
+                api_key_name = config.LLM_CONFIG.get("api_keys", {}).get(
+                    provider_name, f"{provider_name.upper()}_API_KEY"
+                )
+                console.print(
+                    f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]"
+                )
+
+        # 기능별 모델 설정 표시
+        console.print(f"\n[bold cyan]기능별 모델 설정[/bold cyan]")
+        console.print("=" * 50)
+
+        models_config = config.LLM_CONFIG.get("models", {})
+        for task, task_config in models_config.items():
+            provider = task_config.get("provider", "N/A")
+            model = task_config.get("model", "N/A")
+            temp = task_config.get("temperature", "N/A")
+            console.print(f"{task}: [blue]{provider}[/blue] - {model} (temp: {temp})")
+
+    except Exception as e:
+        console.print(f"[bold red]Error: {e}[/bold red]")
+
+
+@app.command()
 def test_email(
     to: str = typer.Option(
         ...,
