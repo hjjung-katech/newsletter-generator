@@ -26,6 +26,11 @@
   - 모든 명령어 및 옵션
   - 실용적인 예시
   - 환경 변수 설정
+- **[MULTI_LLM_GUIDE.md](user/MULTI_LLM_GUIDE.md)** - 🤖 Multi-LLM 설정 가이드
+  - 지원되는 LLM 제공자 (Gemini, OpenAI, Anthropic)
+  - 기능별 LLM 모델 설정
+  - 비용 최적화 전략
+  - 자동 fallback 시스템
 
 ### 🔧 설정 문서 (`setup/`)
 시스템 설치 및 구성 가이드
@@ -47,6 +52,12 @@
   - 디버깅 방법
   - 기여 프로세스
   - 릴리스 절차
+- **[MULTI_LLM_IMPLEMENTATION_SUMMARY.md](dev/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)** - 🤖 멀티 LLM 시스템 구현 완료 보고서
+  - 요구사항 달성 현황
+  - 구현된 아키텍처 상세
+  - 테스트 시스템 및 성능 검증
+  - 비용 최적화 전략
+  - 안정성 보장 메커니즘
 - **[CI_CD_GUIDE.md](dev/CI_CD_GUIDE.md)** - 🔄 CI/CD 파이프라인 가이드
 - **[CODE_QUALITY.md](dev/CODE_QUALITY.md)** - ✨ 코드 품질 관리
 - **[langsmith_setup.md](dev/langsmith_setup.md)** - 🔗 LangSmith 통합 설정
@@ -94,6 +105,7 @@ graph TD
     E --> G[dev/CI_CD_GUIDE.md<br/>CI/CD 가이드]
     E --> H[dev/CODE_QUALITY.md<br/>코드 품질]
     E --> I[ARCHITECTURE.md<br/>시스템 아키텍처]
+    E --> M[dev/MULTI_LLM_IMPLEMENTATION_SUMMARY.md<br/>멀티 LLM 구현 보고서]
     
     I --> J[UNIFIED_ARCHITECTURE.md<br/>통합 아키텍처]
     
@@ -105,6 +117,7 @@ graph TD
     style C fill:#e8f5e8
     style D fill:#fff3e0
     style E fill:#fce4ec
+    style M fill:#e3f2fd
 ```
 
 ## 🚀 빠른 시작 가이드
@@ -112,12 +125,14 @@ graph TD
 ### 새로운 사용자라면
 1. **[설치 가이드](setup/INSTALLATION.md)** - 시스템 설정
 2. **[사용자 가이드](user/USER_GUIDE.md)** - 기본 사용법 학습
-3. **[CLI 참조](user/CLI_REFERENCE.md)** - 명령어 상세 정보
+3. **[Multi-LLM 가이드](user/MULTI_LLM_GUIDE.md)** - LLM 제공자 설정
+4. **[CLI 참조](user/CLI_REFERENCE.md)** - 명령어 상세 정보
 
 ### 개발에 기여하고 싶다면
 1. **[개발자 가이드](dev/DEVELOPMENT_GUIDE.md)** - 개발 환경 설정
 2. **[아키텍처 문서](ARCHITECTURE.md)** - 시스템 이해
-3. **[코드 품질 가이드](dev/CODE_QUALITY.md)** - 코딩 표준
+3. **[멀티 LLM 구현 보고서](dev/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)** - 최신 구현 현황
+4. **[코드 품질 가이드](dev/CODE_QUALITY.md)** - 코딩 표준
 
 ### 프로젝트를 이해하고 싶다면
 1. **[프로젝트 요구사항](PRD.md)** - 프로젝트 목표

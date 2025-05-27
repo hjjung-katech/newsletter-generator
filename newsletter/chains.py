@@ -204,8 +204,15 @@ Output Requirements:
 """
 
 
-def get_llm(temperature=0.3, callbacks=None):
-    """구글 Gemini Pro 모델 인스턴스를 생성합니다."""
+def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
+    """
+    지정된 작업에 최적화된 LLM 모델 인스턴스를 생성합니다.
+
+    Args:
+        temperature: 모델 온도 설정
+        callbacks: LangChain 콜백 리스트
+        task: 작업 유형 (html_generation, news_summarization 등)
+    """
     if callbacks is None:
         callbacks = []
     if os.environ.get("ENABLE_COST_TRACKING"):
@@ -215,23 +222,61 @@ def get_llm(temperature=0.3, callbacks=None):
             callbacks += get_tracking_callbacks()
         except Exception:
             pass
-    if not config.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
-    # gRPC 메타데이터 관련 옵션 설정
-    transport = "rest"  # 기본적으로 REST API 사용 (gRPC 대신)
+    # LLM 팩토리를 사용하여 작업별 최적화된 모델 생성
+    try:
+        from .llm_factory import get_llm_for_task
 
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.5-pro-preview-03-25",  # 최신 Gemini 2.5 Pro 모델 사용
-        google_api_key=config.GEMINI_API_KEY,
-        temperature=temperature,
-        transport=transport,
-        callbacks=callbacks,
-        convert_system_message_to_human=False,
-        timeout=60,  # 타임아웃 60초
-        max_retries=2,  # 최대 2회 재시도
-        disable_streaming=False,  # 스트리밍 활성화 (streaming=True와 같음)
-    )
+        llm = get_llm_for_task(task, callbacks)
+
+        # 온도 설정이 다른 경우 모델 재구성
+        if hasattr(llm, "temperature") and llm.temperature != temperature:
+            # 기존 설정을 복사하고 온도만 변경
+            if hasattr(llm, "_get_client_config"):
+                # Gemini의 경우
+                return type(llm)(
+                    model=llm.model,
+                    google_api_key=getattr(llm, "google_api_key", None),
+                    temperature=temperature,
+                    transport=getattr(llm, "transport", "rest"),
+                    callbacks=callbacks,
+                    convert_system_message_to_human=getattr(
+                        llm, "convert_system_message_to_human", False
+                    ),
+                    timeout=getattr(llm, "timeout", 60),
+                    max_retries=getattr(llm, "max_retries", 2),
+                    disable_streaming=getattr(llm, "disable_streaming", False),
+                )
+            else:
+                # OpenAI, Anthropic의 경우
+                return type(llm)(
+                    model=llm.model,
+                    api_key=getattr(llm, "api_key", None),
+                    temperature=temperature,
+                    callbacks=callbacks,
+                    timeout=getattr(llm, "timeout", 60),
+                    max_retries=getattr(llm, "max_retries", 2),
+                )
+
+        return llm
+
+    except Exception as e:
+        print(f"Warning: LLM factory failed, falling back to default Gemini: {e}")
+        # Fallback to original Gemini implementation
+        if not config.GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
+
+        return ChatGoogleGenerativeAI(
+            model="gemini-2.5-pro-preview-03-25",
+            google_api_key=config.GEMINI_API_KEY,
+            temperature=temperature,
+            transport="rest",
+            callbacks=callbacks,
+            convert_system_message_to_human=False,
+            timeout=60,
+            max_retries=2,
+            disable_streaming=False,
+        )
 
 
 # 기사 목록을 텍스트로 변환하는 함수

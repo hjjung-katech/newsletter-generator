@@ -36,13 +36,17 @@ def test_extract_common_theme_fallback():
 def test_extract_common_theme_with_mock():
     """키워드 공통 주제 추출 메인 함수 테스트 (API 호출 없이)"""
 
-    # 테스트를 위해 API 키가 없는 환경에서 실행하여 폴백 방식 사용
+    # 테스트를 위해 모든 API 키를 비활성화
     original_env_api_key = os.environ.get("GOOGLE_API_KEY", "")
-    original_config_api_key = config.GEMINI_API_KEY
+    original_config_gemini_key = config.GEMINI_API_KEY
+    original_config_openai_key = getattr(config, "OPENAI_API_KEY", None)
+    original_config_anthropic_key = getattr(config, "ANTHROPIC_API_KEY", None)
 
     # 환경 변수와 config 모두 비활성화
     os.environ["GOOGLE_API_KEY"] = ""
     config.GEMINI_API_KEY = None
+    config.OPENAI_API_KEY = None
+    config.ANTHROPIC_API_KEY = None
 
     try:
         # 테스트 케이스: 여러 키워드
@@ -71,7 +75,9 @@ def test_extract_common_theme_with_mock():
         else:
             os.environ.pop("GOOGLE_API_KEY", None)
 
-        config.GEMINI_API_KEY = original_config_api_key
+        config.GEMINI_API_KEY = original_config_gemini_key
+        config.OPENAI_API_KEY = original_config_openai_key
+        config.ANTHROPIC_API_KEY = original_config_anthropic_key
 
 
 if __name__ == "__main__":

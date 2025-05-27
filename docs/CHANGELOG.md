@@ -1,5 +1,55 @@
 # Changelog
 
+## [0.4.0] - 2025-05-26
+
+### Added
+- **멀티 LLM 제공자 지원 시스템 구축**
+  - Google Gemini, Anthropic Claude, OpenAI GPT 통합 지원
+  - 기능별 최적화된 LLM 모델 선택 시스템 구현
+  - LLM Factory 패턴으로 제공자 관리 통합
+  - 자동 Fallback 메커니즘으로 안정성 향상
+
+- **기능별 세밀한 LLM 설정**
+  - 키워드 생성: Claude (창의성 중시)
+  - 테마 추출: Gemini Flash (빠른 분석)
+  - 뉴스 요약: Gemini Pro (정확성 중시)
+  - 섹션 재생성: Claude (구조화 작업)
+  - 소개 생성: Claude (자연스러운 글쓰기)
+  - HTML 생성: Gemini Pro (복잡한 구조화)
+  - 기사 점수: Gemini Flash (빠른 판단)
+  - 번역: Gemini Pro (정확성)
+
+- **LLM 테스트 및 검증 도구**
+  - `test_llm.py`: 기본 LLM 시스템 상태 확인
+  - `test_llm_providers.py`: 제공자별 상세 테스트
+  - 실시간 응답 테스트 및 성능 검증
+
+### Changed
+- **LLM 설정 구조 개선**
+  - `config.yml`에서 제공자별/기능별 세밀한 설정 지원
+  - Temperature, timeout, max_retries 등 매개변수 최적화
+  - 제공자별 모델 티어 시스템 (fast/standard/advanced)
+
+- **비용 최적화**
+  - 작업 특성에 맞는 모델 자동 선택
+  - Flash/Haiku 모델로 빠른 작업 처리
+  - Pro/Sonnet 모델로 정확한 작업 처리
+
+### Fixed
+- **모델 호환성 문제 해결**
+  - 최신 Claude 모델명으로 업데이트
+  - 404 오류 발생 모델 교체
+  - API 키 검증 및 오류 처리 개선
+
+### Documentation
+- **[🤖 LLM 설정 가이드](docs/technical/LLM_CONFIGURATION.md)** 추가
+  - 다양한 LLM 제공자 설정 방법
+  - 기능별 모델 선택 가이드
+  - 비용 최적화 팁
+  - 문제 해결 방법
+- **README.md** 업데이트: 멀티 LLM 지원 정보 추가
+- **env.example** 파일 추가: 환경변수 설정 예시
+
 ## [0.3.0] - 2025-05-25
 
 ### Added

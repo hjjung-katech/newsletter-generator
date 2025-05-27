@@ -1,108 +1,186 @@
 import sys
 import os
+import importlib
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, MagicMock, patch
 
-# newsletter.summarize 모듈의 genai 변수를 패치
-genai_patch = patch("newsletter.summarize.genai", new=Mock())
-genai_patch.start()
-
-from newsletter.summarize import summarize_articles
 from newsletter import config
 
 
 class TestSummarize(unittest.TestCase):
-
     def setUp(self):
-        # 매 테스트마다 maxDiff를 None으로 설정하여 전체 차이점을 표시
         self.maxDiff = None
+        self.original_google_generativeai = sys.modules.get("google.generativeai")
 
     def tearDown(self):
-        genai_patch.stop()
+        # Restore original google.generativeai module state
+        if self.original_google_generativeai is not None:
+            sys.modules["google.generativeai"] = self.original_google_generativeai
+        elif "google.generativeai" in sys.modules:
+            # If it wasn't there before but got added
+            del sys.modules["google.generativeai"]
 
-    # 실제 Gemini 모델 호출을 피하기 위해 generateContent 메서드를 패치
-    @patch("newsletter.summarize.genai")
-    def test_summarize_articles_success(self, mock_genai):
-        # genai 모듈 설정
-        mock_model = Mock()
-        mock_response = Mock()
-        mock_response.text = "<html><body>Mocked HTML Summary</body></html>"
-        mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
-        # genai는 None이 아니도록 설정
-        mock_genai.__bool__.return_value = True
+        # Clean up other potentially problematic modules that are reloaded
+        for mod_key in [
+            "newsletter.summarize",
+            "newsletter.llm_factory",
+            "langchain_core",
+            "langchain_google_genai",
+        ]:
+            if mod_key in sys.modules:
+                del sys.modules[mod_key]
 
-        # API 키 설정
-        with patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
-            keywords = ["AI", "머신러닝"]
-            articles = [
-                {
-                    "title": "Article 1",
-                    "url": "http://example.com/1",
-                    "content": "Content 1 about AI.",
-                },
-                {
-                    "title": "Article 2",
-                    "url": "http://example.com/2",
-                    "content": "Content 2 about Machine Learning.",
-                },
-            ]
+    def test_summarize_articles_success(self):
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "<html><body>Mocked HTML Summary</body></html>"
+        mock_llm_instance.invoke.return_value = mock_response
+        # mock_get_llm.return_value will be set by patch.object later
 
-            # 함수 호출
-            html_output = summarize_articles(keywords, articles)
+        for mod_key_to_delete in [
+            "newsletter.summarize",
+            "newsletter.llm_factory",
+            "langchain_google_genai",
+            "google.generativeai",
+        ]:
+            if mod_key_to_delete in sys.modules:
+                del sys.modules[mod_key_to_delete]
 
-            # 반환값 검증
-            self.assertEqual(
-                html_output, "<html><body>Mocked HTML Summary</body></html>"
-            )
+        mock_genai_module_for_summarize_import = MagicMock()
+        sys.modules["google.generativeai"] = mock_genai_module_for_summarize_import
 
-            # generative_model 인스턴스화 및 generate_content 호출 확인
-            mock_genai.GenerativeModel.assert_called_once()
-            mock_model.generate_content.assert_called_once()
+        # Import and reload to ensure we get fresh modules
+        import newsletter.summarize
+        import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
 
-    @patch("newsletter.summarize.genai", None)
+        importlib.reload(newsletter.llm_factory)  # Reload llm_factory first
+        importlib.reload(
+            newsletter.summarize
+        )  # Then reload summarize, which imports the reloaded llm_factory
+        summarize_articles_func = newsletter.summarize.summarize_articles
+
+        with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
+            # Patch get_llm_for_task on the reloaded llm_factory module object
+            with patch.object(
+                newsletter.llm_factory,
+                "get_llm_for_task",
+                return_value=mock_llm_instance,
+            ) as mock_get_llm_direct:
+                keywords = ["AI", "머신러닝"]
+                articles = [
+                    {
+                        "title": "Article 1",
+                        "url": "http://example.com/1",
+                        "content": "Content 1 about AI.",
+                    },
+                    {
+                        "title": "Article 2",
+                        "url": "http://example.com/2",
+                        "content": "Content 2 about Machine Learning.",
+                    },
+                ]
+                html_output = summarize_articles_func(keywords, articles)
+                self.assertEqual(
+                    html_output, "<html><body>Mocked HTML Summary</body></html>"
+                )
+                mock_get_llm_direct.assert_called_once_with(
+                    "news_summarization", unittest.mock.ANY
+                )
+                mock_llm_instance.invoke.assert_called_once()
+                mock_genai_module_for_summarize_import.GenerativeModel.assert_not_called()
+
     def test_summarize_with_missing_module(self):
-        """Test summarize_articles when generativeai module is not available"""
+        # Ensure google.generativeai is seen as None by summarize.py
+        if "google.generativeai" in sys.modules:
+            del sys.modules["google.generativeai"]
+        sys.modules["google.generativeai"] = None
+
+        # Reload affected modules
+        for mod_key in [
+            "newsletter.llm_factory",
+            "langchain_core",
+            "langchain_google_genai",
+        ]:
+            if mod_key in sys.modules:
+                del sys.modules[mod_key]
+
+        import newsletter.summarize
+
+        importlib.reload(newsletter.summarize)
+        summarize_articles = newsletter.summarize.summarize_articles
+
         keywords = ["AI"]
         articles = [
             {"title": "Test", "url": "http://test.com", "content": "Test content"}
         ]
-
         html_output = summarize_articles(keywords, articles)
-
-        # 모듈이 없을 때 적절한 오류 메시지 반환 검증
         self.assertIn("오류: google.generativeai 모듈을 찾을 수 없습니다", html_output)
         self.assertIn("pip install google-generativeai", html_output)
 
     def test_summarize_articles_no_api_key(self):
-        # API 키가 없는 경우
-        with patch.object(config, "GEMINI_API_KEY", None):
+        # Ensure google.generativeai is a benign mock to prevent NameError during its import
+        # The API key check in summarize_articles should happen before this mock is heavily used.
+        if "google.generativeai" in sys.modules:
+            del sys.modules["google.generativeai"]
+        mock_genai_module = MagicMock()
+        sys.modules["google.generativeai"] = mock_genai_module
+
+        # Reload other modules that might be affected or cached
+        for mod_key in [
+            "newsletter.llm_factory",
+            "langchain_core",
+            "langchain_google_genai",
+        ]:
+            if mod_key in sys.modules:
+                del sys.modules[mod_key]
+
+        import newsletter.summarize
+
+        importlib.reload(newsletter.summarize)
+        summarize_articles = newsletter.summarize.summarize_articles
+
+        with unittest.mock.patch.object(config, "GEMINI_API_KEY", None):
             keywords = ["테스트"]
             articles = [
                 {"title": "Test", "url": "http://test.com", "content": "Test content"}
             ]
-
-            # 함수 호출
             html_output = summarize_articles(keywords, articles)
-
-            # 오류 메시지에 필요한 정보가 포함되어 있는지 검증
             self.assertIn("오류: GEMINI_API_KEY가 설정되지 않았습니다", html_output)
             self.assertIn("키워드: 테스트", html_output)
             self.assertIn("제공된 기사 수: 1", html_output)
+            # Ensure the direct genai mock wasn't used for generation
+            mock_genai_module.GenerativeModel.assert_not_called()
 
-    @patch("newsletter.summarize.genai")
-    def test_summarize_articles_api_error(self, mock_genai):
-        # 모델 설정
-        mock_model = Mock()
-        mock_model.generate_content.side_effect = Exception("Gemini API Error")
-        mock_genai.GenerativeModel.return_value = mock_model
-        mock_genai.__bool__.return_value = True
+    @patch("newsletter.llm_factory.get_llm_for_task")
+    def test_summarize_articles_api_error(self, mock_get_llm):
+        mock_llm_instance = MagicMock()
+        mock_llm_instance.invoke.side_effect = Exception(
+            "Gemini API Error via llm_factory"
+        )
+        mock_get_llm.return_value = mock_llm_instance
 
-        with patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
+        # Ensure google.generativeai is a benign mock
+        if "google.generativeai" in sys.modules:
+            del sys.modules["google.generativeai"]
+        mock_genai_module = MagicMock()
+        # If llm_factory fails and summarize.py tries to use genai directly, make it also fail
+        mock_genai_model = MagicMock()
+        mock_genai_model.generate_content.side_effect = Exception(
+            "Gemini API Error via genai fallback"
+        )
+        mock_genai_module.GenerativeModel.return_value = mock_genai_model
+        sys.modules["google.generativeai"] = mock_genai_module
+
+        import newsletter.summarize
+
+        importlib.reload(newsletter.summarize)
+        summarize_articles = newsletter.summarize.summarize_articles
+
+        with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
             keywords = ["에러 테스트"]
             articles = [
                 {
@@ -111,55 +189,99 @@ class TestSummarize(unittest.TestCase):
                     "content": "Error content",
                 }
             ]
-
-            # 함수 호출
             html_output = summarize_articles(keywords, articles)
-
-            # 오류 메시지 검증
             self.assertIn("오류 발생", html_output)
             self.assertIn(
                 "키워드 '에러 테스트'에 대한 뉴스레터 요약 중 오류가 발생했습니다",
                 html_output,
             )
-            self.assertIn("Gemini API Error", html_output)
+            self.assertIn("Gemini API Error via llm_factory", html_output)
+            mock_get_llm.assert_called_once_with(
+                "news_summarization", unittest.mock.ANY
+            )
+            mock_llm_instance.invoke.assert_called_once()
+            # Ensure the direct genai mock was not used if llm_factory path was taken
+            mock_genai_module.GenerativeModel.assert_not_called()
 
     def test_summarize_articles_empty_articles(self):
-        # 빈 기사 목록
+        # Ensure google.generativeai is a benign mock. No LLM call should happen.
+        if "google.generativeai" in sys.modules:
+            del sys.modules["google.generativeai"]
+        mock_genai_module = MagicMock()
+        sys.modules["google.generativeai"] = mock_genai_module
+
+        for mod_key in [
+            "newsletter.llm_factory",
+            "langchain_core",
+            "langchain_google_genai",
+        ]:
+            if mod_key in sys.modules:
+                del sys.modules[mod_key]
+
+        import newsletter.summarize
+
+        importlib.reload(newsletter.summarize)
+        summarize_articles = newsletter.summarize.summarize_articles
+
         keywords = ["빈 기사"]
         articles = []
-
-        # 함수 호출
         html_output = summarize_articles(keywords, articles)
-
-        # 결과 검증 - 빈 기사 메시지 포함 여부
         self.assertEqual(html_output, "<html><body>No articles summary</body></html>")
+        mock_genai_module.GenerativeModel.assert_not_called()
 
-    @patch("newsletter.summarize.genai")
-    def test_summarize_articles_empty_keywords(self, mock_genai):
-        # 모델 설정
-        mock_model = Mock()
-        mock_response = Mock()
-        mock_response.text = "<html><body>Empty Keywords Summary</body></html>"
-        mock_model.generate_content.return_value = mock_response
-        mock_genai.GenerativeModel.return_value = mock_model
-        mock_genai.__bool__.return_value = True
+    def test_summarize_articles_empty_keywords(self):
+        mock_llm_instance = MagicMock()
+        mock_response = MagicMock()
+        mock_response.content = "<html><body>Empty Keywords Summary</body></html>"
+        mock_llm_instance.invoke.return_value = mock_response
+        # mock_get_llm.return_value will be set by patch.object later
 
-        with patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
-            keywords = []
-            articles = [
-                {"title": "Article", "url": "http://example.com", "content": "Content"}
-            ]
+        for mod_key_to_delete in [
+            "newsletter.summarize",
+            "newsletter.llm_factory",
+            "langchain_google_genai",
+            "google.generativeai",
+        ]:
+            if mod_key_to_delete in sys.modules:
+                del sys.modules[mod_key_to_delete]
 
-            # 함수 호출
-            html_output = summarize_articles(keywords, articles)
+        mock_genai_module_for_summarize_import = MagicMock()
+        sys.modules["google.generativeai"] = mock_genai_module_for_summarize_import
 
-            # 결과 검증
-            self.assertEqual(
-                html_output, "<html><body>Empty Keywords Summary</body></html>"
-            )
+        # Import and reload to ensure we get fresh modules
+        import newsletter.summarize
+        import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
 
-            # generate_content 호출 확인
-            mock_model.generate_content.assert_called_once()
+        importlib.reload(newsletter.llm_factory)  # Reload llm_factory first
+        importlib.reload(
+            newsletter.summarize
+        )  # Then reload summarize, which imports the reloaded llm_factory
+        summarize_articles_func = newsletter.summarize.summarize_articles
+
+        with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
+            # Patch get_llm_for_task on the reloaded llm_factory module object
+            with patch.object(
+                newsletter.llm_factory,
+                "get_llm_for_task",
+                return_value=mock_llm_instance,
+            ) as mock_get_llm_direct:
+                keywords = []
+                articles = [
+                    {
+                        "title": "Article",
+                        "url": "http://example.com",
+                        "content": "Content",
+                    }
+                ]
+                html_output = summarize_articles_func(keywords, articles)
+                self.assertEqual(
+                    html_output, "<html><body>Empty Keywords Summary</body></html>"
+                )
+                mock_get_llm_direct.assert_called_once_with(
+                    "news_summarization", unittest.mock.ANY
+                )
+                mock_llm_instance.invoke.assert_called_once()
+                mock_genai_module_for_summarize_import.GenerativeModel.assert_not_called()
 
 
 if __name__ == "__main__":
