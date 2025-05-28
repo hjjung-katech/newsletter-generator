@@ -314,6 +314,16 @@ def run(
         f"[green]Newsletter generated successfully using {template_style} template via LangGraph.[/green]"
     )
 
+    info = graph.get_last_generation_info()
+    step_times = info.get("step_times", {})
+    total_time = info.get("total_time")
+    cost_summary = info.get("cost_summary")
+    console.print(f"[blue]Step times (seconds): {step_times}[/blue]")
+    if total_time is not None:
+        console.print(f"[blue]Total generation time: {total_time:.2f} seconds[/blue]")
+    if cost_summary:
+        console.print(f"[blue]Cost summary: {cost_summary}[/blue]")
+
     # 뉴스레터 주제 및 파일명 설정
     newsletter_topic = ""
     if domain:

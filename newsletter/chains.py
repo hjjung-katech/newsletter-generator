@@ -783,11 +783,47 @@ def create_rendering_chain():
                 combined_data["newsletter_topic"] = keywords[0]
             elif isinstance(keywords, list) and len(keywords) > 1:
                 # 3. 여러 키워드의 공통 주제 추출
-                common_theme = tools.extract_common_theme_from_keywords(keywords)
+                cb = []
+                if os.environ.get("ENABLE_COST_TRACKING") or os.environ.get(
+                    "LANGCHAIN_TRACING_V2"
+                ):
+                    try:
+                        from .cost_tracking import (
+                            get_tracking_callbacks,
+                            register_recent_callbacks,
+                        )
+
+                        cb = get_tracking_callbacks()
+                        register_recent_callbacks(cb)
+                    except Exception as e:
+                        print(
+                            f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
+                        )
+                common_theme = tools.extract_common_theme_from_keywords(
+                    keywords, callbacks=cb
+                )
                 combined_data["newsletter_topic"] = common_theme
             elif isinstance(keywords, str) and "," in keywords:
                 # 4. 콤마로 구분된 여러 키워드
-                common_theme = tools.extract_common_theme_from_keywords(keywords)
+                cb = []
+                if os.environ.get("ENABLE_COST_TRACKING") or os.environ.get(
+                    "LANGCHAIN_TRACING_V2"
+                ):
+                    try:
+                        from .cost_tracking import (
+                            get_tracking_callbacks,
+                            register_recent_callbacks,
+                        )
+
+                        cb = get_tracking_callbacks()
+                        register_recent_callbacks(cb)
+                    except Exception as e:
+                        print(
+                            f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
+                        )
+                common_theme = tools.extract_common_theme_from_keywords(
+                    keywords, callbacks=cb
+                )
                 combined_data["newsletter_topic"] = common_theme
             else:
                 # 5. 기본값 - 단일 문자열 키워드
