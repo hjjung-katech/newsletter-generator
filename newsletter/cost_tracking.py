@@ -17,6 +17,31 @@ except Exception:  # Fallback when langchain is not installed
 _global_tracer = None
 _tracer_initialized = False
 
+# Track callbacks used in the most recent generation for reporting
+_recent_callbacks: List[Any] = []
+
+
+def register_recent_callbacks(callbacks: List[Any]) -> None:
+    """Store callbacks from the latest workflow run."""
+    _recent_callbacks.extend(callbacks)
+
+
+def clear_recent_callbacks() -> None:
+    """Reset stored callbacks."""
+    _recent_callbacks.clear()
+
+
+def get_cost_summary() -> Dict[str, Any]:
+    """Return aggregated cost information from recent callbacks."""
+    summaries = []
+    total_cost = 0.0
+    for cb in _recent_callbacks:
+        if hasattr(cb, "get_summary"):
+            data = cb.get_summary()
+            summaries.append(data)
+            total_cost += data.get("total_cost_usd", 0.0)
+    return {"callbacks": summaries, "total_cost_usd": total_cost}
+
 
 class GoogleGenAICostCB(BaseCallbackHandler):
     """Callback handler to track Google Generative AI token usage and costs."""
