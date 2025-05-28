@@ -36,7 +36,7 @@ cp .env.example .env
 
 필요한 API 키: 
 - **필수**: Google Gemini API (기본 LLM), Serper API (뉴스 검색)
-- **멀티 LLM**: OpenAI API (GPT 모델), Anthropic API (Claude 모델)
+- **멀티 LLM**: Anthropic API (Claude 모델), OpenAI API (GPT 모델)
 - **기타**: Postmark (이메일), Google Drive API (저장)
 
 ### 기본 사용법
@@ -111,3 +111,56 @@ flowchart LR
 - **[이슈 트래커](https://github.com/your-org/newsletter-generator/issues)** - 버그 리포트 및 기능 요청
 - **[토론](https://github.com/your-org/newsletter-generator/discussions)** - 질문 및 아이디어 공유
 - **[문서](docs/README.md)** - 상세한 사용법 및 개발 가이드
+
+## 🚨 문제 해결
+
+### API 할당량 초과 문제
+
+Google Gemini API의 일일 할당량을 초과한 경우 다음과 같이 해결할 수 있습니다:
+
+#### 1. 현재 LLM 상태 확인
+```bash
+newsletter check-llm
+```
+
+#### 2. 다른 LLM 제공자 사용
+OpenAI 또는 Anthropic API 키를 `.env` 파일에 추가:
+
+```bash
+# .env 파일에 추가
+OPENAI_API_KEY=your_openai_api_key_here
+# 또는
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+```
+
+#### 3. LLM 설정 변경
+`config.yml` 파일에서 기본 제공자를 변경:
+
+```yaml
+llm_settings:
+  default_provider: "openai"  # 또는 "anthropic"
+```
+
+#### 4. LLM 테스트
+```bash
+newsletter test-llm --task keyword_generation --prompt "자율주행 관련 키워드 5개 생성"
+```
+
+### 새로운 다중 LLM 기능
+
+이제 여러 LLM 제공자를 동시에 사용할 수 있습니다:
+
+- **Gemini**: 한국어 지원 우수, 빠른 응답
+- **OpenAI GPT-4**: 안정적이고 정확한 응답
+- **Anthropic Claude**: 자연스러운 글쓰기, 구조화된 작업에 강함
+
+#### 자동 Fallback 기능
+- API 할당량 초과 시 자동으로 다른 제공자로 전환
+- 429 에러 감지 및 자동 복구
+- 사용자 개입 없이 안정적인 서비스 제공
+
+#### 작업별 최적화
+각 작업에 가장 적합한 LLM이 자동으로 선택됩니다:
+- 키워드 생성: 창의성이 중요한 작업
+- 뉴스 요약: 정확성이 중요한 작업  
+- HTML 생성: 구조화된 작업

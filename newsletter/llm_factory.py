@@ -28,6 +28,171 @@ from . import config
 from .cost_tracking import get_cost_callback_for_provider
 
 
+class QuotaExceededError(Exception):
+    """API 할당량 초과 에러"""
+
+    pass
+
+
+class LLMWithFallback:
+    """
+    API 할당량 초과 시 자동으로 다른 제공자로 fallback하는 LLM 래퍼
+    """
+
+    def __init__(self, primary_llm, factory, task, callbacks=None):
+        self.primary_llm = primary_llm
+        self.factory = factory
+        self.task = task
+        self.callbacks = callbacks or []
+        self.fallback_llm = None
+
+    def invoke(self, input_data, **kwargs):
+        """LLM 호출 시 429 에러 처리"""
+        try:
+            return self.primary_llm.invoke(input_data, **kwargs)
+        except Exception as e:
+            error_str = str(e).lower()
+            # 429 에러 또는 할당량 초과 관련 에러 감지
+            if (
+                "429" in error_str
+                or "quota" in error_str
+                or "rate limit" in error_str
+                or "too many requests" in error_str
+            ):
+
+                print(
+                    f"[WARNING] API quota exceeded for {type(self.primary_llm).__name__}. Attempting fallback..."
+                )
+
+                # Fallback LLM 생성 (한 번만)
+                if self.fallback_llm is None:
+                    self.fallback_llm = self._get_fallback_llm()
+
+                if self.fallback_llm:
+                    print(
+                        f"[INFO] Using fallback LLM: {type(self.fallback_llm).__name__}"
+                    )
+                    return self.fallback_llm.invoke(input_data, **kwargs)
+                else:
+                    raise QuotaExceededError(
+                        f"Primary LLM quota exceeded and no fallback available. Original error: {e}"
+                    )
+            else:
+                # 다른 종류의 에러는 그대로 전파
+                raise e
+
+    def stream(self, input_data, **kwargs):
+        """스트리밍 지원"""
+        try:
+            if hasattr(self.primary_llm, "stream"):
+                return self.primary_llm.stream(input_data, **kwargs)
+            else:
+                # 스트리밍을 지원하지 않는 경우 일반 invoke 사용
+                result = self.invoke(input_data, **kwargs)
+                yield result
+        except Exception as e:
+            error_str = str(e).lower()
+            if (
+                "429" in error_str
+                or "quota" in error_str
+                or "rate limit" in error_str
+                or "too many requests" in error_str
+            ):
+
+                if self.fallback_llm is None:
+                    self.fallback_llm = self._get_fallback_llm()
+
+                if self.fallback_llm and hasattr(self.fallback_llm, "stream"):
+                    return self.fallback_llm.stream(input_data, **kwargs)
+                elif self.fallback_llm:
+                    result = self.fallback_llm.invoke(input_data, **kwargs)
+                    yield result
+                else:
+                    raise e
+            else:
+                raise e
+
+    def batch(self, inputs, **kwargs):
+        """배치 처리 지원"""
+        try:
+            if hasattr(self.primary_llm, "batch"):
+                return self.primary_llm.batch(inputs, **kwargs)
+            else:
+                # 배치를 지원하지 않는 경우 개별 처리
+                return [self.invoke(input_data, **kwargs) for input_data in inputs]
+        except Exception as e:
+            error_str = str(e).lower()
+            if (
+                "429" in error_str
+                or "quota" in error_str
+                or "rate limit" in error_str
+                or "too many requests" in error_str
+            ):
+
+                if self.fallback_llm is None:
+                    self.fallback_llm = self._get_fallback_llm()
+
+                if self.fallback_llm and hasattr(self.fallback_llm, "batch"):
+                    return self.fallback_llm.batch(inputs, **kwargs)
+                elif self.fallback_llm:
+                    return [
+                        self.fallback_llm.invoke(input_data, **kwargs)
+                        for input_data in inputs
+                    ]
+                else:
+                    raise e
+            else:
+                raise e
+
+    def _get_fallback_llm(self):
+        """Fallback LLM을 찾아서 반환"""
+        primary_provider = type(self.primary_llm).__name__
+
+        # 사용 가능한 다른 제공자 찾기
+        available_providers = self.factory.get_available_providers()
+
+        for provider_name in available_providers:
+            provider = self.factory.providers[provider_name]
+            try:
+                # 임시 모델을 생성해서 타입 확인
+                temp_model = provider.create_model(
+                    {"model": self.factory._get_default_model(provider_name)}, []
+                )
+                provider_class = type(temp_model).__name__
+
+                # Primary와 다른 제공자인 경우
+                if provider_class != primary_provider:
+                    # 기본 모델 설정으로 fallback LLM 생성
+                    fallback_config = {
+                        "provider": provider_name,
+                        "model": self.factory._get_default_model(provider_name),
+                        "temperature": 0.3,
+                        "max_retries": 2,
+                        "timeout": 60,
+                    }
+
+                    # 비용 추적 콜백 추가
+                    fallback_callbacks = list(self.callbacks)
+                    try:
+                        cost_callback = get_cost_callback_for_provider(provider_name)
+                        fallback_callbacks.append(cost_callback)
+                    except Exception:
+                        pass
+
+                    return provider.create_model(fallback_config, fallback_callbacks)
+            except Exception as e:
+                print(
+                    f"[WARNING] Failed to create fallback LLM with {provider_name}: {e}"
+                )
+                continue
+
+        return None
+
+    def __getattr__(self, name):
+        """다른 속성들은 primary LLM에 위임"""
+        return getattr(self.primary_llm, name)
+
+
 class LLMProvider(ABC):
     """LLM 제공자 추상 클래스"""
 
@@ -141,16 +306,19 @@ class LLMFactory:
         }
         self.llm_config = config.LLM_CONFIG
 
-    def get_llm_for_task(self, task: str, callbacks: Optional[List] = None):
+    def get_llm_for_task(
+        self, task: str, callbacks: Optional[List] = None, enable_fallback: bool = True
+    ):
         """
         특정 작업에 최적화된 LLM 모델을 반환합니다.
 
         Args:
             task: 작업 유형 (keyword_generation, theme_extraction, etc.)
             callbacks: LangChain 콜백 리스트
+            enable_fallback: 할당량 초과 시 자동 fallback 활성화 여부
 
         Returns:
-            LLM 모델 인스턴스
+            LLM 모델 인스턴스 (fallback 기능 포함)
         """
         model_config = self.llm_config.get("models", {}).get(task)
 
@@ -200,13 +368,25 @@ class LLMFactory:
                             f"Warning: Failed to add cost tracking for {fallback_name}: {e}"
                         )
 
-                    return fallback_provider.create_model(model_config, final_callbacks)
+                    llm = fallback_provider.create_model(model_config, final_callbacks)
+
+                    # Fallback 래퍼 적용
+                    if enable_fallback:
+                        return LLMWithFallback(llm, self, task, final_callbacks)
+                    else:
+                        return llm
 
             raise ValueError(
                 f"No LLM providers are available. Please check your API keys."
             )
 
-        return provider.create_model(model_config, final_callbacks)
+        llm = provider.create_model(model_config, final_callbacks)
+
+        # Fallback 래퍼 적용
+        if enable_fallback:
+            return LLMWithFallback(llm, self, task, final_callbacks)
+        else:
+            return llm
 
     def _get_default_model(self, provider_name: str) -> str:
         """제공자별 기본 모델명을 반환합니다."""
@@ -242,18 +422,21 @@ class LLMFactory:
 llm_factory = LLMFactory()
 
 
-def get_llm_for_task(task: str, callbacks: Optional[List] = None):
+def get_llm_for_task(
+    task: str, callbacks: Optional[List] = None, enable_fallback: bool = True
+):
     """
     편의 함수: 특정 작업에 최적화된 LLM 모델을 반환합니다.
 
     Args:
         task: 작업 유형
         callbacks: LangChain 콜백 리스트
+        enable_fallback: 할당량 초과 시 자동 fallback 활성화 여부
 
     Returns:
         LLM 모델 인스턴스
     """
-    return llm_factory.get_llm_for_task(task, callbacks)
+    return llm_factory.get_llm_for_task(task, callbacks, enable_fallback)
 
 
 def get_available_providers() -> List[str]:

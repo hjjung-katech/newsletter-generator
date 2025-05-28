@@ -360,7 +360,9 @@ def generate_keywords_with_gemini(
         try:
             from .llm_factory import get_llm_for_task
 
-            llm = get_llm_for_task("keyword_generation", callbacks)
+            llm = get_llm_for_task(
+                "keyword_generation", callbacks, enable_fallback=False
+            )
         except Exception as e:
             console.print(
                 f"[yellow]Warning: LLM factory failed, using fallback: {e}[/yellow]"
@@ -544,7 +546,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                 except Exception:
                     pass
 
-            llm = get_llm_for_task("theme_extraction", callbacks)
+            llm = get_llm_for_task("theme_extraction", callbacks, enable_fallback=False)
 
             prompt_template = PromptTemplate.from_template(
                 """다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
@@ -761,7 +763,7 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
         from .llm_factory import get_llm_for_task
         from langchain_core.messages import HumanMessage
 
-        llm = get_llm_for_task("section_regeneration")
+        llm = get_llm_for_task("section_regeneration", enable_fallback=False)
 
         # 뉴스 링크 정보를 문자열로 변환
         news_links_text = ""
@@ -902,7 +904,7 @@ def generate_introduction_with_gemini(
         from .llm_factory import get_llm_for_task
         from langchain_core.messages import HumanMessage
 
-        llm = get_llm_for_task("introduction_generation")
+        llm = get_llm_for_task("introduction_generation", enable_fallback=False)
 
         # 섹션 제목을 문자열로 변환
         safe_topic = str(newsletter_topic).replace("{", "{{").replace("}", "}}")

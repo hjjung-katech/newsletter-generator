@@ -39,7 +39,7 @@ newsletter_settings:
 
 # LLM Configuration - 기능별 LLM 모델 설정
 llm_settings:
-  # 기본 설정
+  # 기본 설정 - 사용 가능한 제공자로 변경
   default_provider: "gemini"  # 기본 LLM 제공자: gemini, openai, anthropic
   
   # 제공자별 API 키 설정 (환경변수 이름)
@@ -50,7 +50,7 @@ llm_settings:
   
   # 기능별 LLM 모델 설정 - 다양한 제공자 활용
   models:
-    # 키워드 생성 (도메인 → 키워드) - 창의성이 중요하므로 Claude 사용
+    # 키워드 생성 (도메인 → 키워드) - 창의성이 중요하므로 Anthropic 사용
     keyword_generation:
       provider: "anthropic"
       model: "claude-3-7-sonnet-latest"
@@ -58,7 +58,7 @@ llm_settings:
       max_retries: 2
       timeout: 60
     
-    # 테마 추출 (키워드 → 공통 테마) - 빠른 분석이 중요하므로 Flash 모델 사용
+    # 테마 추출 (키워드 → 공통 테마) - 빠른 분석이 중요하므로 Gemini Flash 사용
     theme_extraction:
       provider: "gemini"
       model: "gemini-2.5-flash-preview-05-20"
@@ -66,7 +66,7 @@ llm_settings:
       max_retries: 2
       timeout: 60
     
-    # 뉴스 요약 (기사 → 요약) - 정확성이 중요하므로 최신 Gemini 모델 사용
+    # 뉴스 요약 (기사 → 요약) - 정확성이 중요하므로 Gemini Pro 사용 (할당량 주의)
     news_summarization:
       provider: "gemini"
       model: "gemini-2.5-pro-preview-03-25"
@@ -74,7 +74,7 @@ llm_settings:
       max_retries: 3
       timeout: 120
     
-    # 섹션 재생성 (뉴스 링크 → 섹션 요약) - 구조화된 작업이므로 Claude 사용
+    # 섹션 재생성 (뉴스 링크 → 섹션 요약) - 구조화된 작업이므로 Anthropic 사용
     section_regeneration:
       provider: "anthropic"
       model: "claude-3-7-sonnet-latest"
@@ -82,7 +82,7 @@ llm_settings:
       max_retries: 2
       timeout: 120
     
-    # 뉴스레터 소개 생성 - 자연스러운 글쓰기를 위해 Claude 사용
+    # 뉴스레터 소개 생성 - 자연스러운 글쓰기를 위해 Anthropic 사용
     introduction_generation:
       provider: "anthropic"
       model: "claude-3-7-sonnet-latest"
@@ -98,7 +98,7 @@ llm_settings:
       max_retries: 3
       timeout: 180
     
-    # 기사 점수 매기기 - 빠른 판단이 중요하므로 Flash 모델 사용
+    # 기사 점수 매기기 - 빠른 판단이 중요하므로 Gemini Flash 사용
     article_scoring:
       provider: "gemini"
       model: "gemini-2.5-flash-preview-05-20"

@@ -37,13 +37,11 @@ def test_extract_common_theme_with_mock():
     """키워드 공통 주제 추출 메인 함수 테스트 (API 호출 없이)"""
 
     # 테스트를 위해 모든 API 키를 비활성화
-    original_env_api_key = os.environ.get("GOOGLE_API_KEY", "")
     original_config_gemini_key = config.GEMINI_API_KEY
     original_config_openai_key = getattr(config, "OPENAI_API_KEY", None)
     original_config_anthropic_key = getattr(config, "ANTHROPIC_API_KEY", None)
 
-    # 환경 변수와 config 모두 비활성화
-    os.environ["GOOGLE_API_KEY"] = ""
+    # config 모두 비활성화
     config.GEMINI_API_KEY = None
     config.OPENAI_API_KEY = None
     config.ANTHROPIC_API_KEY = None
@@ -69,12 +67,7 @@ def test_extract_common_theme_with_mock():
         assert result_str == expected_str
 
     finally:
-        # 환경 변수 및 config 복원
-        if original_env_api_key:
-            os.environ["GOOGLE_API_KEY"] = original_env_api_key
-        else:
-            os.environ.pop("GOOGLE_API_KEY", None)
-
+        # config 복원
         config.GEMINI_API_KEY = original_config_gemini_key
         config.OPENAI_API_KEY = original_config_openai_key
         config.ANTHROPIC_API_KEY = original_config_anthropic_key

@@ -207,7 +207,9 @@ def summarize_articles(
             from .llm_factory import get_llm_for_task
             from langchain_core.messages import HumanMessage, SystemMessage
 
-            llm = get_llm_for_task("news_summarization", callbacks)
+            llm = get_llm_for_task(
+                "news_summarization", callbacks, enable_fallback=False
+            )
             system_prompt = SYSTEM_INSTRUCTION
         except (ImportError, AttributeError) as e:
             print(
