@@ -119,7 +119,7 @@ class TestNewsletterMocked:
 
     #     # 테스트 데이터
     #     test_data = {
-    #         "newsletter_title": "주간 기술 동향 브리프",
+    #         "newsletter_title": "주간 기술 동향 뉴스 클리핑",
     #         "tagline": "이번 주 핵심 기술 트렌드",
     #         "grouped_sections": [],
     #         "definitions": [
