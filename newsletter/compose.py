@@ -366,11 +366,11 @@ def render_newsletter_template(
 
     # 제목이 명시적으로 설정되지 않은 경우 도메인 기반 제목 생성
     if not newsletter_title and newsletter_topic:
-        # 도메인이 있거나 의미 있는 주제가 있는 경우 "도메인명 주간 산업동향 뉴스레터" 형식 사용
+        # 도메인이 있거나 의미 있는 주제가 있는 경우 "도메인명 주간 산업 동향 뉴스 클리핑" 형식 사용
         domain = data.get("domain")
         if domain:
             # 명시적 도메인이 있는 경우
-            newsletter_title = f"{domain} 주간 산업동향 뉴스레터"
+            newsletter_title = f"{domain} 주간 산업동향 뉴스 클리핑"
         elif newsletter_topic and newsletter_topic not in [
             "최신 산업 동향",
             "General News",
@@ -379,9 +379,9 @@ def render_newsletter_template(
             # "외 N개 분야" 형식이면 첫 번째 키워드만 사용
             if " 외 " in newsletter_topic and "개 분야" in newsletter_topic:
                 main_topic = newsletter_topic.split(" 외 ")[0]
-                newsletter_title = f"{main_topic} 주간 산업동향 뉴스레터"
+                newsletter_title = f"{main_topic} 주간 산업 동향 뉴스 클리핑"
             else:
-                newsletter_title = f"{newsletter_topic} 주간 산업동향 뉴스레터"
+                newsletter_title = f"{newsletter_topic} 주간 산업 동향 뉴스 클리핑"
         else:
             newsletter_title = newsletter_settings.get(
                 "newsletter_title", config["title_default"]
@@ -514,7 +514,9 @@ def compose_compact_newsletter_html(
 
         # 간단한 컨텍스트로 렌더링
         context = {
-            "newsletter_title": data.get("newsletter_topic", "주간 산업 동향 브리프"),
+            "newsletter_title": data.get(
+                "newsletter_topic", "주간 산업 동향 뉴스 클리핑"
+            ),
             "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
             "generation_date": data.get(
                 "generation_date", datetime.now().strftime("%Y-%m-%d")
@@ -849,7 +851,7 @@ def load_newsletter_settings(config_file: str = "config.yml") -> Dict[str, Any]:
         Dict[str, Any]: 뉴스레터 설정 딕셔너리
     """
     default_settings = {
-        "newsletter_title": "주간 산업 동향 브리프",
+        "newsletter_title": "주간 산업 동향 뉴스 클리핑",
         "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
         "publisher_name": "Your Company",
         "company_name": "Your Company",

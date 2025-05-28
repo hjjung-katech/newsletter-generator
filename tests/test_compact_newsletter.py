@@ -120,7 +120,7 @@ class TestCompactNewsletterUnit:
         """Compact 템플릿 렌더링 단위 테스트"""
         # 테스트용 데이터
         test_data = {
-            "newsletter_title": "자율주행 주간 브리프",
+            "newsletter_title": "자율주행 주간 산업 동향 뉴스 클리핑",
             "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
             "generation_date": "2025-05-23",
             "top_articles": [
@@ -152,8 +152,10 @@ class TestCompactNewsletterUnit:
 
         # 검증 - 실제 렌더링되는 제목으로 수정
         assert html is not None and len(html) > 0, "HTML이 생성되지 않았습니다"
-        assert "자율주행 주간 브리프" in html, "제목이 렌더링되지 않았습니다"
-        assert "💡 이런 뜻이에요" in html, "정의 섹션이 렌더링되지 않았습니다"
+        assert (
+            "자율주행 주간 산업 동향 뉴스 클리핑" in html
+        ), "제목이 렌더링되지 않았습니다"
+        assert "📖 이런 뜻이에요" in html, "정의 섹션이 렌더링되지 않았습니다"
         assert "테스트용어" in html, "용어가 렌더링되지 않았습니다"
         assert "테스트를 위한 용어입니다" in html, "용어 설명이 렌더링되지 않았습니다"
         assert (
@@ -191,7 +193,7 @@ class TestCompactNewsletterUnit:
 
         # 필수 필드가 누락된 데이터 테스트
         minimal_data = {
-            "newsletter_topic": "테스트 뉴스레터",  # newsletter_title 대신 newsletter_topic 사용
+            "newsletter_topic": "테스트 뉴스 클리핑",  # newsletter_title 대신 newsletter_topic 사용
             "generation_date": "2025-05-23",
             "definitions": [],
         }
@@ -209,7 +211,7 @@ class TestCompactNewsletterUnit:
             ), "최소 데이터로 HTML이 생성되지 않았습니다"
             assert "<!DOCTYPE html>" in html, "유효한 HTML 형식이 아닙니다"
             # compose_compact_newsletter_html은 newsletter_topic을 newsletter_title로 매핑함
-            assert "테스트 뉴스레터" in html, "제목이 렌더링되지 않았습니다"
+            assert "테스트 뉴스 클리핑" in html, "제목이 렌더링되지 않았습니다"
             assert (
                 "이번 주, 주요 산업 동향을 미리 만나보세요" in html
             ), "태그라인이 렌더링되지 않았습니다"

@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ newsletter_title | default('주간 산업동향 뉴스레터') }} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
+    <title>{{ newsletter_title | default('주간 산업 동향 뉴스 클리핑') }} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
     <style>
+        :root {
+            --primary-color: {{ primary_color | default('#0d47a1') }};
+            --secondary-color: {{ secondary_color | default('#2c3e50') }};
+            --font-family: {{ font_family | default('Malgun Gothic, sans-serif') }};
+        }
+        
         body { 
-            font-family: {{ font_family | default('Malgun Gothic, sans-serif') }}; 
+            font-family: var(--font-family); 
             margin: 20px; 
             background-color: #f4f4f4; 
             color: #333; 
@@ -28,7 +34,7 @@
             margin-bottom: 25px;
         }
         .header-title { 
-            color: {{ secondary_color | default('#2c3e50') }}; 
+            color: var(--secondary-color); 
             font-size: 28px; 
             font-weight: bold; 
             margin-bottom: 15px; 
@@ -76,7 +82,7 @@
         .section h2 { 
             font-size: 22px; 
             font-weight: bold; 
-            color: {{ primary_color | default('#3498db') }}; 
+            color: var(--primary-color); 
             margin-bottom: 15px; 
         }
         .summary { 
@@ -88,7 +94,7 @@
         .news-links h3 { 
             font-size: 18px; 
             font-weight: bold; 
-            color: {{ secondary_color | default('#2c3e50') }}; 
+            color: var(--secondary-color); 
             margin-bottom: 10px; 
         }
         .news-links ul { 
@@ -99,7 +105,7 @@
             font-size: 14px; 
         }
         .news-links a { 
-            color: {{ primary_color | default('#3498db') }}; 
+            color: var(--primary-color); 
             text-decoration: none; 
         }
         .news-links a:hover { 
@@ -115,13 +121,13 @@
             margin-top: 30px; 
             padding: 20px; 
             background-color: #f8f9fa; 
-            border-left: 4px solid {{ primary_color | default('#3498db') }}; 
+            border-left: 4px solid var(--primary-color); 
             border-radius: 8px; 
         }
         .definition-section h3 { 
             font-size: 20px; 
             font-weight: bold; 
-            color: {{ secondary_color | default('#2c3e50') }}; 
+            color: var(--secondary-color); 
             margin-bottom: 15px; 
         }
         .definition-list { 
@@ -133,7 +139,7 @@
         }
         .definition-term { 
             font-weight: bold; 
-            color: {{ primary_color | default('#3498db') }}; 
+            color: var(--primary-color); 
         }
         .definition-explanation { 
             color: #333; 
@@ -148,12 +154,12 @@
         .food-for-thought-section h3 { 
             font-size: 20px; 
             font-weight: bold; 
-            color: {{ secondary_color | default('#2c3e50') }}; 
+            color: var(--secondary-color); 
             margin-bottom: 15px; 
         }
         .food-for-thought .quote { 
             font-style: italic; 
-            color: {{ secondary_color | default('#2c3e50') }}; 
+            color: var(--secondary-color); 
             font-size: 18px; 
             margin-bottom: 10px; 
             text-align: center;
@@ -223,7 +229,7 @@
             border-bottom: none;
         }
         .article-number {
-            background: {{ primary_color | default('#3498db') }};
+            background: var(--primary-color);
             color: white;
             border-radius: 50%;
             width: 30px;
@@ -266,14 +272,14 @@
         }
         .def-term {
             font-weight: bold;
-            color: {{ primary_color | default('#3498db') }};
+            color: var(--primary-color);
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header-section">
-            <div class="header-title">{{ newsletter_title | default('주간 산업동향 뉴스레터') }}</div>
+            <div class="header-title">{{ newsletter_title | default('주간 산업 동향 뉴스 클리핑') }}</div>
             {% if newsletter_topic or domain %}
             <div class="topic-badge">{{ newsletter_topic | default(domain) }} 분야</div>
             {% endif %}
@@ -299,7 +305,7 @@
                 <article class="top-article-item">
                     <div class="article-number">{{ loop.index }}</div>
                     <div class="article-content">
-                        <h3><a href="{{ article.url }}" style="color: {{ secondary_color | default('#2c3e50') }}; text-decoration: none;">{{ article.title }}</a></h3>
+                        <h3><a href="{{ article.url }}" style="color: var(--secondary-color); text-decoration: none;">{{ article.title }}</a></h3>
                         <p class="article-summary">{{ article.snippet }}</p>
                         <span class="article-meta">{{ article.source_and_date }}</span>
                     </div>
