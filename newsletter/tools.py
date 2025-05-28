@@ -363,13 +363,13 @@ def generate_keywords_with_gemini(
             from .llm_factory import get_llm_for_task
 
             llm = get_llm_for_task(
-                "keyword_generation", callbacks, enable_fallback=False
+                "keyword_generation", callbacks, enable_fallback=True
             )
         except Exception as e:
             console.print(
                 f"[yellow]Warning: LLM factory failed, using fallback: {e}[/yellow]"
             )
-            # Fallback to Gemini if factory fails
+            # Fallback to stable Gemini model
             if not config.GEMINI_API_KEY:
                 console.print(
                     "[bold red]Error: GEMINI_API_KEY is not configured. Cannot generate keywords.[/bold red]"
@@ -377,14 +377,14 @@ def generate_keywords_with_gemini(
                 return []
 
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-pro-preview-03-25",
+                model="gemini-1.5-pro",  # 더 안정적인 모델로 변경
                 temperature=0.7,
                 google_api_key=config.GEMINI_API_KEY,
                 transport="rest",
                 convert_system_message_to_human=True,
                 callbacks=callbacks,
                 timeout=60,
-                max_retries=2,
+                max_retries=3,  # 재시도 횟수 증가
                 disable_streaming=False,
             )
 

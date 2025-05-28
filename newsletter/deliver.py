@@ -3,12 +3,22 @@ import os
 
 import markdownify  # For HTML to Markdown conversion
 import requests
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 
 from . import config
 from .tools import clean_html_markers  # Import the clean_html_markers function
+
+# Google Drive 관련 import를 조건부로 처리
+try:
+    from google.oauth2.service_account import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaFileUpload
+
+    GOOGLE_DRIVE_AVAILABLE = True
+except ImportError:
+    GOOGLE_DRIVE_AVAILABLE = False
+    print(
+        "Note: Google Drive dependencies not available. Google Drive upload will be disabled."
+    )
 
 
 def save_to_drive(
@@ -24,6 +34,12 @@ def save_to_drive(
     Returns:
         bool: True if successful, False otherwise
     """
+    if not GOOGLE_DRIVE_AVAILABLE:
+        print(
+            "Warning: Google Drive dependencies not available. Skipping Google Drive upload."
+        )
+        return False
+
     if not config.GOOGLE_APPLICATION_CREDENTIALS:
         print(
             "Warning: GOOGLE_APPLICATION_CREDENTIALS not set. Skipping Google Drive upload."

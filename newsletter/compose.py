@@ -232,6 +232,9 @@ def create_grouped_sections(
     grouped_sections = []
     article_count = 0
 
+    # compact 모드 여부 확인 (max_articles가 설정되어 있으면 compact 모드)
+    is_compact = max_articles is not None
+
     for section in sections[:max_groups]:
         # 섹션의 기사 목록 가져오기
         news_links = section.get("news_links", [])
@@ -255,13 +258,31 @@ def create_grouped_sections(
             # 이모지 추가된 섹션 제목
             section_title = add_emoji_to_section_title(section.get("title", "기타"))
 
-            grouped_section = {
-                "heading": section_title,
-                "intro": (
+            # intro 생성 - compact 모드에서는 간결하게
+            intro = ""
+            if is_compact:
+                # compact 모드: 1-2문장으로 간결하게
+                summary_paragraphs = section.get("summary_paragraphs", [])
+                if summary_paragraphs:
+                    first_paragraph = summary_paragraphs[0]
+                    # 첫 번째 문장만 추출
+                    sentences = first_paragraph.split(". ")
+                    if sentences:
+                        intro = sentences[0] + "."
+                        # 너무 길면 자르기
+                        if len(intro) > 100:
+                            intro = intro[:97] + "..."
+            else:
+                # detailed 모드: 기존 방식 유지
+                intro = (
                     section.get("summary_paragraphs", [""])[0]
                     if section.get("summary_paragraphs")
                     else ""
-                ),
+                )
+
+            grouped_section = {
+                "heading": section_title,
+                "intro": intro,
                 "articles": remaining_articles,
             }
             grouped_sections.append(grouped_section)

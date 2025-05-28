@@ -3,146 +3,363 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ newsletter_title | default(title_prefix | default('주간 산업 동향 뉴스레터')) }}{% if newsletter_topic %} - {{ newsletter_topic }}{% endif %} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
+    <title>{{ newsletter_title | default('주간 산업동향 뉴스레터') }} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
     <style>
-        body { font-family: {{ font_family | default('Malgun Gothic, sans-serif') }}; margin: 20px; background-color: #f4f4f4; color: #333; line-height: 1.6; }
-        .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 800px; margin: 20px auto; }
+        body { 
+            font-family: {{ font_family | default('Malgun Gothic, sans-serif') }}; 
+            margin: 20px; 
+            background-color: #f4f4f4; 
+            color: #333; 
+            line-height: 1.6; 
+        }
+        .container { 
+            background-color: #fff; 
+            padding: 30px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            max-width: 800px; 
+            margin: 20px auto; 
+        }
         
-        .header-title { color: {{ secondary_color | default('#2c3e50') }}; font-size: 28px; font-weight: bold; text-align: center; margin-bottom: 10px; }
-        .sub-header { text-align: center; color: #555; font-size: 16px; margin-bottom: 30px; }
-        .generation-timestamp { text-align: center; color: #999; font-size: 12px; margin-bottom: 20px; }
-        .search-keywords { text-align: center; color: #777; font-size: 14px; margin-bottom: 20px; }
+        .header-section {
+            text-align: center;
+            padding-bottom: 25px;
+            border-bottom: 1px solid #ecf0f1;
+            margin-bottom: 25px;
+        }
+        .header-title { 
+            color: {{ secondary_color | default('#2c3e50') }}; 
+            font-size: 28px; 
+            font-weight: bold; 
+            margin-bottom: 15px; 
+        }
+        .topic-badge {
+            margin: 0 auto 15px auto;
+            padding: 8px 18px;
+            background: linear-gradient(135deg, #e8f4f8 0%, #f0f8ff 100%);
+            color: #2c3e50;
+            border: 1px solid #b8dce8;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 500;
+            display: inline-block;
+            max-width: 400px;
+        }
+        .meta-info { 
+            color: #666; 
+            font-size: 14px; 
+            margin-bottom: 8px; 
+        }
+        .search-keywords { 
+            color: #888; 
+            font-size: 12px; 
+            margin-bottom: 0;
+            font-style: italic;
+        }
 
-        .greeting { margin-bottom: 20px; font-size: 16px; }
-        .introduction { margin-bottom: 30px; font-size: 16px; border-bottom: 1px solid #ecf0f1; padding-bottom: 20px; }
+        .greeting { 
+            margin-bottom: 20px; 
+            font-size: 16px; 
+        }
+        .introduction { 
+            margin-bottom: 30px; 
+            font-size: 16px; 
+            border-bottom: 1px solid #ecf0f1; 
+            padding-bottom: 20px; 
+        }
 
-        .section { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #ecf0f1; }
-        .section:last-of-type { border-bottom: none; } /* This might need adjustment if new sections are added below 'sections' loop */
-        .section-title { font-size: 22px; font-weight: bold; color: {{ primary_color | default('#3498db') }}; margin-top: 0; margin-bottom: 15px; }
-        
-        .section-content p { margin-bottom: 10px; }
-        
-        .definitions-box { background-color: #f9f9f9; border: 1px solid #e0e0e0; border-left: 5px solid {{ primary_color | default('#3498db') }}; padding: 15px; margin-top: 15px; margin-bottom: 15px; border-radius: 5px; }
-        .definitions-box h4 { font-size: 18px; color: #333; margin-top: 0; margin-bottom: 10px; font-weight: bold; }
-        .definitions-box ul { list-style-type: none; padding-left: 0; margin-bottom: 0; }
-        .definitions-box ul li { margin-bottom: 10px; }
-        .definitions-box ul li strong { color: {{ primary_color | default('#3498db') }}; }
+        .section { 
+            margin-bottom: 30px; 
+            padding-bottom: 20px; 
+            border-bottom: 1px solid #ecf0f1; 
+        }
+        .section h2 { 
+            font-size: 22px; 
+            font-weight: bold; 
+            color: {{ primary_color | default('#3498db') }}; 
+            margin-bottom: 15px; 
+        }
+        .summary { 
+            margin-bottom: 15px; 
+        }
+        .news-links { 
+            margin-bottom: 15px; 
+        }
+        .news-links h3 { 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: {{ secondary_color | default('#2c3e50') }}; 
+            margin-bottom: 10px; 
+        }
+        .news-links ul { 
+            padding-left: 20px; 
+        }
+        .news-links li { 
+            margin-bottom: 8px; 
+            font-size: 14px; 
+        }
+        .news-links a { 
+            color: {{ primary_color | default('#3498db') }}; 
+            text-decoration: none; 
+        }
+        .news-links a:hover { 
+            text-decoration: underline; 
+        }
+        .source-date { 
+            color: #777; 
+            font-size: 12px; 
+            margin-left: 10px; 
+        }
 
-        .news-links-section { margin-top: 20px; }
-        .news-links-section h4 { font-size: 18px; color: #333; margin-bottom: 10px; font-weight: bold; }
-        .news-links-section ul { list-style-type: disc; padding-left: 20px; margin: 0; }
-        .news-links-section ul li { margin-bottom: 8px; }
-        .news-links-section ul li a { color: {{ primary_color | default('#3498db') }}; text-decoration: none; }
-        .news-links-section ul li a:hover { text-decoration: underline; }
-        .news-links-section ul li .source { font-size: 0.9em; color: #777; }
+        .definition-section { 
+            margin-top: 30px; 
+            padding: 20px; 
+            background-color: #f8f9fa; 
+            border-left: 4px solid {{ primary_color | default('#3498db') }}; 
+            border-radius: 8px; 
+        }
+        .definition-section h3 { 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: {{ secondary_color | default('#2c3e50') }}; 
+            margin-bottom: 15px; 
+        }
+        .definition-list { 
+            list-style: none; 
+            padding-left: 0; 
+        }
+        .definition-list li { 
+            margin-bottom: 10px; 
+        }
+        .definition-term { 
+            font-weight: bold; 
+            color: {{ primary_color | default('#3498db') }}; 
+        }
+        .definition-explanation { 
+            color: #333; 
+            margin-left: 10px; 
+        }
 
-        .top-articles { margin: 20px 0; padding: 15px; background-color: #fcf8e3; border: 1px solid #f0e6be; border-radius: 5px; }
-        .top-articles h3 { margin-top: 0; color: #d35400; font-size: 20px; }
-        .top-articles ol { padding-left: 20px; }
-        .top-articles li { margin-bottom: 8px; }
+        .food-for-thought-section { 
+            margin-top: 30px; 
+            padding-top: 20px; 
+            border-top: 1px solid #ecf0f1; 
+        }
+        .food-for-thought-section h3 { 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: {{ secondary_color | default('#2c3e50') }}; 
+            margin-bottom: 15px; 
+        }
+        .food-for-thought .quote { 
+            font-style: italic; 
+            color: {{ secondary_color | default('#2c3e50') }}; 
+            font-size: 18px; 
+            margin-bottom: 10px; 
+            text-align: center;
+        }
+        .food-for-thought .author { 
+            color: #555; 
+            font-size: 14px; 
+            margin-bottom: 15px; 
+            text-align: center; 
+        }
+        .food-for-thought .message { 
+            color: #333; 
+            font-size: 16px; 
+        }
 
-        .food-for-thought-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; }
-        .food-for-thought-section h3 { font-size: 20px; font-weight: bold; color: {{ secondary_color | default('#2c3e50') }}; margin-bottom: 15px; }
-        .food-for-thought .quote { font-style: italic; color: {{ secondary_color | default('#2c3e50') }}; font-size: 18px; margin-bottom: 10px; text-align: center;}
-        .food-for-thought .author { color: #555; font-size: 14px; margin-bottom: 15px; text-align: center; }
-        .food-for-thought .message { color: #333; font-size: 16px; }
+        .closing-section { 
+            margin-top: 30px; 
+            padding-top: 20px; 
+            border-top: 1px solid #ecf0f1; 
+        }
+        .closing-section p { 
+            margin-bottom: 10px; 
+            font-size: 16px; 
+        }
+        .editor-signature { 
+            margin-top: 20px; 
+            font-style: italic; 
+            color: #555; 
+            text-align: right; 
+        }
 
-        .closing-section { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; }
-        .closing-section p { margin-bottom: 10px; font-size: 16px; }
-        .editor-signature { margin-top: 20px; font-style: italic; color: #555; text-align: right; }
+        .footer { 
+            text-align: center; 
+            margin-top: 40px; 
+            font-size: 0.9em; 
+            color: #aaa; 
+        }
+        .footer p { 
+            margin-bottom: 5px; 
+        }
+        .company-tagline { 
+            margin-top: 10px; 
+            font-style: italic; 
+        }
+        .footer-contact { 
+            margin-top: 8px; 
+        }
 
-        .footer { text-align: center; margin-top: 40px; font-size: 0.9em; color: #aaa; }
-        .footer p { margin-bottom: 5px; }
-        .company-tagline { margin-top: 10px; font-style: italic; }
-        .footer-contact { margin-top: 8px; }
+        .hero {
+            background: #fff9e6;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+        .top-articles-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .top-article-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 15px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .top-article-item:last-child {
+            border-bottom: none;
+        }
+        .article-number {
+            background: {{ primary_color | default('#3498db') }};
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .article-content {
+            flex: 1;
+        }
+        .article-content h3 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        .article-summary {
+            font-size: 14px;
+            color: #555;
+            margin: 0 0 5px 0;
+            line-height: 1.4;
+        }
+        .article-meta {
+            font-size: 12px;
+            color: #777;
+        }
+
+        .definition-compact {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .def-item {
+            margin-bottom: 10px;
+        }
+        .def-term {
+            font-weight: bold;
+            color: {{ primary_color | default('#3498db') }};
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header-title">{{ newsletter_title | default(title_prefix | default('주간 산업 동향 뉴스레터')) }}</div>
-        <div class="sub-header">{% if newsletter_topic %}{{ newsletter_topic }} ({{ generation_date }}){% else %}{{ generation_date }}{% endif %}{% if issue_no %} | 제 {{ issue_no }}호{% endif %}</div>
-        
-        {% if generation_timestamp %}
-        <div class="generation-timestamp">생성시간: {{ generation_timestamp }}</div>
-        {% endif %}
-        
-        {% if search_keywords %}
-        <div class="search-keywords">검색 키워드: {{ search_keywords }}</div>
-        {% endif %}
+        <div class="header-section">
+            <div class="header-title">{{ newsletter_title | default('주간 산업동향 뉴스레터') }}</div>
+            {% if newsletter_topic or domain %}
+            <div class="topic-badge">{{ newsletter_topic | default(domain) }} 분야</div>
+            {% endif %}
+            <div class="meta-info">{{ generation_date }}{% if issue_no %} · 제{{ issue_no }}호{% endif %}{% if generation_timestamp %} · {{ generation_timestamp }}{% endif %}</div>
+            {% if search_keywords %}
+            <div class="search-keywords">{{ search_keywords }}</div>
+            {% endif %}
+        </div>
 
         {% if recipient_greeting %}
-        <p class="greeting">{{ recipient_greeting }}</p>
+        <div class="greeting">{{ recipient_greeting }}</div>
         {% endif %}
-        
+
         {% if introduction_message %}
-        <div class="introduction">
-            {% for para in introduction_message.split('\n') %}<p>{{ para }}</p>{% endfor %}
-        </div>
+        <div class="introduction">{{ introduction_message }}</div>
         {% endif %}
 
         {% if top_articles %}
-        <div class="top-articles">
-            <h3>🔥 핵심 뉴스 TOP {{ top_articles|length }}</h3>
-            <ol>
-                {% for art in top_articles %}
-                <li>
-                    {% if art.url %}<a href="{{ art.url }}" target="_blank">{% endif %}
-                    {{ art.title }}
-                    {% if art.url %}</a>{% endif %}
-                    {% if art.source_and_date %} <span class="source">({{ art.source_and_date }})</span>{% endif %}
-                </li>
+        <section class="hero">
+            <h2>🔥 이번 주 꼭 봐야 할 {{ top_articles|length }}선</h2>
+            <div class="top-articles-list">
+                {% for article in top_articles %}
+                <article class="top-article-item">
+                    <div class="article-number">{{ loop.index }}</div>
+                    <div class="article-content">
+                        <h3><a href="{{ article.url }}" style="color: {{ secondary_color | default('#2c3e50') }}; text-decoration: none;">{{ article.title }}</a></h3>
+                        <p class="article-summary">{{ article.snippet }}</p>
+                        <span class="article-meta">{{ article.source_and_date }}</span>
+                    </div>
+                </article>
                 {% endfor %}
-            </ol>
-        </div>
-        {% endif %}
-
-        {% if sections %}
-            {% for section in sections %}
-            <div class="section">
-                <h3 class="section-title">{{ loop.index }}. {{ section.title }}</h3>
-                
-                <div class="section-content">
-                    {% for paragraph in section.summary_paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
-                </div>
-
-                {% if section.definitions %}
-                <div class="definitions-box">
-                    <h4>💡 이런 뜻이에요!</h4>
-                    <ul>
-                        {% for def in section.definitions %}<li><strong>{{ def.term }}:</strong> {{ def.explanation }}</li>{% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-
-                {% if section.news_links %}
-                <div class="news-links-section">
-                    <h4>📄 참고 뉴스 링크</h4>
-                    <ul>
-                        {% for link in section.news_links %}
-                        <li>
-                            {% if link.url %}<a href="{{ link.url }}" target="_blank">{% endif %}
-                            {{ link.title }}
-                            {% if link.url %}</a>{% endif %}
-                            {% if link.source_and_date %} <span class="source">({{ link.source_and_date }})</span>{% endif %}
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
             </div>
-            {% endfor %}
+        </section>
         {% endif %}
+
+        {% for section in sections %}
+        <div class="section">
+            <h2>{{ section.title }}</h2>
+            
+            {% if section.summary_paragraphs %}
+            <div class="summary">
+                {% for paragraph in section.summary_paragraphs %}
+                <p>{{ paragraph }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if section.news_links %}
+            <div class="news-links">
+                <h3>📄 참고 뉴스 링크</h3>
+                <ul>
+                    {% for link in section.news_links %}
+                    <li>
+                        <a href="{{ link.url }}">{{ link.title }}</a>
+                        {% if link.source_and_date %}<span class="source-date">({{ link.source_and_date }})</span>{% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {% if section.definitions %}
+            <div class="definition-compact">
+                <h4>📖 이런 뜻이에요!</h4>
+                {% for definition in section.definitions %}
+                <div class="def-item">
+                    <span class="def-term">{{ definition.term }}</span>: {{ definition.explanation }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
 
         {% if food_for_thought %}
         <div class="food-for-thought-section">
-            <h3>🤔 생각해 볼 거리</h3>
+            <h3>💡 생각해 볼 거리</h3>
             <div class="food-for-thought">
                 {% if food_for_thought.quote %}
-                <p class="quote">"{{ food_for_thought.quote }}"</p>
-                {% if food_for_thought.author %}<p class="author">- {{ food_for_thought.author }} -</p>{% endif %}
+                <div class="quote">"{{ food_for_thought.quote }}"</div>
+                {% endif %}
+                {% if food_for_thought.author %}
+                <div class="author">- {{ food_for_thought.author }}</div>
                 {% endif %}
                 {% if food_for_thought.message %}
-                {% for para in food_for_thought.message.split('\n\n') %}<p class="message">{{ para }}</p>{% endfor %}
+                <div class="message">{{ food_for_thought.message }}</div>
                 {% endif %}
             </div>
         </div>
@@ -150,21 +367,18 @@
 
         {% if closing_message %}
         <div class="closing-section">
-            {% for para in closing_message.split('\n\n') %}<p>{{ para }}</p>{% endfor %}
+            <p>{{ closing_message }}</p>
             {% if editor_signature %}
-            <p class="editor-signature"><em>{{ editor_signature }}</em></p>
+            <div class="editor-signature">{{ editor_signature }}</div>
             {% endif %}
         </div>
         {% endif %}
 
         <div class="footer">
-            <p>&copy; {{ copyright_year | default(generation_date.split('-')[0]) }} {{ publisher_name | default(company_name | default('Your Company')) }}. All rights reserved.</p>
-            <p>{{ footer_disclaimer | default('이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.') }}</p>
+            {% if company_name %}<p>&copy; {{ copyright_year | default('2024') }} {{ company_name }}. All rights reserved.</p>{% endif %}
             {% if company_tagline %}<p class="company-tagline">{{ company_tagline }}</p>{% endif %}
             {% if footer_contact %}<p class="footer-contact">{{ footer_contact }}</p>{% endif %}
-            {% if editor_name and editor_email %}
-            <p>{{ editor_title | default('편집자') }}: {{ editor_name }} ({{ editor_email }})</p>
-            {% endif %}
+            {% if footer_disclaimer %}<p>{{ footer_disclaimer }}</p>{% endif %}
         </div>
     </div>
 </body>

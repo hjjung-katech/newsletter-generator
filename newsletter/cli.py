@@ -522,6 +522,11 @@ def test(
         "-m",
         help="Mode: 'template' (just re-render) or 'content' (run full processing pipeline with saved articles)",
     ),
+    template_style: str = typer.Option(
+        "detailed",
+        "--template-style",
+        help="Newsletter template style: 'compact' (short, main news focused), 'detailed' (full length with all sections).",
+    ),
     track_cost: bool = typer.Option(
         False, "--track-cost", help="Enable LangSmith cost tracking during generation."
     ),
@@ -551,26 +556,18 @@ def test(
         if mode.lower() == "template":
             # Template 모드: 기존 데이터를 HTML 템플릿으로 렌더링만 수행
             console.print(
-                "[cyan]Running in template mode - just re-rendering existing data[/cyan]"
+                f"[cyan]Running in template mode - just re-rendering existing data with {template_style} style[/cyan]"
             )
 
-            # HTML 템플릿 로드
-            from jinja2 import Template
+            # 템플릿 스타일에 따른 compose_newsletter 함수 사용
+            from .compose import compose_newsletter
 
-            from .chains import load_html_template
+            template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
 
-            html_template_content = load_html_template()
-            if not html_template_content:
-                console.print("[red]Error: Failed to load HTML template.[/red]")
-                raise typer.Exit(code=1)
-
-            template = Template(html_template_content)
-
-            # 렌더링
             console.print(
-                f"[cyan]Rendering newsletter using loaded template and data...[/cyan]"
+                f"[cyan]Rendering newsletter using {template_style} template...[/cyan]"
             )
-            html_content = template.render(**data)
+            html_content = compose_newsletter(data, template_dir, style=template_style)
 
             # 파일명 생성 및 저장
             if output is None:
@@ -585,9 +582,7 @@ def test(
                     )
                 else:
                     topic_part = "test"
-                output_filename = (
-                    f"test_newsletter_result_{timestamp}_template_{topic_part}.html"
-                )
+                output_filename = f"test_newsletter_result_{timestamp}_{template_style}_{topic_part}.html"
                 output = os.path.join("output", output_filename)
 
             # 출력 디렉토리 생성
