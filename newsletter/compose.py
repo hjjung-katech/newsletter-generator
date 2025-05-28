@@ -484,14 +484,41 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
             template_name
         )  # 여기서 TemplateNotFound 예외 발생 가능
 
+        # 현재 날짜와 시간 가져오기
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M:%S")
+
+        generation_date = data.get(
+            "generation_date", os.environ.get("GENERATION_DATE", current_date)
+        )
+        generation_timestamp = data.get(
+            "generation_timestamp", os.environ.get("GENERATION_TIMESTAMP", current_time)
+        )
+
         # 간단한 컨텍스트로 렌더링
         context = {
             "newsletter_topic": data.get("newsletter_topic", "주간 산업 동향"),
-            "generation_date": data.get(
-                "generation_date", datetime.now().strftime("%Y-%m-%d")
+            "newsletter_title": data.get(
+                "newsletter_title",
+                data.get("newsletter_topic", "주간 산업 동향 뉴스 클리핑"),
             ),
+            "generation_date": generation_date,
+            "generation_timestamp": generation_timestamp,
             "sections": data.get("sections", []),
+            "recipient_greeting": data.get("recipient_greeting"),
+            "introduction_message": data.get("introduction_message"),
+            "closing_message": data.get("closing_message"),
+            "editor_signature": data.get("editor_signature"),
+            "company_name": data.get("company_name"),
+            "top_articles": data.get("top_articles", []),
+            "food_for_thought": data.get("food_for_thought"),
+            "search_keywords": data.get("search_keywords"),
         }
+
+        # 검색 키워드 처리 (리스트를 문자열로 변환)
+        if context["search_keywords"] and isinstance(context["search_keywords"], list):
+            context["search_keywords"] = ", ".join(context["search_keywords"])
+
         return template.render(context)
 
     return compose_newsletter(data, template_dir, "detailed")
