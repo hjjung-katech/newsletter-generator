@@ -2,17 +2,18 @@
 수정된 search_news_articles 함수 테스트
 """
 
-import unittest
-import sys
 import os
-from unittest.mock import patch, MagicMock
+import sys
+import unittest
+from unittest.mock import MagicMock, patch
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+from newsletter import config
+
 # 테스트할 모듈 임포트
 from newsletter.tools import search_news_articles
-from newsletter import config
 
 
 class TestImprovedSearch(unittest.TestCase):

@@ -3,21 +3,22 @@
 - tools.py와 collect.py 모두 업데이트된 내용이 올바르게 적용되었는지 확인합니다.
 """
 
-import unittest
-import sys
-import os
 import json
+import os
+import sys
+import unittest
 from datetime import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-# 필요한 모듈 임포트
-from newsletter.tools import search_news_articles
+from newsletter import config
 from newsletter.collect import collect_articles
 from newsletter.sources import NewsSourceManager
-from newsletter import config
+
+# 필요한 모듈 임포트
+from newsletter.tools import search_news_articles
 
 
 class TestNewsIntegrationEnhanced(unittest.TestCase):

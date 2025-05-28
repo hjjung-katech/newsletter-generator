@@ -3,11 +3,11 @@ Serper.dev API 통합 테스트
 - 뉴스 검색 API 호출 및 응답 처리 검증
 """
 
-import unittest
-import sys
-import os
 import json
-from unittest.mock import patch, MagicMock
+import os
+import sys
+import unittest
+from unittest.mock import MagicMock, patch
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

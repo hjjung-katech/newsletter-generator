@@ -1,4 +1,5 @@
 import unittest
+
 from newsletter.tools import clean_html_markers
 
 

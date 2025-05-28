@@ -2,16 +2,17 @@
 """
 LLM 제공자별 상세 테스트
 """
-import sys
 import os
-import pytest
+import sys
 import time
+
+import pytest
 
 # 모듈 경로 추가 (루트 디렉토리 기준)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from newsletter.llm_factory import get_llm_for_task, llm_factory
 from newsletter import config
+from newsletter.llm_factory import get_llm_for_task, llm_factory
 
 
 class TestLLMProviders:

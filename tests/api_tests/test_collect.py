@@ -1,17 +1,19 @@
-import sys
 import os
+import sys
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 # 현재 파일의 디렉토리(tests/api_tests)의 조부모 디렉토리(프로젝트 루트)를 경로에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import requests  # requests 모듈 임포트 추가
-from newsletter.collect import (
+
+from newsletter.collect import (  # collect_articles_from_serper 추가
     collect_articles,
     collect_articles_from_serper,
-)  # collect_articles_from_serper 추가
+)
 
 
 class TestCollect(unittest.TestCase):

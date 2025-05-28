@@ -1,5 +1,6 @@
-from newsletter.graph import generate_newsletter
 import os
+
+from newsletter.graph import generate_newsletter
 
 # 테스트용 키워드 설정
 test_keywords = ["AI반도체", "HBM", "추론칩", "LLM 가속"]

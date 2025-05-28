@@ -74,8 +74,14 @@ def setup_environment_variables(env_type):
 
 
 def run_code_formatting():
-    """Black을 사용하여 코드를 포맷팅합니다."""
+    """Black과 isort를 사용하여 코드를 포맷팅합니다."""
     print("🎨 코드 포맷팅 검사 실행 중...")
+
+    # isort로 import 정렬
+    print("📋 import 정렬 중...")
+    result_isort = subprocess.run(
+        [sys.executable, "-m", "isort", "newsletter", "tests"], check=False
+    )
 
     # newsletter 패키지 포맷팅
     print("📦 newsletter 패키지 포맷팅 중...")
@@ -87,7 +93,11 @@ def run_code_formatting():
     print("🧪 tests 디렉토리 포맷팅 중...")
     result_tests = subprocess.run([sys.executable, "-m", "black", "tests"], check=False)
 
-    if result_pkg.returncode == 0 and result_tests.returncode == 0:
+    if (
+        result_isort.returncode == 0
+        and result_pkg.returncode == 0
+        and result_tests.returncode == 0
+    ):
         print("✅ 코드 포맷팅 완료!")
         return True
     else:

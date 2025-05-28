@@ -2,12 +2,13 @@
 """
 뉴스레터 생성 기능 통합 테스트
 """
-import unittest
-from unittest.mock import patch, MagicMock
-import os
-import sys
-import re
 import datetime
+import os
+import re
+import sys
+import unittest
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 # 프로젝트 루트 디렉토리를 Python 경로에 추가

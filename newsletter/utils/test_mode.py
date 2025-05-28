@@ -2,12 +2,12 @@
 Utilities for running the newsletter generator in test mode.
 """
 
-import os
-import sys
 import json
 import logging
-from typing import Dict, Any, Optional, Tuple
+import os
+import sys
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -136,9 +136,10 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         Path to the generated HTML file
     """
     # 실제 템플릿 렌더링을 위해 필요한 모듈 임포트
-    from ..compose import compose_newsletter_html
-    import os
     import datetime
+    import os
+
+    from ..compose import compose_newsletter_html
 
     # Load data file
     data = load_intermediate_data(data_file)

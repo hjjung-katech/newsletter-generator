@@ -1,9 +1,10 @@
+from datetime import datetime, timedelta
+
 from newsletter.date_utils import (
     format_date_for_display,
     parse_date_string,
     standardize_date,
 )
-from datetime import datetime, timedelta
 
 
 def test_weeks_ago_pattern():

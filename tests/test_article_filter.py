@@ -1,20 +1,20 @@
-import unittest
-from unittest.mock import patch, MagicMock
-import sys
 import os
-from typing import List, Dict, Any
+import sys
+import unittest
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from newsletter.article_filter import (
+    MAJOR_NEWS_SOURCES,
+    filter_articles_by_domains,
     filter_articles_by_major_sources,
     group_articles_by_keywords,
     remove_duplicate_articles,
-    filter_articles_by_domains,
     remove_similar_articles,
     select_top_articles,
-    MAJOR_NEWS_SOURCES,
 )
 
 

@@ -7,17 +7,18 @@ Mock 기반 뉴스레터 생성 테스트
 
 import os
 import sys
-import pytest
-from unittest.mock import patch, MagicMock
 from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = str(Path(__file__).parent.parent)
 sys.path.insert(0, project_root)
 
-from newsletter.graph import generate_newsletter
 from newsletter.chains import get_newsletter_chain
-from newsletter.compose import compose_newsletter_html, compose_compact_newsletter_html
+from newsletter.compose import compose_compact_newsletter_html, compose_newsletter_html
+from newsletter.graph import generate_newsletter
 
 
 class TestNewsletterMocked:

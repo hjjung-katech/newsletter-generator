@@ -3,6 +3,7 @@ Test minimal version of clean_html_markers function
 """
 
 import unittest
+
 from tests.tools_minimal import clean_html_markers
 
 

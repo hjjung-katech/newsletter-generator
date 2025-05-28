@@ -3,12 +3,13 @@ Serper.dev API 직접 호출 테스트
 - 다양한 API 설정과 응답 형식을 검증
 """
 
-import unittest
 import json
-import requests
 import os
 import sys
-from unittest.mock import patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, patch
+
+import requests
 from dotenv import load_dotenv
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가

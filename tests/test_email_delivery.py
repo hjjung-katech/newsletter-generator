@@ -10,20 +10,21 @@
 - @pytest.mark.integration: 실제 API 호출 테스트 (수동 실행 권장)
 """
 
-import unittest
 import os
-import tempfile
-from unittest.mock import patch, MagicMock
-import pytest
 
 # 프로젝트 루트를 Python 경로에 추가
 import sys
+import tempfile
+import unittest
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from newsletter import deliver as news_deliver
 from newsletter import config
+from newsletter import deliver as news_deliver
 
 
 class TestEmailDelivery(unittest.TestCase):
@@ -230,8 +231,9 @@ class TestEmailDelivery(unittest.TestCase):
 
         try:
             # CLI 명령어 시뮬레이션
-            from newsletter.cli import test_email
             from unittest.mock import patch
+
+            from newsletter.cli import test_email
 
             with patch("newsletter.deliver.send_email") as mock_send:
                 mock_send.return_value = True
@@ -239,6 +241,7 @@ class TestEmailDelivery(unittest.TestCase):
                 # test_email 함수 직접 호출 (CLI 대신)
                 import typer
                 from typer.testing import CliRunner
+
                 from newsletter.cli import app
 
                 runner = CliRunner()
@@ -270,6 +273,7 @@ class TestEmailDelivery(unittest.TestCase):
     def test_email_with_nonexistent_template(self):
         """존재하지 않는 템플릿 파일 처리 테스트 - GitHub Actions 안전"""
         from typer.testing import CliRunner
+
         from newsletter.cli import app
 
         runner = CliRunner()
@@ -294,6 +298,7 @@ class TestEmailDelivery(unittest.TestCase):
     def test_email_dry_run_mode(self):
         """Dry run 모드 테스트 - GitHub Actions 안전"""
         from typer.testing import CliRunner
+
         from newsletter.cli import app
 
         runner = CliRunner()
@@ -319,9 +324,11 @@ class TestEmailDelivery(unittest.TestCase):
     @pytest.mark.unit
     def test_email_config_validation(self):
         """이메일 설정 검증 테스트 - GitHub Actions 안전"""
-        from typer.testing import CliRunner
-        from newsletter.cli import app
         from unittest.mock import patch
+
+        from typer.testing import CliRunner
+
+        from newsletter.cli import app
 
         # POSTMARK_SERVER_TOKEN이 없는 경우 테스트
         with patch("newsletter.config.POSTMARK_SERVER_TOKEN", None):
@@ -347,6 +354,7 @@ class TestEmailDelivery(unittest.TestCase):
         latest_file = max(html_files, key=os.path.getctime)
 
         from typer.testing import CliRunner
+
         from newsletter.cli import app
 
         runner = CliRunner()

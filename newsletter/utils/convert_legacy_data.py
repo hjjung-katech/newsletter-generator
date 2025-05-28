@@ -2,13 +2,13 @@
 Legacy 데이터 파일을 새로운 통합 형식으로 변환하는 유틸리티
 """
 
-import os
+import argparse
 import json
 import logging
-import argparse
-from glob import glob
+import os
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from glob import glob
+from typing import Any, Dict, List, Optional
 
 # 로깅 설정
 logging.basicConfig(

@@ -1,8 +1,10 @@
-import os
 import json
-import pytest
+import os
 from datetime import datetime
 from pathlib import Path
+
+import pytest
+
 from newsletter.compose import compose_newsletter_html
 
 

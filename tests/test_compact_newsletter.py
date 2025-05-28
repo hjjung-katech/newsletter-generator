@@ -7,8 +7,9 @@ Compact 뉴스레터 단위 테스트
 
 import os
 import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

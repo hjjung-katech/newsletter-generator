@@ -1,9 +1,11 @@
 import unittest
-import pytest
 from unittest.mock import patch
+
+import pytest
+
 from newsletter.tools import (
-    extract_common_theme_from_keywords,
     extract_common_theme_fallback,
+    extract_common_theme_from_keywords,
     get_filename_safe_theme,
 )
 

@@ -1,12 +1,12 @@
-import typer
-from rich.console import Console
-import os
-from datetime import datetime
-from typing import Optional, List
 import json
+import os
 import traceback
+from datetime import datetime
+from typing import List, Optional
 
+import typer
 from dotenv import load_dotenv
+from rich.console import Console
 
 # Explicitly load .env from the project root
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -18,13 +18,13 @@ else:
     print(f"[DEBUG_CLI] .env file not found at: {dotenv_path}")  # Debug print
 
 from . import collect as news_collect
-from . import summarize as news_summarize
 from . import compose as news_compose
-from .compose import compose_newsletter_html, compose_compact_newsletter_html
-from . import deliver as news_deliver
-from . import config
 from . import graph  # 새로운 LangGraph 모듈 임포트
 from . import tools  # Import the tools module
+from . import config
+from . import deliver as news_deliver
+from . import summarize as news_summarize
+from .compose import compose_compact_newsletter_html, compose_newsletter_html
 
 app = typer.Typer()
 console = Console()
@@ -555,8 +555,9 @@ def test(
             )
 
             # HTML 템플릿 로드
-            from .chains import load_html_template
             from jinja2 import Template
+
+            from .chains import load_html_template
 
             html_template_content = load_html_template()
             if not html_template_content:
@@ -913,8 +914,8 @@ def check_llm():
     console.print("\n[bold blue]🤖 LLM 제공자 상태 확인[/bold blue]")
 
     try:
-        from .llm_factory import get_available_providers, get_provider_info
         from . import config
+        from .llm_factory import get_available_providers, get_provider_info
 
         # 사용 가능한 제공자 확인
         available_providers = get_available_providers()
@@ -998,8 +999,9 @@ def test_llm(
     console.print(f"\n[bold blue]🧪 LLM 테스트: {task}[/bold blue]")
 
     try:
-        from .llm_factory import get_llm_for_task
         import time
+
+        from .llm_factory import get_llm_for_task
 
         # LLM 생성
         console.print(f"[cyan]LLM 생성 중...[/cyan]")
@@ -1041,8 +1043,8 @@ def test_llm(
 def list_providers():
     """사용 가능한 LLM 제공자와 모델 정보를 표시합니다."""
     try:
-        from .llm_factory import get_provider_info, get_available_providers
         from . import config
+        from .llm_factory import get_available_providers, get_provider_info
 
         console.print("\n[bold cyan]LLM 제공자 정보[/bold cyan]")
         console.print("=" * 50)
