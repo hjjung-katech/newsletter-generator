@@ -2,11 +2,11 @@
 Helper module for managing test dependencies and imports
 """
 
-import sys
-import os
 import importlib
-from unittest.mock import Mock, patch
+import os
+import sys
 from types import ModuleType
+from unittest.mock import Mock, patch
 
 # Use mocks from tests directory
 from tests.mock_google_generativeai import GenerativeModel

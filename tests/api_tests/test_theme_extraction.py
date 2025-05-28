@@ -1,9 +1,11 @@
 import os
-import pytest
 from datetime import datetime
 from pathlib import Path
-from newsletter.tools import extract_common_theme_from_keywords
+
+import pytest
+
 from newsletter import config
+from newsletter.tools import extract_common_theme_from_keywords
 
 
 @pytest.mark.api

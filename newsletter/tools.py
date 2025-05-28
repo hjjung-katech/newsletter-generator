@@ -3,25 +3,27 @@ Newsletter Generator - Custom Tools
 이 모듈은 뉴스레터 생성을 위한 LangChain 도구를 정의합니다.
 """
 
-from langchain.tools import tool
-from langchain_core.tools import ToolException
-import requests
 import json
 import os
-from bs4 import BeautifulSoup
-import markdownify
-from typing import Dict, List, Any, Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.outputs import Generation, LLMResult
-from . import config
-from rich.console import Console
 import re
 import time
 import uuid
+from typing import Any, Dict, List, Optional
+
 import google.generativeai as genai
+import markdownify
+import requests
+from bs4 import BeautifulSoup
 from google.generativeai import types
+from langchain.prompts import PromptTemplate
+from langchain.tools import tool
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.outputs import Generation, LLMResult
+from langchain_core.tools import ToolException
+from langchain_google_genai import ChatGoogleGenerativeAI
+from rich.console import Console
+
+from . import config
 
 console = Console()
 
@@ -531,10 +533,11 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
     try:
         # LLM 팩토리를 사용하여 테마 추출에 최적화된 모델 사용
         try:
-            from .llm_factory import get_llm_for_task
             from langchain_core.messages import HumanMessage
             from langchain_core.output_parsers import StrOutputParser
             from langchain_core.prompts import PromptTemplate
+
+            from .llm_factory import get_llm_for_task
 
             if callbacks is None:
                 callbacks = []
@@ -760,8 +763,9 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
 
     # LLM 팩토리를 사용하여 섹션 재생성에 최적화된 모델 사용
     try:
-        from .llm_factory import get_llm_for_task
         from langchain_core.messages import HumanMessage
+
+        from .llm_factory import get_llm_for_task
 
         llm = get_llm_for_task("section_regeneration", enable_fallback=False)
 
@@ -901,8 +905,9 @@ def generate_introduction_with_gemini(
 
     # LLM 팩토리를 사용하여 소개 생성에 최적화된 모델 사용
     try:
-        from .llm_factory import get_llm_for_task
         from langchain_core.messages import HumanMessage
+
+        from .llm_factory import get_llm_for_task
 
         llm = get_llm_for_task("introduction_generation", enable_fallback=False)
 

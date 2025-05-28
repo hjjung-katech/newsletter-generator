@@ -1,7 +1,8 @@
-from . import config  # Import config module
 import os
-from typing import List, Union, Dict, Any
 import uuid
+from typing import Any, Dict, List, Union
+
+from . import config  # Import config module
 
 SYSTEM_INSTRUCTION = """
 Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업동향 뉴스레터"를 작성하는 전문 편집자입니다.
@@ -204,8 +205,9 @@ def summarize_articles(
     try:
         # LLM 팩토리를 사용하여 뉴스 요약에 최적화된 모델 사용
         try:
-            from .llm_factory import get_llm_for_task
             from langchain_core.messages import HumanMessage, SystemMessage
+
+            from .llm_factory import get_llm_for_task
 
             llm = get_llm_for_task(
                 "news_summarization", callbacks, enable_fallback=False

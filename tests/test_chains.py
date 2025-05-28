@@ -1,10 +1,11 @@
 import unittest
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
+
 from newsletter.chains import (
     CATEGORIZATION_PROMPT,
-    SUMMARIZATION_PROMPT,
     COMPOSITION_PROMPT,
     HTML_TEMPLATE,
+    SUMMARIZATION_PROMPT,
     load_html_template,
 )
 

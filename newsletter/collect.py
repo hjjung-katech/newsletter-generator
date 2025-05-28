@@ -1,10 +1,11 @@
-import requests
 import json
-from . import config
-from .sources import configure_default_sources, NewsSourceManager
-from typing import List, Dict, Any, Union
+from typing import Any, Dict, List, Union
+
+import requests
 from rich.console import Console
-from . import article_filter
+
+from . import article_filter, config
+from .sources import NewsSourceManager, configure_default_sources
 
 console = Console()
 

@@ -1,15 +1,17 @@
 # Placeholder for newsletter composition logic
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+import json
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
+
+import yaml
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 from .date_utils import (
-    format_date_for_display,
     extract_source_and_date,
+    format_date_for_display,
     standardize_date,
 )
-import json
-import yaml
 
 
 # 뉴스레터 스타일 설정

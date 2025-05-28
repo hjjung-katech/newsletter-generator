@@ -9,11 +9,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from .article_filter import MAJOR_NEWS_SOURCES
-from .date_utils import parse_date_string
 from .chains import get_llm
+from .date_utils import parse_date_string
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {

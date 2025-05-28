@@ -2,8 +2,8 @@
 Isolated test for tools module without external dependencies
 """
 
-import sys
 import os
+import sys
 import unittest
 from unittest.mock import Mock, patch
 

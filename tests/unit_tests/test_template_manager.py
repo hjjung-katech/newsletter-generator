@@ -1,16 +1,16 @@
-import unittest
-import os
 import json
-import tempfile
+import os
 import shutil
-from unittest.mock import patch, MagicMock
-
 import sys
+import tempfile
+import unittest
+from unittest.mock import MagicMock, patch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from newsletter.template_manager import TemplateManager
 from jinja2 import Environment, FileSystemLoader
+
+from newsletter.template_manager import TemplateManager
 
 
 class TestTemplateManager(unittest.TestCase):

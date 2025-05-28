@@ -1,8 +1,9 @@
-import unittest
-from unittest.mock import patch, mock_open
-from newsletter.compose import compose_newsletter_html
 import os
 import sys
+import unittest
+from unittest.mock import mock_open, patch
+
+from newsletter.compose import compose_newsletter_html
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 # 현재 파일의 디렉토리(tests)의 부모 디렉토리(프로젝트 루트)를 경로에 추가

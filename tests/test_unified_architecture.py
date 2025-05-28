@@ -11,9 +11,10 @@ NewsletterConfig와 아키텍처 정합성 검증에 집중합니다.
 
 import os
 import sys
-import pytest
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
+
+import pytest
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,8 +23,8 @@ sys.path.insert(0, project_root)
 from newsletter.compose import (
     NewsletterConfig,
     compose_newsletter,
-    extract_and_prepare_top_articles,
     create_grouped_sections,
+    extract_and_prepare_top_articles,
     extract_definitions,
     extract_food_for_thought,
 )

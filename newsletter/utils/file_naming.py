@@ -5,7 +5,7 @@
 import os
 import re
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
 
 def get_safe_filename(text: str) -> str:

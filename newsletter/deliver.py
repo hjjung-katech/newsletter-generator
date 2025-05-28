@@ -1,10 +1,12 @@
 # Placeholder for delivery logic (email, Google Drive)
 import os
+
+import markdownify  # For HTML to Markdown conversion
 import requests
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-import markdownify  # For HTML to Markdown conversion
+
 from . import config
 from .tools import clean_html_markers  # Import the clean_html_markers function
 

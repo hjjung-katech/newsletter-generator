@@ -3,14 +3,16 @@ Newsletter Generator - LangGraph Workflow
 이 모듈은 LangGraph를 사용하여 뉴스레터 생성 워크플로우를 정의합니다.
 """
 
-from typing import Dict, List, Any, Tuple, TypedDict, Annotated, Literal, Optional
-from langgraph.graph import StateGraph, END
-from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
-from langchain_core.messages import HumanMessage
 import json
 import os  # Added import
 import re  # Added import for regex date parsing
 from datetime import datetime, timedelta, timezone  # Added imports
+from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple, TypedDict
+
+from langchain_core.messages import HumanMessage
+from langgraph.graph import END, StateGraph
+from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
+
 from .date_utils import parse_date_string
 
 
@@ -322,7 +324,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
 def score_articles_node(state: NewsletterState) -> NewsletterState:
     """Score articles using LLM to rank priority."""
-    from .scoring import score_articles, load_scoring_weights_from_config
+    from .scoring import load_scoring_weights_from_config, score_articles
 
     print("\n[cyan]Step: Scoring articles...[/cyan]")
 
@@ -380,8 +382,9 @@ def summarize_articles_node(
     """
     수집된 기사를 요약하는 노드
     """
-    from .chains import get_newsletter_chain
     import os
+
+    from .chains import get_newsletter_chain
 
     print("\n[cyan]Step: Summarizing articles...[/cyan]")
 
@@ -469,9 +472,10 @@ def compose_newsletter_node(
     """
     카테고리 요약에서 최종 뉴스레터 HTML을 생성하는 노드
     """
-    from .compose import compose_newsletter
     import os
     from datetime import datetime  # Import datetime for timestamp
+
+    from .compose import compose_newsletter
 
     print("\n[cyan]Step: Composing final newsletter...[/cyan]")
 

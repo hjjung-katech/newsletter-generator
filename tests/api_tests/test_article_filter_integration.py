@@ -1,9 +1,10 @@
-import unittest
-from unittest.mock import patch, MagicMock, call, PropertyMock
-import sys
-import os
 import argparse  # Add import for argparse
-from typing import List, Dict, Any
+import os
+import sys
+import unittest
+from typing import Any, Dict, List
+from unittest.mock import MagicMock, PropertyMock, call, patch
+
 import pytest
 
 # Add parent directory to path for imports
@@ -11,11 +12,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 # 필요한 모듈을 패치
 with patch.dict("sys.modules", {"google.generativeai": MagicMock()}):
-    from newsletter import collect
-    from newsletter import article_filter
-    from newsletter import cli
+    from newsletter import article_filter, cli, collect, config
     from newsletter.sources import NewsSourceManager, SerperAPISource
-    from newsletter import config
 
 
 class TestArticleFilterIntegration(unittest.TestCase):

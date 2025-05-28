@@ -1,12 +1,14 @@
 import os
-import pytest
 from datetime import datetime
 from pathlib import Path
-from newsletter.tools import (
-    extract_common_theme_from_keywords,
-    extract_common_theme_fallback,
-)
+
+import pytest
+
 from newsletter import config
+from newsletter.tools import (
+    extract_common_theme_fallback,
+    extract_common_theme_from_keywords,
+)
 
 
 def test_extract_common_theme_fallback():

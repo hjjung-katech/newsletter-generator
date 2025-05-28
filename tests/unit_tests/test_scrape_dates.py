@@ -1,7 +1,7 @@
-import unittest
-from unittest.mock import patch, MagicMock
 import json
 import os
+import unittest
+from unittest.mock import MagicMock, patch
 
 
 class TestScrapeDates(unittest.TestCase):
@@ -17,8 +17,8 @@ class TestScrapeDates(unittest.TestCase):
         # Mock console to prevent AttributeError
         mock_console.print = MagicMock()
 
-        from newsletter.sources import SerperAPISource, NewsSourceManager
-        from newsletter.date_utils import standardize_date, format_date_for_display
+        from newsletter.date_utils import format_date_for_display, standardize_date
+        from newsletter.sources import NewsSourceManager, SerperAPISource
 
         # 테스트용 키워드
         test_keywords = ["AI반도체", "HBM"]

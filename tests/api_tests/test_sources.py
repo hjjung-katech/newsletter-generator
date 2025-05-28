@@ -1,19 +1,21 @@
-import sys
 import os
+import sys
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-import unittest
-from unittest.mock import patch, MagicMock, Mock
 import json
+import unittest
+from unittest.mock import MagicMock, Mock, patch
+
 import feedparser
+
 from newsletter.sources import (
-    NewsSource,
-    SerperAPISource,
-    RSSFeedSource,
     NaverNewsAPISource,
+    NewsSource,
     NewsSourceManager,
+    RSSFeedSource,
+    SerperAPISource,
     configure_default_sources,
 )
 

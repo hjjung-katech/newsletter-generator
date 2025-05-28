@@ -2,9 +2,11 @@
 """
 HTML 템플릿 로딩 기능 테스트
 """
-from newsletter.chains import load_html_template, HTML_TEMPLATE
 import sys
+
 import pytest
+
+from newsletter.chains import HTML_TEMPLATE, load_html_template
 
 
 def test_template_loading():

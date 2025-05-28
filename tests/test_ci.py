@@ -4,9 +4,9 @@ CI 테스트 스크립트
 GitHub Actions에서 안정적으로 실행되는 테스트
 """
 
-import sys
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 

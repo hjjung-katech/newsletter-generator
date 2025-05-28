@@ -3,27 +3,29 @@ Newsletter Generator - LangChain Chains
 이 모듈은 뉴스레터 생성을 위한 LangChain 체인을 정의합니다.
 """
 
-from langchain_core.prompts import PromptTemplate
-from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import LLMChain, SequentialChain
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from . import config
-from langchain_core.messages import SystemMessage, HumanMessage
-import os
 import datetime
 import json
-from jinja2 import Template
+import os
+
+from jinja2 import Environment, FileSystemLoader, Template
+from langchain.chains import LLMChain, SequentialChain
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_google_genai import ChatGoogleGenerativeAI
+
 from newsletter.sources import NewsSourceManager
+
 from . import tools  # 추가: tools 모듈 가져오기
-from .template_manager import TemplateManager
-from jinja2 import Environment, FileSystemLoader
+from . import config
 from .compose import (
-    prepare_grouped_sections_for_compact,
-    extract_key_definitions_for_compact,
     compose_compact_newsletter_html,
     compose_newsletter,
+    extract_key_definitions_for_compact,
+    prepare_grouped_sections_for_compact,
 )
+from .template_manager import TemplateManager
 
 
 # HTML 템플릿 파일 로딩

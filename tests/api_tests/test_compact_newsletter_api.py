@@ -7,8 +7,9 @@ LLM API, 뉴스 검색 API 등 외부 API를 사용하는 테스트들
 
 import os
 import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = os.path.dirname(
@@ -16,8 +17,8 @@ project_root = os.path.dirname(
 )
 sys.path.insert(0, project_root)
 
+from newsletter.chains import create_summarization_chain, get_newsletter_chain
 from newsletter.graph import generate_newsletter
-from newsletter.chains import get_newsletter_chain, create_summarization_chain
 
 
 class TestCompactNewsletterAPI:

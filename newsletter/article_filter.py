@@ -3,8 +3,9 @@ Newsletter Generator - Article Filtering and Grouping
 이 모듈은 뉴스 기사를 필터링하고 그룹화하는 기능을 제공합니다.
 """
 
-from typing import Dict, List, Any
 import re
+from typing import Any, Dict, List
+
 from rich.console import Console
 
 console = Console()
@@ -420,6 +421,7 @@ def remove_similar_articles(
 
 
 from datetime import datetime, timezone
+
 from .date_utils import parse_date_string
 
 

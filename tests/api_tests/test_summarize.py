@@ -1,12 +1,12 @@
-import sys
-import os
 import importlib
+import os
+import sys
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import unittest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from newsletter import config
 
@@ -54,8 +54,8 @@ class TestSummarize(unittest.TestCase):
         sys.modules["google.generativeai"] = mock_genai_module_for_summarize_import
 
         # Import and reload to ensure we get fresh modules
-        import newsletter.summarize
         import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
+        import newsletter.summarize
 
         importlib.reload(newsletter.llm_factory)  # Reload llm_factory first
         importlib.reload(
@@ -182,8 +182,8 @@ class TestSummarize(unittest.TestCase):
         sys.modules["google.generativeai"] = mock_genai_module
 
         # Import and reload to ensure we get fresh modules
-        import newsletter.summarize
         import newsletter.llm_factory
+        import newsletter.summarize
 
         importlib.reload(newsletter.llm_factory)
         importlib.reload(newsletter.summarize)
@@ -264,8 +264,8 @@ class TestSummarize(unittest.TestCase):
         sys.modules["google.generativeai"] = mock_genai_module_for_summarize_import
 
         # Import and reload to ensure we get fresh modules
-        import newsletter.summarize
         import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
+        import newsletter.summarize
 
         importlib.reload(newsletter.llm_factory)  # Reload llm_factory first
         importlib.reload(

@@ -8,6 +8,7 @@ sys.modules.setdefault("rich.console", SimpleNamespace(Console=lambda *a, **k: N
 
 import unittest
 from unittest.mock import patch
+
 from newsletter.article_filter import group_articles_by_keywords
 
 

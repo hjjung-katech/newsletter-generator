@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import MagicMock
+
 from langchain_core.messages import AIMessage
 
-from newsletter.scoring import score_articles, DEFAULT_WEIGHTS
+from newsletter.scoring import DEFAULT_WEIGHTS, score_articles
 
 
 class TestScoring(unittest.TestCase):

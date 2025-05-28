@@ -2,19 +2,20 @@
 """
 LLM 시스템 기본 테스트
 """
-import sys
 import os
+import sys
+
 import pytest
 
 # 모듈 경로 추가 (루트 디렉토리 기준)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
+from newsletter import config
 from newsletter.llm_factory import (
     get_available_providers,
-    get_provider_info,
     get_llm_for_task,
+    get_provider_info,
 )
-from newsletter import config
 
 
 class TestLLMSystem:

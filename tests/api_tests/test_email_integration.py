@@ -18,20 +18,21 @@ GitHub Actions에서는 API 키가 없어 자동으로 스킵됩니다.
 """
 
 import argparse
+import glob
 import os
 import sys
-import glob
 from datetime import datetime
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
 from newsletter import config
 from newsletter import deliver as news_deliver
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
 
 console = Console()
 

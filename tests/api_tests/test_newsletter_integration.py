@@ -5,8 +5,10 @@ Newsletter Generator - Integration Test
 """
 
 import os
+
 import pytest
 from dotenv import load_dotenv
+
 from newsletter.chains import get_newsletter_chain
 
 # .env 파일 로드

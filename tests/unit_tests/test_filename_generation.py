@@ -1,10 +1,12 @@
 import os
-import pytest
 import re
+
+import pytest
+
 from newsletter.tools import (
-    sanitize_filename,
-    get_filename_safe_theme,
     extract_common_theme_from_keywords,
+    get_filename_safe_theme,
+    sanitize_filename,
 )
 
 

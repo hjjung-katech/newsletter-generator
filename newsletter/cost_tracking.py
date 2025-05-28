@@ -1,6 +1,6 @@
 import os
-from typing import List, Dict, Any, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 try:
     from langchain.callbacks.base import BaseCallbackHandler
@@ -334,10 +334,10 @@ def get_tracking_callbacks():
 
     if is_tracing_enabled and api_key_set:
         try:
-            from langsmith import (
-                traceable,
-            )  # 이 부분은 LangChainTracer와 직접 관련 없음
             from langchain.callbacks.tracers.langchain import LangChainTracer
+            from langsmith import (  # 이 부분은 LangChainTracer와 직접 관련 없음
+                traceable,
+            )
 
             project_name = os.environ.get("LANGCHAIN_PROJECT", "default-project")
             if debug_mode:

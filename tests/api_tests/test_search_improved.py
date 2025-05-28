@@ -3,12 +3,13 @@
 - 다양한 검색 방식과 응답 처리 검증
 """
 
-import unittest
 import json
-import requests
 import os
 import sys
-from unittest.mock import patch, MagicMock
+import unittest
+from unittest.mock import MagicMock, patch
+
+import requests
 from dotenv import load_dotenv
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가

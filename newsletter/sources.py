@@ -4,17 +4,19 @@ Newsletter Generator - News Sources
 """
 
 import json
-import requests
-import feedparser
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 import os
-import time
-from bs4 import BeautifulSoup
-from . import config
-from rich.console import Console
 import re
-from .date_utils import standardize_date, parse_date_string
+import time
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+import feedparser
+import requests
+from bs4 import BeautifulSoup
+from rich.console import Console
+
+from . import config
+from .date_utils import parse_date_string, standardize_date
 
 console = Console()
 
