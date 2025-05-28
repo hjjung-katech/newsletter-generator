@@ -164,6 +164,27 @@ def send_email(to_email: str, subject: str, html_content: str):
             return True
         else:
             print(f"Error sending email: {response.status_code} {response.text}")
+
+            # 특정 오류에 대한 도움말 제공
+            if response.status_code == 422:
+                try:
+                    error_data = response.json()
+                    if error_data.get("ErrorCode") == 406:
+                        print("\n💡 해결 방법:")
+                        print("   1. 다른 이메일 주소로 테스트해보세요")
+                        print(
+                            "   2. Postmark 대시보드에서 해당 이메일을 재활성화하세요:"
+                        )
+                        print("      - Message Stream → Suppressions 탭")
+                        print("      - 이메일 주소 검색 → Reactivate 버튼 클릭")
+                        print("   3. 발송자와 수신자가 같은 이메일인지 확인하세요")
+                except:
+                    pass
+            elif response.status_code == 401:
+                print("\n💡 해결 방법:")
+                print("   - POSTMARK_SERVER_TOKEN이 올바른지 확인하세요")
+                print("   - Postmark 대시보드에서 토큰을 다시 확인하세요")
+
             return False
     except Exception as e:
         print(f"Error sending email via Postmark: {e}")

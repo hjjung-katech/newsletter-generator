@@ -23,7 +23,7 @@ ADDITIONAL_RSS_FEEDS = os.getenv(
 
 # 이메일 발송 설정 (Postmark)
 POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
-EMAIL_SENDER = os.getenv("EMAIL_SENDER", "hjjung2@osp.re.kr")
+EMAIL_SENDER = os.getenv("EMAIL_SENDER")
 
 # Google Drive 설정
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
