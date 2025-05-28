@@ -88,7 +88,7 @@ class TestSummarize(unittest.TestCase):
                     html_output, "<html><body>Mocked HTML Summary</body></html>"
                 )
                 mock_get_llm_direct.assert_called_once_with(
-                    "news_summarization", unittest.mock.ANY
+                    "news_summarization", unittest.mock.ANY, enable_fallback=False
                 )
                 mock_llm_instance.invoke.assert_called_once()
                 mock_genai_module_for_summarize_import.GenerativeModel.assert_not_called()
@@ -155,17 +155,23 @@ class TestSummarize(unittest.TestCase):
             # Ensure the direct genai mock wasn't used for generation
             mock_genai_module.GenerativeModel.assert_not_called()
 
-    @patch("newsletter.llm_factory.get_llm_for_task")
-    def test_summarize_articles_api_error(self, mock_get_llm):
+    def test_summarize_articles_api_error(self):
         mock_llm_instance = MagicMock()
         mock_llm_instance.invoke.side_effect = Exception(
             "Gemini API Error via llm_factory"
         )
-        mock_get_llm.return_value = mock_llm_instance
+
+        # Clean up modules first
+        for mod_key_to_delete in [
+            "newsletter.summarize",
+            "newsletter.llm_factory",
+            "langchain_google_genai",
+            "google.generativeai",
+        ]:
+            if mod_key_to_delete in sys.modules:
+                del sys.modules[mod_key_to_delete]
 
         # Ensure google.generativeai is a benign mock
-        if "google.generativeai" in sys.modules:
-            del sys.modules["google.generativeai"]
         mock_genai_module = MagicMock()
         # If llm_factory fails and summarize.py tries to use genai directly, make it also fail
         mock_genai_model = MagicMock()
@@ -175,33 +181,42 @@ class TestSummarize(unittest.TestCase):
         mock_genai_module.GenerativeModel.return_value = mock_genai_model
         sys.modules["google.generativeai"] = mock_genai_module
 
+        # Import and reload to ensure we get fresh modules
         import newsletter.summarize
+        import newsletter.llm_factory
 
+        importlib.reload(newsletter.llm_factory)
         importlib.reload(newsletter.summarize)
         summarize_articles = newsletter.summarize.summarize_articles
 
         with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
-            keywords = ["에러 테스트"]
-            articles = [
-                {
-                    "title": "Error Article",
-                    "url": "http://error.com",
-                    "content": "Error content",
-                }
-            ]
-            html_output = summarize_articles(keywords, articles)
-            self.assertIn("오류 발생", html_output)
-            self.assertIn(
-                "키워드 '에러 테스트'에 대한 뉴스레터 요약 중 오류가 발생했습니다",
-                html_output,
-            )
-            self.assertIn("Gemini API Error via llm_factory", html_output)
-            mock_get_llm.assert_called_once_with(
-                "news_summarization", unittest.mock.ANY
-            )
-            mock_llm_instance.invoke.assert_called_once()
-            # Ensure the direct genai mock was not used if llm_factory path was taken
-            mock_genai_module.GenerativeModel.assert_not_called()
+            # Patch get_llm_for_task on the reloaded llm_factory module object
+            with patch.object(
+                newsletter.llm_factory,
+                "get_llm_for_task",
+                return_value=mock_llm_instance,
+            ) as mock_get_llm_direct:
+                keywords = ["에러 테스트"]
+                articles = [
+                    {
+                        "title": "Error Article",
+                        "url": "http://error.com",
+                        "content": "Error content",
+                    }
+                ]
+                html_output = summarize_articles(keywords, articles)
+                self.assertIn("오류 발생", html_output)
+                self.assertIn(
+                    "키워드 '에러 테스트'에 대한 뉴스레터 요약 중 오류가 발생했습니다",
+                    html_output,
+                )
+                self.assertIn("Gemini API Error via llm_factory", html_output)
+                mock_get_llm_direct.assert_called_once_with(
+                    "news_summarization", unittest.mock.ANY, enable_fallback=False
+                )
+                mock_llm_instance.invoke.assert_called_once()
+                # Ensure the direct genai mock was not used if llm_factory path was taken
+                mock_genai_module.GenerativeModel.assert_not_called()
 
     def test_summarize_articles_empty_articles(self):
         # Ensure google.generativeai is a benign mock. No LLM call should happen.
@@ -278,7 +293,7 @@ class TestSummarize(unittest.TestCase):
                     html_output, "<html><body>Empty Keywords Summary</body></html>"
                 )
                 mock_get_llm_direct.assert_called_once_with(
-                    "news_summarization", unittest.mock.ANY
+                    "news_summarization", unittest.mock.ANY, enable_fallback=False
                 )
                 mock_llm_instance.invoke.assert_called_once()
                 mock_genai_module_for_summarize_import.GenerativeModel.assert_not_called()

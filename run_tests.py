@@ -354,7 +354,7 @@ def main():
 
         # API 키 확인
         api_keys = {
-            "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY"),
+            "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY"),
             "SERPER_API_KEY": os.getenv("SERPER_API_KEY"),
         }
 

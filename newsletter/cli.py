@@ -908,6 +908,136 @@ def test(
 
 
 @app.command()
+def check_llm():
+    """현재 사용 가능한 LLM 제공자와 설정을 확인합니다."""
+    console.print("\n[bold blue]🤖 LLM 제공자 상태 확인[/bold blue]")
+
+    try:
+        from .llm_factory import get_available_providers, get_provider_info
+        from . import config
+
+        # 사용 가능한 제공자 확인
+        available_providers = get_available_providers()
+        provider_info = get_provider_info()
+
+        console.print(
+            f"\n[bold green]✅ 사용 가능한 제공자: {len(available_providers)}개[/bold green]"
+        )
+
+        for provider_name, info in provider_info.items():
+            if info["available"]:
+                console.print(f"  • [green]{provider_name}[/green] - 사용 가능")
+            else:
+                console.print(
+                    f"  • [red]{provider_name}[/red] - 사용 불가 (API 키 없음)"
+                )
+
+        # 현재 LLM 설정 표시
+        console.print(f"\n[bold blue]📋 현재 LLM 설정[/bold blue]")
+        llm_config = config.LLM_CONFIG
+        default_provider = llm_config.get("default_provider", "gemini")
+        console.print(f"기본 제공자: [blue]{default_provider}[/blue]")
+
+        # 작업별 설정 표시
+        console.print(f"\n[bold blue]🔧 작업별 LLM 할당[/bold blue]")
+        models_config = llm_config.get("models", {})
+
+        for task, task_config in models_config.items():
+            provider = task_config.get("provider", "N/A")
+            model = task_config.get("model", "N/A")
+            temp = task_config.get("temperature", "N/A")
+
+            # 제공자 사용 가능 여부에 따라 색상 변경
+            if provider in available_providers:
+                provider_color = "green"
+                status = "✅"
+            else:
+                provider_color = "red"
+                status = "❌"
+
+            console.print(
+                f"  {status} {task}: [{provider_color}]{provider}[/{provider_color}] - {model} (temp: {temp})"
+            )
+
+        # 권장사항 표시
+        if len(available_providers) == 0:
+            console.print(
+                f"\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]"
+            )
+            console.print("다음 중 하나 이상의 API 키를 .env 파일에 설정해주세요:")
+            console.print("  • GEMINI_API_KEY")
+            console.print("  • OPENAI_API_KEY")
+            console.print("  • ANTHROPIC_API_KEY")
+        elif len(available_providers) == 1:
+            console.print(
+                f"\n[yellow]💡 권장사항: 더 나은 fallback을 위해 추가 LLM 제공자를 설정하는 것을 권장합니다.[/yellow]"
+            )
+        else:
+            console.print(
+                f"\n[green]🎉 좋습니다! 여러 LLM 제공자가 설정되어 있어 안정적인 서비스가 가능합니다.[/green]"
+            )
+
+    except Exception as e:
+        console.print(f"[bold red]Error: {e}[/bold red]")
+
+
+@app.command()
+def test_llm(
+    task: str = typer.Option(
+        "keyword_generation",
+        "--task",
+        help="테스트할 작업 유형 (keyword_generation, theme_extraction, news_summarization 등)",
+    ),
+    prompt: str = typer.Option(
+        "안녕하세요. 이것은 테스트 메시지입니다.",
+        "--prompt",
+        help="테스트에 사용할 프롬프트",
+    ),
+):
+    """특정 작업에 대한 LLM 응답을 테스트합니다."""
+    console.print(f"\n[bold blue]🧪 LLM 테스트: {task}[/bold blue]")
+
+    try:
+        from .llm_factory import get_llm_for_task
+        import time
+
+        # LLM 생성
+        console.print(f"[cyan]LLM 생성 중...[/cyan]")
+        llm = get_llm_for_task(task, enable_fallback=False)
+        console.print(f"[green]✅ LLM 생성 완료: {type(llm).__name__}[/green]")
+
+        # 테스트 실행
+        console.print(f"[cyan]테스트 실행 중...[/cyan]")
+        console.print(f"프롬프트: {prompt}")
+
+        start_time = time.time()
+        response = llm.invoke(prompt)
+        end_time = time.time()
+
+        # 결과 출력
+        response_time = end_time - start_time
+        response_text = str(response).strip()
+
+        console.print(f"\n[bold green]📝 응답 결과[/bold green]")
+        console.print(f"응답 시간: {response_time:.2f}초")
+        console.print(f"응답 길이: {len(response_text)}자")
+        console.print(f"\n[blue]응답 내용:[/blue]")
+        console.print(response_text)
+
+    except Exception as e:
+        console.print(f"[bold red]❌ 테스트 실패: {e}[/bold red]")
+
+        # 429 에러인 경우 특별한 안내
+        if "429" in str(e) or "quota" in str(e).lower():
+            console.print(
+                f"[yellow]💡 API 할당량이 초과된 것 같습니다. 다른 LLM 제공자를 사용해보세요.[/yellow]"
+            )
+            console.print(
+                f"[yellow]   'newsletter check-llm' 명령어로 사용 가능한 제공자를 확인하세요.[/yellow]"
+            )
+
+
+@app.command()
 def list_providers():
     """사용 가능한 LLM 제공자와 모델 정보를 표시합니다."""
     try:

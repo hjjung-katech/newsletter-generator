@@ -227,7 +227,7 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
     try:
         from .llm_factory import get_llm_for_task
 
-        llm = get_llm_for_task(task, callbacks)
+        llm = get_llm_for_task(task, callbacks, enable_fallback=False)
 
         # 온도 설정이 다른 경우 모델 재구성
         if hasattr(llm, "temperature") and llm.temperature != temperature:
