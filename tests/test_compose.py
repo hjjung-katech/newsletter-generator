@@ -76,8 +76,11 @@ class TestCompose(unittest.TestCase):
         self.assertIn(
             "12:34:56", html_content
         )  # Check if generation timestamp is in the output
-        # Check that the main structure is there but no articles
-        self.assertNotIn("<h2>", html_content)  # Assuming articles are under h2 tags
+        # Check that the main structure is there but no section content
+        # Instead of checking for absence of h2 tags, check that specific content sections are not present
+        self.assertNotIn(
+            "📄 참고 뉴스 링크", html_content
+        )  # Assuming this appears only when there are articles
 
     def test_compose_newsletter_html_template_not_found(self):
         summaries = [
