@@ -179,22 +179,33 @@ NAVER_CLIENT_SECRET=your_naver_client_secret
 
 1. [Postmark](https://postmarkapp.com/)에 가입
 2. 서버(Server) 생성 후 **Server Token** 확인
-3. 발송자 이메일 주소를 Postmark에서 인증
+3. **중요**: 발송자 이메일 주소를 Postmark에서 인증 (도메인 인증 필요)
 4. `.env` 파일에 다음과 같이 추가:
 
 ```bash
 POSTMARK_SERVER_TOKEN=your_postmark_server_token
-EMAIL_SENDER=your_verified_sender@example.com
+EMAIL_SENDER=newsletter@yourdomain.com
 ```
+
+**⚠️ 중요한 주의사항:**
+- `EMAIL_SENDER`는 반드시 Postmark에서 인증된 도메인의 이메일이어야 합니다
+- 발송자와 수신자가 같은 이메일 주소이면 안됩니다 (Hard Bounce 발생)
+- 테스트 시에는 다른 이메일 주소를 수신자로 사용하세요
 
 **Postmark 설정 확인:**
 ```bash
-# 이메일 발송 기능 테스트
-newsletter test-email --to your-email@example.com --dry-run
+# 이메일 발송 기능 테스트 (실제 발송 없음)
+newsletter test-email --to different-email@example.com --dry-run
 
-# 실제 테스트 이메일 발송
-newsletter test-email --to your-email@example.com
+# 실제 테스트 이메일 발송 (발송자와 다른 이메일로)
+newsletter test-email --to different-email@example.com
 ```
+
+**Hard Bounce 문제 해결:**
+만약 이메일 주소가 비활성화(inactive)된 경우:
+1. Postmark 대시보드 → Message Stream → Suppressions 탭
+2. 해당 이메일 주소 검색
+3. "Reactivate" 버튼 클릭하여 재활성화
 
 #### 5. Google Drive API (파일 저장용)
 
