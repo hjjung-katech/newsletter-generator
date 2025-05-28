@@ -2,25 +2,47 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>{{ newsletter_title | default('주간 산업 동향 뉴스레터') }}{% if newsletter_topic %} - {{ newsletter_topic }}{% endif %} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
+<title>{{ newsletter_title | default('주간 산업동향 뉴스레터') }} ({{ generation_date }}{% if generation_timestamp %} {{ generation_timestamp }}{% endif %})</title>
 <style>
 body{font-family:Arial, sans-serif; line-height:1.6; margin:0; padding:0; background:#f5f6fa;}
 .container{max-width:680px; margin:auto; background:#ffffff; padding:20px;}
-header{text-align:center; padding:10px 0;}
-.tagline{font-style:italic; color:#555;}
-.hero{background:#fff9e6; padding:20px; margin:20px 0;}
-.hero h2{margin-top:0;}
-.cards{display:grid; grid-template-columns:1fr; gap:1rem;}
-@media(min-width:600px){.cards{grid-template-columns:repeat(3,1fr);}}
-.card{background:#ffffff; border:1px solid #eee; padding:10px; border-radius:8px;}
-.card h3{margin-top:0; font-size:1.1em;}
-.summary{display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:0.9em; color:#333;}
+header{text-align:center; padding:15px 0 20px 0;}
+.main-title{font-size:1.8em; font-weight:bold; color:#2c3e50; margin-bottom:12px;}
+.topic-badge{
+  margin:0 auto 12px auto; 
+  padding:6px 14px; 
+  background:#e8f4f8; 
+  color:#2c3e50; 
+  text-align:center; 
+  font-size:0.9em; 
+  border:1px solid #b8dce8; 
+  border-radius:20px;
+  display:inline-block;
+  font-weight:500;
+  max-width:300px;
+}
+.meta-info{font-size:0.85em; color:#666; margin-bottom:8px;}
+.tagline{font-style:italic; color:#777; font-size:0.9em; margin-bottom:0;}
+.hero{background:#fff9e6; padding:20px; margin:20px 0; text-align:center; border-bottom:1px solid #ecf0f1;}
+.hero h2{margin-top:0; color:#2c3e50; font-size:1.5em; margin-bottom:20px;}
+.cards{display:flex; flex-wrap:wrap; justify-content:center; gap:20px;}
+@media(max-width:600px){.cards{flex-direction:column;}}
+.card{background:#f8f9fa; border:1px solid #eee; padding:12px; border-radius:8px; width:calc(31% - 10px); min-width:180px; box-shadow:0 4px 15px rgba(0,0,0,0.1);}
+@media(max-width:600px){.card{width:100%;}}
+.card h3{margin-top:0; font-size:1.1em; margin-bottom:10px;}
+.card h3 a{color:#2c3e50; text-decoration:none; font-weight:bold;}
+.card h3 a:hover{text-decoration:underline;}
+.summary{font-size:0.9em; color:#555; margin-bottom:8px; line-height:1.4;}
 .meta{font-size:0.8em; color:#777;}
 .group{margin:24px 0;}
 .group h3{margin-bottom:6px; color:#0d47a1;}
 .intro{font-size:0.9em; color:#333; margin:4px 0 10px 0;}
 .group ul{padding-left:20px;}
 .group li{margin-bottom:6px;}
+.definition-compact{background:#f8f9fa; padding:10px 15px; border-radius:6px; border-left:3px solid #0d47a1; margin-top:10px;}
+.definition-compact h4{margin:0 0 8px 0; color:#0d47a1; font-size:0.9em; font-weight:bold;}
+.definition-compact .def-item{margin-bottom:6px; font-size:0.85em;}
+.definition-compact .def-term{color:#0d47a1; font-weight:bold;}
 footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 .issue-info{font-size:0.8em; color:#777; margin-top:5px;}
 </style>
@@ -28,9 +50,12 @@ footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 <body>
 <div class="container">
 <header>
-<h1>{{ newsletter_title | default('주간 산업 동향 뉴스레터') }}</h1>
+<h1 class="main-title">{{ newsletter_title | default('주간 산업동향 뉴스레터') }}</h1>
+{% if newsletter_topic or domain %}
+<div class="topic-badge">{{ newsletter_topic | default(domain) }} 분야</div>
+{% endif %}
+<div class="meta-info">{{ generation_date }}{% if issue_no %} · 제{{ issue_no }}호{% endif %}{% if generation_timestamp %} · {{ generation_timestamp }}{% endif %}</div>
 <p class="tagline">{{ tagline | default('이번 주, 주요 산업 동향을 미리 만나보세요.') }}</p>
-<small>발행일: {{ generation_date }}{% if issue_no %} | 제 {{ issue_no }}호{% endif %}{% if generation_timestamp %} | 생성시간: {{ generation_timestamp }}{% endif %}</small>
 </header>
 
 {% if top_articles %}
@@ -57,16 +82,27 @@ footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 <li><a href="{{ a.url }}">{{ a.title }}</a> <span class="meta">{{ a.source_and_date }}</span></li>
 {% endfor %}
 </ul>
+
+{% if group.definitions %}
+<div class="definition-compact">
+<h4>📖 이런 뜻이에요!</h4>
+{% for def in group.definitions %}
+<div class="def-item">
+<span class="def-term">{{ def.term }}</span>: {{ def.explanation }}
+</div>
+{% endfor %}
+</div>
+{% endif %}
 </section>
 {% endfor %}
 
 {% if definitions %}
 <section class="group">
-<h3>💡 이런 뜻이에요</h3>
-<div style="background:#f8f9fa; padding:15px; border-radius:8px; border-left:4px solid #0d47a1;">
+<h3>📖 이런 뜻이에요</h3>
+<div class="definition-compact">
 {% for def in definitions %}
-<div style="margin-bottom:10px;">
-<strong style="color:#0d47a1;">{{ def.term }}</strong>: {{ def.explanation }}
+<div class="def-item">
+<span class="def-term">{{ def.term }}</span>: {{ def.explanation }}
 </div>
 {% endfor %}
 </div>

@@ -263,20 +263,29 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
         return llm
 
     except Exception as e:
-        print(f"Warning: LLM factory failed, falling back to default Gemini: {e}")
+        # Google Cloud 인증 관련 오류는 조용히 처리
+        error_msg = str(e).lower()
+        if "credentials" in error_msg or "not found" in error_msg:
+            # 조용한 fallback (디버그 모드에서만 출력)
+            if os.environ.get("DEBUG_LLM_FACTORY"):
+                print(f"Debug: LLM factory failed, using fallback: {e}")
+        else:
+            # 다른 오류는 출력
+            print(f"Warning: LLM factory failed, falling back to default Gemini: {e}")
+
         # Fallback to original Gemini implementation
         if not config.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
         return ChatGoogleGenerativeAI(
-            model="gemini-2.5-pro-preview-03-25",
+            model="gemini-1.5-pro",  # 안정적인 모델로 변경
             google_api_key=config.GEMINI_API_KEY,
             temperature=temperature,
             transport="rest",
             callbacks=callbacks,
             convert_system_message_to_human=False,
             timeout=60,
-            max_retries=2,
+            max_retries=3,  # 재시도 횟수 증가
             disable_streaming=False,
         )
 

@@ -48,7 +48,7 @@ llm_settings:
     openai: "OPENAI_API_KEY"
     anthropic: "ANTHROPIC_API_KEY"
   
-  # 기능별 LLM 모델 설정 - 다양한 제공자 활용
+  # 기능별 LLM 모델 설정 - 최신 모델 우선 시도, 문제 시 안정적인 모델로 fallback
   models:
     # 키워드 생성 (도메인 → 키워드) - 창의성이 중요하므로 Anthropic 사용
     keyword_generation:
@@ -71,7 +71,7 @@ llm_settings:
       provider: "gemini"
       model: "gemini-2.5-pro-preview-03-25"
       temperature: 0.3
-      max_retries: 3
+      max_retries: 2
       timeout: 120
     
     # 섹션 재생성 (뉴스 링크 → 섹션 요약) - 구조화된 작업이므로 Anthropic 사용
@@ -95,7 +95,7 @@ llm_settings:
       provider: "gemini"
       model: "gemini-2.5-pro-preview-03-25"
       temperature: 0.2
-      max_retries: 3
+      max_retries: 2
       timeout: 180
     
     # 기사 점수 매기기 - 빠른 판단이 중요하므로 Gemini Flash 사용
@@ -106,7 +106,7 @@ llm_settings:
       max_retries: 2
       timeout: 30
     
-    # 번역 작업 - 정확성이 중요하므로 Gemini Pro 사용
+    # 번역 작업 - 정확성이 중요하므로 최신 Pro 모델 시도
     translation:
       provider: "gemini"
       model: "gemini-2.5-pro-preview-03-25"

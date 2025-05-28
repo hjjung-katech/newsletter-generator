@@ -9,6 +9,26 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+# Google Cloud 인증 문제 해결
+# 시스템에 잘못된 GOOGLE_APPLICATION_CREDENTIALS가 설정되어 있는 경우 처리
+google_creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+if google_creds_path and not os.path.exists(google_creds_path):
+    # 파일이 존재하지 않으면 환경변수 제거
+    print(
+        f"Warning: GOOGLE_APPLICATION_CREDENTIALS points to non-existent file: {google_creds_path}"
+    )
+    print("Disabling Google Cloud authentication to use API key only.")
+    os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+
+# Google Cloud 기본 인증 파일 검색 완전 비활성화
+# 이렇게 하면 langchain_google_genai가 credentials.json을 찾지 않음
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
+os.environ["GOOGLE_CLOUD_PROJECT"] = ""
+
+# Google Cloud SDK 기본 설정 파일도 비활성화
+os.environ.pop("CLOUDSDK_CONFIG", None)
+os.environ.pop("GCLOUD_PROJECT", None)
+
 try:
     from langchain_google_genai import ChatGoogleGenerativeAI
 except ImportError:
@@ -24,6 +44,18 @@ try:
 except ImportError:
     ChatAnthropic = None
 
+# LangChain Runnable 관련 imports 추가
+try:
+    from langchain_core.runnables import Runnable
+    from langchain_core.runnables.config import RunnableConfig
+    from langchain_core.runnables.utils import Input, Output
+except ImportError:
+    # Fallback for older versions
+    Runnable = object
+    RunnableConfig = dict
+    Input = Any
+    Output = Any
+
 from . import config
 from .cost_tracking import get_cost_callback_for_provider
 
@@ -34,7 +66,7 @@ class QuotaExceededError(Exception):
     pass
 
 
-class LLMWithFallback:
+class LLMWithFallback(Runnable):
     """
     API 할당량 초과 시 자동으로 다른 제공자로 fallback하는 LLM 래퍼
     """
@@ -46,22 +78,24 @@ class LLMWithFallback:
         self.callbacks = callbacks or []
         self.fallback_llm = None
 
-    def invoke(self, input_data, **kwargs):
+    def invoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         """LLM 호출 시 429 에러 처리"""
         try:
-            return self.primary_llm.invoke(input_data, **kwargs)
+            return self.primary_llm.invoke(input_data, config=config, **kwargs)
         except Exception as e:
             error_str = str(e).lower()
-            # 429 에러 또는 할당량 초과 관련 에러 감지
+            # 529, 429 에러 또는 할당량 초과 관련 에러 감지
             if (
-                "429" in error_str
+                "529" in error_str
+                or "429" in error_str
                 or "quota" in error_str
                 or "rate limit" in error_str
                 or "too many requests" in error_str
+                or "overloaded" in error_str
             ):
 
                 print(
-                    f"[WARNING] API quota exceeded for {type(self.primary_llm).__name__}. Attempting fallback..."
+                    f"[WARNING] API error ({e}) for {type(self.primary_llm).__name__}. Attempting fallback..."
                 )
 
                 # Fallback LLM 생성 (한 번만)
@@ -72,71 +106,80 @@ class LLMWithFallback:
                     print(
                         f"[INFO] Using fallback LLM: {type(self.fallback_llm).__name__}"
                     )
-                    return self.fallback_llm.invoke(input_data, **kwargs)
+                    return self.fallback_llm.invoke(input_data, config=config, **kwargs)
                 else:
                     raise QuotaExceededError(
-                        f"Primary LLM quota exceeded and no fallback available. Original error: {e}"
+                        f"Primary LLM error and no fallback available. Original error: {e}"
                     )
             else:
                 # 다른 종류의 에러는 그대로 전파
                 raise e
 
-    def stream(self, input_data, **kwargs):
+    def stream(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
         """스트리밍 지원"""
         try:
             if hasattr(self.primary_llm, "stream"):
-                return self.primary_llm.stream(input_data, **kwargs)
+                return self.primary_llm.stream(input_data, config=config, **kwargs)
             else:
                 # 스트리밍을 지원하지 않는 경우 일반 invoke 사용
-                result = self.invoke(input_data, **kwargs)
+                result = self.invoke(input_data, config=config, **kwargs)
                 yield result
         except Exception as e:
             error_str = str(e).lower()
             if (
-                "429" in error_str
+                "529" in error_str
+                or "429" in error_str
                 or "quota" in error_str
                 or "rate limit" in error_str
                 or "too many requests" in error_str
+                or "overloaded" in error_str
             ):
 
                 if self.fallback_llm is None:
                     self.fallback_llm = self._get_fallback_llm()
 
                 if self.fallback_llm and hasattr(self.fallback_llm, "stream"):
-                    return self.fallback_llm.stream(input_data, **kwargs)
+                    return self.fallback_llm.stream(input_data, config=config, **kwargs)
                 elif self.fallback_llm:
-                    result = self.fallback_llm.invoke(input_data, **kwargs)
+                    result = self.fallback_llm.invoke(
+                        input_data, config=config, **kwargs
+                    )
                     yield result
                 else:
                     raise e
             else:
                 raise e
 
-    def batch(self, inputs, **kwargs):
+    def batch(self, inputs, config: Optional[RunnableConfig] = None, **kwargs):
         """배치 처리 지원"""
         try:
             if hasattr(self.primary_llm, "batch"):
-                return self.primary_llm.batch(inputs, **kwargs)
+                return self.primary_llm.batch(inputs, config=config, **kwargs)
             else:
                 # 배치를 지원하지 않는 경우 개별 처리
-                return [self.invoke(input_data, **kwargs) for input_data in inputs]
+                return [
+                    self.invoke(input_data, config=config, **kwargs)
+                    for input_data in inputs
+                ]
         except Exception as e:
             error_str = str(e).lower()
             if (
-                "429" in error_str
+                "529" in error_str
+                or "429" in error_str
                 or "quota" in error_str
                 or "rate limit" in error_str
                 or "too many requests" in error_str
+                or "overloaded" in error_str
             ):
 
                 if self.fallback_llm is None:
                     self.fallback_llm = self._get_fallback_llm()
 
                 if self.fallback_llm and hasattr(self.fallback_llm, "batch"):
-                    return self.fallback_llm.batch(inputs, **kwargs)
+                    return self.fallback_llm.batch(inputs, config=config, **kwargs)
                 elif self.fallback_llm:
                     return [
-                        self.fallback_llm.invoke(input_data, **kwargs)
+                        self.fallback_llm.invoke(input_data, config=config, **kwargs)
                         for input_data in inputs
                     ]
                 else:
@@ -147,45 +190,97 @@ class LLMWithFallback:
     def _get_fallback_llm(self):
         """Fallback LLM을 찾아서 반환"""
         primary_provider = type(self.primary_llm).__name__
+        primary_model = getattr(self.primary_llm, "model", "unknown")
 
-        # 사용 가능한 다른 제공자 찾기
+        print(f"[INFO] Looking for fallback for {primary_provider} ({primary_model})")
+
+        # 1. 같은 제공자 내에서 안정적인 모델로 fallback 시도
+        if "gemini" in primary_provider.lower():
+            stable_models = ["gemini-1.5-pro", "gemini-1.5-flash"]
+
+            for stable_model in stable_models:
+                if stable_model != primary_model:  # 동일한 모델이 아닌 경우만
+                    try:
+                        print(f"[INFO] Trying stable Gemini model: {stable_model}")
+                        fallback_config = {
+                            "provider": "gemini",
+                            "model": stable_model,
+                            "temperature": getattr(
+                                self.primary_llm, "temperature", 0.3
+                            ),
+                            "max_retries": 2,
+                            "timeout": 60,
+                        }
+
+                        # 비용 추적 콜백 추가
+                        fallback_callbacks = list(self.callbacks)
+                        try:
+                            cost_callback = get_cost_callback_for_provider("gemini")
+                            fallback_callbacks.append(cost_callback)
+                        except Exception:
+                            pass
+
+                        provider = self.factory.providers.get("gemini")
+                        if provider and provider.is_available():
+                            return provider.create_model(
+                                fallback_config, fallback_callbacks
+                            )
+                    except Exception as e:
+                        print(
+                            f"[WARNING] Failed to create stable Gemini model {stable_model}: {e}"
+                        )
+                        continue
+
+        # 2. 다른 제공자로 fallback 시도
         available_providers = self.factory.get_available_providers()
 
         for provider_name in available_providers:
             provider = self.factory.providers[provider_name]
+
+            # 이미 시도한 제공자는 스킵 (단, Gemini는 다른 모델로 이미 시도했으므로 제외)
+            if provider_name == "gemini":
+                continue
+
             try:
-                # 임시 모델을 생성해서 타입 확인
-                temp_model = provider.create_model(
-                    {"model": self.factory._get_default_model(provider_name)}, []
+                # 제공자별 안정적인 기본 모델 사용
+                stable_model_map = {
+                    "openai": "gpt-4o",
+                    "anthropic": "claude-3-5-sonnet-20241022",
+                }
+
+                fallback_model = stable_model_map.get(
+                    provider_name, self.factory._get_default_model(provider_name)
                 )
-                provider_class = type(temp_model).__name__
 
-                # Primary와 다른 제공자인 경우
-                if provider_class != primary_provider:
-                    # 기본 모델 설정으로 fallback LLM 생성
-                    fallback_config = {
-                        "provider": provider_name,
-                        "model": self.factory._get_default_model(provider_name),
-                        "temperature": 0.3,
-                        "max_retries": 2,
-                        "timeout": 60,
-                    }
+                print(
+                    f"[INFO] Trying different provider: {provider_name} with model {fallback_model}"
+                )
 
-                    # 비용 추적 콜백 추가
-                    fallback_callbacks = list(self.callbacks)
-                    try:
-                        cost_callback = get_cost_callback_for_provider(provider_name)
-                        fallback_callbacks.append(cost_callback)
-                    except Exception:
-                        pass
+                fallback_config = {
+                    "provider": provider_name,
+                    "model": fallback_model,
+                    "temperature": getattr(self.primary_llm, "temperature", 0.3),
+                    "max_retries": 2,
+                    "timeout": 60,
+                }
 
-                    return provider.create_model(fallback_config, fallback_callbacks)
+                # 비용 추적 콜백 추가
+                fallback_callbacks = list(self.callbacks)
+                try:
+                    cost_callback = get_cost_callback_for_provider(provider_name)
+                    fallback_callbacks.append(cost_callback)
+                except Exception:
+                    pass
+
+                return provider.create_model(fallback_config, fallback_callbacks)
+
             except Exception as e:
                 print(
                     f"[WARNING] Failed to create fallback LLM with {provider_name}: {e}"
                 )
                 continue
 
+        print("[WARNING] No fallback LLM could be created")
         return None
 
     def __getattr__(self, name):
@@ -223,17 +318,26 @@ class GeminiProvider(LLMProvider):
                 "langchain_google_genai is not installed. Run: pip install langchain-google-genai"
             )
 
-        return ChatGoogleGenerativeAI(
-            model=model_config.get("model", "gemini-1.5-pro"),
-            google_api_key=config.GEMINI_API_KEY,
-            temperature=model_config.get("temperature", 0.3),
-            transport="rest",
-            callbacks=callbacks or [],
-            convert_system_message_to_human=False,
-            timeout=model_config.get("timeout", 60),
-            max_retries=model_config.get("max_retries", 2),
-            disable_streaming=False,
-        )
+        # Google Cloud 서비스 계정 인증 비활성화 (API 키 사용)
+        # 이렇게 하면 credentials.json 파일을 찾지 않음
+        model_kwargs = {
+            "model": model_config.get("model", "gemini-1.5-pro"),
+            "google_api_key": config.GEMINI_API_KEY,
+            "temperature": model_config.get("temperature", 0.3),
+            "transport": "rest",
+            "callbacks": callbacks or [],
+            "convert_system_message_to_human": False,
+            "timeout": model_config.get("timeout", 60),
+            "max_retries": model_config.get("max_retries", 2),
+            "disable_streaming": False,
+        }
+
+        # Google Cloud 인증 관련 환경변수가 설정되어 있지 않으면 명시적으로 비활성화
+        if not config.GOOGLE_APPLICATION_CREDENTIALS:
+            # API 키 기반 인증만 사용하도록 강제
+            os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+
+        return ChatGoogleGenerativeAI(**model_kwargs)
 
     def is_available(self) -> bool:
         return bool(config.GEMINI_API_KEY and ChatGoogleGenerativeAI)
