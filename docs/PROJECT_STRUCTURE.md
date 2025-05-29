@@ -13,10 +13,11 @@ newsletter-generator/
 │   └── newsletter.yml           # Newsletter generation & deployment
 ├── 📁 .vscode/                  # VS Code configuration
 ├── 📁 config/                   # Configuration files
-├── 📁 debug_archives/           # Debug files archive
+├── 📁 debug_files/              # 🆕 Debug files (moved from root)
 ├── 📁 docs/                     # 📚 All Documentation
 │   ├── 📁 dev/                  # Development documentation
 │   │   ├── DEVELOPMENT_GUIDE.md # Comprehensive development guide
+│   │   ├── MULTI_LLM_IMPLEMENTATION_SUMMARY.md # 🆕 Multi-LLM implementation report
 │   │   ├── CI_CD_GUIDE.md       # CI/CD comprehensive guide
 │   │   ├── CODE_QUALITY.md      # Code quality guidelines  
 │   │   └── langsmith_setup.md   # LangSmith integration guide
@@ -24,32 +25,57 @@ newsletter-generator/
 │   │   └── INSTALLATION.md      # Installation and configuration
 │   ├── 📁 user/                 # User documentation
 │   │   ├── USER_GUIDE.md        # Comprehensive user manual
-│   │   └── CLI_REFERENCE.md     # CLI command reference
+│   │   ├── CLI_REFERENCE.md     # CLI command reference
+│   │   └── MULTI_LLM_GUIDE.md   # 🆕 Multi-LLM setup and usage guide
+│   ├── 📁 technical/            # Technical documentation
+│   │   └── LLM_CONFIGURATION.md # 🆕 LLM configuration guide
 │   ├── 📄 README.md             # Documentation navigation
 │   ├── 📄 PRD.md                # Product Requirements Document
-│   ├── 📄 ARCHITECTURE.md       # System architecture
+│   ├── 📄 ARCHITECTURE.md       # System architecture (updated with Multi-LLM)
 │   ├── 📄 UNIFIED_ARCHITECTURE.md # Unified architecture details
 │   ├── 📄 CHANGELOG.md          # Version history
 │   └── 📄 PROJECT_STRUCTURE.md  # This file
 ├── 📁 newsletter/               # Main application code
+│   ├── __init__.py
+│   ├── cli.py                   # CLI interface
+│   ├── llm_factory.py           # 🆕 Multi-LLM factory system
+│   ├── cost_tracking.py         # 🆕 Enhanced cost tracking
+│   ├── graph.py                 # LangGraph workflows
+│   ├── chains.py                # LangChain chains
+│   ├── collect.py               # News collection
+│   ├── compose.py               # Newsletter composition
+│   ├── scoring.py               # 🆕 AI-based article scoring
+│   ├── article_filter.py        # Article filtering
+│   ├── sources.py               # News sources
+│   ├── tools.py                 # Utility tools
+│   ├── deliver.py               # Email/Drive delivery
+│   ├── summarize.py             # Article summarization
+│   ├── template_manager.py      # Template management
+│   ├── date_utils.py            # Date utilities
+│   ├── config.py                # Configuration management
+│   └── utils/                   # Utility modules
 ├── 📁 output/                   # Generated newsletters
 ├── 📁 templates/                # HTML/text templates
 ├── 📁 tests/                    # Test files
 │   ├── 📁 api_tests/            # API integration tests
 │   ├── 📁 unit_tests/           # Unit tests
 │   ├── 📁 test_data/            # Test data files
+│   ├── test_llm.py              # 🆕 Basic LLM system tests
+│   ├── test_llm_providers.py    # 🆕 LLM provider tests
+│   ├── test_email_integration.py # Email integration tests
 │   ├── test_ci.py               # CI testing script
 │   ├── test_minimal.py          # Minimal tests for CI
 │   ├── test_tools.py            # Tools testing
 │   └── ...                      # Other test files
 ├── 📄 README.md                 # Main project entry point
+├── 📄 .env.example              # 🆕 Environment variables example
 ├── 📄 pyproject.toml            # Modern Python packaging config
 ├── 📄 setup.py                  # Legacy setup (minimal)
 ├── 📄 requirements.txt          # Production dependencies
 ├── 📄 requirements-dev.txt      # Development dependencies
 ├── 📄 requirements-minimal.txt  # Minimal CI dependencies
 ├── 📄 run_tests.py              # Test runner script
-└── 📄 config.yml                # Application configuration
+└── 📄 config.yml                # Application configuration (updated with Multi-LLM)
 ```
 
 ## Key Directories
@@ -66,6 +92,7 @@ All project documentation is organized under this directory:
 
 #### `docs/dev/` - Developer Documentation
 - **DEVELOPMENT_GUIDE.md**: Complete development setup and contribution guide
+- **MULTI_LLM_IMPLEMENTATION_SUMMARY.md**: 🆕 Multi-LLM system implementation completion report
 - **CI_CD_GUIDE.md**: CI/CD pipeline configuration and usage
 - **CODE_QUALITY.md**: Code quality standards and tools
 - **langsmith_setup.md**: LangSmith integration for cost tracking
@@ -76,24 +103,50 @@ All project documentation is organized under this directory:
 #### `docs/user/` - User Documentation  
 - **USER_GUIDE.md**: Comprehensive user manual with workflows
 - **CLI_REFERENCE.md**: Complete CLI command reference
+- **MULTI_LLM_GUIDE.md**: 🆕 Multi-LLM provider setup and usage guide
+
+#### `docs/technical/` - Technical Documentation
+- **LLM_CONFIGURATION.md**: 🆕 LLM configuration and optimization guide
 
 #### `docs/` Root - Core Project Documentation
 - **README.md**: Documentation navigation and overview
 - **PRD.md**: Product Requirements Document
-- **ARCHITECTURE.md**: System architecture and design
+- **ARCHITECTURE.md**: System architecture and design (updated with Multi-LLM)
 - **UNIFIED_ARCHITECTURE.md**: Unified architecture implementation details
 - **CHANGELOG.md**: Version history and release notes
 - **PROJECT_STRUCTURE.md**: This file - project organization
+
+### `newsletter/` - Main Application Code
+
+#### 🆕 Multi-LLM System Components
+- **llm_factory.py**: LLM Factory pattern with provider abstraction
+- **cost_tracking.py**: Enhanced cost tracking for multiple providers
+
+#### Core Application Files
+- **cli.py**: Typer-based CLI interface
+- **graph.py**: LangGraph workflow definitions
+- **chains.py**: LangChain chain implementations
+- **collect.py**: News collection from multiple sources
+- **compose.py**: Newsletter composition
+- **scoring.py**: 🆕 AI-based article scoring system
+- **article_filter.py**: Article filtering and deduplication
+- **sources.py**: News source management
+- **tools.py**: Utility tools and helpers
+- **deliver.py**: Email and Drive delivery
+- **config.py**: Configuration management
 
 ### `tests/`
 Comprehensive testing structure:
 - **api_tests/**: External API integration tests
 - **unit_tests/**: Pure unit tests without external dependencies  
 - **test_data/**: Test fixtures and data files
+- **test_llm.py**: 🆕 Basic LLM system testing
+- **test_llm_providers.py**: 🆕 Multi-provider LLM testing
+- **test_email_integration.py**: Comprehensive email testing
 - **Root**: Core test files including CI scripts
 
-### `newsletter/`
-Main application source code (see docs/ARCHITECTURE.md for details)
+### `debug_files/` - Debug Archive
+🆕 Moved all debug files to separate directory for cleaner project root
 
 ## Documentation Organization Principles
 
@@ -128,14 +181,41 @@ Main application source code (see docs/ARCHITECTURE.md for details)
 
 ## Recent Changes (v0.4.0)
 
-1. **Consolidated** all documentation under `docs/` directory
-2. **Reorganized** documentation by user type and purpose
-3. **Enhanced** README.md as focused project entry point
-4. **Improved** docs/README.md as comprehensive navigation hub
-5. **Established** systematic cross-referencing between documents
-6. **Updated** all internal links to reflect new structure
+1. **🆕 Multi-LLM System Implementation**
+   - Added `llm_factory.py` for Multi-LLM provider management
+   - Enhanced `cost_tracking.py` for multiple provider cost monitoring
+   - Added `scoring.py` for AI-based article scoring
+   - Updated `config.yml` with comprehensive LLM settings
 
-This structure supports:
+2. **📚 Documentation Enhancements**
+   - Added `MULTI_LLM_GUIDE.md` for user guidance on multi-provider setup
+   - Added `MULTI_LLM_IMPLEMENTATION_SUMMARY.md` for development completion report
+   - Added `LLM_CONFIGURATION.md` for technical configuration guidance
+   - Updated `ARCHITECTURE.md` with Multi-LLM system details
+
+3. **🧪 Testing Infrastructure**
+   - Added `test_llm.py` for basic LLM system testing
+   - Added `test_llm_providers.py` for multi-provider testing
+   - Enhanced `test_email_integration.py` for comprehensive email testing
+
+4. **🔧 Project Organization**
+   - Created `debug_files/` directory and moved all debug files
+   - Added `.env.example` for environment variables guidance
+   - Updated `.gitignore` to include debug_files directory
+   - Enhanced project structure documentation
+
+5. **⚙️ Configuration Management**
+   - Updated `config.yml` with provider-specific LLM settings
+   - Added function-specific LLM optimization configurations
+   - Enhanced fallback system configuration
+
+This structure now supports:
+- ✅ Multi-LLM provider integration (Gemini, OpenAI, Anthropic)
+- ✅ Automatic fallback system for API quota management
+- ✅ Function-specific LLM optimization
+- ✅ Comprehensive cost tracking across providers
+- ✅ Enhanced testing infrastructure
+- ✅ Cleaner project organization
 - ✅ Centralized documentation management
 - ✅ Clear user journey from discovery to contribution
 - ✅ Efficient maintenance and updates
