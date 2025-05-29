@@ -258,3 +258,92 @@ def generate_regenerated_newsletter_filename(
         return generate_unified_newsletter_filename(
             topic=topic, style=style, generation_type="regenerated"
         )
+
+
+def ensure_debug_directory() -> str:
+    """
+    debug_files 디렉토리가 존재하는지 확인하고, 없으면 생성합니다.
+
+    Returns:
+        str: debug_files 디렉토리의 절대 경로
+    """
+    # 프로젝트 루트를 기준으로 debug_files 디렉토리 경로 생성
+    project_root = os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    )
+    debug_dir = os.path.join(project_root, "debug_files")
+
+    # 디렉토리가 없으면 생성
+    os.makedirs(debug_dir, exist_ok=True)
+
+    return debug_dir
+
+
+def generate_debug_filename(
+    prefix: str = "template_debug",
+    extension: str = "txt",
+    timestamp: Optional[str] = None,
+) -> str:
+    """
+    debug 파일의 전체 경로를 생성합니다.
+    파일은 debug_files 디렉토리에 저장됩니다.
+
+    Args:
+        prefix: 파일명 접두사 (기본: "template_debug")
+        extension: 파일 확장자 (기본: "txt")
+        timestamp: 선택적 타임스탬프 (기본: 현재 시간)
+
+    Returns:
+        str: debug 파일의 전체 경로
+    """
+    # 타임스탬프가 제공되지 않은 경우 현재 시간 사용
+    if not timestamp:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # debug_files 디렉토리 확인 및 생성
+    debug_dir = ensure_debug_directory()
+
+    # 파일명 생성
+    filename = f"{prefix}_{timestamp}.{extension}"
+
+    return os.path.join(debug_dir, filename)
+
+
+def save_debug_file(
+    content: str,
+    prefix: str = "template_debug",
+    extension: str = "txt",
+    encoding: str = "utf-8",
+) -> str:
+    """
+    debug 파일을 debug_files 디렉토리에 저장합니다.
+
+    Args:
+        content: 저장할 내용
+        prefix: 파일명 접두사
+        extension: 파일 확장자
+        encoding: 파일 인코딩
+
+    Returns:
+        str: 저장된 파일의 경로
+
+    Raises:
+        Exception: 파일 저장 중 오류 발생시
+    """
+    try:
+        debug_file_path = generate_debug_filename(prefix, extension)
+
+        with open(debug_file_path, "w", encoding=encoding) as f:
+            f.write(content)
+
+        return debug_file_path
+
+    except Exception as e:
+        # 로깅이 가능한 경우 로그 남김
+        try:
+            from ..utils.logger import logger
+
+            logger.error(f"Debug 파일 저장 중 오류: {e}")
+        except:
+            print(f"Debug 파일 저장 중 오류: {e}")
+        raise

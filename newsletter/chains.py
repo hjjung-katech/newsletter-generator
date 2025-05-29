@@ -36,7 +36,7 @@ from .template_manager import TemplateManager
 from .utils.logger import get_logger
 
 # 로거 초기화
-logger = get_logger()
+logger = get_logger(__name__)
 
 
 # HTML 템플릿 파일 로딩
@@ -61,12 +61,10 @@ HTML_TEMPLATE = load_html_template()
 
 # 디버깅을 위해 템플릿을 파일에 저장
 try:
-    with open(
-        f"template_debug_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-        "w",
-        encoding="utf-8",
-    ) as f:
-        f.write(HTML_TEMPLATE)
+    from .utils.file_naming import save_debug_file
+
+    debug_file_path = save_debug_file(HTML_TEMPLATE, "template_debug", "txt")
+    logger.info(f"HTML 템플릿 디버그 파일 저장됨: {debug_file_path}")
 except Exception as e:
     logger.error(f"디버그 파일 작성 중 오류: {e}")
 

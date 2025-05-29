@@ -2,7 +2,74 @@
 
 ## 개요
 
-본 문서는 뉴스레터 생성기의 기능, 아키텍처 구조, 그리고 핵심 작성 방식에 대해 설명합니다. 뉴스레터 생성기는 사용자가 제공한 키워드 또는 관심 도메인을 기반으로 다양한 소스에서 최신 뉴스를 수집하고, 이를 LLM(Large Language Model)을 활용하여 요약 및 편집하여 HTML 형식의 뉴스레터를 생성하고 이메일 발송 또는 Google Drive에 저장하는 기능을 제공하는 Python CLI 도구입니다.
+본 문서는 뉴스레터 생성기의 기능, 아키텍처 구조, 그리고 핵심 작성 방식에 대해 설명합니다. 뉴스레터 생성기는 사용자가 제공한 키워드 또는 관심 도메인을 기반으로 다양한 소스에서 최신 뉴스를 수집하고, 이를 **멀티 LLM(Large Language Model) 시스템**을 활용하여 요약 및 편집하여 HTML 형식의 뉴스레터를 생성하고 이메일 발송 또는 Google Drive에 저장하는 기능을 제공하는 Python CLI 도구입니다.
+
+## 0. Multi-LLM 시스템 아키텍처
+
+### 0.1. 지원되는 LLM 제공자
+
+Newsletter Generator는 여러 LLM 제공자를 통합 지원하며, 기능별로 최적화된 모델을 자동 선택합니다:
+
+#### Google Gemini
+- **모델**: `gemini-2.5-pro`, `gemini-1.5-pro`, `gemini-2.5-flash`
+- **강점**: 무료 할당량 제공, 긴 컨텍스트 지원, 한국어 지원 우수
+- **주요 용도**: 뉴스 요약, HTML 생성, 기사 점수 평가
+
+#### OpenAI GPT
+- **모델**: `gpt-4o`, `gpt-4o-mini`, `gpt-4-turbo`
+- **강점**: 뛰어난 텍스트 생성 품질, 빠른 응답
+- **주요 용도**: 키워드 생성, 도입부 생성
+
+#### Anthropic Claude
+- **모델**: `claude-3-5-sonnet`, `claude-3-sonnet`, `claude-3-haiku`
+- **강점**: 안전성, 정확한 분석, 구조화된 작업
+- **주요 용도**: 키워드 생성, 섹션 재생성, 도입부 생성
+
+### 0.2. LLM Factory 패턴
+
+```python
+# LLM Factory 구조
+class LLMFactory:
+    providers = {
+        "gemini": GeminiProvider(),
+        "openai": OpenAIProvider(), 
+        "anthropic": AnthropicProvider()
+    }
+    
+    def get_llm_for_task(task: str) -> LLM:
+        # 기능별 최적화된 LLM 반환
+        # 자동 fallback 지원
+```
+
+### 0.3. 자동 Fallback 시스템
+
+API 할당량 초과나 오류 발생 시 자동으로 다른 제공자로 전환:
+
+1. **1차 Fallback**: 같은 제공자 내 안정적인 모델로 전환
+2. **2차 Fallback**: 다른 제공자의 호환 모델로 전환
+3. **오류 처리**: 모든 fallback 실패 시 적절한 에러 메시지 제공
+
+### 0.4. 기능별 LLM 최적화
+
+| 기능 | 추천 LLM | 이유 | 설정 |
+|------|----------|------|------|
+| **키워드 생성** | Anthropic Claude | 창의성과 다양성 | temperature: 0.7 |
+| **테마 추출** | Gemini Flash | 빠른 분석과 분류 | temperature: 0.2 |
+| **뉴스 요약** | Gemini Pro | 정확성과 한국어 지원 | temperature: 0.3 |
+| **섹션 재생성** | Claude Sonnet | 구조화된 작업 | temperature: 0.3 |
+| **도입부 생성** | Claude/GPT-4o | 자연스러운 글쓰기 | temperature: 0.4 |
+| **HTML 생성** | Gemini Pro | 복잡한 구조화 작업 | temperature: 0.2 |
+| **기사 점수** | Gemini Flash | 빠른 판단 | temperature: 0.1 |
+
+### 0.5. 비용 최적화 전략
+
+```yaml
+# 비용 효율적인 모델 선택
+keyword_generation: gpt-4o-mini  # $0.15/1M tokens
+theme_extraction: gemini-flash   # 무료 할당량
+news_summarization: gemini-pro   # $0.70/1M tokens
+html_generation: gemini-pro      # 복잡한 작업에만 고성능 모델
+```
 
 ## 1. 기능 및 아키텍처
 
@@ -102,12 +169,26 @@
 | ------------------- | ----------------------------------------------------- | ------------------------------------------- |
 | **CLI**             | `Typer`                                               | 사용자 친화적 명령줄 인터페이스 제공        |
 | **LLM Orchestration** | `LangChain`, `LangGraph`                              | LLM 기반 워크플로우 구성 및 실행, 상태 관리 |
-| **LLM**             | Google `Gemini Pro` (`google-generativeai`)           | 뉴스 기사 요약 및 뉴스레터 콘텐츠 생성      |
+| **Multi-LLM 시스템** | **Custom LLM Factory + Provider Pattern**            | **여러 LLM 제공자 통합 관리 및 자동 Fallback** |
+| **LLM - Google**    | `langchain-google-genai` (Gemini Pro/Flash/2.5-Pro)  | **한국어 뉴스 요약, HTML 생성, 기사 점수 평가** |
+| **LLM - OpenAI**    | `langchain-openai` (GPT-4o/4o-mini/4-turbo)          | **키워드 생성, 도입부 생성, 고품질 텍스트 생성** |
+| **LLM - Anthropic** | `langchain-anthropic` (Claude 3.5-Sonnet/3-Sonnet/3-Haiku) | **창의적 키워드 생성, 구조화된 섹션 재생성** |
 | **뉴스 수집**       | `requests`, `feedparser`, Serper.dev API, Naver API | 다양한 웹 소스에서 뉴스 데이터 크롤링/수집  |
+| **비용 추적**       | **Custom Cost Tracking + LangSmith**                 | **제공자별 토큰 사용량 및 비용 모니터링**   |
 | **HTML 템플릿**     | `Jinja2`                                              | 동적 HTML 뉴스레터 생성 (LLM 직접 생성 방식과 병행) |
 | **API 키 관리**     | `python-dotenv` (`.env` 파일)                         | 민감한 API 키 및 설정 정보 관리             |
 | **Google API**      | `google-api-python-client`, `google-auth`             | Google Drive 연동                           |
 | **이메일 발송**     | `postmark`                                            | Postmark API를 통한 이메일 발송             |
+
+#### Multi-LLM 시스템 핵심 구성 요소
+
+| 컴포넌트 | 기능 | 특징 |
+|----------|------|------|
+| **LLM Factory** | 제공자별 LLM 인스턴스 생성 | Factory Pattern, Singleton 지원 |
+| **Provider Pattern** | 제공자별 통합 인터페이스 | Gemini/OpenAI/Anthropic 추상화 |
+| **LLMWithFallback** | 자동 오류 복구 래퍼 | 429/529 에러 감지 및 자동 전환 |
+| **Cost Callback** | 실시간 비용 추적 | 제공자별 토큰 사용량 및 비용 계산 |
+| **Task Optimizer** | 기능별 최적 모델 선택 | Temperature, timeout 등 세밀 조정 |
 
 ### 1.5. 아키텍처 다이어그램 (Mermaid)
 
@@ -124,15 +205,27 @@ flowchart TD
         C1 -- 수집된 기사 목록 --> C2
         C2["process_articles_node (기사 처리: 필터링, 그룹화, 정렬)"]
         C2 -- 필터링 및 그룹화된 기사 목록 --> C3
-        C3["score_articles_node (AI 기반 점수 평가)"]
+        C3["score_articles_node (Multi-LLM 기반 점수 평가)"]
         C3 -- 점수별 상위 10개 기사 --> C4
-        C4["summarize_articles_node (LLM 요약 및 HTML 생성)"]
+        C4["summarize_articles_node (Multi-LLM 요약 및 HTML 생성)"]
         C4 -- 생성된 HTML 뉴스레터 --> D
         C_ERR["handle_error (오류 처리)"]
         C1 --> C_ERR
         C2 --> C_ERR
         C3 --> C_ERR
         C4 --> C_ERR
+    end
+
+    subgraph "Multi-LLM 시스템"
+        LLM_FACTORY["LLM Factory"]
+        LLM_FACTORY --> GEMINI["Google Gemini<br/>Flash/Pro/2.5-Pro"]
+        LLM_FACTORY --> OPENAI["OpenAI GPT<br/>4o/4o-mini/4-turbo"]
+        LLM_FACTORY --> ANTHROPIC["Anthropic Claude<br/>3.5-Sonnet/3-Sonnet/3-Haiku"]
+        
+        FALLBACK["자동 Fallback 시스템<br/>할당량 초과 시 자동 전환"]
+        GEMINI --> FALLBACK
+        OPENAI --> FALLBACK
+        ANTHROPIC --> FALLBACK
     end
 
     subgraph "출력 및 전달"
@@ -143,20 +236,58 @@ flowchart TD
     end
 
     subgraph "외부 서비스 및 데이터"
-        S1["뉴스 소스 (Serper API, RSS, Naver API)"]
-        S2["LLM (Google Gemini Pro)"]
-        S3["HTML 템플릿 (Jinja2 - LLM 직접 생성 시 참조)"]
+        S1["뉴스 소스<br/>(Serper API, RSS, Naver API)"]
         S4["API 키 (.env)"]
         S5["Google Drive API"]
         S6["Postmark API"]
+        S7["비용 추적 시스템<br/>(LangSmith)"]
     end
 
     C1 --> S1
-    C3 --> S2
-    C3 --> S3
+    C3 --> LLM_FACTORY
+    C4 --> LLM_FACTORY
+    LLM_FACTORY --> S7
     A1 --> S4
     E3 --> S5
     E2 --> S6
+    
+    style LLM_FACTORY fill:#e1f5fe
+    style FALLBACK fill:#fff3e0
+    style GEMINI fill:#e8f5e8
+    style OPENAI fill:#f3e5f5
+    style ANTHROPIC fill:#fce4ec
+```
+
+#### Multi-LLM 워크플로우 세부사항
+
+```mermaid
+flowchart LR
+    subgraph "기능별 LLM 최적화"
+        KG["키워드 생성<br/>Claude 3.5-Sonnet<br/>창의성 중시"]
+        TE["테마 추출<br/>Gemini Flash<br/>빠른 분석"]
+        NS["뉴스 요약<br/>Gemini Pro<br/>정확성 중시"]
+        SR["섹션 재생성<br/>Claude Sonnet<br/>구조화 작업"]
+        IG["도입부 생성<br/>GPT-4o/Claude<br/>자연스러운 글쓰기"]
+        HG["HTML 생성<br/>Gemini Pro<br/>복잡한 구조화"]
+        AS["기사 점수<br/>Gemini Flash<br/>빠른 판단"]
+    end
+    
+    TASK_INPUT["작업 요청"] --> LLM_FACTORY
+    LLM_FACTORY --> KG
+    LLM_FACTORY --> TE
+    LLM_FACTORY --> NS
+    LLM_FACTORY --> SR
+    LLM_FACTORY --> IG
+    LLM_FACTORY --> HG
+    LLM_FACTORY --> AS
+    
+    KG --> FALLBACK_SYS["Fallback 시스템"]
+    TE --> FALLBACK_SYS
+    NS --> FALLBACK_SYS
+    SR --> FALLBACK_SYS
+    IG --> FALLBACK_SYS
+    HG --> FALLBACK_SYS
+    AS --> FALLBACK_SYS
 ```
 
 ## 2. 뉴스레터 작성 방식 (LLM 프롬프트 중심)
