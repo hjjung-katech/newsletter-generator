@@ -950,8 +950,7 @@ def get_newsletter_chain(is_compact=False):
             )
 
             if is_compact:
-                # Compact 버전: 상위 3개 기사 선정 중...")
-
+                # Compact 모드 처리
                 # compose.py의 extract_and_prepare_top_articles를 사용해 top_articles 추출
                 config = NewsletterConfig.get_config("compact")
 
@@ -1064,7 +1063,7 @@ def get_newsletter_chain(is_compact=False):
                 )
                 logger.debug(f"  - definitions: {len(result_data['definitions'])}개")
 
-                # Compact 모드에서도 템플릿 렌더링 수행
+                # 템플릿 렌더링
                 logger.step("HTML 템플릿 렌더링", "rendering")
 
                 # 템플릿 렌더링
@@ -1082,7 +1081,13 @@ def get_newsletter_chain(is_compact=False):
 
                 logger.success("Compact 뉴스레터 생성 완료!")
 
-                return html_content
+                # Compact 모드에서 HTML과 구조화된 데이터를 함께 반환
+                return {
+                    "html": html_content,
+                    "structured_data": result_data,
+                    "sections": sections_data.get("sections", []),
+                    "mode": "compact",
+                }
 
             else:
                 # Detailed 모드 처리
@@ -1134,7 +1139,14 @@ def get_newsletter_chain(is_compact=False):
                     combined_data, template_dir, style="detailed"
                 )
                 logger.success("Detailed 뉴스레터 생성 완료!")
-                return html_content
+
+                # Detailed 모드에서 HTML과 구조화된 데이터를 함께 반환
+                return {
+                    "html": html_content,
+                    "structured_data": combined_data,
+                    "sections": sections_data.get("sections", []),
+                    "mode": "detailed",
+                }
 
         except Exception as e:
             logger.error(f"데이터 흐름 처리 중 오류 발생: {e}")
