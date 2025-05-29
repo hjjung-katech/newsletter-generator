@@ -13,8 +13,16 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple, TypedDi
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, StateGraph
 from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
+from langchain_core.runnables import RunnableConfig
 
+from . import collect as news_collect
+from . import config
+from .chains import get_newsletter_chain
 from .date_utils import parse_date_string
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
 
 
 # State 정의
@@ -76,7 +84,7 @@ def collect_articles_node(
     """
     from .tools import search_news_articles
 
-    print("\n[cyan]Step: Collecting articles...[/cyan]")
+    logger.info("\n[cyan]Step: Collecting articles...[/cyan]")
     start_time = time.time()
 
     try:
@@ -94,7 +102,7 @@ def collect_articles_node(
             "step_times": step_times,
         }
     except Exception as e:
-        print(f"[red]Error during article collection: {e}[/red]")
+        logger.error(f"[red]Error during article collection: {e}[/red]")
         step_times = state.get("step_times", {})
         step_times["collect_articles"] = time.time() - start_time
         return {
@@ -108,14 +116,14 @@ def collect_articles_node(
 
 # New node for processing articles
 def process_articles_node(state: NewsletterState) -> NewsletterState:
-    print(
+    logger.info(
         "\n[cyan]Step: Processing collected articles (filtering, sorting, deduplicating)...[/cyan]"
     )
     start_time = time.time()
     collected_articles = state.get("collected_articles")
 
     if not collected_articles or not isinstance(collected_articles, list):
-        print(
+        logger.warning(
             "[yellow]Warning: No articles collected or 'collected_articles' is not a list. Skipping processing.[/yellow]"
         )
         step_times = state.get("step_times", {})
@@ -128,7 +136,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             "step_times": step_times,
         }
 
-    print(f"Total articles received for processing: {len(collected_articles)}")
+    logger.info(f"Total articles received for processing: {len(collected_articles)}")
 
     output_dir = os.path.join(os.getcwd(), "output", "intermediate_processing")
     os.makedirs(output_dir, exist_ok=True)
@@ -147,9 +155,9 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
         with open(raw_output_path, "w", encoding="utf-8") as f:
             json.dump(raw_data_with_metadata, f, ensure_ascii=False, indent=4)
-        print(f"Saved raw collected articles to {raw_output_path}")
+        logger.info(f"Saved raw collected articles to {raw_output_path}")
     except Exception as e:
-        print(f"[red]Error saving raw articles: {e}[/red]")
+        logger.error(f"[red]Error saving raw articles: {e}[/red]")
     now_utc = datetime.now(timezone.utc)
     news_period_days = state.get("news_period_days", 14)  # 기본값은 14일(2주)로 설정
     news_period_ago_utc = now_utc - timedelta(days=news_period_days)
@@ -173,7 +181,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
     for article in collected_articles:
         if not isinstance(article, dict):
-            print(
+            logger.warning(
                 f"Warning: Skipping non-dictionary item in collected_articles: {article}"
             )
             continue
@@ -183,7 +191,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
         if not article_date_str or str(article_date_str).strip() == "날짜 없음":
             articles_missing_date += 1
-            print(
+            logger.info(
                 f"Debug: Article has missing date: '{article_title_for_log}'. Including by default."
             )
             recent_articles.append(article)
@@ -207,38 +215,42 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
                 articles_kept_recent_date += 1
             else:
                 articles_discarded_old_date += 1
-                print(
+                logger.info(
                     f"Debug: Article too old: '{article_title_for_log}', Date: {article_date_obj.isoformat()}. Discarding."
                 )
         else:
             # article_date_str was present, but parse_article_date_for_graph returned None
             articles_unparseable_date += 1
-            print(
+            logger.info(
                 f"Debug: Article with unparseable date: '{article_title_for_log}', Date string: '{article_date_str}'. Including by default."
             )
             recent_articles.append(article)
             articles_kept_unparseable_date += 1
 
-    print(f"\nArticle date processing summary:")
-    print(f"  Total collected articles: {len(collected_articles)}")
-    print(
+    logger.info(f"\nArticle date processing summary:")
+    logger.info(f"  Total collected articles: {len(collected_articles)}")
+    logger.info(
         f"  Articles with a date string provided: {articles_with_date + articles_unparseable_date}"
     )
-    print(f"    Successfully parsed dates: {articles_with_date}")
-    print(f"    Unparseable date strings: {articles_unparseable_date}")
-    print(f"  Articles with missing date string (initially): {articles_missing_date}")
-    print(
+    logger.info(f"    Successfully parsed dates: {articles_with_date}")
+    logger.info(f"    Unparseable date strings: {articles_unparseable_date}")
+    logger.info(
+        f"  Articles with missing date string (initially): {articles_missing_date}"
+    )
+    logger.info(
         f"  Total articles included for further processing (recent_articles): {len(recent_articles)}"
     )
-    print(f"    Kept (recent with valid date): {articles_kept_recent_date}")
-    print(f"    Kept (due to missing date): {articles_kept_missing_date}")
-    print(f"    Kept (due to unparseable date): {articles_kept_unparseable_date}")
-    print(
+    logger.info(f"    Kept (recent with valid date): {articles_kept_recent_date}")
+    logger.info(f"    Kept (due to missing date): {articles_kept_missing_date}")
+    logger.info(f"    Kept (due to unparseable date): {articles_kept_unparseable_date}")
+    logger.info(
         f"  Articles discarded (parseable but too old): {articles_discarded_old_date}\n"
     )
 
     if not recent_articles:
-        print("[yellow]Warning: No articles retained after recency filter.[/yellow]")
+        logger.warning(
+            "[yellow]Warning: No articles retained after recency filter.[/yellow]"
+        )
         # Optionally, save an empty processed file or skip
         processed_output_filename = (
             f"{timestamp}_collected_articles_processed_EMPTY.json"
@@ -247,9 +259,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         try:
             with open(processed_output_path, "w", encoding="utf-8") as f:
                 json.dump([], f, ensure_ascii=False, indent=4)
-            print(f"Saved empty processed articles list to {processed_output_path}")
+            logger.info(
+                f"Saved empty processed articles list to {processed_output_path}"
+            )
         except Exception as e:
-            print(f"[red]Error saving empty processed articles list: {e}[/red]")
+            logger.error(f"[red]Error saving empty processed articles list: {e}[/red]")
 
         return {
             **state,
@@ -269,11 +283,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             if normalized_url not in unique_articles_dict:
                 unique_articles_dict[normalized_url] = article
             else:
-                print(
+                logger.info(
                     f"Debug: Deduplicated article (URL already seen): {article.get('title', 'N/A')}, URL: {url}"
                 )
         else:
-            print(
+            logger.warning(
                 f"Warning: Article missing URL or URL is not a string, cannot deduplicate: {article.get('title', 'N/A')}"
             )
             # Decide how to handle articles without URLs: include them, or skip them for deduplication.
@@ -284,10 +298,12 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             # If you want to keep them, you'd need a different strategy.
 
     deduplicated_articles = list(unique_articles_dict.values())
-    print(f"Retained {len(deduplicated_articles)} articles after deduplication.")
+    logger.info(f"Retained {len(deduplicated_articles)} articles after deduplication.")
 
     if not deduplicated_articles:
-        print("[yellow]Warning: No articles retained after deduplication.[/yellow]")
+        logger.warning(
+            "[yellow]Warning: No articles retained after deduplication.[/yellow]"
+        )
         # Optionally, save an empty processed file or skip
         processed_output_filename = (
             f"{timestamp}_collected_articles_processed_EMPTY_DEDUP.json"
@@ -296,11 +312,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         try:
             with open(processed_output_path, "w", encoding="utf-8") as f:
                 json.dump([], f, ensure_ascii=False, indent=4)
-            print(
+            logger.info(
                 f"Saved empty processed articles list (post-dedup) to {processed_output_path}"
             )
         except Exception as e:
-            print(f"[red]Error saving empty processed articles list: {e}[/red]")
+            logger.error(f"[red]Error saving empty processed articles list: {e}[/red]")
 
         return {
             **state,
@@ -320,7 +336,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     processed_articles_sorted = sorted(
         deduplicated_articles, key=get_sort_key, reverse=True
     )
-    print(f"Sorted {len(processed_articles_sorted)} articles by date.")
+    logger.info(f"Sorted {len(processed_articles_sorted)} articles by date.")
 
     processed_output_filename = f"{timestamp}_collected_articles_processed.json"
     processed_output_path = os.path.join(output_dir, processed_output_filename)
@@ -335,9 +351,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
         with open(processed_output_path, "w", encoding="utf-8") as f:
             json.dump(processed_data_with_metadata, f, ensure_ascii=False, indent=4)
-        print(f"Saved processed articles with metadata to {processed_output_path}")
+        logger.info(
+            f"Saved processed articles with metadata to {processed_output_path}"
+        )
     except Exception as e:
-        print(f"[red]Error saving processed articles: {e}[/red]")
+        logger.error(f"[red]Error saving processed articles: {e}[/red]")
 
     step_times = state.get("step_times", {})
     step_times["process_articles"] = time.time() - start_time
@@ -353,12 +371,12 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
     """Score articles using LLM to rank priority."""
     from .scoring import load_scoring_weights_from_config, score_articles
 
-    print("\n[cyan]Step: Scoring articles...[/cyan]")
+    logger.info("\n[cyan]Step: Scoring articles...[/cyan]")
     start_time = time.time()
 
     processed = state.get("processed_articles") or []
     if not processed:
-        print("[yellow]No articles to score.[/yellow]")
+        logger.warning("[yellow]No articles to score.[/yellow]")
         step_times = state.get("step_times", {})
         step_times["score_articles"] = time.time() - start_time
         return {
@@ -374,7 +392,7 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
 
     # Load scoring weights from config.yml
     scoring_weights = load_scoring_weights_from_config()
-    print(f"[cyan]Using scoring weights: {scoring_weights}[/cyan]")
+    logger.info(f"[cyan]Using scoring weights: {scoring_weights}[/cyan]")
 
     # Get full ranked list for saving; top 10 will be passed forward
     ranked = score_articles(processed, domain, top_n=None, weights=scoring_weights)
@@ -396,9 +414,9 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
                 ensure_ascii=False,
                 indent=4,
             )
-        print(f"Saved scored articles to {scored_path}")
+        logger.info(f"Saved scored articles to {scored_path}")
     except Exception as e:
-        print(f"[red]Error saving scored articles: {e}[/red]")
+        logger.error(f"[red]Error saving scored articles: {e}[/red]")
 
     step_times = state.get("step_times", {})
     step_times["score_articles"] = time.time() - start_time
@@ -420,14 +438,14 @@ def summarize_articles_node(
 
     from .chains import get_newsletter_chain
 
-    print("\n[cyan]Step: Summarizing articles...[/cyan]")
+    logger.info("\n[cyan]Step: Summarizing articles...[/cyan]")
     start_time = time.time()
 
     articles_for_summary = state.get("ranked_articles") or state.get(
         "processed_articles"
     )
     if not articles_for_summary:
-        print("[yellow]No articles to summarize.[/yellow]")
+        logger.warning("[yellow]No articles to summarize.[/yellow]")
         step_times = state.get("step_times", {})
         step_times["summarize_articles"] = time.time() - start_time
         return {
@@ -455,7 +473,7 @@ def summarize_articles_node(
                 callbacks = get_tracking_callbacks()
                 register_recent_callbacks(callbacks)
             except Exception as e:
-                print(
+                logger.warning(
                     f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
                 )
 
@@ -463,11 +481,11 @@ def summarize_articles_node(
         is_compact = template_style == "compact"
 
         if is_compact:
-            print(
+            logger.info(
                 "[cyan]Using compact processing - running compact newsletter chain...[/cyan]"
             )
         else:
-            print(
+            logger.info(
                 "[cyan]Using detailed processing - running full summarization chain...[/cyan]"
             )
 
@@ -501,7 +519,7 @@ def summarize_articles_node(
         import traceback
 
         error_msg = f"기사 요약 중 오류가 발생했습니다: {str(e)}"
-        print(f"[bold red]Error in summarization: {str(e)}[/bold red]")
+        logger.error(f"[bold red]Error in summarization: {str(e)}[/bold red]")
         traceback.print_exc()
         step_times = state.get("step_times", {})
         step_times["summarize_articles"] = time.time() - start_time
@@ -524,12 +542,12 @@ def compose_newsletter_node(
 
     from .compose import compose_newsletter
 
-    print("\n[cyan]Step: Composing final newsletter...[/cyan]")
+    logger.info("\n[cyan]Step: Composing final newsletter...[/cyan]")
     start_time = time.time()
 
     category_summaries = state.get("category_summaries")
     if not category_summaries:
-        print("[yellow]No category summaries to compose newsletter.[/yellow]")
+        logger.warning("[yellow]No category summaries to compose newsletter.[/yellow]")
         step_times = state.get("step_times", {})
         step_times["compose_newsletter"] = time.time() - start_time
         return {
@@ -552,7 +570,7 @@ def compose_newsletter_node(
                 os.path.dirname(os.path.dirname(__file__)), "templates"
             )
 
-            print(f"[cyan]Using {template_style} newsletter template...[/cyan]")
+            logger.info(f"[cyan]Using {template_style} newsletter template...[/cyan]")
             newsletter_html = compose_newsletter(
                 category_summaries, template_dir, template_style
             )
@@ -588,7 +606,7 @@ def compose_newsletter_node(
             with open(file_path, "w", encoding="utf-8") as f:
                 f.write(html_content)
 
-            print(f"[green]Newsletter saved to {file_path}[/green]")
+            logger.info(f"[green]Newsletter saved to {file_path}[/green]")
             return file_path
 
         # 뉴스레터 저장
@@ -609,7 +627,7 @@ def compose_newsletter_node(
         import traceback
 
         error_msg = f"뉴스레터 생성 중 오류가 발생했습니다: {str(e)}"
-        print(f"[bold red]Error in newsletter composition: {str(e)}[/bold red]")
+        logger.error(f"[bold red]Error in newsletter composition: {str(e)}[/bold red]")
         traceback.print_exc()
         step_times = state.get("step_times", {})
         step_times["compose_newsletter"] = time.time() - start_time
@@ -625,7 +643,7 @@ def handle_error(state: NewsletterState) -> NewsletterState:
     """
     에러 처리 노드
     """
-    print(f"[오류] {state['error']}")
+    logger.error(f"[오류] {state['error']}")
     return state
 
 
@@ -737,7 +755,7 @@ def generate_newsletter(
                 callbacks = get_tracking_callbacks()
                 register_recent_callbacks(callbacks)
             except Exception as e:
-                print(
+                logger.warning(
                     f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
                 )
 

@@ -2,6 +2,13 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from langchain.callbacks.base import BaseCallbackHandler
+
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
+
 try:
     from langchain.callbacks.base import BaseCallbackHandler
     from langsmith import Client
@@ -89,7 +96,7 @@ class GoogleGenAICostCB(BaseCallbackHandler):
                 self.total_cost += this_cost
 
                 if os.environ.get("DEBUG_COST_TRACKING"):
-                    print(
+                    logger.debug(
                         f"[Token Usage - {model_name}] Input: {in_tok}, Output: {out_tok}, Cost: ${this_cost:.6f}"
                     )
             elif os.environ.get("DEBUG_COST_TRACKING"):
@@ -181,7 +188,7 @@ class OpenAICostCB(BaseCallbackHandler):
                 self.total_cost += this_cost
 
                 if os.environ.get("DEBUG_COST_TRACKING"):
-                    print(
+                    logger.debug(
                         f"[Token Usage - {model_name}] Input: {in_tok}, Output: {out_tok}, Cost: ${this_cost:.6f}"
                     )
 
@@ -258,7 +265,7 @@ class AnthropicCostCB(BaseCallbackHandler):
                 self.total_cost += this_cost
 
                 if os.environ.get("DEBUG_COST_TRACKING"):
-                    print(
+                    logger.debug(
                         f"[Token Usage - {model_name}] Input: {in_tok}, Output: {out_tok}, Cost: ${this_cost:.6f}"
                     )
 
@@ -349,12 +356,12 @@ def get_tracking_callbacks():
     # 디버그 정보 출력 (처음 초기화할 때만)
     debug_mode = os.environ.get("DEBUG_COST_TRACKING")
     if debug_mode:
-        print(
-            f"[DEBUG_COST_TRACKING] LANGCHAIN_API_KEY raw value: '{api_key_env}' (Type: {type(api_key_env)}, Length: {len(api_key_env) if api_key_env else 0})"
+        logger.debug(
+            f"LANGCHAIN_API_KEY raw value: '{api_key_env}' (Type: {type(api_key_env)}, Length: {len(api_key_env) if api_key_env else 0})"
         )
         if cleaned_api_key != api_key_env:
-            print(
-                f"[DEBUG_COST_TRACKING] LANGCHAIN_API_KEY cleaned value: '{cleaned_api_key}' (Used for LangSmith)"
+            logger.debug(
+                f"LANGCHAIN_API_KEY cleaned value: '{cleaned_api_key}' (Used for LangSmith)"
             )
 
     if is_tracing_enabled and api_key_set:
@@ -366,8 +373,8 @@ def get_tracking_callbacks():
 
             project_name = os.environ.get("LANGCHAIN_PROJECT", "default-project")
             if debug_mode:
-                print(
-                    f"[DEBUG] Initializing LangChainTracer for project: {project_name} with cleaned API key."
+                logger.debug(
+                    f"Initializing LangChainTracer for project: {project_name} with cleaned API key."
                 )
 
             # 임시로 환경 변수 설정
@@ -382,20 +389,20 @@ def get_tracking_callbacks():
             else:
                 del os.environ["LANGCHAIN_API_KEY"]
 
-            print(f"LangSmith tracing enabled for project: {project_name}")
+            logger.info(f"LangSmith tracing enabled for project: {project_name}")
         except Exception as e:
-            print(f"Warning: Failed to initialize LangSmith tracing: {e}")
+            logger.warning(f"Failed to initialize LangSmith tracing: {e}")
         finally:
             _tracer_initialized = True
     else:
         if debug_mode:
-            print("[DEBUG] LangSmith tracing not enabled or API key not set.")
-            print(
+            logger.debug("LangSmith tracing not enabled or API key not set.")
+            logger.debug(
                 f"  LANGCHAIN_TRACING_V2 value: {os.environ.get('LANGCHAIN_TRACING_V2')}"
             )
-            print(f"  Evaluated as enabled: {is_tracing_enabled}")
-            print(f"  LANGCHAIN_API_KEY is set: {api_key_set}")
-            print(f"  LANGCHAIN_API_KEY actual value for check: '{api_key_env}'")
+            logger.debug(f"  Evaluated as enabled: {is_tracing_enabled}")
+            logger.debug(f"  LANGCHAIN_API_KEY is set: {api_key_set}")
+            logger.debug(f"  LANGCHAIN_API_KEY actual value for check: '{api_key_env}'")
         _tracer_initialized = True
 
     # 초기화된 트레이서가 있으면 추가
@@ -406,6 +413,6 @@ def get_tracking_callbacks():
     try:
         callbacks.append(GoogleGenAICostCB())
     except Exception as e:
-        print(f"Warning: Failed to initialize Google GenAI cost tracking: {e}")
+        logger.warning(f"Failed to initialize Google GenAI cost tracking: {e}")
 
     return callbacks

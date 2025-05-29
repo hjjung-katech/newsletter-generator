@@ -11,11 +11,18 @@ from rich.console import Console
 # Explicitly load .env from the project root
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 dotenv_path = os.path.join(project_root, ".env")
+
+# 새로운 로깅 시스템 import
+from .utils.logger import get_logger, set_log_level
+
+# 로거 초기화
+logger = get_logger()
+
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path=dotenv_path)
-    print(f"[DEBUG_CLI] Loaded .env file from: {dotenv_path}")  # Debug print
+    logger.debug(f"Loaded .env file from: {dotenv_path}")
 else:
-    print(f"[DEBUG_CLI] .env file not found at: {dotenv_path}")  # Debug print
+    logger.warning(f".env file not found at: {dotenv_path}")
 
 from . import collect as news_collect
 from . import compose as news_compose
@@ -102,16 +109,23 @@ def run(
     max_per_source: int = typer.Option(
         3, "--max-per-source", min=1, help="Maximum number of articles per source."
     ),
+    log_level: str = typer.Option(
+        "INFO",
+        "--log-level",
+        help="Logging level: DEBUG, INFO, WARNING, ERROR",
+    ),
 ):
     """
     Run the newsletter generation and saving process.
     Can generate keywords from a domain or use provided keywords, or load from a config file.
     """
+    # 로그 레벨 설정
+    set_log_level(log_level)
+    logger = get_logger()
+
     # 나머지 코드는 그대로 유지
     if not output_format and not drive:
-        console.print(
-            "[yellow]No output option selected. Defaulting to local HTML save.[/yellow]"
-        )
+        logger.warning("No output option selected. Defaulting to local HTML save.")
         output_format = "html"  # Default to local html if no other option
 
     if track_cost:
@@ -136,33 +150,27 @@ def run(
             if config_keywords and not keywords:
                 if isinstance(config_keywords, list):
                     keywords = ",".join(config_keywords)
-                    console.print(
-                        f"[green]Using keywords from config file: {keywords}[/green]"
-                    )
+                    logger.success(f"Using keywords from config file: {keywords}")
                 else:
                     keywords = str(config_keywords)
-                    console.print(
-                        f"[yellow]Keywords in config file is not a list. Converted to string: {keywords}[/yellow]"
+                    logger.warning(
+                        f"Keywords in config file is not a list. Converted to string: {keywords}"
                     )
 
             config_domain = newsletter_settings.get("domain")
             if config_domain and not domain:
                 domain = config_domain
-                console.print(f"[green]Using domain from config file: {domain}[/green]")
+                logger.success(f"Using domain from config file: {domain}")
 
             config_suggest_count = newsletter_settings.get("suggest_count")
             if config_suggest_count:
                 suggest_count = config_suggest_count
-                console.print(
-                    f"[green]Using suggest_count from config file: {suggest_count}[/green]"
-                )
+                logger.success(f"Using suggest_count from config file: {suggest_count}")
 
             config_output_format = newsletter_settings.get("output_format")
             if config_output_format and not output_format:
                 output_format = config_output_format
-                console.print(
-                    f"[green]Using output_format from config file: {output_format}[/green]"
-                )
+                logger.success(f"Using output_format from config file: {output_format}")
 
             # Template style from config
             config_template_style = newsletter_settings.get("template_style")
@@ -170,21 +178,19 @@ def run(
                 # Only override if it's a valid option
                 if config_template_style in ["compact", "detailed"]:
                     template_style = config_template_style
-                    console.print(
-                        f"[green]Using template_style from config file: {template_style}[/green]"
+                    logger.success(
+                        f"Using template_style from config file: {template_style}"
                     )
                 else:
-                    console.print(
-                        f"[yellow]Invalid template_style in config file: {config_template_style}. Using default: {template_style}[/yellow]"
+                    logger.warning(
+                        f"Invalid template_style in config file: {config_template_style}. Using default: {template_style}"
                     )
 
             # Extract and log output directory from config
             output_directory = newsletter_settings.get(
                 "output_directory", output_directory
             )
-            console.print(
-                f"[green]Output directory from config file: {output_directory}[/green]"
-            )
+            logger.success(f"Output directory from config file: {output_directory}")
 
             # If email distribution is enabled in config, set it up
             distribution_settings = config_data.get("distribution", {})
@@ -192,75 +198,71 @@ def run(
                 email_recipients = distribution_settings.get("email_recipients", [])
                 if email_recipients and isinstance(email_recipients, list):
                     to = ",".join(email_recipients)
-                    console.print(
-                        f"[green]Using email recipients from config file[/green]"
-                    )
+                    logger.success("Using email recipients from config file")
 
-            console.print(f"[info]Loaded configuration from {config_file}[/info]")
+            logger.info(f"Loaded configuration from {config_file}")
         except Exception as e:
-            console.print(
-                f"[error]Failed to load or parse config file {config_file}: {e}[/error]"
-            )
+            logger.error(f"Failed to load or parse config file {config_file}: {e}")
             # Continue with CLI options
 
     # 디렉토리가 존재하는지 확인하고 생성
     os.makedirs(output_directory, exist_ok=True)
 
+    # 뉴스레터 생성 정보 표시
+    logger.show_newsletter_info(
+        domain=domain or "키워드 기반",
+        template_style=template_style,
+        output_format=output_format or "html",
+        recipient=to,
+    )
+
     final_keywords_str = ""
     keyword_list = []
 
     if domain:
-        console.print(
-            f"[bold green]Attempting to generate {suggest_count} keywords for domain: '{domain}'[/bold green]"
-        )
-        if not config.GEMINI_API_KEY:
-            console.print(
-                "[bold red]Error: GEMINI_API_KEY is not set. Cannot generate keywords from domain.[/bold red]"
-            )
-            if not keywords:
-                console.print(
-                    "[bold red]No fallback keywords provided. Exiting.[/bold red]"
-                )
-                raise typer.Exit(code=1)
-            else:
-                console.print(
-                    f"[yellow]Falling back to provided keywords: '{keywords}'[/yellow]"
-                )
-                final_keywords_str = keywords
-        else:
-            generated_keywords = tools.generate_keywords_with_gemini(
-                domain, count=suggest_count
-            )
-            if generated_keywords:
-                keyword_list = generated_keywords
-                final_keywords_str = ",".join(keyword_list)
-                console.print(
-                    f"[bold blue]Generated keywords: {final_keywords_str}[/bold blue]"
-                )
-            else:
-                console.print(
-                    f"[yellow]Failed to generate keywords for domain '{domain}'.[/yellow]"
+        with logger.step_context(
+            "keyword_generation", f"도메인 '{domain}'에서 {suggest_count}개 키워드 생성"
+        ):
+            if not config.GEMINI_API_KEY:
+                logger.error(
+                    "GEMINI_API_KEY is not set. Cannot generate keywords from domain."
                 )
                 if not keywords:
-                    console.print(
-                        "[bold red]No fallback keywords provided. Exiting.[/bold red]"
-                    )
+                    logger.error("No fallback keywords provided. Exiting.")
                     raise typer.Exit(code=1)
                 else:
-                    console.print(
-                        f"[yellow]Falling back to provided keywords: '{keywords}'[/yellow]"
-                    )
+                    logger.warning(f"Falling back to provided keywords: '{keywords}'")
                     final_keywords_str = keywords
+            else:
+                generated_keywords = tools.generate_keywords_with_gemini(
+                    domain, count=suggest_count
+                )
+                if generated_keywords:
+                    keyword_list = generated_keywords
+                    final_keywords_str = ",".join(keyword_list)
+                    logger.success(f"Generated keywords: {final_keywords_str}")
+                else:
+                    logger.warning(
+                        f"Failed to generate keywords for domain '{domain}'."
+                    )
+                    if not keywords:
+                        logger.error("No fallback keywords provided. Exiting.")
+                        raise typer.Exit(code=1)
+                    else:
+                        logger.warning(
+                            f"Falling back to provided keywords: '{keywords}'"
+                        )
+                        final_keywords_str = keywords
     elif keywords:
         final_keywords_str = keywords
     else:
-        console.print(
-            "[bold red]Error: No keywords provided and no domain specified for keyword generation. Exiting.[/bold red]"
+        logger.error(
+            "No keywords provided and no domain specified for keyword generation. Exiting."
         )
         raise typer.Exit(code=1)
 
     if not final_keywords_str:  # Should be caught by above, but as a safeguard
-        console.print("[bold red]Error: Keyword list is empty. Exiting.[/bold red]")
+        logger.error("Keyword list is empty. Exiting.")
         raise typer.Exit(code=1)
 
     if (
@@ -270,13 +272,8 @@ def run(
             kw.strip() for kw in final_keywords_str.split(",") if kw.strip()
         ]
 
-    console.print(
-        f"[bold green]Starting newsletter generation for final keywords: '{final_keywords_str}'[/bold green]"
-    )
-    if output_format:
-        console.print(f"[bold green]Local output format: {output_format}[/bold green]")
-    if drive:
-        console.print(f"[bold green]Save to Google Drive: Enabled[/bold green]")
+    # 키워드 정보 표시
+    logger.show_keyword_info(keyword_list, domain or "키워드 기반")
 
     # 날짜 및 시간 정보 설정
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -284,15 +281,12 @@ def run(
     os.environ["GENERATION_DATE"] = current_date
     os.environ["GENERATION_TIMESTAMP"] = current_time
 
-    console.print(f"[blue]Generation date: {current_date}, time: {current_time}[/blue]")
+    logger.info(f"Generation date: {current_date}, time: {current_time}")
 
     html_content = ""
 
     # LangGraph를 사용하는 것이 이제 기본이자 유일한 방식입니다.
-    console.print("\n[cyan]Using LangGraph workflow...[/cyan]")
-    console.print(
-        "\n[cyan]Step 1: Starting LangGraph workflow...[/cyan]"
-    )  # LangGraph 워크플로우 실행
+    logger.step("LangGraph 워크플로우 시작", "langgraph_workflow")
 
     # graph.generate_newsletter는 내부적으로 chains.get_newsletter_chain()을 호출하고,
     # chains.py의 변경으로 인해 render_data_langgraph...json 파일이 저장됩니다.
@@ -305,24 +299,28 @@ def run(
     )
 
     if status == "error":
-        console.print(
-            f"[yellow]Error in newsletter generation: {html_content}[/yellow]"
-        )
+        logger.error(f"Error in newsletter generation: {html_content}")
         return
 
-    console.print(
-        f"[green]Newsletter generated successfully using {template_style} template via LangGraph.[/green]"
-    )
+    logger.step_complete("뉴스레터 생성 완료", "langgraph_workflow")
 
     info = graph.get_last_generation_info()
     step_times = info.get("step_times", {})
     total_time = info.get("total_time")
     cost_summary = info.get("cost_summary")
-    console.print(f"[blue]Step times (seconds): {step_times}[/blue]")
+
+    # 통계 정보 업데이트
+    if step_times:
+        for step_name, elapsed_time in step_times.items():
+            logger.update_statistics(f"step_time_{step_name}", elapsed_time)
+
     if total_time is not None:
-        console.print(f"[blue]Total generation time: {total_time:.2f} seconds[/blue]")
+        logger.update_statistics("total_generation_time", total_time)
+        logger.info(f"Total generation time: {total_time:.2f} seconds")
+
     if cost_summary:
-        console.print(f"[blue]Cost summary: {cost_summary}[/blue]")
+        logger.update_statistics("cost_summary", cost_summary)
+        logger.debug(f"Cost summary: {cost_summary}")
 
     # 뉴스레터 주제 및 파일명 설정
     newsletter_topic = ""
@@ -342,61 +340,61 @@ def run(
 
     # 뉴스레터 파일 저장
     if output_format:
-        console.print(
-            f"\n[cyan]Saving newsletter locally as {output_format.upper()}...[/cyan]"
-        )
-        save_path = os.path.join(output_directory, f"{filename_base}.{output_format}")
-        console.print(f"[info]Saving to: {save_path}[/info]")
-
-        if news_deliver.save_locally(
-            html_content, filename_base, output_format, output_directory
+        with logger.step_context(
+            "local_save", f"뉴스레터를 {output_format.upper()}로 로컬 저장"
         ):
-            console.print(f"[green]Newsletter saved locally as {save_path}.[/green]")
-            # 파일 존재 확인
-            if os.path.exists(save_path):
-                file_size = os.path.getsize(save_path)
-                console.print(
-                    f"[green]File created successfully - Size: {file_size} bytes[/green]"
-                )
-            else:
-                console.print(
-                    f"[bold red]Error: File was not created at {save_path}[/bold red]"
-                )
-        else:
-            console.print(
-                f"[yellow]Failed to save newsletter locally as {output_format.upper()}.[/yellow]"
+            save_path = os.path.join(
+                output_directory, f"{filename_base}.{output_format}"
             )
+            logger.info(f"Saving to: {save_path}")
+
+            if news_deliver.save_locally(
+                html_content, filename_base, output_format, output_directory
+            ):
+                logger.success(f"Newsletter saved locally as {save_path}")
+                # 파일 존재 확인
+                if os.path.exists(save_path):
+                    file_size = os.path.getsize(save_path)
+                    logger.info(f"File created successfully - Size: {file_size} bytes")
+                else:
+                    logger.error(f"File was not created at {save_path}")
+            else:
+                logger.error(
+                    f"Failed to save newsletter locally as {output_format.upper()}"
+                )
 
     # Google Drive에 저장(드라이브 옵션이 활성화된 경우)
     if drive:
-        console.print(f"\n[cyan]Uploading to Google Drive...[/cyan]")
-        if news_deliver.save_to_drive(html_content, filename_base, output_directory):
-            console.print(
-                "[green]Successfully uploaded newsletter to Google Drive.[/green]"
-            )
-        else:
-            console.print(
-                "[yellow]Failed to upload newsletter to Google Drive. Check your credentials.[/yellow]"
-            )
+        with logger.step_context("drive_upload", "Google Drive에 업로드"):
+            if news_deliver.save_to_drive(
+                html_content, filename_base, output_directory
+            ):
+                logger.success("Successfully uploaded newsletter to Google Drive")
+            else:
+                logger.warning(
+                    "Failed to upload newsletter to Google Drive. Check your credentials."
+                )
 
     # 이메일 전송 로직 (LangGraph 경로에도 추가)
     if to:
-        console.print(f"\n[cyan]Sending email to {to}...[/cyan]")
-        email_subject = (
-            f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
-        )
-        if news_deliver.send_email(
-            to_email=to, subject=email_subject, html_content=html_content
-        ):
-            console.print(f"[green]Email sent successfully to {to}.[/green]")
-        else:
-            console.print(f"[yellow]Failed to send email to {to}.[/yellow]")
+        with logger.step_context("email_send", f"이메일 전송 to {to}"):
+            email_subject = (
+                f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
+            )
+            if news_deliver.send_email(
+                to_email=to, subject=email_subject, html_content=html_content
+            ):
+                logger.success(f"Email sent successfully to {to}")
+            else:
+                logger.warning(f"Failed to send email to {to}")
     else:
-        console.print(
-            "\n[yellow]Email sending skipped as no recipient was provided.[/yellow]"
-        )
+        logger.info("Email sending skipped as no recipient was provided")
 
-    console.print("\n[bold green]Newsletter process completed.[/bold green]")
+    # 시간 요약 및 최종 요약 표시
+    logger.show_time_summary()
+    logger.show_final_summary()
+
+    logger.success("Newsletter process completed")
 
 
 # The 'collect' command can remain if it's used for other purposes or direct testing.
@@ -415,38 +413,49 @@ def collect(
     no_major_sources_filter: bool = typer.Option(
         False, "--no-major-sources-filter", help="Don't prioritize major news sources."
     ),
+    log_level: str = typer.Option(
+        "INFO",
+        "--log-level",
+        help="Logging level: DEBUG, INFO, WARNING, ERROR",
+    ),
 ):
     """
     Collect articles based on keywords with improved filtering and grouping.
     """
-    console.print(f"Collecting articles for keywords: {keywords}")
+    # 로그 레벨 설정
+    set_log_level(log_level)
+    logger = get_logger()
+
+    logger.info(f"Collecting articles for keywords: {keywords}")
 
     # 기사 수집 및 처리
-    articles = news_collect.collect_articles(
-        keywords,
-        max_per_source=max_per_source,
-        filter_duplicates=not no_filter_duplicates,
-        group_by_keywords=not no_group_by_keywords,
-        use_major_sources_filter=not no_major_sources_filter,
-    )
+    with logger.step_context("article_collection", "기사 수집 및 처리"):
+        articles = news_collect.collect_articles(
+            keywords,
+            max_per_source=max_per_source,
+            filter_duplicates=not no_filter_duplicates,
+            group_by_keywords=not no_group_by_keywords,
+            use_major_sources_filter=not no_major_sources_filter,
+        )
 
     # 결과 출력
     if isinstance(articles, dict):  # 그룹화된 결과인 경우
-        console.print(
-            f"[green]Collected articles grouped by {len(articles)} keywords:[/green]"
-        )
+        keyword_counts = {
+            keyword: len(keyword_articles)
+            for keyword, keyword_articles in articles.items()
+        }
+        logger.show_article_collection_summary(keyword_counts)
+
         for keyword, keyword_articles in articles.items():
-            console.print(
-                f"[bold cyan]Keyword: {keyword} - {len(keyword_articles)} articles[/bold cyan]"
-            )
+            logger.info(f"Keyword: {keyword} - {len(keyword_articles)} articles")
             for i, article in enumerate(keyword_articles, 1):
-                console.print(
+                logger.debug(
                     f"  {i}. {article.get('title', 'No title')} ({article.get('source', 'Unknown')})"
                 )
     else:  # 그룹화되지 않은 결과인 경우
-        console.print(f"[green]Collected {len(articles)} articles:[/green]")
+        logger.success(f"Collected {len(articles)} articles")
         for i, article in enumerate(articles, 1):
-            console.print(
+            logger.debug(
                 f"{i}. {article.get('title', 'No title')} ({article.get('source', 'Unknown')})"
             )
 
@@ -456,24 +465,13 @@ def collect(
     filename_base = f"{current_date_str}_collected_articles_{keywords.replace(',', '_').replace(' ', '')}"
 
     # 결과 저장
-    if isinstance(articles, dict):
-        # 그룹화된 결과를 JSON으로 저장
-        output_dir = os.path.join(os.getcwd(), "output")
-        os.makedirs(output_dir, exist_ok=True)
+    output_dir = os.path.join(os.getcwd(), "output")
+    os.makedirs(output_dir, exist_ok=True)
 
-        output_path = os.path.join(output_dir, f"{filename_base}.json")
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(articles, f, ensure_ascii=False, indent=2)
-        console.print(f"[green]Results saved to {output_path}[/green]")
-    else:
-        # 단순한 기사 목록을 텍스트로 저장
-        output_dir = os.path.join(os.getcwd(), "output")
-        os.makedirs(output_dir, exist_ok=True)
-
-        output_path = os.path.join(output_dir, f"{filename_base}.json")
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(articles, f, ensure_ascii=False, indent=2)
-        console.print(f"[green]Results saved to {output_path}[/green]")
+    output_path = os.path.join(output_dir, f"{filename_base}.json")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(articles, f, ensure_ascii=False, indent=2)
+    logger.success(f"Results saved to {output_path}")
 
 
 @app.command()
@@ -482,38 +480,46 @@ def suggest(
     count: int = typer.Option(
         10, "--count", min=1, help="Number of keywords to generate."
     ),
+    log_level: str = typer.Option(
+        "WARNING",
+        "--log-level",
+        help="Logging level: DEBUG, INFO, WARNING, ERROR",
+    ),
 ):
     """
     Suggests trend keywords for a given domain using Google Gemini.
     """
-    console.print(
-        f"[bold green]Suggesting {count} keywords for domain: '{domain}'[/bold green]"
-    )
+    # 로그 레벨 설정
+    set_log_level(log_level)
+    logger = get_logger()
+
+    logger.info(f"Suggesting {count} keywords for domain: '{domain}'")
 
     if not config.GEMINI_API_KEY:  # GOOGLE_API_KEY 대신 GEMINI_API_KEY 사용
-        console.print(
-            "[bold red]Error: GEMINI_API_KEY is not set in the environment variables or .env file.[/bold red]"
+        logger.error(
+            "GEMINI_API_KEY is not set in the environment variables or .env file."
         )
-        console.print("Please set it to use the keyword suggestion feature.")
+        logger.info("Please set it to use the keyword suggestion feature.")
         raise typer.Exit(code=1)
 
-    suggested_keywords = tools.generate_keywords_with_gemini(domain, count=count)
+    with logger.step_context(
+        "keyword_suggestion", f"도메인 '{domain}'에 대한 키워드 제안"
+    ):
+        suggested_keywords = tools.generate_keywords_with_gemini(domain, count=count)
 
     if suggested_keywords:
-        console.print("\n[bold blue]Suggested Keywords:[/bold blue]")
-        for keyword in suggested_keywords:
-            console.print(f"- {keyword}")
+        logger.show_keyword_info(suggested_keywords, domain)
 
         # Construct the command for the user
         keywords_str = ",".join(suggested_keywords)
         run_command = f'newsletter run --keywords "{keywords_str}"'
-        console.print(
-            f"\n[bold yellow]To generate a newsletter with these keywords, you can use the following command:[/bold yellow]"
+        logger.info(
+            "To generate a newsletter with these keywords, you can use the following command:"
         )
-        console.print(f"[cyan]{run_command}[/cyan]")
+        logger.info(f"{run_command}")
     else:
-        console.print(
-            "\n[yellow]Could not generate keywords for the given domain. Please check the logs for errors.[/yellow]"
+        logger.error(
+            f"Failed to generate keywords for domain '{domain}'. Please check your API configuration."
         )
 
 

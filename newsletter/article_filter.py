@@ -4,10 +4,15 @@ Newsletter Generator - Article Filtering and Grouping
 """
 
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from rich.console import Console
 
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
 console = Console()
 
 # 주요 언론사 티어 설정
@@ -131,10 +136,10 @@ def group_articles_by_keywords(
     articles: List[Dict[str, Any]], keywords: List[str]
 ) -> Dict[str, List[Dict[str, Any]]]:
     """키워드별로 기사 그룹화 (동의어 및 문맥 기반 매칭 지원)"""
-    console.print(
-        f"[bold cyan]DEBUG: Starting grouping of {len(articles)} articles by {len(keywords)} keywords[/bold cyan]"
+    logger.debug(
+        f"Starting grouping of {len(articles)} articles by {len(keywords)} keywords"
     )
-    console.print(f"[bold cyan]DEBUG: Keywords: {keywords}[/bold cyan]")
+    logger.debug(f"Keywords: {keywords}")
 
     grouped_articles = {keyword: [] for keyword in keywords}
 
@@ -162,9 +167,7 @@ def group_articles_by_keywords(
     for i, article in enumerate(articles):
         full_text = f"{article.get('title', '')} {article.get('content', '')}".lower()
         tokens = _tokenize(full_text)
-        console.print(
-            f"[grey]DEBUG: Processing article {i+1}: {full_text[:50]}...[/grey]"
-        )
+        logger.debug(f"Processing article {i+1}: {full_text[:50]}...")
 
         for keyword in keywords:
             variations = SYNONYMS.get(keyword, [keyword])
@@ -180,18 +183,16 @@ def group_articles_by_keywords(
                     matched = True
                 if matched:
                     grouped_articles[keyword].append(article)
-                    console.print(
-                        f"[cyan]DEBUG: Article {i+1} matched keyword '{keyword}' via variant '{variant}'[/cyan]"
+                    logger.debug(
+                        f"Article {i+1} matched keyword '{keyword}' via variant '{variant}'"
                     )
                     break
             if not matched:
-                console.print(
-                    f"[grey]DEBUG: Article {i+1} did not match keyword '{keyword}'[/grey]"
-                )
+                logger.debug(f"Article {i+1} did not match keyword '{keyword}'")
 
     for keyword in grouped_articles:
-        console.print(
-            f"[green]Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'[/green]"
+        logger.info(
+            f"Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'"
         )
 
     return grouped_articles
@@ -419,8 +420,6 @@ def remove_similar_articles(
     )
     return unique_articles
 
-
-from datetime import datetime, timezone
 
 from .date_utils import parse_date_string
 
