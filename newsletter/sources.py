@@ -400,47 +400,7 @@ class NewsSourceManager:
 
     def __init__(self):
         self.sources = []
-        # 주요 언론사 티어 설정
-        self.major_news_sources = {
-            # 티어 1: 최우선 포함 주요 언론사
-            "tier1": [
-                "조선일보",
-                "중앙일보",
-                "동아일보",
-                "한국일보",
-                "한겨레",
-                "경향신문",
-                "매일경제",
-                "한국경제",
-                "서울경제",
-                "연합뉴스",
-                "YTN",
-                "KBS",
-                "MBC",
-                "SBS",
-                "Bloomberg",
-                "Reuters",
-                "Wall Street Journal",
-                "Financial Times",
-                "The Economist",
-                "TechCrunch",
-                "Wired",
-            ],
-            # 티어 2: 보조 언론사
-            "tier2": [
-                "뉴시스",
-                "뉴스1",
-                "아시아경제",
-                "아주경제",
-                "이데일리",
-                "머니투데이",
-                "디지털타임스",
-                "전자신문",
-                "IT조선",
-                "ZDNet Korea",
-                "디지털데일리",
-            ],
-        }
+        # 주요 언론사 설정은 config에서 중앙 관리
 
     def add_source(self, source: NewsSource) -> None:
         """뉴스 소스 추가"""
@@ -522,39 +482,7 @@ class NewsSourceManager:
             return []
 
         # 주요 언론사 목록 (한국 주요 언론사)
-        major_sources = {
-            "조선일보",
-            "중앙일보",
-            "동아일보",
-            "한국일보",
-            "경향신문",
-            "한겨레",
-            "매일경제",
-            "한국경제",
-            "서울경제",
-            "이데일리",
-            "연합뉴스",
-            "뉴시스",
-            "뉴스1",
-            "YTN",
-            "KBS",
-            "MBC",
-            "SBS",
-            "JTBC",
-            "채널A",
-            "MBN",
-            "TV조선",
-            "아시아경제",
-            "파이낸셜뉴스",
-            "머니투데이",
-            "비즈니스워치",
-            "디지털타임스",
-            "전자신문",
-            "ZDNet Korea",
-            "테크M",
-            "IT조선",
-            "블로터",
-        }
+        major_sources = config.ALL_MAJOR_NEWS_SOURCES
 
         # 주요 언론사 기사와 기타 기사 분리
         major_articles = []

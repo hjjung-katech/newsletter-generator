@@ -9,53 +9,14 @@ from typing import Any, Dict, List
 
 from rich.console import Console
 
+from . import config
 from .utils.logger import get_logger
 
 # 로거 초기화
 logger = get_logger()
 console = Console()
 
-# 주요 언론사 티어 설정
-MAJOR_NEWS_SOURCES = {
-    # 티어 1: 최우선 포함 주요 언론사
-    "tier1": [
-        "조선일보",
-        "중앙일보",
-        "동아일보",
-        "한국일보",
-        "한겨레",
-        "경향신문",
-        "매일경제",
-        "한국경제",
-        "서울경제",
-        "연합뉴스",
-        "YTN",
-        "KBS",
-        "MBC",
-        "SBS",
-        "Bloomberg",
-        "Reuters",
-        "Wall Street Journal",
-        "Financial Times",
-        "The Economist",
-        "TechCrunch",
-        "Wired",
-    ],
-    # 티어 2: 보조 언론사
-    "tier2": [
-        "뉴시스",
-        "뉴스1",
-        "아시아경제",
-        "아주경제",
-        "이데일리",
-        "머니투데이",
-        "디지털타임스",
-        "전자신문",
-        "IT조선",
-        "ZDNet Korea",
-        "디지털데일리",
-    ],
-}
+# 동의어 설정 (키워드 매칭 개선용)
 SYNONYMS: Dict[str, List[str]] = {
     "AI반도체": ["AI반도체", "AI 반도체", "인공지능 반도체", "ai semiconductor"],
     "HBM": ["HBM", "hbm", "high bandwidth memory", "고대역폭 메모리"],
@@ -89,12 +50,12 @@ def filter_articles_by_major_sources(
         # 티어에 따라 분류
         if any(
             major_source.lower() in source_norm
-            for major_source in MAJOR_NEWS_SOURCES["tier1"]
+            for major_source in config.MAJOR_NEWS_SOURCES["tier1"]
         ):
             tier1_articles.append(article)
         elif any(
             major_source.lower() in source_norm
-            for major_source in MAJOR_NEWS_SOURCES["tier2"]
+            for major_source in config.MAJOR_NEWS_SOURCES["tier2"]
         ):
             tier2_articles.append(article)
         else:
@@ -428,9 +389,9 @@ def calculate_article_importance(article: Dict[str, Any]) -> float:
     """Calculate a simple importance score for an article."""
     score = 0.0
     source = article.get("source", "")
-    if any(s.lower() in source.lower() for s in MAJOR_NEWS_SOURCES["tier1"]):
+    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier1"]):
         score += 2.0
-    elif any(s.lower() in source.lower() for s in MAJOR_NEWS_SOURCES["tier2"]):
+    elif any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier2"]):
         score += 1.0
 
     date_obj = parse_date_string(article.get("date"))
