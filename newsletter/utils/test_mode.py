@@ -243,8 +243,16 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
 
     # Set output path with the improved timestamp
     if not output_html_path:
-        output_html_path = generate_newsletter_filename(
-            content_data.get("newsletter_topic", "test_newsletter"), timestamp
+        # 통일된 파일명 생성 함수 사용
+        from .file_naming import generate_unified_newsletter_filename
+
+        topic = content_data.get("newsletter_topic", "test_newsletter")
+        output_html_path = generate_unified_newsletter_filename(
+            topic=f"test_{topic}",
+            style="detailed",  # 기본 스타일
+            timestamp=timestamp,
+            use_current_date=True,
+            generation_type="test",
         )
 
     # 템플릿 디렉토리 설정

@@ -357,11 +357,34 @@ def run(
         # 여러 키워드의 공통 주제 추출
         newsletter_topic = tools.extract_common_theme_from_keywords(keyword_list)
 
-    current_date_str = datetime.now().strftime("%Y-%m-%d")
+    # 통일된 파일명 생성 함수 사용
+    from .utils.file_naming import generate_unified_newsletter_filename
+
     current_time_str = datetime.now().strftime("%H%M%S")  # Add time for filename
+    # 날짜 문자열은 항상 정의 (이메일 제목에서 사용)
+    current_date_str = datetime.now().strftime("%Y-%m-%d")
+
     # 파일 이름에 안전한 주제 문자열 생성
     safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
-    filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
+
+    # 기본 스타일 설정 (output_format이 있으면 그에 맞춘 확장자 처리)
+    default_style = "detailed"  # 기본값
+
+    # output_format이 지정된 경우 통일된 함수 사용
+    if output_format:
+        # 통일된 파일명 생성 (확장자 제외)
+        full_file_path = generate_unified_newsletter_filename(
+            topic=safe_topic,
+            style=default_style,
+            timestamp=f"{datetime.now().strftime('%Y%m%d')}_{current_time_str}",
+            use_current_date=True,
+            generation_type="original",
+        )
+        # .html 확장자를 제거하고 output_format으로 교체
+        filename_base = os.path.splitext(os.path.basename(full_file_path))[0]
+    else:
+        # output_format이 없으면 기존 방식 호환성 유지 (새로운 날짜 형식 적용)
+        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
 
     # 뉴스레터 파일 저장
     if output_format:
@@ -612,7 +635,9 @@ def test(
 
             # 파일명 생성 및 저장
             if output is None:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                # 통일된 파일명 생성 함수 사용
+                from .utils.file_naming import generate_unified_newsletter_filename
+
                 # 입력 파일명에서 주제 추출 시도
                 base_name = os.path.basename(data_file)
                 if "render_data_langgraph" in base_name:
@@ -623,8 +648,16 @@ def test(
                     )
                 else:
                     topic_part = "test"
-                output_filename = f"test_newsletter_result_{timestamp}_{template_style}_{topic_part}.html"
-                output = os.path.join("output", output_filename)
+
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                # 통일된 파일명 생성
+                output = generate_unified_newsletter_filename(
+                    topic=f"test_{topic_part}",
+                    style=template_style,
+                    timestamp=timestamp,
+                    use_current_date=True,
+                    generation_type="test",
+                )
 
             # 출력 디렉토리 생성
             output_dir = os.path.dirname(output)
@@ -868,18 +901,23 @@ def test(
             current_date_str = datetime.now().strftime("%Y-%m-%d")
             current_time_str = datetime.now().strftime("%H%M%S")
 
-            # 파일 이름에 안전한 주제 문자열 생성
-            from .tools import get_filename_safe_theme
+            # 통일된 파일명 생성 함수 사용
+            from .utils.file_naming import generate_unified_newsletter_filename
 
-            safe_topic = get_filename_safe_theme(keywords, domain)
-            filename_base = (
-                f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
-            )
+            # 파일 이름에 안전한 주제 문자열 생성
+            safe_topic = tools.get_filename_safe_theme(keywords, domain)
 
             # 출력 파일명 설정
             if output is None:
-                output_format = "html"
-                save_path = os.path.join("output", f"{filename_base}.{output_format}")
+                # 통일된 파일명 생성
+                timestamp = f"{datetime.now().strftime('%Y%m%d')}_{current_time_str}"
+                save_path = generate_unified_newsletter_filename(
+                    topic=f"content_{safe_topic}",
+                    style=template_style,
+                    timestamp=timestamp,
+                    use_current_date=True,
+                    generation_type="regenerated",
+                )
             else:
                 save_path = output
 

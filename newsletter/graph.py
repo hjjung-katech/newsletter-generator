@@ -20,6 +20,7 @@ from . import config
 from .chains import get_newsletter_chain
 from .date_utils import parse_date_string
 from .utils.logger import get_logger
+from .utils.file_naming import generate_unified_newsletter_filename
 
 # 로거 초기화
 logger = get_logger()
@@ -142,7 +143,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     os.makedirs(output_dir, exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    raw_output_filename = f"{timestamp}_collected_articles_raw.json"
+    raw_output_filename = f"{timestamp}_articles_raw.json"
     raw_output_path = os.path.join(output_dir, raw_output_filename)
     try:
         # Create a dictionary that includes metadata for raw articles too
@@ -252,9 +253,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             "[yellow]Warning: No articles retained after recency filter.[/yellow]"
         )
         # Optionally, save an empty processed file or skip
-        processed_output_filename = (
-            f"{timestamp}_collected_articles_processed_EMPTY.json"
-        )
+        processed_output_filename = f"{timestamp}_articles_processed_EMPTY.json"
         processed_output_path = os.path.join(output_dir, processed_output_filename)
         try:
             with open(processed_output_path, "w", encoding="utf-8") as f:
@@ -305,9 +304,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
             "[yellow]Warning: No articles retained after deduplication.[/yellow]"
         )
         # Optionally, save an empty processed file or skip
-        processed_output_filename = (
-            f"{timestamp}_collected_articles_processed_EMPTY_DEDUP.json"
-        )
+        processed_output_filename = f"{timestamp}_articles_processed_EMPTY_DEDUP.json"
         processed_output_path = os.path.join(output_dir, processed_output_filename)
         try:
             with open(processed_output_path, "w", encoding="utf-8") as f:
@@ -338,7 +335,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     )
     logger.info(f"Sorted {len(processed_articles_sorted)} articles by date.")
 
-    processed_output_filename = f"{timestamp}_collected_articles_processed.json"
+    processed_output_filename = f"{timestamp}_articles_processed.json"
     processed_output_path = os.path.join(output_dir, processed_output_filename)
     try:
         # Create a dictionary that includes metadata
@@ -400,7 +397,7 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
     output_dir = os.path.join(os.getcwd(), "output", "intermediate_processing")
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    scored_path = os.path.join(output_dir, f"{timestamp}_scored_articles.json")
+    scored_path = os.path.join(output_dir, f"{timestamp}_articles_scored.json")
     try:
         with open(scored_path, "w", encoding="utf-8") as f:
             json.dump(
@@ -498,7 +495,35 @@ def summarize_articles_node(
             "keywords": state.get("keywords", ""),
         }
 
-        category_summaries = newsletter_chain.invoke(input_data)
+        chain_result = newsletter_chain.invoke(input_data)
+
+        # chains에서 반환되는 새로운 형태 처리
+        if isinstance(chain_result, dict) and "html" in chain_result:
+            # 새로운 형태: {"html": ..., "structured_data": ..., "sections": ..., "mode": ...}
+            category_summaries = chain_result["structured_data"]
+            html_content = chain_result["html"]
+            sections = chain_result.get("sections", [])
+
+            logger.info(
+                f"[green]Successfully processed {chain_result['mode']} mode newsletter[/green]"
+            )
+            logger.info(
+                f"[cyan]Structured data keys: {list(category_summaries.keys())}[/cyan]"
+            )
+        elif isinstance(chain_result, str):
+            # 기존 형태: HTML 문자열 (하위 호환성)
+            category_summaries = chain_result
+            html_content = chain_result
+            sections = []
+            logger.info(f"[yellow]Received HTML string (legacy format)[/yellow]")
+        else:
+            # 예상치 못한 형태
+            logger.error(
+                f"[red]Unexpected chain result type: {type(chain_result)}[/red]"
+            )
+            category_summaries = chain_result
+            html_content = None
+            sections = []
 
         if not category_summaries:
             return {
@@ -512,6 +537,8 @@ def summarize_articles_node(
         return {
             **state,
             "category_summaries": category_summaries,
+            "newsletter_html": html_content,  # 생성된 HTML도 저장
+            "sections": sections,  # sections 데이터 추가
             "status": "composing",  # Changed to composing to indicate next step
             "step_times": step_times,
         }
@@ -560,20 +587,28 @@ def compose_newsletter_node(
     try:
         template_style = state.get("template_style", "compact")
 
-        # category_summaries is the full newsletter data structure created by the rendering chain
-        if isinstance(category_summaries, str):
-            # If it's already HTML, just use it
-            newsletter_html = category_summaries
-        else:
-            # If it's structured data, render with appropriate template using unified function
-            template_dir = os.path.join(
-                os.path.dirname(os.path.dirname(__file__)), "templates"
-            )
+        # 이미 생성된 HTML이 있는지 확인 (summarize_articles_node에서 생성된 경우)
+        newsletter_html = state.get("newsletter_html")
 
-            logger.info(f"[cyan]Using {template_style} newsletter template...[/cyan]")
-            newsletter_html = compose_newsletter(
-                category_summaries, template_dir, template_style
-            )
+        if newsletter_html:
+            logger.info(f"[cyan]Using pre-generated HTML from chains[/cyan]")
+        else:
+            # HTML이 없으면 직접 생성
+            if isinstance(category_summaries, str):
+                # If it's already HTML, just use it
+                newsletter_html = category_summaries
+            else:
+                # If it's structured data, render with appropriate template using unified function
+                template_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)), "templates"
+                )
+
+                logger.info(
+                    f"[cyan]Using {template_style} newsletter template...[/cyan]"
+                )
+                newsletter_html = compose_newsletter(
+                    category_summaries, template_dir, template_style
+                )
 
         # 뉴스레터 HTML 저장
         def save_newsletter_html(html_content, topic, style):
@@ -588,19 +623,20 @@ def compose_newsletter_node(
             Returns:
                 str: 저장된 파일 경로
             """
-            # 주제에서 파일명 생성
-            from .tools import sanitize_filename
+            # 통일된 파일명 생성 함수 사용
+            from .utils.file_naming import generate_unified_newsletter_filename
 
-            filename_base = sanitize_filename(topic)
-
-            # 폴더가 없으면 생성
-            output_dir = os.path.join(os.getcwd(), "output")
-            os.makedirs(output_dir, exist_ok=True)
-
-            # 날짜와 시간을 파일명에 추가
+            # 현재 타임스탬프 생성
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{filename_base}_{style}_{timestamp}.html"
-            file_path = os.path.join(output_dir, filename)
+
+            # 통일된 파일명으로 경로 생성
+            file_path = generate_unified_newsletter_filename(
+                topic=topic,
+                style=style,
+                timestamp=timestamp,
+                use_current_date=True,
+                generation_type="original",
+            )
 
             # 파일 저장
             with open(file_path, "w", encoding="utf-8") as f:
@@ -614,6 +650,194 @@ def compose_newsletter_node(
         save_path = save_newsletter_html(
             newsletter_html, newsletter_topic, template_style
         )
+
+        # 렌더 데이터 저장 (재사용 및 테스트용)
+        def save_render_data(state_data, topic, timestamp_override=None):
+            """
+            뉴스레터 렌더링 데이터를 JSON 파일로 저장합니다.
+
+            Args:
+                state_data: 저장할 상태 데이터
+                topic: 뉴스레터 주제
+                timestamp_override: 선택적 타임스탬프 덮어쓰기
+
+            Returns:
+                str: 저장된 파일 경로
+            """
+            from .utils.file_naming import generate_render_data_filename
+
+            # 타임스탬프 생성 (통일성을 위해 같은 시간 사용)
+            if timestamp_override:
+                timestamp = timestamp_override
+            else:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+            # 렌더 데이터 파일 경로 생성
+            render_data_path = generate_render_data_filename(topic, timestamp)
+
+            # 현재 시간 정보
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            current_time = datetime.now().strftime("%H:%M:%S")
+
+            # 저장할 렌더 데이터 구성 (template 모드에서 재사용 가능한 형태)
+            render_data = {
+                "newsletter_topic": state_data.get("newsletter_topic", topic),
+                "generation_date": current_date,
+                "generation_timestamp": current_time,
+                "search_keywords": state_data.get("keywords", []),
+                "domain": state_data.get("domain"),
+                "template_style": state_data.get("template_style", "compact"),
+                "news_period_days": state_data.get("news_period_days", 14),
+                # 카테고리 요약 데이터를 sections로 변환
+                "sections": [],
+                # top_articles 추가
+                "top_articles": [],
+                # grouped_sections 추가 (compact 모드용)
+                "grouped_sections": [],
+                # definitions 추가
+                "definitions": [],
+                # food_for_thought 추가
+                "food_for_thought": {},
+                # 기본 메타데이터
+                "recipient_greeting": "안녕하세요,",
+                "introduction_message": "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
+                "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+                "editor_signature": "편집자 드림",
+                "company_name": "산업통상자원 R&D 전략기획단",
+                "copyright_year": datetime.now().strftime("%Y"),
+                "company_tagline": "최신 기술 동향을 한눈에",
+                "footer_contact": "문의사항: hjjung2@osp.re.kr",
+                "footer_disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+                "editor_name": "Google Gemini",
+                "editor_email": "hjjung2@osp.re.kr",
+            }
+
+            # category_summaries에서 구조화된 데이터 추출
+            category_summaries = state_data.get("category_summaries", {})
+            sections_from_state = state_data.get("sections", [])
+
+            logger.info(
+                f"[cyan]Debug: category_summaries type: {type(category_summaries)}[/cyan]"
+            )
+            logger.info(
+                f"[cyan]Debug: sections from state: {len(sections_from_state)} sections[/cyan]"
+            )
+
+            # structured_data에서 완전한 정보 추출
+            if isinstance(category_summaries, dict):
+                # top_articles 추출
+                if "top_articles" in category_summaries:
+                    render_data["top_articles"] = category_summaries["top_articles"]
+                    logger.info(
+                        f"[green]Found top_articles: {len(render_data['top_articles'])} articles[/green]"
+                    )
+
+                # grouped_sections 추출 (compact 모드)
+                if "grouped_sections" in category_summaries:
+                    render_data["grouped_sections"] = category_summaries[
+                        "grouped_sections"
+                    ]
+                    logger.info(
+                        f"[green]Found grouped_sections: {len(render_data['grouped_sections'])} groups[/green]"
+                    )
+
+                # definitions 추출
+                if "definitions" in category_summaries:
+                    render_data["definitions"] = category_summaries["definitions"]
+                    logger.info(
+                        f"[green]Found definitions: {len(render_data['definitions'])} definitions[/green]"
+                    )
+
+                # food_for_thought 추출
+                if "food_for_thought" in category_summaries:
+                    render_data["food_for_thought"] = category_summaries[
+                        "food_for_thought"
+                    ]
+                    logger.info(f"[green]Found food_for_thought[/green]")
+
+                # 기타 메타데이터 업데이트
+                for key in [
+                    "newsletter_topic",
+                    "generation_date",
+                    "recipient_greeting",
+                    "introduction_message",
+                    "closing_message",
+                    "editor_signature",
+                    "company_name",
+                ]:
+                    if key in category_summaries:
+                        render_data[key] = category_summaries[key]
+
+            # sections 데이터 우선순위: state의 sections > category_summaries의 sections
+            if sections_from_state:
+                # sections_from_state에서 완전한 정보 추출
+                complete_sections = []
+                for section in sections_from_state:
+                    complete_section = {
+                        "title": section.get("title", ""),
+                        "summary_paragraphs": section.get("summary_paragraphs", []),
+                        "definitions": section.get("definitions", []),
+                        "news_links": section.get("news_links", []),
+                    }
+
+                    # intro 필드가 있으면 summary_paragraphs로 변환
+                    if (
+                        "intro" in section
+                        and not complete_section["summary_paragraphs"]
+                    ):
+                        complete_section["summary_paragraphs"] = [section["intro"]]
+
+                    # articles 필드가 있으면 news_links로 변환
+                    if "articles" in section and not complete_section["news_links"]:
+                        complete_section["news_links"] = [
+                            {
+                                "title": article.get("title", ""),
+                                "url": article.get("url", "#"),
+                                "source_and_date": article.get("source_and_date", ""),
+                            }
+                            for article in section.get("articles", [])
+                        ]
+
+                    complete_sections.append(complete_section)
+
+                render_data["sections"] = complete_sections
+                logger.info(
+                    f"[green]Using sections from state: {len(complete_sections)} sections[/green]"
+                )
+
+                # sections에서 definitions도 추출 (아직 없는 경우)
+                if not render_data["definitions"]:
+                    all_definitions = []
+                    for section in complete_sections:
+                        all_definitions.extend(section.get("definitions", []))
+                    render_data["definitions"] = all_definitions[:3]  # 최대 3개
+
+            elif (
+                isinstance(category_summaries, dict)
+                and "sections" in category_summaries
+            ):
+                render_data["sections"] = category_summaries["sections"]
+                logger.info(
+                    f"[green]Found sections data in category_summaries: {len(render_data['sections'])} sections[/green]"
+                )
+
+            # 파일 저장
+            try:
+                with open(render_data_path, "w", encoding="utf-8") as f:
+                    json.dump(render_data, f, ensure_ascii=False, indent=2)
+                logger.info(
+                    f"[green]Enhanced render data saved to {render_data_path}[/green]"
+                )
+                logger.info(
+                    f"[cyan]Render data contains: {len(render_data['sections'])} sections, {len(render_data['top_articles'])} top articles, {len(render_data['definitions'])} definitions[/cyan]"
+                )
+                return render_data_path
+            except Exception as e:
+                logger.error(f"[red]Error saving render data: {e}[/red]")
+                return None
+
+        # 렌더 데이터 저장 실행
+        render_data_path = save_render_data(state, newsletter_topic)
 
         step_times = state.get("step_times", {})
         step_times["compose_newsletter"] = time.time() - start_time
