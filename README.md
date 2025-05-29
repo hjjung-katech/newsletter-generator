@@ -1,7 +1,7 @@
 # Newsletter Generator
 
-[![CI](https://github.com/your-org/newsletter-generator/workflows/CI/badge.svg)](https://github.com/your-org/newsletter-generator/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/your-org/newsletter-generator/workflows/Code%20Quality/badge.svg)](https://github.com/your-org/newsletter-generator/actions/workflows/code-quality.yml)
+[![CI](https://github.com/hjjung-katech/newsletter-generator/workflows/CI/badge.svg)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/hjjung-katech/newsletter-generator/workflows/Code%20Quality/badge.svg)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -108,8 +108,8 @@ flowchart LR
 
 ## 🆘 지원
 
-- **[이슈 트래커](https://github.com/your-org/newsletter-generator/issues)** - 버그 리포트 및 기능 요청
-- **[토론](https://github.com/your-org/newsletter-generator/discussions)** - 질문 및 아이디어 공유
+- **[이슈 트래커](https://github.com/hjjung-katech/newsletter-generator/issues)** - 버그 리포트 및 기능 요청
+- **[토론](https://github.com/hjjung-katech/newsletter-generator/discussions)** - 질문 및 아이디어 공유
 - **[문서](docs/README.md)** - 상세한 사용법 및 개발 가이드
 
 ## 🚨 문제 해결

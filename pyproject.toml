@@ -78,10 +78,10 @@ test = [
 newsletter = "newsletter.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/your-org/newsletter-generator"
-Repository = "https://github.com/your-org/newsletter-generator"
-Documentation = "https://github.com/your-org/newsletter-generator/blob/main/README.md"
-"Bug Tracker" = "https://github.com/your-org/newsletter-generator/issues"
+Homepage = "https://github.com/hjjung-katech/newsletter-generator"
+Repository = "https://github.com/hjjung-katech/newsletter-generator"
+Documentation = "https://github.com/hjjung-katech/newsletter-generator/blob/main/README.md"
+"Bug Tracker" = "https://github.com/hjjung-katech/newsletter-generator/issues"
 
 [tool.setuptools]
 packages = ["newsletter"]

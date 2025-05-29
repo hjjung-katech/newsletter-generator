@@ -85,7 +85,10 @@ def generate_unified_newsletter_filename(
             regen_date, regen_time = _parse_and_standardize_timestamp(
                 regen_timestamp, True
             )
-            filename = f"{source_date}_{source_time}_newsletter_{safe_topic}_{style}_regen_{regen_date}_{regen_time}.html"
+            filename = (
+                f"{source_date}_{source_time}_newsletter_{safe_topic}_{style}"
+                f"_regen_{regen_date}_{regen_time}.html"
+            )
         else:
             # source_timestamp가 없으면 현재 시간으로 재생성 표시
             filename = (
@@ -344,6 +347,6 @@ def save_debug_file(
             from ..utils.logger import logger
 
             logger.error(f"Debug 파일 저장 중 오류: {e}")
-        except:
+        except ImportError:
             print(f"Debug 파일 저장 중 오류: {e}")
         raise
