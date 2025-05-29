@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from newsletter import config
 from newsletter.article_filter import (
-    MAJOR_NEWS_SOURCES,
     filter_articles_by_domains,
     filter_articles_by_major_sources,
     group_articles_by_keywords,
@@ -76,7 +76,9 @@ class TestArticleFilter(unittest.TestCase):
         result = filter_articles_by_major_sources(self.test_articles, max_per_topic=3)
 
         # 티어1 소스 기사가 우선 선택되었는지 확인
-        tier1_sources = [source.lower() for source in MAJOR_NEWS_SOURCES["tier1"]]
+        tier1_sources = [
+            source.lower() for source in config.MAJOR_NEWS_SOURCES["tier1"]
+        ]
         tier1_articles = [
             a for a in result if any(s in a["source"].lower() for s in tier1_sources)
         ]
