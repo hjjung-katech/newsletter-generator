@@ -293,7 +293,6 @@ def get_logger(name: str = "newsletter", log_level: str = None) -> NewsletterLog
 
 def set_log_level(level: str):
     """로그 레벨 설정"""
-    global _global_logger
     if _global_logger:
         _global_logger.log_level = getattr(logging, level.upper())
         _global_logger.logger.setLevel(_global_logger.log_level)
