@@ -8,7 +8,7 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import feedparser
 import requests
@@ -17,7 +17,10 @@ from rich.console import Console
 
 from . import config
 from .date_utils import parse_date_string, standardize_date
+from .utils.logger import get_logger
 
+# 로거 초기화
+logger = get_logger()
 console = Console()
 
 
@@ -510,54 +513,74 @@ class NewsSourceManager:
 
         Args:
             articles: 필터링할 기사 목록
-            max_per_topic: 각 주제별 최대 기사 수
+            max_per_topic: 주제별 최대 기사 수
 
         Returns:
             필터링된 기사 목록
         """
-        # 언론사 소스별로 분류
-        tier1_articles = []
-        tier2_articles = []
+        if not articles:
+            return []
+
+        # 주요 언론사 목록 (한국 주요 언론사)
+        major_sources = {
+            "조선일보",
+            "중앙일보",
+            "동아일보",
+            "한국일보",
+            "경향신문",
+            "한겨레",
+            "매일경제",
+            "한국경제",
+            "서울경제",
+            "이데일리",
+            "연합뉴스",
+            "뉴시스",
+            "뉴스1",
+            "YTN",
+            "KBS",
+            "MBC",
+            "SBS",
+            "JTBC",
+            "채널A",
+            "MBN",
+            "TV조선",
+            "아시아경제",
+            "파이낸셜뉴스",
+            "머니투데이",
+            "비즈니스워치",
+            "디지털타임스",
+            "전자신문",
+            "ZDNet Korea",
+            "테크M",
+            "IT조선",
+            "블로터",
+        }
+
+        # 주요 언론사 기사와 기타 기사 분리
+        major_articles = []
         other_articles = []
 
         for article in articles:
-            source = article.get("source", "")
+            source = article.get("source", "").strip()
+            is_major = any(major_source in source for major_source in major_sources)
 
-            # 소스 이름 정규화 (대소문자 무시, 공백 제거)
-            source_norm = source.lower().strip()
-
-            # 티어에 따라 분류
-            if any(
-                major_source.lower() in source_norm
-                for major_source in self.major_news_sources["tier1"]
-            ):
-                tier1_articles.append(article)
-            elif any(
-                major_source.lower() in source_norm
-                for major_source in self.major_news_sources["tier2"]
-            ):
-                tier2_articles.append(article)
+            if is_major:
+                major_articles.append(article)
             else:
                 other_articles.append(article)
 
-        # 티어에 따라 기사 선택 (티어1 우선, 그 다음 티어2, 마지막에 기타)
-        filtered_articles = []
+        # 주요 언론사 기사 우선 선택 (최대 개수의 70%)
+        major_count = min(len(major_articles), int(max_per_topic * 0.7))
+        selected_major = major_articles[:major_count]
 
-        # 먼저 티어1 기사 추가
-        filtered_articles.extend(tier1_articles[:max_per_topic])
+        # 나머지 자리는 기타 기사로 채움
+        remaining_slots = max_per_topic - len(selected_major)
+        selected_other = other_articles[:remaining_slots]
 
-        # 아직 공간이 남으면 티어2 기사 추가
-        remaining_slots = max_per_topic - len(filtered_articles)
-        if remaining_slots > 0:
-            filtered_articles.extend(tier2_articles[:remaining_slots])
+        filtered_articles = selected_major + selected_other
 
-        # 그래도 남으면 기타 기사 추가
-        remaining_slots = max_per_topic - len(filtered_articles)
-        if remaining_slots > 0:
-            filtered_articles.extend(other_articles[:remaining_slots])
-
-        console.print(
-            f"[cyan]Filtered articles by major sources: {len(filtered_articles)} selected from {len(articles)} total[/cyan]"
+        logger.info(
+            f"Filtered articles by major sources: {len(filtered_articles)} selected from {len(articles)} total"
         )
 
         return filtered_articles
@@ -601,8 +624,8 @@ class NewsSourceManager:
             grouped_articles[keyword] = self.remove_duplicates(
                 grouped_articles[keyword]
             )
-            console.print(
-                f"[green]Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'[/green]"
+            logger.info(
+                f"Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'"
             )
 
         return grouped_articles

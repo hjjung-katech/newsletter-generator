@@ -6,6 +6,7 @@ Newsletter Generator - LangChain Chains
 import datetime
 import json
 import os
+from typing import Any, Dict, List
 
 from jinja2 import Environment, FileSystemLoader, Template
 from langchain.chains import LLMChain, SequentialChain
@@ -24,37 +25,35 @@ from .compose import (
     compose_newsletter,
     extract_key_definitions_for_compact,
     prepare_grouped_sections_for_compact,
+    extract_and_prepare_top_articles,
+    create_grouped_sections,
+    NewsletterConfig,
+    extract_definitions,
+    extract_food_for_thought,
 )
 from .template_manager import TemplateManager
+from .utils.logger import get_logger
+from newsletter.article_filter import select_top_articles
+
+# 로거 초기화
+logger = get_logger()
 
 
 # HTML 템플릿 파일 로딩
 def load_html_template():
     """HTML 템플릿 파일을 로드합니다."""
     template_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "templates",
-        "newsletter_template.html",
+        os.path.dirname(__file__), "..", "templates", "newsletter_template.html"
     )
     try:
-        with open(template_path, "r", encoding="utf-8") as file:
-            return file.read()
+        with open(template_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        logger.error(f"Template file not found: {template_path}")
+        return ""
     except Exception as e:
-        print(f"템플릿 파일 로딩 중 오류 발생: {e}")
-        # 기본 템플릿 반환
-        return """
-        <!DOCTYPE html>
-        <html lang="ko">
-        <head>
-            <meta charset="UTF-8">
-            <title>오늘의 뉴스레터</title>
-        </head>
-        <body>
-            <h1>오늘의 뉴스레터</h1>
-            <!-- 뉴스레터 내용이 여기에 들어갑니다 -->
-        </body>
-        </html>
-        """
+        logger.error(f"Error loading template: {e}")
+        return ""
 
 
 # HTML 템플릿 로드
@@ -69,7 +68,7 @@ try:
     ) as f:
         f.write(HTML_TEMPLATE)
 except Exception as e:
-    print(f"디버그 파일 작성 중 오류: {e}")
+    logger.error(f"디버그 파일 작성 중 오류: {e}")
 
 # 분류 시스템 프롬프트
 CATEGORIZATION_PROMPT = """
@@ -268,10 +267,12 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
         if "credentials" in error_msg or "not found" in error_msg:
             # 조용한 fallback (디버그 모드에서만 출력)
             if os.environ.get("DEBUG_LLM_FACTORY"):
-                print(f"Debug: LLM factory failed, using fallback: {e}")
+                logger.debug(f"Debug: LLM factory failed, using fallback: {e}")
         else:
             # 다른 오류는 출력
-            print(f"Warning: LLM factory failed, falling back to default Gemini: {e}")
+            logger.warning(
+                f"Warning: LLM factory failed, falling back to default Gemini: {e}"
+            )
 
         # Fallback to original Gemini implementation
         if not config.GEMINI_API_KEY:
@@ -371,7 +372,7 @@ def create_categorization_chain(is_compact=False):
             # 메시지를 HumanMessage로 변환 (Gemini는 시스템 메시지 지원이 불안정함)
             return [HumanMessage(content=prompt)]
         except Exception as e:
-            print(f"카테고리 메시지 생성 중 오류: {e}")
+            logger.error(f"카테고리 메시지 생성 중 오류: {e}")
             import traceback
 
             traceback.print_exc()
@@ -402,13 +403,13 @@ def create_categorization_chain(is_compact=False):
 
             # JSON 파싱
             result = json.loads(json_str)
-            print(
+            logger.info(
                 f"카테고리 분류 결과: {json.dumps(result, ensure_ascii=False, indent=2)}"
             )
             return result
         except Exception as e:
-            print(f"JSON 파싱 오류: {e}")
-            print(f"원본 텍스트: {text}")
+            logger.error(f"JSON 파싱 오류: {e}")
+            logger.error(f"원본 텍스트: {text}")
             # 기본 구조 반환
             if is_compact:
                 return {
@@ -462,7 +463,7 @@ def create_summarization_chain(is_compact=False):
         articles_data = data["articles_data"]
         results = []
 
-        print(f"처리할 카테고리 수: {len(categories_data.get('categories', []))}")
+        logger.info(f"처리할 카테고리 수: {len(categories_data.get('categories', []))}")
 
         for category in categories_data.get("categories", []):
             # 해당 카테고리에 속한 기사들 추출
@@ -471,7 +472,7 @@ def create_summarization_chain(is_compact=False):
                 if 0 <= idx - 1 < len(articles_data.get("articles", [])):
                     category_articles.append(articles_data["articles"][idx - 1])
 
-            print(
+            logger.info(
                 f"카테고리 '{category.get('title', '제목 없음')}' - 관련 기사 수: {len(category_articles)}"
             )
 
@@ -599,7 +600,7 @@ def create_summarization_chain(is_compact=False):
                     results.append(summary_json)
 
             except Exception as e:
-                print(
+                logger.error(
                     f"카테고리 '{category.get('title', '제목 없음')}' 요약 파싱 오류: {e}"
                 )
                 # 오류 발생 시 기본 구조 제공
@@ -690,7 +691,9 @@ def create_composition_chain():
 
     def create_composition_prompt(data):
         current_date = datetime.date.today().strftime("%Y-%m-%d")
-        sections_data = json.dumps(data["sections"], ensure_ascii=False, indent=2)
+        sections_data = json.dumps(
+            data.get("sections", []), ensure_ascii=False, indent=2
+        )
 
         # JSON 데이터의 중괄호 이스케이프 처리
         sections_data = sections_data.replace("{", "{{").replace("}", "}}")
@@ -720,8 +723,8 @@ def create_composition_chain():
             # JSON 파싱
             return json.loads(json_str)
         except Exception as e:
-            print(f"종합 구성 JSON 파싱 오류: {e}")
-            print(f"원본 텍스트: {text}")
+            logger.error(f"종합 구성 JSON 파싱 오류: {e}")
+            logger.error(f"원본 텍스트: {text}")
             # 기본 구조 반환
             return {
                 "newsletter_topic": "최신 산업 동향",
@@ -796,7 +799,7 @@ def create_rendering_chain():
                         cb = get_tracking_callbacks()
                         register_recent_callbacks(cb)
                     except Exception as e:
-                        print(
+                        logger.warning(
                             f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
                         )
                 common_theme = tools.extract_common_theme_from_keywords(
@@ -818,7 +821,7 @@ def create_rendering_chain():
                         cb = get_tracking_callbacks()
                         register_recent_callbacks(cb)
                     except Exception as e:
-                        print(
+                        logger.warning(
                             f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
                         )
                 common_theme = tools.extract_common_theme_from_keywords(
@@ -884,27 +887,20 @@ def create_rendering_chain():
                 f"{combined_data.get('greeting_prefix', '안녕하십니까, ')} {combined_data.get('company_name')} {audience_desc}."
             )
 
+        # 템플릿 렌더링 직전 상위 3개 주요 기사 추출
+        if "top_articles" not in combined_data:
+            articles_for_top = (
+                data.get("ranked_articles") or data.get("processed_articles") or []
+            )
+            combined_data["top_articles"] = select_top_articles(
+                articles_for_top, top_n=3
+            )
+
         # Jinja2 템플릿 렌더링
         from jinja2 import Template
 
         template = Template(HTML_TEMPLATE)
         rendered_html = template.render(**combined_data)
-
-        # 디버깅용 - 렌더링에 사용된 데이터 저장
-        # try:
-        #     debug_dir = os.path.join("output", "intermediate_processing")
-        #     os.makedirs(debug_dir, exist_ok=True)
-        #     with open(
-        #         os.path.join(
-        #             debug_dir,
-        #             f"render_data_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-        #         ),
-        #         "w",
-        #         encoding="utf-8",
-        #     ) as f:
-        #         json.dump(combined_data, f, ensure_ascii=False, indent=2)
-        # except Exception as e:
-        #     print(f"디버그 데이터 저장 중 오류: {e}")
 
         return rendered_html, combined_data
 
@@ -927,7 +923,7 @@ def get_newsletter_chain(is_compact=False):
 
     # 데이터 흐름 관리 함수
     def manage_data_flow(data):
-        print(f"[DEBUG] manage_data_flow 호출됨. is_compact={is_compact}")
+        logger.debug(f"manage_data_flow 호출됨. is_compact={is_compact}")
         try:
             # 데이터 유효성 검증
             if "articles" not in data:
@@ -935,73 +931,66 @@ def get_newsletter_chain(is_compact=False):
 
             # 1. 분류 단계 실행
             if is_compact:
-                print("Compact 1단계: 뉴스 카테고리 분류 중...")
+                logger.step("뉴스 카테고리 분류", "categorization")
             else:
-                print("1단계: 뉴스 카테고리 분류 중...")
+                logger.step("뉴스 카테고리 분류", "categorization")
             categories_data = categorization_chain.invoke(data)
 
             # 2. 요약 단계 실행
             if is_compact:
-                print("Compact 2단계: 카테고리별 요약 생성 중...")
+                logger.step("카테고리별 요약 생성", "summarization")
             else:
-                print("2단계: 카테고리별 요약 생성 중...")
+                logger.step("카테고리별 요약 생성", "summarization")
             sections_data = summarization_chain.invoke(
                 {"categories_data": categories_data, "articles_data": data}
             )
 
             if is_compact:
-                # Compact 버전: 상위 3개 기사 선정 + 최종 데이터 구성
-                print("Compact 3단계: 상위 기사 선정 중...")
-                top_articles = []
-                for i, article in enumerate(data["articles"][:3]):
-                    top_article = {
-                        "title": article.get("title", ""),
-                        "url": article.get("url", "#"),
-                        "snippet": (
-                            article.get("snippet", "")[:200] + "..."
-                            if len(article.get("snippet", "")) > 200
-                            else article.get("snippet", "")
-                        ),
-                        "source_and_date": f"{article.get('source', 'Unknown')} · {article.get('date', 'Unknown date')}",
-                    }
-                    top_articles.append(top_article)
+                # Compact 버전: 상위 3개 기사 선정 중...")
 
-                # 생각해볼 거리 생성
-                keywords = data.get("keywords", [])
-                if isinstance(keywords, str):
-                    keywords = [keywords]
+                # compose.py의 extract_and_prepare_top_articles를 사용해 top_articles 추출
+                config = NewsletterConfig.get_config("compact")
 
-                food_for_thought = f"{', '.join(keywords[:2])} 분야의 급속한 발전은 우리에게 어떤 새로운 기회와 도전을 제시할까요?"
-
-                # compose.py의 함수들을 사용하여 올바른 데이터 구조 생성
-                sections = sections_data.get("sections", [])
-
-                print(f"[DEBUG] sections 개수: {len(sections)}")
-                for i, section in enumerate(sections):
-                    print(
-                        f"[DEBUG] Section {i}: title='{section.get('title', 'NO_TITLE')}', news_links={len(section.get('news_links', []))}, articles={len(section.get('articles', []))}"
+                # 원본 기사 데이터에서 직접 상위 3개 추출 (점수순 정렬 후)
+                articles = data.get("articles", [])
+                if articles:
+                    # 점수가 있으면 점수순으로 정렬, 없으면 그대로 사용
+                    sorted_articles = sorted(
+                        articles, key=lambda x: x.get("score", 0), reverse=True
                     )
-                    for j, link in enumerate(
-                        section.get("news_links", [])[:2]
-                    ):  # 처음 2개만 출력
-                        print(f"[DEBUG]   Link {j}: url='{link.get('url', 'NO_URL')}'")
-                    for j, article in enumerate(
-                        section.get("articles", [])[:2]
-                    ):  # 처음 2개만 출력
-                        print(
-                            f"[DEBUG]   Article {j}: url='{article.get('url', 'NO_URL')}'"
-                        )
+                    top_3_articles = sorted_articles[:3]
 
-                print(f"[DEBUG] top_articles 개수: {len(top_articles)}")
-                for i, article in enumerate(top_articles):
-                    print(
-                        f"[DEBUG] Top Article {i}: url='{article.get('url', 'NO_URL')}')"
-                    )
+                    # 템플릿용 포맷팅
+                    top_articles = []
+                    for article in top_3_articles:
+                        top_article = {
+                            "title": article.get("title", ""),
+                            "url": article.get("url", "#"),
+                            "snippet": (
+                                article.get("snippet", article.get("content", ""))[:200]
+                                + "..."
+                                if len(
+                                    article.get("snippet", article.get("content", ""))
+                                )
+                                > 200
+                                else article.get("snippet", article.get("content", ""))
+                            ),
+                            "source_and_date": f"{article.get('source', 'Unknown')} · {article.get('date', 'Unknown date')}",
+                        }
+                        top_articles.append(top_article)
+                else:
+                    top_articles = []
 
-                grouped_sections = prepare_grouped_sections_for_compact(
-                    sections, top_articles[:3]
+                grouped_sections = create_grouped_sections(
+                    sections_data,
+                    top_articles,
+                    max_groups=config["max_groups"],
+                    max_articles=config["max_articles"],
                 )
-                definitions = extract_key_definitions_for_compact(sections)
+
+                definitions = extract_key_definitions_for_compact(
+                    sections_data.get("sections", [])
+                )
 
                 # 템플릿 매니저로부터 메타데이터 가져오기
                 template_manager = TemplateManager()
@@ -1010,42 +999,39 @@ def get_newsletter_chain(is_compact=False):
                 keywords = data.get("keywords", [])
                 domain = data.get("domain", "")
 
-                # 뉴스레터 주제 결정
+                if isinstance(keywords, str):
+                    keywords = [kw.strip() for kw in keywords.split(",") if kw.strip()]
+
+                # 주제 결정
                 if domain:
                     newsletter_topic = domain
-                elif isinstance(keywords, list) and len(keywords) == 1:
+                elif len(keywords) == 1:
                     newsletter_topic = keywords[0]
-                elif isinstance(keywords, list) and len(keywords) > 1:
-                    newsletter_topic = tools.extract_common_theme_from_keywords(
-                        keywords
-                    )
-                elif isinstance(keywords, str):
-                    newsletter_topic = keywords
                 else:
-                    newsletter_topic = "최신 산업 동향"
+                    from .tools import extract_common_theme_from_keywords
 
-                # 최종 데이터 구성
+                    newsletter_topic = extract_common_theme_from_keywords(keywords)
+
+                # 현재 날짜 및 시간 정보
+                current_date = datetime.date.today().strftime("%Y년 %m월 %d일")
+                current_time = datetime.datetime.now().strftime("%H:%M")
+
+                # 최종 데이터 구조 생성
                 result_data = {
-                    "newsletter_topic": newsletter_topic,
-                    "domain": domain,  # 도메인 정보 추가
-                    "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
-                    "generation_date": os.environ.get(
-                        "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
-                    ),
-                    "generation_timestamp": os.environ.get(
-                        "GENERATION_TIMESTAMP",
-                        datetime.datetime.now().strftime("%H:%M:%S"),
-                    ),
-                    "top_articles": top_articles,
+                    "top_articles": top_articles[:3],
                     "grouped_sections": grouped_sections,
                     "definitions": definitions,
-                    "food_for_thought": food_for_thought,
-                    # 템플릿 매니저에서 가져온 정보
+                    "newsletter_topic": newsletter_topic,
+                    "generation_date": current_date,
+                    "generation_time": current_time,
                     "company_name": template_manager.get(
-                        "company.name", "산업통상자원 R&D 전략기획단"
+                        "company.name", "Your Newsletter Co."
                     ),
-                    "publisher_name": template_manager.get(
-                        "company.name", "산업통상자원 R&D 전략기획단"
+                    "company_logo_url": template_manager.get(
+                        "company.logo_url", "/static/logo.png"
+                    ),
+                    "company_website": template_manager.get(
+                        "company.website", "https://example.com"
                     ),
                     "copyright_year": template_manager.get(
                         "company.copyright_year", datetime.date.today().strftime("%Y")
@@ -1067,142 +1053,90 @@ def get_newsletter_chain(is_compact=False):
                     ),
                 }
 
-                print(f"[DEBUG] Compact 최종 데이터 구조:")
-                print(f"  - top_articles: {len(result_data['top_articles'])}개")
-                print(f"  - grouped_sections: {len(result_data['grouped_sections'])}개")
-                print(f"  - definitions: {len(result_data['definitions'])}개")
-                print(f"  - grouped_sections 내용: {result_data['grouped_sections']}")
-                print(f"  - definitions 내용: {result_data['definitions']}")
+                logger.debug(f"Compact 최종 데이터 구조:")
+                logger.debug(f"  - top_articles: {len(result_data['top_articles'])}개")
+                logger.debug(
+                    f"  - grouped_sections: {len(result_data['grouped_sections'])}개"
+                )
+                logger.debug(f"  - definitions: {len(result_data['definitions'])}개")
 
                 # Compact 모드에서도 템플릿 렌더링 수행
-                print("Compact 4단계: HTML 템플릿 렌더링 중...")
-                newsletter_html = compose_newsletter(
-                    result_data,
-                    os.path.join(
-                        os.path.dirname(os.path.dirname(__file__)), "templates"
-                    ),
-                    "compact",
+                logger.step("HTML 템플릿 렌더링", "rendering")
+
+                # 템플릿 렌더링
+                logger.info(
+                    "Composing compact newsletter for topic: {}...".format(
+                        newsletter_topic
+                    )
+                )
+                template_dir = os.path.join(
+                    os.path.dirname(__file__), "..", "templates"
+                )
+                html_content = compose_compact_newsletter_html(
+                    result_data, template_dir
                 )
 
-                print("Compact 뉴스레터 생성 완료!")
-                return newsletter_html  # HTML 문자열 반환
+                logger.success("Compact 뉴스레터 생성 완료!")
+
+                return html_content
 
             else:
-                # Detailed 버전: 통합 아키텍처 사용
-                print("3단계: Detailed 뉴스레터 데이터 구성 중...")
+                # Detailed 모드 처리
+                # 3. 종합 구성 단계 실행
+                logger.step("종합 구성", "composition")
+                composition_data = composition_chain.invoke(
+                    {"sections_data": sections_data, "articles_data": data}
+                )
 
-                # 템플릿 매니저로부터 메타데이터 가져오기
-                template_manager = TemplateManager()
+                # 4. 렌더링 단계 실행
+                logger.step("HTML 템플릿 렌더링", "rendering")
 
-                # 키워드 및 주제 처리
-                keywords = data.get("keywords", [])
-                domain = data.get("domain", "")
+                # 템플릿 렌더링 직전 상위 3개 주요 기사 추출
+                config = NewsletterConfig.get_config("detailed")
 
-                # 뉴스레터 주제 결정
-                if domain:
-                    newsletter_topic = domain
-                elif isinstance(keywords, list) and len(keywords) == 1:
-                    newsletter_topic = keywords[0]
-                elif isinstance(keywords, list) and len(keywords) > 1:
-                    newsletter_topic = tools.extract_common_theme_from_keywords(
-                        keywords
-                    )
-                elif isinstance(keywords, str):
-                    newsletter_topic = keywords
-                else:
-                    newsletter_topic = "최신 산업 동향"
+                # composition_data와 sections_data 병합
+                combined_data = {**composition_data, **sections_data}
 
-                # 검색 키워드 문자열 생성
-                if isinstance(keywords, list):
-                    search_keywords = ", ".join(keywords)
-                else:
-                    search_keywords = keywords
+                # 상위 기사 추출
+                top_articles = extract_and_prepare_top_articles(
+                    combined_data, config["top_articles_count"]
+                )
 
-                # Detailed 뉴스레터 데이터 구성
-                detailed_data = {
-                    "newsletter_topic": newsletter_topic,
-                    "domain": domain,  # 도메인 정보 추가
-                    "generation_date": os.environ.get(
-                        "GENERATION_DATE", datetime.datetime.now().strftime("%Y-%m-%d")
-                    ),
-                    "generation_timestamp": os.environ.get(
-                        "GENERATION_TIMESTAMP",
-                        datetime.datetime.now().strftime("%H:%M:%S"),
-                    ),
-                    "search_keywords": search_keywords,
-                    "sections": sections_data.get("sections", []),
-                    # 템플릿 매니저에서 가져온 정보
-                    "company_name": template_manager.get(
-                        "company.name", "산업통상자원 R&D 전략기획단"
-                    ),
-                    "recipient_greeting": template_manager.get(
-                        "audience.description", "R&D 전략기획단 전문위원님들께"
-                    ),
-                    "introduction_message": f"안녕하십니까. 금주 '{newsletter_topic}' 관련 주요 산업 동향을 정리해 드립니다.",
-                    "food_for_thought": {
-                        "message": f"이번 주 {newsletter_topic} 분야의 뉴스를 종합해보면, 기술 혁신의 속도가 빨라지고 있으며 글로벌 경쟁이 더욱 치열해지고 있습니다. 특히 AI와의 융합, 공급망 재편, 새로운 규제 환경 등이 산업 전반에 큰 영향을 미치고 있습니다. 우리 R&D 전략기획단은 이러한 변화의 흐름 속에서 어떤 기술 분야에 우선순위를 두고 투자해야 할까요? 또한 국제 협력과 자체 기술 개발 사이에서 어떤 균형점을 찾아야 할까요? 이번 주 뉴스가 제시하는 시사점을 바탕으로 중장기 R&D 로드맵을 재검토해 보시기 바랍니다."
-                    },
-                    "closing_message": "이번 주 뉴스 클리핑이 위원님들의 연구 개발 활동과 전략 구상에 도움이 되었기를 바랍니다. 다음 주에도 더욱 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
-                    "editor_signature": template_manager.get(
-                        "editor.signature", "OSP 뉴스레터 편집팀 드림"
-                    ),
-                    # 추가 템플릿 설정
-                    "copyright_year": template_manager.get(
-                        "company.copyright_year", datetime.date.today().strftime("%Y")
-                    ),
-                    "company_tagline": template_manager.get(
-                        "company.tagline", "최신 기술 동향을 한눈에"
-                    ),
-                    "footer_contact": template_manager.get(
-                        "footer.contact_info", "문의사항: hjjung2@osp.re.kr"
-                    ),
-                    "editor_name": template_manager.get("editor.name", "Google Gemini"),
-                    "editor_email": template_manager.get(
-                        "editor.email", "hjjung2@osp.re.kr"
-                    ),
-                    "footer_disclaimer": template_manager.get(
-                        "footer.disclaimer",
-                        "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
-                    ),
-                }
+                # 그룹 섹션 생성
+                grouped_sections = create_grouped_sections(
+                    combined_data,
+                    top_articles,
+                    max_groups=config["max_groups"],
+                    max_articles=config["max_articles"],
+                )
 
-                # render_data.json 파일 저장
-                try:
-                    output_dir = os.path.join("output", "intermediate_processing")
-                    os.makedirs(output_dir, exist_ok=True)
-                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                # 최종 데이터에 top_articles와 grouped_sections 추가
+                combined_data["top_articles"] = top_articles
+                combined_data["grouped_sections"] = grouped_sections
 
-                    # 파일명에 사용할 안전한 주제 문자열 생성
-                    topic_slug = tools.get_filename_safe_theme(
-                        keywords if isinstance(keywords, list) else [keywords], domain
-                    )
+                # definitions와 food_for_thought 추출
+                combined_data["definitions"] = extract_definitions(
+                    combined_data, grouped_sections, config
+                )
+                combined_data["food_for_thought"] = extract_food_for_thought(
+                    combined_data
+                )
 
-                    render_data_filename = (
-                        f"render_data_langgraph_{timestamp}_{topic_slug}.json"
-                    )
-                    render_data_path = os.path.join(output_dir, render_data_filename)
-
-                    with open(render_data_path, "w", encoding="utf-8") as f:
-                        json.dump(detailed_data, f, ensure_ascii=False, indent=2)
-                    print(f"Render data saved to {render_data_path}")
-                except Exception as e:
-                    print(f"Render data 저장 중 오류: {e}")
-
-                # 4단계: compose_newsletter 함수로 HTML 렌더링
-                print("4단계: HTML 템플릿 렌더링 중...")
+                # compose_newsletter 호출
                 template_dir = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)), "templates"
+                    os.path.dirname(__file__), "..", "templates"
                 )
-
-                newsletter_html = compose_newsletter(
-                    detailed_data, template_dir, "detailed"  # detailed 템플릿 사용
+                html_content = compose_newsletter(
+                    combined_data, template_dir, style="detailed"
                 )
-
-                print("Detailed 뉴스레터 생성 완료!")
-                return newsletter_html  # HTML 문자열 반환
+                logger.success("Detailed 뉴스레터 생성 완료!")
+                return html_content
 
         except Exception as e:
-            print(f"뉴스레터 생성 중 오류 발생: {e}")
+            logger.error(f"데이터 흐름 처리 중 오류 발생: {e}")
+            import traceback
+
+            traceback.print_exc()
             raise
 
     # 최종 체인 반환

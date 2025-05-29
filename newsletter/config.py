@@ -1,9 +1,28 @@
 import os
-
 import yaml
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()  # Load environment variables from .env file
+# 환경 변수 로드
+load_dotenv()
+
+# 로깅 시스템 import (config 로드 후)
+try:
+    from .utils.logger import get_logger
+
+    logger = get_logger()
+except ImportError:
+    # config.py가 먼저 로드되는 경우를 위한 fallback
+    logger = None
+
+
+def log_message(level, message):
+    """로거가 없는 경우를 위한 fallback 함수"""
+    if logger:
+        getattr(logger, level)(message)
+    else:
+        print(f"[{level.upper()}] {message}")
+
 
 # 기존 API 키 설정
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
@@ -38,10 +57,15 @@ def load_llm_config():
             config_data = yaml.safe_load(f)
             return config_data.get("llm_settings", {})
     except FileNotFoundError:
-        print("Warning: config.yml not found. Using default LLM settings.")
+        log_message(
+            "warning", "Warning: config.yml not found. Using default LLM settings."
+        )
         return get_default_llm_config()
     except Exception as e:
-        print(f"Warning: Error loading config.yml: {e}. Using default LLM settings.")
+        log_message(
+            "warning",
+            f"Warning: Error loading config.yml: {e}. Using default LLM settings.",
+        )
         return get_default_llm_config()
 
 
@@ -124,36 +148,42 @@ LLM_CONFIG = load_llm_config()
 # 경고 메시지 출력
 # 필수 API 키
 if not SERPER_API_KEY:
-    print("Warning: SERPER_API_KEY not found in .env file.")
+    log_message("warning", "Warning: SERPER_API_KEY not found in .env file.")
 if not GEMINI_API_KEY:
-    print(
-        "Warning: GEMINI_API_KEY not found in .env file. Gemini-based features may not work."
+    log_message(
+        "warning",
+        "Warning: GEMINI_API_KEY not found in .env file. Gemini-based features may not work.",
     )
 
 # 새로 추가된 LLM API 키 경고
 if not OPENAI_API_KEY:
-    print(
-        "Note: OPENAI_API_KEY not found in .env file. OpenAI/ChatGPT features will be disabled."
+    log_message(
+        "info",
+        "Note: OPENAI_API_KEY not found in .env file. OpenAI/ChatGPT features will be disabled.",
     )
 if not ANTHROPIC_API_KEY:
-    print(
-        "Note: ANTHROPIC_API_KEY not found in .env file. Anthropic/Claude features will be disabled."
+    log_message(
+        "info",
+        "Note: ANTHROPIC_API_KEY not found in .env file. Anthropic/Claude features will be disabled.",
     )
 
 # 선택적 API 키
 if not GOOGLE_APPLICATION_CREDENTIALS:
-    print(
-        "Warning: GOOGLE_APPLICATION_CREDENTIALS not found in .env file. Google Drive upload will not work."
+    log_message(
+        "warning",
+        "Warning: GOOGLE_APPLICATION_CREDENTIALS not found in .env file. Google Drive upload will not work.",
     )
 
 # Postmark 설정 경고
 if not POSTMARK_SERVER_TOKEN:
-    print(
-        "Warning: POSTMARK_SERVER_TOKEN not found in .env file. Email sending will not work."
+    log_message(
+        "warning",
+        "Warning: POSTMARK_SERVER_TOKEN not found in .env file. Email sending will not work.",
     )
 
 # 새로 추가된 API 키에 대한 경고 (선택적)
 if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
-    print(
-        "Note: Naver News API credentials not found. Naver News API source will be disabled."
+    log_message(
+        "info",
+        "Note: Naver News API credentials not found. Naver News API source will be disabled.",
     )

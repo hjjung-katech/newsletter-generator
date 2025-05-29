@@ -24,7 +24,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from rich.console import Console
 
 from . import config
+from .utils.logger import get_logger
 
+# 로거 초기화
+logger = get_logger()
 console = Console()
 
 
@@ -49,9 +52,9 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     all_collected_articles = []
     keyword_article_counts = {}
 
-    print("\nStarting article collection process:")
+    logger.info("\nStarting article collection process:")
     for keyword in individual_keywords:
-        print(f"Searching articles for keyword: '{keyword}'")
+        logger.info(f"Searching articles for keyword: '{keyword}'")
         # 뉴스 전용 엔드포인트 사용으로 변경
         url = "https://google.serper.dev/news"
 
@@ -77,29 +80,29 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
 
             # 1. 'news' 키 확인 (뉴스 엔드포인트의 주요 응답 형식)
             if "news" in results:
-                print(f"Found 'news' results for keyword '{keyword}'")
+                logger.info(f"Found 'news' results for keyword '{keyword}'")
                 containers.extend(results["news"])
 
             # 2. 'topStories' 키도 확인 (일부 응답에 존재할 수 있음)
             if "topStories" in results:
-                print(f"Found 'topStories' results for keyword '{keyword}'")
+                logger.info(f"Found 'topStories' results for keyword '{keyword}'")
                 containers.extend(results["topStories"])
 
             # 3. 'organic' 키 확인 (fallback - 일반 검색 결과)
             if "organic" in results and not containers:
-                print(f"Found 'organic' results for keyword '{keyword}'")
+                logger.info(f"Found 'organic' results for keyword '{keyword}'")
                 containers.extend(results["organic"])
 
             # 결과 로깅
-            print(f"Total container items found: {len(containers)}")
+            logger.info(f"Total container items found: {len(containers)}")
 
             # 디버깅: 응답 구조 확인
             if not containers and results:
-                print(
+                logger.warning(
                     f"Warning: No result containers found. Available keys: {list(results.keys())}"
                 )
                 if len(results.keys()) <= 3:  # 키가 적으면 전체 구조 확인
-                    print(
+                    logger.warning(
                         f"Response structure: {json.dumps(results, ensure_ascii=False)[:300]}..."
                     )
 
@@ -109,10 +112,12 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
             ):
                 # 디버깅 정보 (첫 3개 항목만)
                 if item_idx < 3:
-                    print(f"Debug: Item keys (index: {item_idx}): {list(item.keys())}")
+                    logger.debug(
+                        f"Debug: Item keys (index: {item_idx}): {list(item.keys())}"
+                    )
                     raw_date_val = item.get("date")
                     raw_published_at_val = item.get("publishedAt")
-                    print(
+                    logger.debug(
                         f"Debug: Date value: '{raw_date_val}' / PublishedAt: '{raw_published_at_val}'"
                     )
                 # 공통 형식으로 변환
@@ -128,28 +133,28 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
                 articles_for_keyword.append(article)
 
             if not articles_for_keyword:
-                print(f"No articles could be parsed for keyword '{keyword}'.")
+                logger.warning(f"No articles could be parsed for keyword '{keyword}'.")
 
             num_found = len(articles_for_keyword)
             keyword_article_counts[keyword] = num_found
-            print(f"Found {num_found} articles for keyword: '{keyword}'")
+            logger.info(f"Found {num_found} articles for keyword: '{keyword}'")
             all_collected_articles.extend(articles_for_keyword)
 
         except requests.exceptions.RequestException as e:
-            print(
+            logger.error(
                 f"Error fetching articles for keyword '{keyword}' from Serper.dev: {e}"
             )
             # Continue to next keyword if one fails
         except json.JSONDecodeError:
-            print(
+            logger.error(
                 f"Error decoding JSON response for keyword '{keyword}' from Serper.dev. Response: {response.text}"
             )
             # Continue to next keyword
 
-    print("\nSummary of articles collected per keyword:")
+    logger.info("\nSummary of articles collected per keyword:")
     for kw, count in keyword_article_counts.items():
-        print(f"- '{kw}': {count} articles")
-    print(f"Total articles collected: {len(all_collected_articles)}\n")
+        logger.info(f"- '{kw}': {count} articles")
+    logger.info(f"Total articles collected: {len(all_collected_articles)}\n")
 
     return all_collected_articles
 
@@ -366,13 +371,11 @@ def generate_keywords_with_gemini(
                 "keyword_generation", callbacks, enable_fallback=True
             )
         except Exception as e:
-            console.print(
-                f"[yellow]Warning: LLM factory failed, using fallback: {e}[/yellow]"
-            )
+            logger.warning(f"LLM factory failed, using fallback: {e}")
             # Fallback to stable Gemini model
             if not config.GEMINI_API_KEY:
-                console.print(
-                    "[bold red]Error: GEMINI_API_KEY is not configured. Cannot generate keywords.[/bold red]"
+                logger.error(
+                    "GEMINI_API_KEY is not configured. Cannot generate keywords."
                 )
                 return []
 
@@ -412,13 +415,11 @@ def generate_keywords_with_gemini(
 
         chain = prompt_template | llm | StrOutputParser()
 
-        console.print(
-            f"\n[cyan]Generating keywords for '{domain}' using Google Gemini...[/cyan]"
-        )
+        logger.info(f"Generating keywords for '{domain}' using Google Gemini...")
 
         # 실행 및 응답 처리
         response_content = chain.invoke({"domain": domain, "count": count})
-        console.print(f"\n[cyan]Raw response from Gemini:[/cyan]\n{response_content}")
+        logger.debug(f"Raw response from Gemini:\n{response_content}")
 
         # 응답 처리
         keywords = []
@@ -449,16 +450,14 @@ def generate_keywords_with_gemini(
             final_keywords, min_results_per_keyword=3, count=count
         )
 
-        console.print(f"\n[cyan]최종 키워드 ({len(final_keywords)}):[/cyan]")
+        logger.info(f"최종 키워드 ({len(final_keywords)}):")
         for i, kw in enumerate(final_keywords, 1):
-            console.print(f"  {i}. [green]{kw}[/green]")
+            logger.info(f"  {i}. {kw}")
 
         return final_keywords
 
     except Exception as e:
-        console.print(
-            f"[bold red]Error generating keywords with Gemini: {e}[/bold red]"
-        )
+        logger.error(f"Error generating keywords with Gemini: {e}")
         return []
 
 
@@ -470,9 +469,7 @@ def validate_and_refine_keywords(
     validated_keywords = []
     replacement_needed = []
 
-    console.print(
-        f"\n[cyan]검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...[/cyan]"
-    )
+    logger.info(f"\n검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...")
 
     for keyword in keywords:
         try:
@@ -483,22 +480,22 @@ def validate_and_refine_keywords(
 
             if len(test_results) >= min_results_per_keyword:
                 validated_keywords.append(keyword)
-                console.print(
+                logger.info(
                     f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]"
                 )
             else:
                 replacement_needed.append(keyword)
-                console.print(
+                logger.info(
                     f"[yellow]✗ '{keyword}': 결과 부족 ({len(test_results)}개)[/yellow]"
                 )
 
         except Exception as e:
-            console.print(f"[red]! '{keyword}' 검증 중 오류: {e}[/red]")
+            logger.info(f"[red]! '{keyword}' 검증 중 오류: {e}[/red]")
             replacement_needed.append(keyword)
 
     # 대체 키워드 생성이 필요한 경우
     if replacement_needed and validated_keywords:
-        console.print(
+        logger.info(
             f"[yellow]{len(replacement_needed)}개 키워드에 대한 대체 키워드 생성 중...[/yellow]"
         )
 

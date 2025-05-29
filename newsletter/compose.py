@@ -175,15 +175,20 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
 def extract_and_prepare_top_articles(
     data: Dict[str, Any], count: int = 3
 ) -> List[Dict[str, Any]]:
-    """상위 기사들을 추출하고 템플릿용으로 준비"""
-
+    """
+    상위 기사(top_articles)를 sections/grouped_sections와 분리하여 추출 및 템플릿용으로 준비합니다.
+    - data["top_articles"]가 있으면 우선 사용
+    - 없으면 data["sections"]에서 추출
+    - 항상 top_articles는 grouped_sections와 별도 관리
+    """
     # 기존 top_articles가 있으면 사용
-    if "top_articles" in data:
+    if "top_articles" in data and data["top_articles"]:
         top_articles = data["top_articles"][:count]
     elif "sections" in data:
         # sections에서 첫 번째 기사들 추출
         top_articles = extract_top_articles_from_sections(data["sections"])[:count]
     else:
+        # sections도 없고 top_articles도 없는 경우 빈 리스트 반환
         top_articles = []
 
     # 템플릿용 포맷팅
@@ -215,8 +220,11 @@ def create_grouped_sections(
     max_groups: int = 6,
     max_articles: int = None,
 ) -> List[Dict[str, Any]]:
-    """그룹화된 섹션들을 생성"""
-
+    """
+    grouped_sections(주제별 기사 그룹)은 top_articles와 분리하여 생성합니다.
+    - top_articles에 포함된 기사 URL은 제외
+    - 항상 top_articles와 별도 관리
+    """
     # 기존 grouped_sections가 있으면 사용
     if "grouped_sections" in data:
         return data["grouped_sections"][:max_groups]
@@ -261,17 +269,11 @@ def create_grouped_sections(
             # intro 생성 - compact 모드에서는 간결하게
             intro = ""
             if is_compact:
-                # compact 모드: 1-2문장으로 간결하게
-                summary_paragraphs = section.get("summary_paragraphs", [])
-                if summary_paragraphs:
-                    first_paragraph = summary_paragraphs[0]
-                    # 첫 번째 문장만 추출
-                    sentences = first_paragraph.split(". ")
-                    if sentences:
-                        intro = sentences[0] + "."
-                        # 너무 길면 자르기
-                        if len(intro) > 100:
-                            intro = intro[:97] + "..."
+                # compact 모드: section.intro를 직접 사용 (요약 체인에서 이미 생성됨)
+                intro = section.get("intro", "")
+                # intro가 없으면 기본 메시지 생성
+                if not intro:
+                    intro = f"{section.get('title', '기타')}에 대한 주요 동향입니다."
             else:
                 # detailed 모드: 기존 방식 유지
                 intro = (
