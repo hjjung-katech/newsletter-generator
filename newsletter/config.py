@@ -187,3 +187,65 @@ if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
         "info",
         "Note: Naver News API credentials not found. Naver News API source will be disabled.",
     )
+
+# 주요 언론사 티어 설정 (중앙 집중식 관리)
+MAJOR_NEWS_SOURCES = {
+    # 티어 1: 최우선 포함 주요 언론사 (신뢰도 가중치: 1.0)
+    "tier1": [
+        # 국내 주요 일간지
+        "조선일보",
+        "중앙일보",
+        "동아일보",
+        "한국일보",
+        "한겨레",
+        "경향신문",
+        # 국내 주요 경제지
+        "매일경제",
+        "한국경제",
+        "서울경제",
+        "파이낸셜뉴스",
+        # 국내 주요 방송/통신사
+        "연합뉴스",
+        "YTN",
+        "KBS",
+        "MBC",
+        "SBS",
+        "JTBC",
+        # 해외 주요 언론사
+        "Bloomberg",
+        "Reuters",
+        "Wall Street Journal",
+        "Financial Times",
+        "The Economist",
+    ],
+    # 티어 2: 보조 언론사 (신뢰도 가중치: 0.6)
+    "tier2": [
+        # 국내 주요 통신사
+        "뉴시스",
+        "뉴스1",
+        # 국내 경제/산업 전문지
+        "아시아경제",
+        "아주경제",
+        "이데일리",
+        "머니투데이",
+        "비즈니스워치",
+        # 국내 IT/기술 전문지
+        "디지털타임스",
+        "전자신문",
+        "IT조선",
+        "ZDNet Korea",
+        "디지털데일리",
+        "테크M",
+        "블로터",
+        # 국내 기타 방송사
+        "채널A",
+        "MBN",
+        "TV조선",
+        # 해외 기술 전문지
+        "TechCrunch",
+        "Wired",
+    ],
+}
+
+# 호환성을 위한 flat한 주요 언론사 목록 (tier1 + tier2)
+ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2"]

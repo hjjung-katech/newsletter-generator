@@ -11,17 +11,17 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from .article_filter import MAJOR_NEWS_SOURCES
+from . import config
 from .chains import get_llm
 from .date_utils import parse_date_string
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {
-    "relevance": 0.40,
+    "relevance": 0.35,
     "impact": 0.25,
     "novelty": 0.15,
-    "source_tier": 0.10,
-    "recency": 0.10,
+    "source_tier": 0.20,
+    "recency": 0.05,
 }
 
 
@@ -83,11 +83,21 @@ Summary: {summary}
 
 
 def _get_source_tier(source: str) -> float:
-    if any(s.lower() in source.lower() for s in MAJOR_NEWS_SOURCES["tier1"]):
+    """Get source tier score and tier name for display."""
+    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier1"]):
         return 1.0
-    if any(s.lower() in source.lower() for s in MAJOR_NEWS_SOURCES["tier2"]):
-        return 0.8
-    return 0.6
+    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier2"]):
+        return 0.6  # 0.8 → 0.6으로 차이 확대
+    return 0.3  # 0.6 → 0.3으로 차이 확대
+
+
+def _get_source_tier_info(source: str) -> tuple[float, str]:
+    """Get source tier score and tier name for display."""
+    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier1"]):
+        return 1.0, "Tier 1 (주요 언론사)"
+    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier2"]):
+        return 0.6, "Tier 2 (보조 언론사)"
+    return 0.3, "Tier 3 (기타 소스)"
 
 
 def _get_recency(date_str: Any) -> float:
@@ -156,14 +166,21 @@ def calculate_priority_score(
     relevance = scores.get("relevance", 1) / 5
     impact = scores.get("impact", 1) / 5
     novelty = scores.get("novelty", 1) / 5
-    source_tier = _get_source_tier(article.get("source", ""))
+
+    # Source tier 정보 저장
+    source_tier_score, source_tier_name = _get_source_tier_info(
+        article.get("source", "")
+    )
+    article["source_tier_score"] = source_tier_score
+    article["source_tier_name"] = source_tier_name
+
     recency = _get_recency(article.get("date"))
 
     priority = (
         weights["relevance"] * relevance
         + weights["impact"] * impact
         + weights["novelty"] * novelty
-        + weights["source_tier"] * source_tier
+        + weights["source_tier"] * source_tier_score
         + weights["recency"] * recency
     ) * 100
 
@@ -201,6 +218,28 @@ def score_articles(
         scored_list.append(article)
 
     scored_list.sort(key=lambda a: a["priority_score"], reverse=True)
+
+    # Tier별 통계 출력
+    from .utils.logger import get_logger
+
+    logger = get_logger()
+
+    tier_stats = {}
+    for article in scored_list:
+        tier_name = article.get("source_tier_name", "Unknown")
+        if tier_name not in tier_stats:
+            tier_stats[tier_name] = {"count": 0, "scores": []}
+        tier_stats[tier_name]["count"] += 1
+        tier_stats[tier_name]["scores"].append(article["priority_score"])
+
+    logger.info("📊 Source Tier 분포 및 점수 통계:")
+    for tier_name, stats in tier_stats.items():
+        avg_score = (
+            sum(stats["scores"]) / len(stats["scores"]) if stats["scores"] else 0
+        )
+        logger.info(
+            f"  • {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}"
+        )
 
     if top_n is None:
         return scored_list
