@@ -16,24 +16,24 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from newsletter.article_filter import select_top_articles
 from newsletter.sources import NewsSourceManager
 
 from . import tools  # 추가: tools 모듈 가져오기
 from . import config
 from .compose import (
+    NewsletterConfig,
     compose_compact_newsletter_html,
     compose_newsletter,
-    extract_key_definitions_for_compact,
-    prepare_grouped_sections_for_compact,
-    extract_and_prepare_top_articles,
     create_grouped_sections,
-    NewsletterConfig,
+    extract_and_prepare_top_articles,
     extract_definitions,
     extract_food_for_thought,
+    extract_key_definitions_for_compact,
+    prepare_grouped_sections_for_compact,
 )
 from .template_manager import TemplateManager
 from .utils.logger import get_logger
-from newsletter.article_filter import select_top_articles
 
 # 로거 초기화
 logger = get_logger()
