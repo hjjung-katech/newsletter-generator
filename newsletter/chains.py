@@ -6,31 +6,20 @@ Newsletter Generator - LangChain Chains
 import datetime
 import json
 import os
-from typing import Any, Dict, List
 
-from jinja2 import Environment, FileSystemLoader, Template
-from langchain.chains import LLMChain, SequentialChain
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_core.prompts import PromptTemplate
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_core.messages import HumanMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableLambda
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from newsletter.article_filter import select_top_articles
-from newsletter.sources import NewsSourceManager
 
-from . import tools  # 추가: tools 모듈 가져오기
 from . import config
 from .compose import (
     NewsletterConfig,
     compose_compact_newsletter_html,
-    compose_newsletter,
     create_grouped_sections,
-    extract_and_prepare_top_articles,
-    extract_definitions,
-    extract_food_for_thought,
     extract_key_definitions_for_compact,
-    prepare_grouped_sections_for_compact,
 )
 from .template_manager import TemplateManager
 from .utils.logger import get_logger
@@ -72,7 +61,8 @@ except Exception as e:
 CATEGORIZATION_PROMPT = """
 당신은 뉴스들을 분석하고 분류하는 전문 편집자입니다.
 
-독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다.
+이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 다음 키워드에 관련된 뉴스 기사들을 분석하여, 의미있는 카테고리로 분류해주세요:
 {keywords}
@@ -80,7 +70,9 @@ CATEGORIZATION_PROMPT = """
 뉴스 기사 목록:
 {formatted_articles}
 
-뉴스 기사들을 분석하여 내용에 따라 여러 카테고리로 분류하세요. 예를 들어, "전기차 시장 동향", "하이브리드차 동향", "배터리 기술 발전" 등처럼 의미 있는 카테고리로 나누어야 합니다. 각 카테고리는 적절한 제목을 가져야 합니다.
+뉴스 기사들을 분석하여 내용에 따라 여러 카테고리로 분류하세요.
+예를 들어, "전기차 시장 동향", "하이브리드차 동향", "배터리 기술 발전" 등처럼
+의미 있는 카테고리로 나누어야 합니다. 각 카테고리는 적절한 제목을 가져야 합니다.
 
 출력 형식은 다음과 같은 JSON 형식으로 작성해주세요:
 {{
@@ -96,32 +88,40 @@ CATEGORIZATION_PROMPT = """
   ]
 }}
 
-하나의 기사는 여러 카테고리에 포함될 수 있지만, 모든 기사가 최소 하나의 카테고리에는 포함되어야 합니다.
-각 카테고리 제목은, 독자가 어떤 내용인지 한눈에 알 수 있도록 명확하고 구체적으로 작성해주세요.
+하나의 기사는 여러 카테고리에 포함될 수 있지만,
+모든 기사가 최소 하나의 카테고리에는 포함되어야 합니다.
+각 카테고리 제목은, 독자가 어떤 내용인지 한눈에 알 수 있도록
+명확하고 구체적으로 작성해주세요.
 """
 
 # 요약 시스템 프롬프트
 SUMMARIZATION_PROMPT = """
-당신은 뉴스들을 분석하고 요약하여 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
+당신은 뉴스들을 분석하고 요약하여 "주간 산업 동향 뉴스 클리핑"을
+작성하는 전문 편집자입니다.
 
-독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다.
+이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 다음은 "{category_title}" 카테고리에 해당하는 뉴스 기사들입니다:
 {category_articles}
 
 위 기사들을 종합적으로 분석하여 다음 정보를 포함한 요약을 JSON 형식으로 만들어주세요:
 
-1. summary_paragraphs: 해당 카테고리의 주요 내용을 1개의 단락으로 요약 (각 단락은 배열의 항목)
+1. summary_paragraphs: 해당 카테고리의 주요 내용을 1개의 단락으로 요약
+   (각 단락은 배열의 항목)
    - 요약문은 객관적이고 분석적이며, 전체 기사들의 맥락을 포괄해야 합니다.
    - 정중한 존댓말을 사용합니다.
 
 2. definitions: 해당 카테고리에서 등장하는 중요 용어나 개념 설명 (0-2개)
    - 신입직원이 이해하기 어려울 수 있는 전문 용어나 개념 중 가장 핵심적인 것만 선정
-   - 다른 카테고리에서 이미 설명된 용어는 피하고, 해당 카테고리 특유의 용어를 우선 선정
-   - 꼭 필요한 경우가 아니면 1-2개로 제한하며, 명확한 용어가 없다면 0개도 가능
+   - 다른 카테고리에서 이미 설명된 용어는 피하고,
+     해당 카테고리 특유의 용어를 우선 선정
+   - 꼭 필요한 경우가 아니면 1-2개로 제한하며,
+     명확한 용어가 없다면 0개도 가능
 
 3. news_links: 원본 기사 링크 정보
-   - 각 카테고리별로 관련 뉴스 기사들의 원문 링크를 제목, 출처, 시간 정보와 함께 제공합니다.
+   - 각 카테고리별로 관련 뉴스 기사들의 원문 링크를
+     제목, 출처, 시간 정보와 함께 제공합니다.
 
 출력 형식:
 ```json
@@ -140,11 +140,14 @@ SUMMARIZATION_PROMPT = """
 
 # 종합 구성 프롬프트
 COMPOSITION_PROMPT = """
-당신은 뉴스들을 분석하고 요약하여, HTML 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
+당신은 뉴스들을 분석하고 요약하여, HTML 형식으로 "주간 산업 동향 뉴스 클리핑"을
+작성하는 전문 편집자입니다.
 
-독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다.
+이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
-이미 각 카테고리별로 상세 요약이 완료되었습니다. 이제 뉴스레터의 전체 구성을 완성해야 합니다.
+이미 각 카테고리별로 상세 요약이 완료되었습니다.
+이제 뉴스레터의 전체 구성을 완성해야 합니다.
 
 주제 키워드: {keywords}
 카테고리 요약:
@@ -152,10 +155,12 @@ COMPOSITION_PROMPT = """
 
 **중요 지시사항:**
 - 위에 제공된 실제 키워드와 카테고리 요약 내용을 바탕으로 구체적인 내용을 생성하세요
-- "[카테고리 요약]", "(각 카테고리별 핵심 내용)" 같은 placeholder 텍스트는 절대 사용하지 마세요
+- "[카테고리 요약]", "(각 카테고리별 핵심 내용)" 같은 placeholder 텍스트는
+  절대 사용하지 마세요
 - newsletter_topic은 실제 키워드를 기반으로 구체적인 주제명을 설정하세요
 - introduction_message는 실제 카테고리들의 내용을 반영한 구체적인 소개문을 작성하세요
-- food_for_thought의 message도 실제 뉴스 내용을 바탕으로 구체적인 질문이나 제안을 작성하세요
+- food_for_thought의 message도 실제 뉴스 내용을 바탕으로
+  구체적인 질문이나 제안을 작성하세요
 
 다음 정보를 포함한 뉴스레터 구성 정보를 JSON 형식으로 반환해주세요:
 
@@ -179,22 +184,29 @@ COMPOSITION_PROMPT = """
 참고:
 - generation_date는 {current_date} 형식으로 유지해주세요.
 - 모든 항목은 한국어로 작성하며, 정중한 존댓말을 사용합니다.
-- 실제 제공된 카테고리 요약 내용을 충분히 활용하여 구체적이고 의미 있는 내용을 생성하세요.
+- 실제 제공된 카테고리 요약 내용을 충분히 활용하여
+  구체적이고 의미 있는 내용을 생성하세요.
 """
 
 # 하위 호환성을 위한 SYSTEM_PROMPT
 # 이전 버전의 코드에서 참조하던 SYSTEM_PROMPT 변수를 제공합니다.
 SYSTEM_PROMPT = f"""
-Role: 당신은 뉴스들을 분석하고 요약하여, HTML 형식으로 "주간 산업 동향 뉴스 클리핑"을 작성하는 전문 편집자입니다.
+Role: 당신은 뉴스들을 분석하고 요약하여, HTML 형식으로 "주간 산업 동향 뉴스 클리핑"을
+작성하는 전문 편집자입니다.
 
-Context: 독자들은 한국 첨단산업의 R&D 전략기획단 소속으로, 분야별 전문위원으로 구성되어 있습니다. 이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+Context: 독자들은 한국 첨단산업의 R&D 전략기획단 소속으로,
+분야별 전문위원으로 구성되어 있습니다. 이들은 매주 특정 산업 주제에 대한
+기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 Input:
-1.  하나 이상의 '키워드' (예: "친환경 자동차", "AI 반도체"). 이 키워드는 뉴스레터의 주된 주제가 됩니다.
+1.  하나 이상의 '키워드' (예: "친환경 자동차", "AI 반도체").
+    이 키워드는 뉴스레터의 주된 주제가 됩니다.
 2.  여러 '뉴스 기사' 목록. 각 기사는 제목, URL, 본문 내용을 포함합니다.
 
 Output Requirements:
--   **HTML 형식**: 최종 결과물은 다른 설명 없이 순수한 HTML 코드여야 합니다. API로 직접 전달될 예정입니다. 반드시 아래 제공된 HTML 템플릿을 사용해야 합니다.
+-   **HTML 형식**: 최종 결과물은 다른 설명 없이 순수한 HTML 코드여야 합니다.
+    API로 직접 전달될 예정입니다.
+    반드시 아래 제공된 HTML 템플릿을 사용해야 합니다.
 -   **언어**: 한국어, 정중한 존댓말을 사용합니다.
 -   **구조**: 뉴스레터는 아래 제공된 HTML 템플릿을 기반으로 생성해야 합니다.
 
@@ -203,7 +215,9 @@ Output Requirements:
 {HTML_TEMPLATE}
 ```
 
-주의: SYSTEM_PROMPT는 하위 호환성을 위해 유지되었습니다. 새로운 코드에서는 CATEGORIZATION_PROMPT, SUMMARIZATION_PROMPT, COMPOSITION_PROMPT를 사용하세요.
+주의: SYSTEM_PROMPT는 하위 호환성을 위해 유지되었습니다.
+새로운 코드에서는 CATEGORIZATION_PROMPT, SUMMARIZATION_PROMPT,
+COMPOSITION_PROMPT를 사용하세요.
 """
 
 
@@ -273,7 +287,7 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
         else:
             # 다른 오류는 출력
             logger.warning(
-                f"Warning: LLM factory failed, falling back to default Gemini: {e}"
+                "Warning: LLM factory failed, falling back to default Gemini: %s", e
             )
 
         # Fallback to original Gemini implementation
@@ -317,7 +331,8 @@ def format_articles(data):
         date = article.get("date", "날짜 없음")
 
         formatted_articles.append(
-            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n날짜: {date}\n내용:\n{content}\n"
+            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n"
+            f"날짜: {date}\n내용:\n{content}\n"
         )
 
     return "\n---\n".join(formatted_articles)
@@ -371,7 +386,8 @@ def create_categorization_chain(is_compact=False):
                     formatted_articles=formatted_articles,
                 )
 
-            # 메시지를 HumanMessage로 변환 (Gemini는 시스템 메시지 지원이 불안정함)
+            # 메시지를 HumanMessage로 변환
+            # (Gemini는 시스템 메시지 지원이 불안정함)
             return [HumanMessage(content=prompt)]
         except Exception as e:
             logger.error(f"카테고리 메시지 생성 중 오류: {e}")
@@ -406,7 +422,8 @@ def create_categorization_chain(is_compact=False):
             # JSON 파싱
             result = json.loads(json_str)
             logger.info(
-                f"카테고리 분류 결과: {json.dumps(result, ensure_ascii=False, indent=2)}"
+                f"카테고리 분류 결과: "
+                f"{json.dumps(result, ensure_ascii=False, indent=2)}"
             )
             return result
         except Exception as e:
@@ -432,7 +449,6 @@ def create_categorization_chain(is_compact=False):
 # 2. 카테고리별 요약 체인 생성 함수 (compact 옵션 추가)
 def create_summarization_chain(is_compact=False):
     llm = get_llm(temperature=0.3)
-    parser = JsonOutputParser()
 
     # compact 버전용 간소화된 프롬프트
     compact_summary_prompt = """당신은 뉴스를 간결하게 요약하는 전문 편집자입니다.
@@ -475,7 +491,8 @@ def create_summarization_chain(is_compact=False):
                     category_articles.append(articles_data["articles"][idx - 1])
 
             logger.info(
-                f"카테고리 '{category.get('title', '제목 없음')}' - 관련 기사 수: {len(category_articles)}"
+                f"카테고리 '{category.get('title', '제목 없음')}' - "
+                f"관련 기사 수: {len(category_articles)}"
             )
 
             # 카테고리 기사들을 포맷팅
@@ -557,7 +574,10 @@ def create_summarization_chain(is_compact=False):
                             compact_result["definitions"] = [
                                 {
                                     "term": "자율주행",
-                                    "explanation": "운전자의 개입 없이 차량이 스스로 주행하는 기술로, 레벨 0부터 5까지 단계별로 구분됩니다.",
+                                    "explanation": (
+                                        "운전자의 개입 없이 차량이 스스로 주행하는 기술로, "
+                                        "레벨 0부터 5까지 단계별로 구분됩니다."
+                                    ),
                                 }
                             ]
                         elif any(
@@ -566,7 +586,11 @@ def create_summarization_chain(is_compact=False):
                             compact_result["definitions"] = [
                                 {
                                     "term": "R&D",
-                                    "explanation": "연구개발(Research and Development)의 줄임말로, 새로운 기술이나 제품을 개발하는 활동입니다.",
+                                    "explanation": (
+                                        "연구개발(Research and Development)의 "
+                                        "줄임말로, 새로운 기술이나 제품을 "
+                                        "개발하는 활동입니다."
+                                    ),
                                 }
                             ]
                         elif any(
@@ -575,7 +599,11 @@ def create_summarization_chain(is_compact=False):
                             compact_result["definitions"] = [
                                 {
                                     "term": "산업정책",
-                                    "explanation": "정부가 특정 산업의 발전을 위해 수립하는 정책으로, 규제 완화, 지원책 등을 포함합니다.",
+                                    "explanation": (
+                                        "정부가 특정 산업의 발전을 위해 "
+                                        "수립하는 정책으로, 규제 완화, "
+                                        "지원책 등을 포함합니다."
+                                    ),
                                 }
                             ]
                         else:
@@ -583,7 +611,11 @@ def create_summarization_chain(is_compact=False):
                             compact_result["definitions"] = [
                                 {
                                     "term": "혁신기술",
-                                    "explanation": "기존 기술을 크게 개선하거나 완전히 새로운 방식의 기술로, 산업과 사회에 큰 변화를 가져올 수 있는 기술입니다.",
+                                    "explanation": (
+                                        "기존 기술을 크게 개선하거나 완전히 새로운 방식의 "
+                                        "기술로, 산업과 사회에 큰 변화를 가져올 수 있는 "
+                                        "기술입니다."
+                                    ),
                                 }
                             ]
 
@@ -615,32 +647,50 @@ def create_summarization_chain(is_compact=False):
                         fallback_definitions = [
                             {
                                 "term": "자율주행",
-                                "explanation": "운전자의 개입 없이 차량이 스스로 주행하는 기술로, 레벨 0부터 5까지 단계별로 구분됩니다.",
+                                "explanation": (
+                                    "운전자의 개입 없이 차량이 스스로 주행하는 기술로, "
+                                    "레벨 0부터 5까지 단계별로 구분됩니다."
+                                ),
                             },
                             {
                                 "term": "레벨4",
-                                "explanation": "운전자가 없어도 특정 조건에서 완전 자율주행이 가능한 수준입니다.",
+                                "explanation": (
+                                    "운전자가 없어도 특정 조건에서 "
+                                    "완전 자율주행이 가능한 수준입니다."
+                                ),
                             },
                         ]
                     elif any(keyword in category_title for keyword in ["기술", "개발"]):
                         fallback_definitions = [
                             {
                                 "term": "R&D",
-                                "explanation": "연구개발(Research and Development)의 줄임말로, 새로운 기술이나 제품을 개발하는 활동입니다.",
+                                "explanation": (
+                                    "연구개발(Research and Development)의 "
+                                    "줄임말로, 새로운 기술이나 제품을 "
+                                    "개발하는 활동입니다."
+                                ),
                             }
                         ]
                     elif any(keyword in category_title for keyword in ["정책", "규제"]):
                         fallback_definitions = [
                             {
                                 "term": "산업정책",
-                                "explanation": "정부가 특정 산업의 발전을 위해 수립하는 정책으로, 규제 완화, 지원책 등을 포함합니다.",
+                                "explanation": (
+                                    "정부가 특정 산업의 발전을 위해 "
+                                    "수립하는 정책으로, 규제 완화, "
+                                    "지원책 등을 포함합니다."
+                                ),
                             }
                         ]
                     else:
                         fallback_definitions = [
                             {
                                 "term": "혁신기술",
-                                "explanation": "기존 기술을 크게 개선하거나 완전히 새로운 방식의 기술로, 산업과 사회에 큰 변화를 가져올 수 있는 기술입니다.",
+                                "explanation": (
+                                    "기존 기술을 크게 개선하거나 완전히 새로운 방식의 "
+                                    "기술로, 산업과 사회에 큰 변화를 가져올 수 있는 "
+                                    "기술입니다."
+                                ),
                             }
                         ]
 
@@ -653,7 +703,10 @@ def create_summarization_chain(is_compact=False):
                                 {
                                     "title": article.get("title", ""),
                                     "url": article.get("url", "#"),
-                                    "source_and_date": f"{article.get('source', 'Unknown')} · {article.get('date', 'Unknown date')}",
+                                    "source_and_date": (
+                                        f"{article.get('source', 'Unknown')} · "
+                                        f"{article.get('date', 'Unknown date')}"
+                                    ),
                                 }
                                 for article in category_articles
                             ],
@@ -802,8 +855,12 @@ def create_rendering_chain():
                         register_recent_callbacks(cb)
                     except Exception as e:
                         logger.warning(
-                            f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
+                            "Cost tracking setup error: %s. "
+                            "Continuing without tracking.",
+                            e,
                         )
+                from . import tools
+
                 common_theme = tools.extract_common_theme_from_keywords(
                     keywords, callbacks=cb
                 )
@@ -824,8 +881,12 @@ def create_rendering_chain():
                         register_recent_callbacks(cb)
                     except Exception as e:
                         logger.warning(
-                            f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
+                            "Cost tracking setup error: %s. "
+                            "Continuing without tracking.",
+                            e,
                         )
+                from . import tools
+
                 common_theme = tools.extract_common_theme_from_keywords(
                     keywords, callbacks=cb
                 )
@@ -840,7 +901,8 @@ def create_rendering_chain():
         )
         combined_data["footer_disclaimer"] = template_manager.get(
             "footer.disclaimer",
-            "이 뉴스레터는 정보 제공용으로만 사용되며, 투자 권유를 목적으로 하지 않습니다.",
+            "이 뉴스레터는 정보 제공용으로만 사용되며, "
+            "투자 권유를 목적으로 하지 않습니다.",
         )
         combined_data["editor_signature"] = template_manager.get(
             "editor.signature", "편집자 드림"
@@ -886,7 +948,8 @@ def create_rendering_chain():
                 "audience.description", "귀하께서 여기 계시다니 영광입니다"
             )
             combined_data["recipient_greeting"] = (
-                f"{combined_data.get('greeting_prefix', '안녕하십니까, ')} {combined_data.get('company_name')} {audience_desc}."
+                f"{combined_data.get('greeting_prefix', '안녕하십니까, ')} "
+                f"{combined_data.get('company_name')} {audience_desc}."
             )
 
         # 템플릿 렌더링 직전 상위 3개 주요 기사 추출
@@ -976,7 +1039,10 @@ def get_newsletter_chain(is_compact=False):
                                 > 200
                                 else article.get("snippet", article.get("content", ""))
                             ),
-                            "source_and_date": f"{article.get('source', 'Unknown')} · {article.get('date', 'Unknown date')}",
+                            "source_and_date": (
+                                f"{article.get('source', 'Unknown')} · "
+                                f"{article.get('date', 'Unknown date')}"
+                            ),
                         }
                         top_articles.append(top_article)
                 else:
@@ -1054,21 +1120,19 @@ def get_newsletter_chain(is_compact=False):
                     ),
                 }
 
-                logger.debug(f"Compact 최종 데이터 구조:")
-                logger.debug(f"  - top_articles: {len(result_data['top_articles'])}개")
+                logger.debug("Compact 최종 데이터 구조:")
+                logger.debug("  - top_articles: %d개", len(result_data["top_articles"]))
                 logger.debug(
-                    f"  - grouped_sections: {len(result_data['grouped_sections'])}개"
+                    "  - grouped_sections: %d개", len(result_data["grouped_sections"])
                 )
-                logger.debug(f"  - definitions: {len(result_data['definitions'])}개")
+                logger.debug("  - definitions: %d개", len(result_data["definitions"]))
 
                 # 템플릿 렌더링
                 logger.step("HTML 템플릿 렌더링", "rendering")
 
                 # 템플릿 렌더링
                 logger.info(
-                    "Composing compact newsletter for topic: {}...".format(
-                        newsletter_topic
-                    )
+                    "Composing compact newsletter for topic: %s", newsletter_topic
                 )
                 template_dir = os.path.join(
                     os.path.dirname(__file__), "..", "templates"
@@ -1098,50 +1162,25 @@ def get_newsletter_chain(is_compact=False):
                 # 4. 렌더링 단계 실행
                 logger.step("HTML 템플릿 렌더링", "rendering")
 
-                # 템플릿 렌더링 직전 상위 3개 주요 기사 추출
-                config = NewsletterConfig.get_config("detailed")
+                # 템플릿 렌더링을 위한 데이터 준비
+                rendering_data = {
+                    "composition": composition_data,
+                    "sections_data": sections_data,
+                    "keywords": data.get("keywords", ""),
+                    "domain": data.get("domain", ""),
+                    "ranked_articles": data.get("ranked_articles", []),
+                    "processed_articles": data.get("processed_articles", []),
+                }
 
-                # composition_data와 sections_data 병합
-                combined_data = {**composition_data, **sections_data}
+                # 렌더링 체인 호출
+                html_content, structured_data = rendering_chain.invoke(rendering_data)
 
-                # 상위 기사 추출
-                top_articles = extract_and_prepare_top_articles(
-                    combined_data, config["top_articles_count"]
-                )
-
-                # 그룹 섹션 생성
-                grouped_sections = create_grouped_sections(
-                    combined_data,
-                    top_articles,
-                    max_groups=config["max_groups"],
-                    max_articles=config["max_articles"],
-                )
-
-                # 최종 데이터에 top_articles와 grouped_sections 추가
-                combined_data["top_articles"] = top_articles
-                combined_data["grouped_sections"] = grouped_sections
-
-                # definitions와 food_for_thought 추출
-                combined_data["definitions"] = extract_definitions(
-                    combined_data, grouped_sections, config
-                )
-                combined_data["food_for_thought"] = extract_food_for_thought(
-                    combined_data
-                )
-
-                # compose_newsletter 호출
-                template_dir = os.path.join(
-                    os.path.dirname(__file__), "..", "templates"
-                )
-                html_content = compose_newsletter(
-                    combined_data, template_dir, style="detailed"
-                )
                 logger.success("Detailed 뉴스레터 생성 완료!")
 
                 # Detailed 모드에서 HTML과 구조화된 데이터를 함께 반환
                 return {
                     "html": html_content,
-                    "structured_data": combined_data,
+                    "structured_data": structured_data,
                     "sections": sections_data.get("sections", []),
                     "mode": "detailed",
                 }

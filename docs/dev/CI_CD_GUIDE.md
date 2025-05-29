@@ -44,7 +44,7 @@ The project uses multiple dependency files for different purposes:
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-org/newsletter-generator.git
+git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
 
 # 2. Create and activate virtual environment
