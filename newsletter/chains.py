@@ -152,32 +152,36 @@ COMPOSITION_PROMPT = """
 카테고리 요약:
 {category_summaries}
 
+**중요 지시사항:**
+- 위에 제공된 실제 키워드와 카테고리 요약 내용을 바탕으로 구체적인 내용을 생성하세요
+- "[카테고리 요약]", "(각 카테고리별 핵심 내용)" 같은 placeholder 텍스트는 절대 사용하지 마세요
+- newsletter_topic은 실제 키워드를 기반으로 구체적인 주제명을 설정하세요
+- introduction_message는 실제 카테고리들의 내용을 반영한 구체적인 소개문을 작성하세요
+- food_for_thought의 message도 실제 뉴스 내용을 바탕으로 구체적인 질문이나 제안을 작성하세요
+
 다음 정보를 포함한 뉴스레터 구성 정보를 JSON 형식으로 반환해주세요:
 
 ```json
 {{
-  "newsletter_topic": "뉴스레터 주제",
+  "newsletter_topic": "실제 키워드를 기반으로 한 구체적인 뉴스레터 주제",
   "generation_date": "{current_date}",
-  "recipient_greeting": "독자들을 위한 인사말",
-  "introduction_message": "뉴스레터 소개 문구",
+  "recipient_greeting": "안녕하세요, R&D 전략기획단 전문위원 여러분",
+  "introduction_message": "실제 카테고리 내용을 반영한 구체적인 소개 문구 (각 카테고리의 핵심 내용을 1-2문장씩 언급)",
   "food_for_thought": {{
     "quote": "관련 명언 (선택사항)",
     "author": "명언 출처 (선택사항)",
-    "message": "독자들에게 생각해볼 만한 질문이나 제안"
+    "message": "실제 뉴스 내용을 바탕으로 한 구체적인 질문이나 제안"
   }},
-  "closing_message": "마무리 문구",
-  "editor_signature": "편집자 서명",
-  "company_name": "회사명"
+  "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+  "editor_signature": "편집자 드림",
+  "company_name": "R&D 전략기획단"
 }}
 ```
 
 참고:
 - generation_date는 {current_date} 형식으로 유지해주세요.
-- newsletter_topic은 입력된 '키워드'를 뉴스레터의 전체 주제로 설정하고, 제목과 도입부에 반영합니다.
-- 각 항목은 한국어로 작성하며, 정중한 존댓말을 사용합니다.
-- introduction_message는 전체 뉴스레터의 주제와 주요 내용을 간략히 소개합니다.
-- food_for_thought는 전체 뉴스 내용을 바탕으로 독자들에게 생각해볼 만한 질문이나 영감을 줄 수 있는 메시지입니다.
-- closing_message는 뉴스레터를 마무리하는 문구입니다.
+- 모든 항목은 한국어로 작성하며, 정중한 존댓말을 사용합니다.
+- 실제 제공된 카테고리 요약 내용을 충분히 활용하여 구체적이고 의미 있는 내용을 생성하세요.
 """
 
 # 하위 호환성을 위한 SYSTEM_PROMPT

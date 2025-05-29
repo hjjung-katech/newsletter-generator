@@ -286,7 +286,7 @@ def run(
     html_content = ""
 
     # LangGraph를 사용하는 것이 이제 기본이자 유일한 방식입니다.
-    logger.step("LangGraph 워크플로우 시작", "langgraph_workflow")
+    logger.info("🔄 LangGraph 워크플로우 시작")
 
     # graph.generate_newsletter는 내부적으로 chains.get_newsletter_chain()을 호출하고,
     # chains.py의 변경으로 인해 render_data_langgraph...json 파일이 저장됩니다.
@@ -302,17 +302,42 @@ def run(
         logger.error(f"Error in newsletter generation: {html_content}")
         return
 
-    logger.step_complete("뉴스레터 생성 완료", "langgraph_workflow")
-
     info = graph.get_last_generation_info()
     step_times = info.get("step_times", {})
     total_time = info.get("total_time")
     cost_summary = info.get("cost_summary")
 
-    # 통계 정보 업데이트
+    # LangGraph의 세부 단계들을 logger에 추가하여 세분화된 시간 표시
     if step_times:
-        for step_name, elapsed_time in step_times.items():
-            logger.update_statistics(f"step_time_{step_name}", elapsed_time)
+        # 단계 순서 정의 (표시 순서 보장)
+        step_order = [
+            "extract_theme",
+            "collect_articles",
+            "process_articles",
+            "score_articles",
+            "summarize_articles",
+            "compose_newsletter",
+        ]
+
+        # 단계명을 한국어로 변환하여 표시
+        korean_step_names = {
+            "extract_theme": "Theme Extraction",
+            "collect_articles": "Article Collection",
+            "process_articles": "Article Processing",
+            "score_articles": "Article Scoring",
+            "summarize_articles": "Article Summarization",
+            "compose_newsletter": "Newsletter Composition",
+        }
+
+        # 순서대로 step_times에 추가
+        for step_name in step_order:
+            if step_name in step_times:
+                elapsed_time = step_times[step_name]
+                korean_name = korean_step_names.get(
+                    step_name, step_name.replace("_", " ").title()
+                )
+                logger.step_times[korean_name] = elapsed_time
+                logger.update_statistics(f"step_time_{step_name}", elapsed_time)
 
     if total_time is not None:
         logger.update_statistics("total_generation_time", total_time)
