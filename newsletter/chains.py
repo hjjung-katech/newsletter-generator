@@ -63,7 +63,7 @@ CATEGORIZATION_PROMPT = """
 당신은 뉴스들을 분석하고 분류하는 전문 편집자입니다.
 
 독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다.
-이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+이들은 매주 요청된 키워드 분야의 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 다음 키워드에 관련된 뉴스 기사들을 분석하여, 의미있는 카테고리로 분류해주세요:
 {keywords}
@@ -101,7 +101,7 @@ SUMMARIZATION_PROMPT = """
 작성하는 전문 편집자입니다.
 
 독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다.
-이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+이들은 매주 요청된 키워드 분야의 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 다음은 "{category_title}" 카테고리에 해당하는 뉴스 기사들입니다:
 {category_articles}
@@ -136,8 +136,7 @@ SUMMARIZATION_PROMPT = """
     {{"title": "기사 제목", "url": "기사 URL", "source_and_date": "출처 및 날짜"}}
   ]
 }}
-```
-"""
+```"""
 
 # 종합 구성 프롬프트
 COMPOSITION_PROMPT = """
@@ -145,7 +144,7 @@ COMPOSITION_PROMPT = """
 작성하는 전문 편집자입니다.
 
 독자 배경: 독자들은 한국 첨단산업의 R&D 전략기획단 소속 분야별 전문위원들입니다.
-이들은 매주 특정 산업 주제에 대한 기술 동향과 주요 뉴스를 받아보기를 원합니다.
+이들은 매주 요청된 키워드 분야의 기술 동향과 주요 뉴스를 받아보기를 원합니다.
 
 이미 각 카테고리별로 상세 요약이 완료되었습니다.
 이제 뉴스레터의 전체 구성을 완성해야 합니다.
@@ -154,27 +153,27 @@ COMPOSITION_PROMPT = """
 카테고리 요약:
 {category_summaries}
 
-**중요 지시사항:**
-- 위에 제공된 실제 키워드와 카테고리 요약 내용을 바탕으로 구체적인 내용을 생성하세요
-- "[카테고리 요약]", "(각 카테고리별 핵심 내용)" 같은 placeholder 텍스트는
-  절대 사용하지 마세요
-- newsletter_topic은 실제 키워드를 기반으로 구체적인 주제명을 설정하세요
-- introduction_message는 실제 카테고리들의 내용을 반영한 구체적인 소개문을 작성하세요
-- food_for_thought의 message도 실제 뉴스 내용을 바탕으로
-  구체적인 질문이나 제안을 작성하세요
+**매우 중요한 지시사항:**
+- 위에 제공된 **주제 키워드({keywords})**와 **실제 카테고리 요약 내용**만을 사용하세요
+- 주제 키워드와 관련 없는 내용은 절대 포함하지 마세요  
+- newsletter_topic은 제공된 키워드를 기반으로만 설정하세요
+- introduction_message는 제공된 카테고리 요약의 실제 내용만을 반영하세요
+- 제공된 뉴스 내용이 없더라도 키워드 주제에 맞는 유용한 뉴스레터를 작성하세요
+- "[카테고리 요약]", "(각 카테고리별 핵심 내용)" 같은 placeholder 텍스트는 절대 사용하지 마세요
+- food_for_thought의 message도 제공된 뉴스 내용과 키워드에만 기반하여 작성하세요
 
 다음 정보를 포함한 뉴스레터 구성 정보를 JSON 형식으로 반환해주세요:
 
 ```json
 {{
-  "newsletter_topic": "실제 키워드를 기반으로 한 구체적인 뉴스레터 주제",
+  "newsletter_topic": "제공된 키워드({keywords})를 기반으로 한 구체적인 뉴스레터 주제",
   "generation_date": "{current_date}",
   "recipient_greeting": "안녕하세요, R&D 전략기획단 전문위원 여러분",
-  "introduction_message": "실제 카테고리 내용을 반영한 구체적인 소개 문구 (각 카테고리의 핵심 내용을 1-2문장씩 언급)",
+  "introduction_message": "키워드 주제에 맞는 구체적이고 유용한 소개 문구 (뉴스가 없어도 해당 분야의 중요성이나 동향에 대한 통찰 제공)",
   "food_for_thought": {{
     "quote": "관련 명언 (선택사항)",
     "author": "명언 출처 (선택사항)",
-    "message": "실제 뉴스 내용을 바탕으로 한 구체적인 질문이나 제안"
+    "message": "제공된 키워드 주제에 기반한 구체적인 질문이나 제안"
   }},
   "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
   "editor_signature": "편집자 드림",
@@ -185,8 +184,7 @@ COMPOSITION_PROMPT = """
 참고:
 - generation_date는 {current_date} 형식으로 유지해주세요.
 - 모든 항목은 한국어로 작성하며, 정중한 존댓말을 사용합니다.
-- 실제 제공된 카테고리 요약 내용을 충분히 활용하여
-  구체적이고 의미 있는 내용을 생성하세요.
+- 뉴스가 수집되지 않았더라도 키워드 주제의 중요성과 전략적 관점을 강조하는 유용한 내용을 작성하세요.
 """
 
 # 하위 호환성을 위한 SYSTEM_PROMPT
@@ -1021,10 +1019,17 @@ def create_rendering_chain():
             combined_data["recipient_greeting"] = combined_data.get(
                 "recipient_greeting", "안녕하세요,"
             )
-            combined_data["introduction_message"] = combined_data.get(
-                "introduction_message",
-                "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
-            )
+            # introduction_message는 이미 LLM이 생성했으면 그대로 사용, 없으면 주제 기반 기본값
+            if "introduction_message" not in combined_data:
+                newsletter_topic = combined_data.get("newsletter_topic", "")
+                if newsletter_topic:
+                    combined_data["introduction_message"] = (
+                        f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
+                    )
+                else:
+                    combined_data["introduction_message"] = (
+                        "이번 주 주요 산업 동향과 기술 발전 현황을 정리하여 보내드립니다."
+                    )
             combined_data["closing_message"] = combined_data.get(
                 "closing_message",
                 "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
@@ -1049,6 +1054,163 @@ def create_rendering_chain():
     return RunnableLambda(render_with_template)
 
 
+# 뉴스가 없을 때의 특별 처리 함수
+def handle_no_articles_scenario(data, is_compact):
+    """
+    뉴스 기사가 수집되지 않았을 때 키워드 기반으로 유용한 뉴스레터를 생성합니다.
+    """
+    from datetime import datetime
+    from .compose import compose_newsletter
+    from .template_manager import TemplateManager
+
+    keywords = data.get("keywords", [])
+    domain = data.get("domain", "")
+    email_compatible = data.get("email_compatible", False)
+    template_style = data.get("template_style", "compact")
+
+    # 키워드 및 주제 처리
+    if isinstance(keywords, str):
+        keywords = [kw.strip() for kw in keywords.split(",") if kw.strip()]
+
+    # 주제 결정
+    if domain:
+        newsletter_topic = domain
+    elif len(keywords) == 1:
+        newsletter_topic = keywords[0]
+    else:
+        from .tools import extract_common_theme_from_keywords
+
+        newsletter_topic = extract_common_theme_from_keywords(keywords)
+
+    # 현재 날짜 및 시간 정보
+    current_date = datetime.now().strftime("%Y년 %m월 %d일")
+    current_time = datetime.now().strftime("%H:%M")
+
+    # 템플릿 매니저로부터 메타데이터 가져오기
+    template_manager = TemplateManager()
+
+    # LLM을 사용하여 키워드 기반 유용한 내용 생성
+    try:
+        llm = get_llm(temperature=0.4)
+
+        # 키워드 기반 소개 메시지 생성
+        intro_prompt = f"""다음 키워드 주제에 대한 뉴스레터 소개 문구를 작성해주세요:
+
+주제: {newsletter_topic}
+키워드: {", ".join(keywords) if isinstance(keywords, list) else keywords}
+
+R&D 전략기획단 전문위원들을 대상으로, 해당 분야의 중요성과 최근 동향에 대한 통찰을 제공하는 소개 문구를 작성해주세요.
+
+요구사항:
+- 이번 주 특정 뉴스에 의존하지 않고, 해당 분야의 일반적인 중요성과 트렌드를 강조
+- 전략적 관점에서 해당 분야가 왜 중요한지 설명
+- 정중한 존댓말 사용
+- 1-2문장으로 간결하게
+
+소개 문구만 반환해주세요 (다른 설명 없이):"""
+
+        messages = [HumanMessage(content=intro_prompt)]
+        intro_response = llm.invoke(messages)
+        introduction_message = intro_response.content.strip()
+
+        # 키워드 기반 생각해 볼 거리 생성
+        thought_prompt = f"""다음 주제에 대한 "생각해 볼 거리" 메시지를 생성해주세요:
+
+주제: {newsletter_topic}
+키워드: {", ".join(keywords) if isinstance(keywords, list) else keywords}
+
+R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전략적 중요성과 미래 방향성에 대한 생각해볼 거리를 제공해주세요.
+
+요구사항:
+- 구체적이고 실용적인 내용
+- 전략적 사고를 유도하는 질문이나 제안
+- 해당 분야의 미래 전망이나 도전 과제 언급
+- 정중한 존댓말 사용
+- 1-2문장으로 간결하게
+
+메시지만 반환해주세요 (다른 설명 없이):"""
+
+        messages = [HumanMessage(content=thought_prompt)]
+        thought_response = llm.invoke(messages)
+        food_for_thought_message = thought_response.content.strip()
+
+    except Exception as e:
+        logger.warning(f"LLM 기반 콘텐츠 생성 실패: {e}")
+        # 실패 시 기본 메시지 사용
+        introduction_message = f"이번 주는 {newsletter_topic} 분야의 특별한 뉴스 수집이 어려웠지만, 해당 분야의 지속적인 발전과 전략적 중요성을 고려할 때 지속적인 관심과 모니터링이 필요합니다."
+        food_for_thought_message = f"{newsletter_topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다. 향후 동향을 예의주시하며 우리 조직의 전략과 방향성을 점검해보시기 바랍니다."
+
+    # 최종 데이터 구조 생성
+    result_data = {
+        "top_articles": [],  # 뉴스가 없으므로 빈 배열
+        "grouped_sections": [],  # 뉴스가 없으므로 빈 배열
+        "definitions": [
+            {
+                "term": newsletter_topic,
+                "explanation": f"{newsletter_topic} 분야는 빠르게 발전하고 있는 핵심 기술 영역으로, 지속적인 연구개발과 전략적 투자가 필요한 분야입니다.",
+            }
+        ],
+        "newsletter_topic": newsletter_topic,
+        "generation_date": current_date,
+        "generation_time": current_time,
+        "search_keywords": (
+            ", ".join(keywords) if isinstance(keywords, list) else str(keywords)
+        ),
+        "food_for_thought": {"message": food_for_thought_message},
+        "recipient_greeting": "안녕하세요,",
+        "introduction_message": introduction_message,
+        "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+        "editor_signature": "편집자 드림",
+        "company_name": template_manager.get(
+            "company.name", "산업통상자원 R&D 전략기획단"
+        ),
+        "company_logo_url": template_manager.get(
+            "company.logo_url", "/static/logo.png"
+        ),
+        "company_website": template_manager.get(
+            "company.website", "https://example.com"
+        ),
+        "copyright_year": template_manager.get(
+            "company.copyright_year", datetime.now().strftime("%Y")
+        ),
+        "company_tagline": template_manager.get(
+            "company.tagline", "최신 기술 동향을 한눈에"
+        ),
+        "footer_contact": template_manager.get(
+            "footer.contact_info", "문의사항: hjjung2@osp.re.kr"
+        ),
+        "editor_name": template_manager.get("editor.name", "Google Gemini"),
+        "editor_email": template_manager.get("editor.email", "hjjung2@osp.re.kr"),
+        "editor_title": template_manager.get("editor.title", "편집자"),
+        "footer_disclaimer": template_manager.get(
+            "footer.disclaimer",
+            "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+        ),
+        "email_compatible": email_compatible,
+        "template_style": template_style,
+    }
+
+    # 템플릿 렌더링
+    logger.info(f"키워드 기반 뉴스레터 생성: {newsletter_topic}")
+    template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+
+    if email_compatible:
+        logger.info("Email-compatible 템플릿 사용")
+        html_content = compose_newsletter(result_data, template_dir, "email_compatible")
+    else:
+        logger.info(f"{template_style} 템플릿 사용")
+        html_content = compose_newsletter(result_data, template_dir, template_style)
+
+    logger.success("키워드 기반 뉴스레터 생성 완료!")
+
+    return {
+        "html": html_content,
+        "structured_data": result_data,
+        "sections": [],  # 뉴스가 없으므로 빈 배열
+        "mode": template_style,
+    }
+
+
 # 전체 파이프라인 구성 (compact 옵션 추가)
 def get_newsletter_chain(is_compact=False):
     # 1. 분류 체인
@@ -1070,6 +1232,16 @@ def get_newsletter_chain(is_compact=False):
             # 데이터 유효성 검증
             if "articles" not in data:
                 raise ValueError("입력 데이터에 'articles' 필드가 없습니다.")
+
+            articles = data.get("articles", [])
+            keywords = data.get("keywords", [])
+
+            # 빈 기사 배열 처리 - 유용한 뉴스레터를 생성하도록 개선
+            if not articles or len(articles) == 0:
+                logger.info(
+                    "뉴스 기사가 수집되지 않았지만, 키워드 기반 유용한 뉴스레터를 생성합니다."
+                )
+                return handle_no_articles_scenario(data, is_compact)
 
             # 1. 분류 단계 실행
             if is_compact:
@@ -1177,28 +1349,35 @@ def get_newsletter_chain(is_compact=False):
                 current_date = datetime.date.today().strftime("%Y년 %m월 %d일")
                 current_time = datetime.datetime.now().strftime("%H:%M")
 
-                # 주제별 동적 "생각해 볼 거리" 생성 (compact용 - 문자열로)
-                def create_food_for_thought_compact(topic):
-                    """주제에 따른 동적 생각해 볼 거리 생성 (compact용)"""
-                    topic_messages = {
-                        "AI": "인공지능 기술의 발전 속도를 고려했을 때, 우리 조직의 AI 도입 전략과 인재 양성 방안에 대한 논의가 필요한 시점입니다.",
-                        "반도체": "인공지능과 양자 컴퓨팅 기술의 발전 속도를 고려했을 때, 국내 반도체 산업의 경쟁력 확보를 위해서는 선제적인 연구 개발과 투자가 필수적입니다. 차세대 반도체 기술 선점을 위한 국가 차원의 전략 수립 및 산학연 협력 강화 방안에 대한 논의가 필요한 시점입니다.",
-                        "바이오": "바이오헬스 분야의 기술 융복합화가 가속화되는 시점에서, 우리나라가 글로벌 바이오헬스 시장을 선도하기 위한 전략적 접근이 필요합니다.",
-                        "친환경": "탄소중립 시대에 맞춰 친환경 기술의 상용화와 확산을 위한 정책적 지원과 민간 투자 활성화 방안을 모색해야 할 시점입니다.",
-                        "친환경차": "전기차 및 친환경차 시장의 급속한 성장에 대응하기 위해 배터리 기술 개발, 충전 인프라 구축, 그리고 관련 정책 지원 체계의 통합적 접근이 필요합니다.",
-                        "이차전지": "전기차 시장의 일시적 침체에도 불구하고 차세대 배터리 기술 개발과 원자재 확보, 재활용 생태계 구축 등 장기적인 관점에서의 전략적 투자와 정책 지원이 필요한 시점입니다.",
-                        "배터리": "전기차 시장의 일시적 침체에도 불구하고 차세대 배터리 기술 개발과 원자재 확보, 재활용 생태계 구축 등 장기적인 관점에서의 전략적 투자와 정책 지원이 필요한 시점입니다.",
-                        "우주": "우주산업의 민간 참여가 확대되는 시점에서, 우리나라 우주산업 생태계 구축과 관련 기술 개발에 대한 전략적 투자가 필요합니다.",
-                        "로봇": "로봇 기술과 AI의 융합이 가속화되는 시점에서, 제조업을 넘어 서비스업까지 확장되는 로봇 활용 전략을 수립해야 합니다.",
-                    }
+                # 주제별 동적 "생각해 볼 거리" 생성 (compact용 - LLM 기반)
+                def create_food_for_thought_compact(topic, keywords=None):
+                    """주제에 따른 동적 생각해 볼 거리 생성 (LLM 기반)"""
+                    try:
+                        # LLM을 사용하여 동적으로 생성
+                        llm = get_llm(temperature=0.4)
 
-                    # 주제에서 키워드 추출
-                    for key, message in topic_messages.items():
-                        if key in topic:
-                            return message
+                        keywords_str = ", ".join(keywords) if keywords else topic
+                        prompt = f"""다음 주제에 대한 "생각해 볼 거리" 메시지를 생성해주세요:
 
-                    # 기본 메시지
-                    return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다. 이번 주 뉴스들을 통해 업계 동향을 파악하고, 우리 조직의 전략과 방향성을 점검해보시기 바랍니다."
+주제: {topic}
+키워드: {keywords_str}
+
+R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 빠른 변화에 대응하기 위한 전략적 관점의 생각해볼 거리를 1-2문장으로 작성해주세요.
+
+- 구체적이고 실용적인 내용
+- 전략적 사고를 유도하는 질문이나 제안
+- 정중한 존댓말 사용
+
+메시지만 반환해주세요 (다른 설명 없이):"""
+
+                        messages = [HumanMessage(content=prompt)]
+                        response = llm.invoke(messages)
+                        return response.content.strip()
+
+                    except Exception as e:
+                        logger.warning(f"LLM 기반 생각해 볼 거리 생성 실패: {e}")
+                        # 실패 시에만 기본 메시지 사용
+                        return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다. 이번 주 뉴스들을 통해 업계 동향을 파악하고, 우리 조직의 전략과 방향성을 점검해보시기 바랍니다."
 
                 # 최종 데이터 구조 생성
                 result_data = {
@@ -1214,12 +1393,14 @@ def get_newsletter_chain(is_compact=False):
                         else str(keywords)
                     ),
                     "food_for_thought": {
-                        "message": create_food_for_thought_compact(newsletter_topic)
+                        "message": create_food_for_thought_compact(
+                            newsletter_topic, keywords
+                        )
                     },
-                    # 이메일 템플릿용 기본 메시지들
+                    # 이메일 템플릿용 기본 메시지들 - 기본값만 설정, LLM 생성 시 덮어쓰기 가능
                     "recipient_greeting": "안녕하세요,",
-                    "introduction_message": "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
-                    "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+                    # introduction_message는 LLM이 생성하도록 함
+                    "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다.",
                     "editor_signature": "편집자 드림",
                     "company_name": template_manager.get(
                         "company.name", "산업통상자원 R&D 전략기획단"
@@ -1249,6 +1430,36 @@ def get_newsletter_chain(is_compact=False):
                         "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
                     ),
                 }
+
+                # LLM을 사용하여 introduction_message 생성 (compact 모드에서도)
+                try:
+                    llm = get_llm(temperature=0.3)
+                    intro_prompt = f"""다음 정보를 바탕으로 뉴스레터 소개 문구를 작성해주세요:
+
+주제: {newsletter_topic}
+키워드: {", ".join(keywords) if isinstance(keywords, list) else keywords}
+그룹 수: {len(grouped_sections)}
+
+R&D 전략기획단 전문위원들을 대상으로, 이번 주 뉴스레터의 내용을 간략히 소개하는 문구를 1-2문장으로 작성해주세요.
+
+- 실제 주제와 내용을 반영할 것
+- 정중한 존댓말 사용
+- 구체적이고 유익한 느낌
+
+소개 문구만 반환해주세요 (다른 설명 없이):"""
+
+                    messages = [HumanMessage(content=intro_prompt)]
+                    response = llm.invoke(messages)
+                    result_data["introduction_message"] = response.content.strip()
+                    logger.info(
+                        f"[green]LLM이 생성한 introduction_message: {result_data['introduction_message']}[/green]"
+                    )
+
+                except Exception as e:
+                    logger.warning(f"LLM 기반 introduction_message 생성 실패: {e}")
+                    result_data["introduction_message"] = (
+                        f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
+                    )
 
                 logger.debug("Compact 최종 데이터 구조:")
                 logger.debug(f"  - top_articles: {len(result_data['top_articles'])}개")
