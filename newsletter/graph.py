@@ -717,9 +717,8 @@ def compose_newsletter_node(
                 "definitions": [],
                 # food_for_thought 추가
                 "food_for_thought": {},
-                # 기본 메타데이터
+                # 기본 메타데이터 - LLM 생성 내용이 있으면 우선 사용
                 "recipient_greeting": "안녕하세요,",
-                "introduction_message": "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
                 "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
                 "editor_signature": "편집자 드림",
                 "company_name": "산업통상자원 R&D 전략기획단",
@@ -744,6 +743,29 @@ def compose_newsletter_node(
 
             # structured_data에서 완전한 정보 추출
             if isinstance(category_summaries, dict):
+                # LLM이 생성한 내용들을 우선 사용
+                for key in [
+                    "newsletter_topic",
+                    "generation_date",
+                    "recipient_greeting",
+                    "introduction_message",
+                    "closing_message",
+                    "editor_signature",
+                    "company_name",
+                ]:
+                    if key in category_summaries:
+                        render_data[key] = category_summaries[key]
+                        logger.info(
+                            f"[green]LLM 생성 내용 사용: {key} = {category_summaries[key][:100] if isinstance(category_summaries[key], str) and len(category_summaries[key]) > 100 else category_summaries[key]}[/green]"
+                        )
+
+                # food_for_thought 추출
+                if "food_for_thought" in category_summaries:
+                    render_data["food_for_thought"] = category_summaries[
+                        "food_for_thought"
+                    ]
+                    logger.info(f"[green]Found food_for_thought[/green]")
+
                 # top_articles 추출
                 if "top_articles" in category_summaries:
                     render_data["top_articles"] = category_summaries["top_articles"]
@@ -767,25 +789,18 @@ def compose_newsletter_node(
                         f"[green]Found definitions: {len(render_data['definitions'])} definitions[/green]"
                     )
 
-                # food_for_thought 추출
-                if "food_for_thought" in category_summaries:
-                    render_data["food_for_thought"] = category_summaries[
-                        "food_for_thought"
-                    ]
-                    logger.info(f"[green]Found food_for_thought[/green]")
-
-                # 기타 메타데이터 업데이트
-                for key in [
-                    "newsletter_topic",
-                    "generation_date",
-                    "recipient_greeting",
-                    "introduction_message",
-                    "closing_message",
-                    "editor_signature",
-                    "company_name",
-                ]:
-                    if key in category_summaries:
-                        render_data[key] = category_summaries[key]
+            # introduction_message가 없으면 주제 기반으로 생성
+            if (
+                "introduction_message" not in render_data
+                or not render_data["introduction_message"]
+            ):
+                newsletter_topic = render_data.get("newsletter_topic", topic)
+                render_data["introduction_message"] = (
+                    f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
+                )
+                logger.info(
+                    f"[yellow]기본 introduction_message 생성: {render_data['introduction_message']}[/yellow]"
+                )
 
             # sections 데이터 우선순위: state의 sections > category_summaries의 sections
             if sections_from_state:

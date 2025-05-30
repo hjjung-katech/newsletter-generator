@@ -1001,7 +1001,7 @@ if __name__ == "__main__":
         "generation_date": datetime.now().strftime("%Y-%m-%d"),
         "generation_timestamp": datetime.now().strftime("%H:%M:%S"),
         "recipient_greeting": "안녕하세요, 전략프로젝트팀의 젊은 팀원과 수석전문위원 여러분.",
-        "introduction_message": "지난 한 주간의 AI 신약 개발, 디지털 치료제, 세포 유전자 치료제, 마이크로바이옴, 합성생물학 산업 관련 주요 기술 동향 및 뉴스를 정리하여 보내드립니다. 함께 살펴보시고 R&D 전략 수립에 참고하시면 좋겠습니다.",
+        "introduction_message": "이번 주 주요 산업 동향과 기술 발전 현황을 정리하여 보내드립니다. 함께 살펴보시고 R&D 전략 수립에 참고하시면 좋겠습니다.",
         "sections": [
             {
                 "title": "AI 신약 개발",
