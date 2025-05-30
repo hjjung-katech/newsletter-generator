@@ -35,6 +35,7 @@ class NewsletterState(TypedDict):
     news_period_days: int  # Configurable days for news recency filter
     domain: str  # Added domain field
     template_style: str  # Template style: 'compact' or 'detailed'
+    email_compatible: bool  # Email compatibility processing flag
     # 중간 결과물
     collected_articles: Optional[List[Dict]]  # Made Optional
     processed_articles: Optional[List[Dict]]  # New field
@@ -493,6 +494,9 @@ def summarize_articles_node(
         input_data = {
             "articles": articles_for_summary,
             "keywords": state.get("keywords", ""),
+            "email_compatible": state.get("email_compatible", False),
+            "template_style": state.get("template_style", "compact"),
+            "domain": state.get("domain"),
         }
 
         chain_result = newsletter_chain.invoke(input_data)
@@ -585,7 +589,9 @@ def compose_newsletter_node(
         }
 
     try:
+        # 변수들을 조건문 외부에서 미리 정의
         template_style = state.get("template_style", "compact")
+        email_compatible = state.get("email_compatible", False)
 
         # 이미 생성된 HTML이 있는지 확인 (summarize_articles_node에서 생성된 경우)
         newsletter_html = state.get("newsletter_html")
@@ -603,11 +609,24 @@ def compose_newsletter_node(
                     os.path.dirname(os.path.dirname(__file__)), "templates"
                 )
 
-                logger.info(
-                    f"[cyan]Using {template_style} newsletter template...[/cyan]"
-                )
+                # email_compatible인 경우 원래 template_style 정보를 데이터에 포함
+                if email_compatible:
+                    # 데이터에 template_style 정보 추가 (compose.py에서 사용)
+                    if isinstance(category_summaries, dict):
+                        category_summaries["template_style"] = template_style
+
+                    effective_style = "email_compatible"
+                    logger.info(
+                        f"[cyan]Using email-compatible template with {template_style} content style...[/cyan]"
+                    )
+                else:
+                    effective_style = template_style
+                    logger.info(
+                        f"[cyan]Using {template_style} newsletter template...[/cyan]"
+                    )
+
                 newsletter_html = compose_newsletter(
-                    category_summaries, template_dir, template_style
+                    category_summaries, template_dir, effective_style
                 )
 
         # 뉴스레터 HTML 저장
@@ -935,6 +954,7 @@ def generate_newsletter(
     news_period_days: int = 14,
     domain: str = None,
     template_style: str = "compact",
+    email_compatible: bool = False,
 ) -> Tuple[str, str]:
     """
     키워드를 기반으로 뉴스레터를 생성하는 메인 함수
@@ -944,6 +964,7 @@ def generate_newsletter(
         news_period_days: 최신 뉴스 수집 기간(일 단위), 기본값 14일(2주)
         domain: 키워드를 생성한 도메인 (있는 경우)
         template_style: 뉴스레터 템플릿 스타일 ('compact' 또는 'detailed')
+        email_compatible: 이메일 호환성 처리 적용 여부
 
     Returns:
         (뉴스레터 HTML, 상태)
@@ -994,6 +1015,7 @@ def generate_newsletter(
         "news_period_days": news_period_days,
         "domain": domain,
         "template_style": template_style,
+        "email_compatible": email_compatible,
         "newsletter_topic": newsletter_topic,
         "collected_articles": None,
         "processed_articles": None,

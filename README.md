@@ -15,6 +15,7 @@
 - 📧 **자동 발송**: Postmark를 통한 이메일 발송 및 Google Drive 저장
 - 🎯 **스마트 필터링**: 중복 제거, 주요 소스 우선순위, 키워드별 그룹화
 - 📱 **두 가지 스타일**: Compact(간결) / Detailed(상세) 뉴스레터 지원
+- 📧 **이메일 호환성**: 모든 이메일 클라이언트에서 완벽 렌더링되는 Email-Compatible 템플릿 지원
 - 💰 **비용 추적**: 제공자별 토큰 사용량 및 비용 자동 추적
 
 ## 🚀 빠른 시작
@@ -51,6 +52,12 @@ newsletter run --domain "자율주행" --to user@example.com
 # 간결한 스타일로 생성
 newsletter run --keywords "반도체" --template-style compact
 
+# 이메일 호환 템플릿으로 생성 (모든 이메일 클라이언트에서 호환)
+newsletter run --keywords "AI,머신러닝" --template-style detailed --email-compatible
+
+# 이메일 호환 + 바로 전송
+newsletter run --keywords "배터리,이차전지" --template-style compact --email-compatible --to user@example.com
+
 # 이메일 발송 기능 테스트
 newsletter test-email --to user@example.com --dry-run
 
@@ -77,6 +84,60 @@ flowchart LR
     E --> F[이메일 발송]
     E --> G[Drive 저장]
 ```
+
+## 🧪 테스트
+
+### 자동 테스트 실행
+
+```bash
+# 전체 테스트 실행
+pytest
+
+# Email-Compatible 기능 테스트
+pytest tests/test_email_compatibility.py -v
+
+# 통합 테스트 (네트워크 연결 필요)
+pytest tests/test_email_compatibility_integration.py -v
+
+# 특정 기능 테스트
+pytest tests/test_compose.py::test_email_compatible_rendering -v
+```
+
+### Email-Compatible 기능 테스트
+
+```bash
+# 이메일 호환성 테스트 보고서 생성
+pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityReport::test_generate_compatibility_report -v
+
+# 실제 이메일 전송 테스트 (환경변수 설정 필요)
+export TEST_EMAIL_RECIPIENT="your-email@example.com"
+pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityIntegration::test_email_sending_detailed -v
+
+# 중복 파일 생성 방지 테스트
+pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityIntegration::test_no_duplicate_files_generated -v
+```
+
+### 수동 테스트
+
+```bash
+# 4가지 조합 모두 테스트
+newsletter run --keywords "AI,테스트" --template-style detailed              # 일반 Detailed
+newsletter run --keywords "AI,테스트" --template-style compact               # 일반 Compact  
+newsletter run --keywords "AI,테스트" --template-style detailed --email-compatible  # Email-Compatible Detailed
+newsletter run --keywords "AI,테스트" --template-style compact --email-compatible   # Email-Compatible Compact
+
+# 실제 이메일 전송 테스트
+newsletter run --keywords "AI,테스트" --template-style detailed --email-compatible --to your-email@example.com
+```
+
+### 테스트 커버리지
+
+현재 테스트 커버리지:
+- ✅ **Email-Compatible 템플릿 렌더링**: HTML 구조, CSS 인라인, 호환성 검증
+- ✅ **중복 파일 생성 방지**: 단일 파일 생성 확인
+- ✅ **콘텐츠 무결성**: "이런 뜻이에요", "생각해 볼 거리" 섹션 포함 확인
+- ✅ **크로스 플랫폼 호환성**: Gmail, Outlook, 모바일 클라이언트 호환성
+- ✅ **실제 이메일 전송**: Postmark 통합 테스트
 
 ## 📚 문서
 

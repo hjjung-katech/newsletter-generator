@@ -58,3 +58,6 @@ grpcio>=1.60.0
 pytest>=7.0.0
 pytest-cov>=4.0.0
 pytest-mock>=3.10.0
+
+# Email compatibility (optional)
+premailer>=3.10.0  # CSS inlining for email compatibility

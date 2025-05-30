@@ -338,7 +338,9 @@ class TestEmailDelivery(unittest.TestCase):
             )
 
             self.assertEqual(result.exit_code, 0)
-            self.assertIn("POSTMARK_SERVER_TOKEN이 설정되지 않았습니다", result.stdout)
+            # Rich 색상 태그나 이모지와 상관없이 핵심 메시지만 확인
+            self.assertIn("POSTMARK_SERVER_TOKEN", result.stdout)
+            self.assertIn("설정되지 않았습니다", result.stdout)
 
     @pytest.mark.unit
     def test_email_with_real_newsletter_file(self):
