@@ -376,19 +376,19 @@ def extract_definitions(
     ]
 
 
-def extract_food_for_thought(data: Dict[str, Any]) -> str:
+def extract_food_for_thought(data: Dict[str, Any]) -> Any:
     """생각해볼 거리 추출"""
     food_for_thought = data.get("food_for_thought")
 
     if not food_for_thought:
-        return ""
+        return {"message": ""}
 
     if isinstance(food_for_thought, dict):
-        # detailed 버전용 딕셔너리 형태
+        # 딕셔너리 형태 그대로 반환
         return food_for_thought
     else:
-        # compact 버전용 문자열 형태
-        return str(food_for_thought)
+        # 문자열인 경우 딕셔너리로 변환하여 반환
+        return {"message": str(food_for_thought)}
 
 
 def render_newsletter_template(
@@ -759,12 +759,11 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
     food_for_thought = newsletter_data.get("food_for_thought")
     if food_for_thought:
         if isinstance(food_for_thought, dict):
-            # 간결하게 메시지만 사용
-            compact_data["food_for_thought"] = food_for_thought.get(
-                "message", food_for_thought.get("quote", "")
-            )
+            # 딕셔너리 형태 그대로 유지 (템플릿에서 .message로 접근)
+            compact_data["food_for_thought"] = food_for_thought
         else:
-            compact_data["food_for_thought"] = str(food_for_thought)
+            # 문자열인 경우 딕셔너리로 변환
+            compact_data["food_for_thought"] = {"message": str(food_for_thought)}
 
     return compact_data
 

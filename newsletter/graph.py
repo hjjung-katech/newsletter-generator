@@ -22,10 +22,10 @@ from .date_utils import parse_date_string
 from .utils.file_naming import generate_unified_newsletter_filename
 from .utils.logger import (
     get_logger,
-    step_brief,
     show_filter_brief,
-    step_result,
     show_final_brief,
+    step_brief,
+    step_result,
 )
 
 # 로거 초기화
@@ -127,7 +127,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     """
     수집된 기사들을 처리하는 노드 (날짜 필터링, 중복 제거, 정렬)
     """
-    from .utils.logger import step_brief, show_filter_brief, step_result
+    from .utils.logger import show_filter_brief, step_brief, step_result
 
     step_brief("기사 처리 중")
     start_time = time.time()
@@ -335,7 +335,7 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
     """
     기사들을 요약하여 뉴스레터를 생성하는 노드
     """
-    from .utils.logger import step_brief, show_final_brief
+    from .utils.logger import show_final_brief, step_brief
 
     step_brief("뉴스레터 생성 중")
     start_time = time.time()

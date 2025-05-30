@@ -1060,8 +1060,6 @@ def handle_no_articles_scenario(data, is_compact):
     뉴스 기사가 수집되지 않았을 때 키워드 기반으로 유용한 뉴스레터를 생성합니다.
     """
     from datetime import datetime
-    from .compose import compose_newsletter
-    from .template_manager import TemplateManager
 
     keywords = data.get("keywords", [])
     domain = data.get("domain", "")
@@ -1111,7 +1109,15 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 분야의 중요성�
 
         messages = [HumanMessage(content=intro_prompt)]
         intro_response = llm.invoke(messages)
-        introduction_message = intro_response.content.strip()
+
+        # 안전한 응답 처리
+        if hasattr(intro_response, "content") and intro_response.content:
+            introduction_message = str(intro_response.content).strip()
+        else:
+            logger.warning(
+                f"LLM 소개 메시지 응답에서 유효한 content를 찾을 수 없음: {intro_response}"
+            )
+            introduction_message = f"이번 주는 {newsletter_topic} 분야의 특별한 뉴스 수집이 어려웠지만, 해당 분야의 지속적인 발전과 전략적 중요성을 고려할 때 지속적인 관심과 모니터링이 필요합니다."
 
         # 키워드 기반 생각해 볼 거리 생성
         thought_prompt = f"""다음 주제에 대한 "생각해 볼 거리" 메시지를 생성해주세요:
@@ -1132,7 +1138,15 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전
 
         messages = [HumanMessage(content=thought_prompt)]
         thought_response = llm.invoke(messages)
-        food_for_thought_message = thought_response.content.strip()
+
+        # 안전한 응답 처리
+        if hasattr(thought_response, "content") and thought_response.content:
+            food_for_thought_message = str(thought_response.content).strip()
+        else:
+            logger.warning(
+                f"LLM 생각해볼거리 응답에서 유효한 content를 찾을 수 없음: {thought_response}"
+            )
+            food_for_thought_message = f"{newsletter_topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다."
 
     except Exception as e:
         logger.warning(f"LLM 기반 콘텐츠 생성 실패: {e}")
@@ -1171,7 +1185,7 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전
             "company.website", "https://example.com"
         ),
         "copyright_year": template_manager.get(
-            "company.copyright_year", datetime.now().strftime("%Y")
+            "company.copyright_year", datetime.date.today().strftime("%Y")
         ),
         "company_tagline": template_manager.get(
             "company.tagline", "최신 기술 동향을 한눈에"
@@ -1372,7 +1386,18 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 빠
 
                         messages = [HumanMessage(content=prompt)]
                         response = llm.invoke(messages)
-                        return response.content.strip()
+
+                        # 안전한 응답 처리
+                        if hasattr(response, "content") and response.content:
+                            message = str(response.content).strip()
+                            if message:
+                                return message
+
+                        # content가 없거나 빈 경우 기본값 사용
+                        logger.warning(
+                            f"LLM 응답에서 유효한 content를 찾을 수 없음: {response}"
+                        )
+                        return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다."
 
                     except Exception as e:
                         logger.warning(f"LLM 기반 생각해 볼 거리 생성 실패: {e}")
@@ -1450,10 +1475,27 @@ R&D 전략기획단 전문위원들을 대상으로, 이번 주 뉴스레터의 
 
                     messages = [HumanMessage(content=intro_prompt)]
                     response = llm.invoke(messages)
-                    result_data["introduction_message"] = response.content.strip()
-                    logger.info(
-                        f"[green]LLM이 생성한 introduction_message: {result_data['introduction_message']}[/green]"
-                    )
+
+                    # 안전한 응답 처리
+                    if hasattr(response, "content") and response.content:
+                        intro_message = str(response.content).strip()
+                        if intro_message:
+                            result_data["introduction_message"] = intro_message
+                            logger.info(
+                                f"[green]LLM이 생성한 introduction_message: {intro_message}[/green]"
+                            )
+                        else:
+                            # 빈 응답인 경우 기본값 사용
+                            result_data["introduction_message"] = (
+                                f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
+                            )
+                    else:
+                        logger.warning(
+                            f"LLM 소개문구 응답에서 유효한 content를 찾을 수 없음: {response}"
+                        )
+                        result_data["introduction_message"] = (
+                            f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
+                        )
 
                 except Exception as e:
                     logger.warning(f"LLM 기반 introduction_message 생성 실패: {e}")
