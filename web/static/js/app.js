@@ -283,10 +283,169 @@ class NewsletterApp {
         progressBar.style.width = '100%';
 
         const preview = document.getElementById('newsletterPreview');
-        preview.innerHTML = result.html_content || '<p>뉴스레터 내용을 불러올 수 없습니다.</p>';
+        
+        // Create detailed results display
+        let detailsHtml = '';
+        
+        // Generation Statistics
+        if (result.generation_stats) {
+            const stats = result.generation_stats;
+            detailsHtml += `
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 class="text-lg font-semibold text-blue-800 mb-3">
+                        <i class="fas fa-chart-bar mr-2"></i>Generation Statistics
+                    </h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        ${stats.total_time ? `
+                            <div class="bg-white p-3 rounded shadow-sm">
+                                <div class="font-medium text-gray-700">Total Time</div>
+                                <div class="text-xl font-bold text-blue-600">${stats.total_time.toFixed(2)}s</div>
+                            </div>
+                        ` : ''}
+                        ${stats.articles_count ? `
+                            <div class="bg-white p-3 rounded shadow-sm">
+                                <div class="font-medium text-gray-700">Articles Found</div>
+                                <div class="text-xl font-bold text-green-600">${stats.articles_count}</div>
+                            </div>
+                        ` : ''}
+                        ${result.html_size ? `
+                            <div class="bg-white p-3 rounded shadow-sm">
+                                <div class="font-medium text-gray-700">Newsletter Size</div>
+                                <div class="text-xl font-bold text-purple-600">${(result.html_size / 1024).toFixed(1)}KB</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${stats.step_times ? this.renderStepTimes(stats.step_times) : ''}
+                    ${stats.generated_keywords ? `
+                        <div class="mt-3 p-3 bg-white rounded shadow-sm">
+                            <div class="font-medium text-gray-700 mb-2">Generated Keywords</div>
+                            <div class="text-sm text-gray-600">${stats.generated_keywords}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+        
+        // Processing Information
+        if (result.processing_info) {
+            const info = result.processing_info;
+            detailsHtml += `
+                <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+                    <h4 class="text-lg font-semibold text-green-800 mb-3">
+                        <i class="fas fa-cogs mr-2"></i>Processing Information
+                    </h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div class="bg-white p-2 rounded shadow-sm">
+                            <div class="font-medium text-gray-700">CLI Mode</div>
+                            <div class="font-bold ${info.using_real_cli ? 'text-green-600' : 'text-orange-600'}">
+                                ${info.using_real_cli ? 'Real CLI' : 'Mock CLI'}
+                            </div>
+                        </div>
+                        <div class="bg-white p-2 rounded shadow-sm">
+                            <div class="font-medium text-gray-700">Template</div>
+                            <div class="font-bold text-gray-600">${info.template_style}</div>
+                        </div>
+                        <div class="bg-white p-2 rounded shadow-sm">
+                            <div class="font-medium text-gray-700">Email Mode</div>
+                            <div class="font-bold text-gray-600">${info.email_compatible ? 'Yes' : 'No'}</div>
+                        </div>
+                        <div class="bg-white p-2 rounded shadow-sm">
+                            <div class="font-medium text-gray-700">Period</div>
+                            <div class="font-bold text-gray-600">${info.period_days} days</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Input Parameters
+        if (result.input_params) {
+            const params = result.input_params;
+            detailsHtml += `
+                <div class="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 class="text-lg font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-info-circle mr-2"></i>Input Parameters
+                    </h4>
+                    <div class="text-sm">
+                        ${params.keywords ? `
+                            <div class="mb-2">
+                                <span class="font-medium text-gray-700">Keywords:</span>
+                                <span class="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded">${params.keywords}</span>
+                            </div>
+                        ` : ''}
+                        ${params.domain ? `
+                            <div class="mb-2">
+                                <span class="font-medium text-gray-700">Domain:</span>
+                                <span class="ml-2 px-2 py-1 bg-purple-100 text-purple-800 rounded">${params.domain}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Newsletter Content
+        detailsHtml += `
+            <div class="p-4 bg-white rounded-lg border border-gray-200">
+                <h4 class="text-lg font-semibold text-gray-800 mb-3">
+                    <i class="fas fa-newspaper mr-2"></i>Newsletter Content
+                </h4>
+                <div class="border rounded p-4 bg-gray-50 max-h-96 overflow-y-auto">
+                    ${result.html_content || '<p class="text-gray-500">Newsletter content could not be loaded.</p>'}
+                </div>
+            </div>
+        `;
+
+        preview.innerHTML = detailsHtml;
+
+        // Update button states
+        this.updateResultButtons(result);
 
         // Reload history
         this.loadHistory();
+    }
+    
+    renderStepTimes(stepTimes) {
+        if (!stepTimes || Object.keys(stepTimes).length === 0) return '';
+        
+        const maxTime = Math.max(...Object.values(stepTimes));
+        
+        return `
+            <div class="mt-3 p-3 bg-white rounded shadow-sm">
+                <div class="font-medium text-gray-700 mb-3">Processing Steps</div>
+                <div class="space-y-2">
+                    ${Object.entries(stepTimes).map(([step, time]) => `
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600 capitalize">${step.replace(/_/g, ' ')}</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-24 bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full" style="width: ${(time / maxTime) * 100}%"></div>
+                                </div>
+                                <span class="text-sm font-medium text-gray-700">${time.toFixed(2)}s</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+    
+    updateResultButtons(result) {
+        const downloadBtn = document.getElementById('downloadBtn');
+        const sendEmailBtn = document.getElementById('sendEmailBtn');
+        
+        // Enable/disable buttons based on result status
+        if (result.status === 'success' && result.html_content) {
+            downloadBtn.disabled = false;
+            downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            sendEmailBtn.disabled = false;
+            sendEmailBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {
+            downloadBtn.disabled = true;
+            downloadBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            sendEmailBtn.disabled = true;
+            sendEmailBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
     }
 
     showError(message) {

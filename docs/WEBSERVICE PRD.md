@@ -4,7 +4,7 @@
 > **저장소:** [https://github.com/hjjung-katech/newsletter-generator](https://github.com/hjjung-katech/newsletter-generator)
 > **작성일:** 2025-05-30
 > **수정일:** 2025-05-30 (v1.1 – 예약 발송/관리 기능 추가)
-> **작성자:** *Your Name*
+> **작성자:** *Hojung Jung*
 
 ---
 
