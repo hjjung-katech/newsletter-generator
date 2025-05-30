@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex">
+                    <div class="flex-shrink-0 flex items-center">
+                        <i class="fas fa-newspaper text-2xl text-blue-600 mr-2"></i>
+                        <h1 class="text-xl font-bold text-gray-900">Newsletter Generator</h1>
+                    </div>
+                </div>                <div class="flex items-center space-x-4">
+                    <button id="historyBtn" class="text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-history mr-1"></i> History
+                    </button>
+                    <button id="scheduleBtn" class="text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-calendar mr-1"></i> Schedules
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Tab Navigation -->
+        <div class="mb-8">            <nav class="flex space-x-8" aria-label="Tabs">
+                <button id="generateTab" class="tab-button active bg-blue-100 text-blue-700 px-3 py-2 font-medium text-sm rounded-md">
+                    Generate Newsletter
+                </button>
+                <button id="historyTab" class="tab-button text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md">
+                    History
+                </button>
+                <button id="scheduleManageTab" class="tab-button text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md">
+                    Schedule Management
+                </button>
+            </nav>
+        </div>
+
+        <!-- Generate Newsletter Tab -->
+        <div id="generatePanel" class="tab-panel">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">뉴스레터 생성</h3>
+                    
+                    <!-- Input Method Selection -->
+                    <div class="mb-6">
+                        <label class="text-base font-medium text-gray-900">입력 방식</label>
+                        <div class="mt-4 space-y-4">
+                            <div class="flex items-center">
+                                <input id="keywordsMethod" name="inputMethod" type="radio" value="keywords" checked 
+                                       class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
+                                <label for="keywordsMethod" class="ml-3 block text-sm font-medium text-gray-700">
+                                    키워드 직접 입력
+                                </label>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="domainMethod" name="inputMethod" type="radio" value="domain" 
+                                       class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300">
+                                <label for="domainMethod" class="ml-3 block text-sm font-medium text-gray-700">
+                                    도메인 기반 추천
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keywords Input -->
+                    <div id="keywordsInput" class="mb-6">
+                        <label for="keywords" class="block text-sm font-medium text-gray-700">키워드</label>
+                        <input type="text" id="keywords" name="keywords" 
+                               placeholder="예: AI, 머신러닝, 딥러닝 (쉼표로 구분)"
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <p class="mt-2 text-sm text-gray-500">쉼표로 구분하여 여러 키워드를 입력하세요.</p>
+                    </div>
+
+                    <!-- Domain Input -->
+                    <div id="domainInput" class="mb-6 hidden">
+                        <label for="domain" class="block text-sm font-medium text-gray-700">도메인</label>
+                        <input type="text" id="domain" name="domain" 
+                               placeholder="예: 인공지능, 블록체인, 핀테크"
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                        <p class="mt-2 text-sm text-gray-500">관심 있는 분야나 도메인을 입력하세요.</p>
+                    </div>
+
+                    <!-- Email Input -->
+                    <div class="mb-6">
+                        <label for="email" class="block text-sm font-medium text-gray-700">이메일 주소 (선택)</label>
+                        <input type="email" id="email" name="email" 
+                               placeholder="뉴스레터를 받을 이메일 주소"
+                               class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+
+                    <!-- Schedule Options -->
+                    <div class="mb-6">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="enableSchedule" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-sm text-gray-700">정기 발송 예약</span>
+                        </label>
+                    </div>
+
+                    <!-- Schedule Settings (Hidden by default) -->
+                    <div id="scheduleSettings" class="mb-6 hidden">
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <h4 class="text-sm font-medium text-gray-900 mb-3">발송 주기 설정</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">빈도</label>
+                                    <select id="frequency" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <option value="DAILY">매일</option>
+                                        <option value="WEEKLY" selected>매주</option>
+                                        <option value="MONTHLY">매월</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">시간</label>
+                                    <input type="time" id="scheduleTime" value="09:00" 
+                                           class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                </div>
+                            </div>
+                            <div id="weeklyOptions" class="mt-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">요일 선택</label>
+                                <div class="flex space-x-4">
+                                    <label class="flex items-center">
+                                        <input type="checkbox" value="MO" class="weekday rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm">월</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" value="TU" class="weekday rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm">화</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" value="WE" class="weekday rounded border-gray-300 text-blue-600" checked>
+                                        <span class="ml-1 text-sm">수</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" value="TH" class="weekday rounded border-gray-300 text-blue-600">
+                                        <span class="ml-1 text-sm">목</span>
+                                    </label>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" value="FR" class="weekday rounded border-gray-300 text-blue-600" checked>
+                                        <span class="ml-1 text-sm">금</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-4">
+                        <button id="generateBtn" 
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i class="fas fa-play mr-2"></i>생성하기
+                        </button>
+                        <button id="previewBtn" 
+                                class="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                            <i class="fas fa-eye mr-2"></i>미리보기
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div id="progressSection" class="mt-6 hidden">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">처리 중...</h3>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                            <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="progressText" class="text-sm text-gray-600">뉴스레터를 생성하고 있습니다...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="resultsSection" class="mt-6 hidden">
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">생성 결과</h3>
+                            <div class="space-x-2">
+                                <button id="downloadBtn" class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md">
+                                    <i class="fas fa-download mr-2"></i>다운로드
+                                </button>
+                                <button id="sendEmailBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md">
+                                    <i class="fas fa-paper-plane mr-2"></i>이메일 발송
+                                </button>
+                            </div>
+                        </div>
+                        <div id="newsletterPreview" class="border rounded-lg p-4 bg-gray-50 max-h-96 overflow-y-auto">
+                            <!-- Newsletter content will be inserted here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="historyPanel" class="tab-panel hidden">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">생성 히스토리</h3>
+                    <div id="historyList">
+                        <!-- History items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schedule Management Tab -->
+        <div id="scheduleManagePanel" class="tab-panel hidden">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">예약 관리</h3>
+                    <div id="schedulesList">
+                        <!-- Schedule items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PORT=$PORT
+      - FLASK_ENV=production
+      - SECRET_KEY=$SECRET_KEY
+      - REDIS_URL=$REDIS_URL
+      - SENDGRID_API_KEY=$SENDGRID_API_KEY
+      - FROM_EMAIL=$FROM_EMAIL
+      - OPENAI_API_KEY=$OPENAI_API_KEY
+    ports:
+      - "$PORT:$PORT"
+    depends_on:
+      - redis
+      
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_URL=$REDIS_URL
+      - OPENAI_API_KEY=$OPENAI_API_KEY
+      - SENDGRID_API_KEY=$SENDGRID_API_KEY
+    command: "python web/worker.py"
+    depends_on:
+      - redis
+      
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
