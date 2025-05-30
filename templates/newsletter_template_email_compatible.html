@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ newsletter_title | default('주간 산업 동향 뉴스 클리핑') }}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Malgun Gothic', Arial, sans-serif; background-color: #f4f4f4; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <!--[if mso | IE]>
+                <table align="center" border="0" cellpadding="0" cellspacing="0" width="600">
+                <tr>
+                <td>
+                <![endif]-->
+                <table width="100%" style="max-width: 600px; background-color: #ffffff; margin: 0 auto;" cellpadding="0" cellspacing="0" border="0">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 30px 30px 20px 30px; text-align: center; border-bottom: 1px solid #ecf0f1;">
+                            <h1 style="margin: 0; color: #2c3e50; font-size: 24px; font-weight: bold; line-height: 1.4;">
+                                {{ newsletter_title | default('주간 산업 동향 뉴스 클리핑') }}
+                            </h1>
+                            {% if newsletter_topic or domain %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 15px;">
+                                <tr>
+                                    <td align="center">
+                                        <table cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td style="padding: 8px 18px; background-color: #e8f4f8; color: #2c3e50; font-size: 14px; border: 1px solid #b8dce8;">
+                                                    {{ newsletter_topic | default(domain) }} 분야
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                            <p style="margin: 10px 0 0 0; color: #666666; font-size: 13px;">
+                                {{ generation_date }}{% if issue_no %} · 제{{ issue_no }}호{% endif %}{% if generation_timestamp %} · {{ generation_timestamp }}{% endif %}
+                            </p>
+                            {% if search_keywords %}
+                            <p style="margin: 5px 0 0 0; color: #888888; font-size: 11px; font-style: italic;">
+                                검색 키워드: {{ search_keywords }}
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if recipient_greeting %}
+                    <tr>
+                        <td style="padding: 20px 30px 0 30px;">
+                            <p style="margin: 0; font-size: 16px; color: #333333;">{{ recipient_greeting }}</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if introduction_message %}
+                    <tr>
+                        <td style="padding: 20px 30px; border-bottom: 1px solid #ecf0f1;">
+                            <p style="margin: 0; font-size: 16px; color: #333333; line-height: 1.6;">{{ introduction_message }}</p>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Top Articles Section -->
+                    {% if top_articles %}
+                    <tr>
+                        <td style="padding: 20px 30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #fff9e6; padding: 20px;">
+                                <tr>
+                                    <td>
+                                        <h2 style="margin: 0 0 20px 0; color: #2c3e50; font-size: 20px; font-weight: bold;">
+                                            🔥 이번 주 꼭 봐야 할 {{ top_articles|length }}선
+                                        </h2>
+                                    </td>
+                                </tr>
+                                {% for article in top_articles %}
+                                <tr>
+                                    <td style="padding-bottom: 15px;">
+                                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td width="30" valign="top" style="padding-right: 15px;">
+                                                    <table cellpadding="0" cellspacing="0" border="0">
+                                                        <tr>
+                                                            <td style="width: 25px; height: 25px; background-color: #0d47a1; color: white; text-align: center; line-height: 25px; font-weight: bold; font-size: 12px;">
+                                                                {{ loop.index }}
+                                                            </td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                                <td>
+                                                    <h3 style="margin: 0 0 5px 0; font-size: 15px; line-height: 1.4;">
+                                                        <a href="{{ article.url }}" style="color: #2c3e50; text-decoration: none;">
+                                                            {{ article.title }}
+                                                        </a>
+                                                    </h3>
+                                                    <p style="margin: 0 0 5px 0; color: #555555; font-size: 13px; line-height: 1.4;">
+                                                        {{ article.snippet }}
+                                                    </p>
+                                                    <span style="color: #777777; font-size: 11px;">
+                                                        {{ article.source_and_date }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Main Sections -->
+                    {% set is_compact_style = template_style == 'compact' %}
+                    
+                    {% if is_compact_style and grouped_sections %}
+                    <!-- Compact style: use grouped_sections -->
+                    {% for group in grouped_sections %}
+                    <tr>
+                        <td style="padding: 20px 30px; border-top: 1px solid #ecf0f1;">
+                            <h2 style="margin: 0 0 15px 0; color: #0d47a1; font-size: 18px; font-weight: bold;">
+                                {{ group.heading }}
+                            </h2>
+                            
+                            {% if group.intro %}
+                            <p style="margin: 0 0 10px 0; color: #333333; font-size: 14px; line-height: 1.6;">
+                                {{ group.intro }}
+                            </p>
+                            {% endif %}
+
+                            {% if group.articles %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                {% for article in group.articles %}
+                                <tr>
+                                    <td style="padding: 0 0 8px 20px;">
+                                        <table cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td valign="top" style="padding-right: 8px; color: #333333; font-size: 13px;">•</td>
+                                                <td>
+                                                    <a href="{{ article.url }}" style="color: #0d47a1; text-decoration: none; font-size: 13px;">
+                                                        {{ article.title }}
+                                                    </a>
+                                                    {% if article.source_and_date %}
+                                                    <span style="color: #777777; font-size: 11px;">
+                                                        ({{ article.source_and_date }})
+                                                    </span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                            {% endif %}
+
+                            <!-- Compact style에서는 각 그룹 내 정의를 표시하지 않음 -->
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    
+                    {% else %}
+                    <!-- Detailed style: use sections -->
+                    {% for section in sections %}
+                    <tr>
+                        <td style="padding: 20px 30px; border-top: 1px solid #ecf0f1;">
+                            <h2 style="margin: 0 0 15px 0; color: #0d47a1; font-size: 18px; font-weight: bold;">
+                                {{ section.title }}
+                            </h2>
+                            
+                            {% if section.summary_paragraphs %}
+                            {% for paragraph in section.summary_paragraphs %}
+                            <p style="margin: 0 0 10px 0; color: #333333; font-size: 14px; line-height: 1.6;">
+                                {{ paragraph }}
+                            </p>
+                            {% endfor %}
+                            {% endif %}
+
+                            {% if section.news_links %}
+                            <h3 style="margin: 20px 0 10px 0; color: #2c3e50; font-size: 16px; font-weight: bold;">
+                                📄 참고 뉴스 링크
+                            </h3>
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                {% for link in section.news_links %}
+                                <tr>
+                                    <td style="padding: 0 0 8px 20px;">
+                                        <table cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td valign="top" style="padding-right: 8px; color: #333333; font-size: 13px;">•</td>
+                                                <td>
+                                                    <a href="{{ link.url }}" style="color: #0d47a1; text-decoration: none; font-size: 13px;">
+                                                        {{ link.title }}
+                                                    </a>
+                                                    {% if link.source_and_date %}
+                                                    <span style="color: #777777; font-size: 11px;">
+                                                        ({{ link.source_and_date }})
+                                                    </span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                            {% endif %}
+
+                            <!-- Detailed style에서는 각 섹션별 정의를 표시 -->
+                            {% if section.definitions %}
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 15px; background-color: #f8f9fa; padding: 10px;">
+                                <tr>
+                                    <td>
+                                        <h4 style="margin: 0 0 8px 0; color: #0d47a1; font-size: 14px; font-weight: bold;">
+                                            📖 이런 뜻이에요!
+                                        </h4>
+                                        {% for definition in section.definitions %}
+                                        <p style="margin: 0 0 6px 0; font-size: 13px; color: #333333;">
+                                            <strong style="color: #0d47a1;">{{ definition.term }}</strong>: {{ definition.explanation }}
+                                        </p>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endif %}
+
+                    <!-- Global Definitions: compact에서만 표시, detailed에서는 표시하지 않음 -->
+                    {% if definitions and is_compact_style %}
+                    <tr>
+                        <td style="padding: 20px 30px; border-top: 1px solid #ecf0f1;">
+                            <h2 style="margin: 0 0 15px 0; color: #0d47a1; font-size: 18px; font-weight: bold;">
+                                📖 이런 뜻이에요
+                            </h2>
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8f9fa; padding: 15px;">
+                                <tr>
+                                    <td>
+                                        {% for definition in definitions %}
+                                        <p style="margin: 0 0 10px 0; font-size: 14px; color: #333333;">
+                                            <strong style="color: #0d47a1;">{{ definition.term }}</strong>: {{ definition.explanation }}
+                                        </p>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if food_for_thought %}
+                    <tr>
+                        <td style="padding: 30px 30px 20px 30px; border-top: 1px solid #ecf0f1;">
+                            <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 18px; font-weight: bold;">
+                                💡 생각해 볼 거리
+                            </h3>
+                            {% if food_for_thought.quote %}
+                            <p style="margin: 0 0 10px 0; color: #2c3e50; font-size: 16px; font-style: italic; text-align: center;">
+                                "{{ food_for_thought.quote }}"
+                            </p>
+                            {% endif %}
+                            {% if food_for_thought.author %}
+                            <p style="margin: 0 0 15px 0; color: #555555; font-size: 14px; text-align: center;">
+                                - {{ food_for_thought.author }}
+                            </p>
+                            {% endif %}
+                            {% if food_for_thought.message %}
+                            <p style="margin: 0; color: #333333; font-size: 14px; line-height: 1.6;">
+                                {{ food_for_thought.message }}
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    {% if closing_message %}
+                    <tr>
+                        <td style="padding: 20px 30px 30px 30px; border-top: 1px solid #ecf0f1;">
+                            <p style="margin: 0 0 10px 0; font-size: 16px; color: #333333;">
+                                {{ closing_message }}
+                            </p>
+                            {% if editor_signature %}
+                            <p style="margin: 0; font-size: 14px; color: #555555; font-style: italic; text-align: right;">
+                                {{ editor_signature }}
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; text-align: center; background-color: #f8f9fa;">
+                            {% if company_name %}
+                            <p style="margin: 0 0 5px 0; color: #999999; font-size: 12px;">
+                                &copy; {{ copyright_year | default('2025') }} {{ company_name }}. All rights reserved.
+                            </p>
+                            {% endif %}
+                            {% if company_tagline %}
+                            <p style="margin: 0 0 5px 0; color: #999999; font-size: 11px; font-style: italic;">
+                                {{ company_tagline }}
+                            </p>
+                            {% endif %}
+                            {% if footer_contact %}
+                            <p style="margin: 0 0 5px 0; color: #999999; font-size: 11px;">
+                                {{ footer_contact }}
+                            </p>
+                            {% endif %}
+                            {% if footer_disclaimer %}
+                            <p style="margin: 0; color: #999999; font-size: 11px;">
+                                {{ footer_disclaimer }}
+                            </p>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+                <!--[if mso | IE]>
+                </td>
+                </tr>
+                </table>
+                <![endif]-->
+            </td>
+        </tr>
+    </table>
+</body>
+</html> 

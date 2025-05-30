@@ -29,7 +29,7 @@ class NewsletterConfig:
                 "max_definitions": 3,  # 최대 용어 정의 수
                 "summary_style": "brief",  # 요약 스타일
                 "template_name": "newsletter_template_compact.html",
-                "title_default": "주간 산업 동향 브리프",
+                "title_default": "주간 산업 동향 뉴스 클리핑",
             },
             "detailed": {
                 "max_articles": None,  # 모든 필터된 기사
@@ -38,6 +38,15 @@ class NewsletterConfig:
                 "max_definitions": None,  # 그룹별 0-2개, 중복 없음
                 "summary_style": "detailed",  # 요약 스타일
                 "template_name": "newsletter_template.html",
+                "title_default": "주간 산업 동향 뉴스 클리핑",
+            },
+            "email_compatible": {
+                "max_articles": None,  # 모든 필터된 기사 (detailed 스타일 기본값)
+                "top_articles_count": 3,  # 상위 기사 수
+                "max_groups": 6,  # 최대 그룹 수
+                "max_definitions": None,  # 그룹별 0-2개, 중복 없음
+                "summary_style": "detailed",  # 요약 스타일 (detailed 스타일 기본값)
+                "template_name": "newsletter_template_email_compatible.html",
                 "title_default": "주간 산업 동향 뉴스 클리핑",
             },
         }
@@ -51,7 +60,7 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
     Args:
         data: 뉴스레터 데이터 (딕셔너리 또는 리스트)
         template_dir: 템플릿 디렉토리 경로
-        style: 뉴스레터 스타일 ("compact" 또는 "detailed")
+        style: 뉴스레터 스타일 ("compact", "detailed", "email_compatible")
 
     Returns:
         str: 렌더링된 HTML 뉴스레터
@@ -101,8 +110,32 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
 
         data = newsletter_data
 
-    # 설정 가져오기
-    config = NewsletterConfig.get_config(style)
+    # email_compatible인 경우 template_style 정보를 확인하여 적절한 설정 적용
+    if style == "email_compatible":
+        # 데이터에서 원래 template_style 확인 (graph.py에서 전달됨)
+        original_template_style = data.get("template_style", "detailed")
+
+        # email_compatible 기본 설정을 가져옴
+        config = NewsletterConfig.get_config(style)
+
+        # 원래 template_style의 설정을 일부 적용
+        base_config = NewsletterConfig.get_config(original_template_style)
+
+        # 중요한 설정들을 원래 스타일에서 가져옴
+        config["max_articles"] = base_config["max_articles"]
+        config["max_groups"] = base_config["max_groups"]
+        config["max_definitions"] = base_config["max_definitions"]
+        config["summary_style"] = base_config["summary_style"]
+
+        print(
+            f"Composing email-compatible newsletter with {original_template_style} content style..."
+        )
+    else:
+        # 설정 가져오기
+        config = NewsletterConfig.get_config(style)
+        print(
+            f"Composing {style} newsletter for topic: {data.get('newsletter_topic', 'N/A')}..."
+        )
 
     # 날짜 형식 포맷팅 처리 (기존 로직 유지)
     if "sections" in data:
@@ -127,10 +160,6 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
                     fmt = format_date_for_display(date_str=d_str)
                     if fmt:
                         art["source_and_date"] = f"{src}, {fmt}"
-
-    print(
-        f"Composing {style} newsletter for topic: {data.get('newsletter_topic', 'N/A')}..."
-    )
 
     # 1. 뉴스키워드 결정 - 이미 data에 포함됨
 
@@ -224,10 +253,36 @@ def create_grouped_sections(
     grouped_sections(주제별 기사 그룹)은 top_articles와 분리하여 생성합니다.
     - top_articles에 포함된 기사 URL은 제외
     - 항상 top_articles와 별도 관리
+    - 각 그룹에 해당하는 definitions 포함
     """
     # 기존 grouped_sections가 있으면 사용
     if "grouped_sections" in data:
-        return data["grouped_sections"][:max_groups]
+        existing_sections = data["grouped_sections"][:max_groups]
+        # 기존 grouped_sections에 definitions가 없으면 추가
+        for section in existing_sections:
+            if "definitions" not in section or not section["definitions"]:
+                # 원본 sections에서 해당하는 정의 찾기
+                section_title = (
+                    section.get("heading", "")
+                    .replace("🚀 ", "")
+                    .replace("🏛️ ", "")
+                    .replace("📊 ", "")
+                    .replace("🌐 ", "")
+                    .replace("📈 ", "")
+                )
+                original_section = next(
+                    (
+                        s
+                        for s in data.get("sections", [])
+                        if s.get("title") == section_title
+                    ),
+                    None,
+                )
+                if original_section and "definitions" in original_section:
+                    section["definitions"] = original_section["definitions"]
+                else:
+                    section["definitions"] = []
+        return existing_sections
 
     # sections에서 grouped_sections 생성
     sections = data.get("sections", [])
@@ -262,7 +317,7 @@ def create_grouped_sections(
                 : max_articles - len(top_articles) - article_count
             ]
 
-        if remaining_articles:
+        if remaining_articles:  # 남은 기사가 있을 때만 섹션 추가
             # 이모지 추가된 섹션 제목
             section_title = add_emoji_to_section_title(section.get("title", "기타"))
 
@@ -286,6 +341,7 @@ def create_grouped_sections(
                 "heading": section_title,
                 "intro": intro,
                 "articles": remaining_articles,
+                "definitions": section.get("definitions", []),  # 섹션의 정의 포함
             }
             grouped_sections.append(grouped_section)
             article_count += len(remaining_articles)
@@ -346,7 +402,11 @@ def render_newsletter_template(
         loader=FileSystemLoader(template_dir),
         autoescape=select_autoescape(["html", "xml"]),
     )
-    template = env.get_template(config["template_name"])
+
+    template_name = config["template_name"]
+    print(f"[DEBUG] Loading template: {template_name}")
+    template = env.get_template(template_name)
+    print(f"[DEBUG] Template loaded successfully: {template_name}")
 
     # 현재 날짜와 시간 가져오기
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -445,6 +505,32 @@ def render_newsletter_template(
             ),
             "grouped_sections": grouped_sections,
         }
+    elif config["template_name"] == "newsletter_template_email_compatible.html":
+        # Email-compatible 템플릿용 컨텍스트 (template_style에 따라 다른 데이터 사용)
+        context = {
+            **common_context,
+            "recipient_greeting": data.get("recipient_greeting", "안녕하세요,"),
+            "introduction_message": data.get(
+                "introduction_message",
+                "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
+            ),
+            "closing_message": data.get(
+                "closing_message",
+                "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+            ),
+            "editor_signature": data.get("editor_signature", "편집자 드림"),
+            # Email-compatible 템플릿은 template_style에 따라 다른 데이터를 사용
+            "template_style": data.get("template_style", "detailed"),
+            "grouped_sections": grouped_sections,  # compact style용
+            "sections": data.get("sections", []),  # detailed style용
+        }
+
+        # 검색 키워드 추가
+        if "search_keywords" in data and data["search_keywords"]:
+            if isinstance(data["search_keywords"], list):
+                context["search_keywords"] = ", ".join(data["search_keywords"])
+            else:
+                context["search_keywords"] = data["search_keywords"]
     else:
         # Detailed 템플릿용 컨텍스트
         context = {

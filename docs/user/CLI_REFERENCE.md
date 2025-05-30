@@ -52,6 +52,7 @@ newsletter run [OPTIONS]
 | `--suggest-count` | INTEGER | 10 | `--domain` 사용 시 생성할 키워드 개수 |
 | `--period`, `-p` | INTEGER | 14 | 최신 뉴스 수집 기간(일 단위) |
 | `--template-style` | CHOICE | detailed | 템플릿 스타일 (`compact` 또는 `detailed`) |
+| `--email-compatible` | FLAG | False | 이메일 클라이언트 호환 템플릿 사용 |
 
 ### 출력 옵션
 

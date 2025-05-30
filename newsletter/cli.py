@@ -79,7 +79,12 @@ def run(
     template_style: str = typer.Option(
         "compact",
         "--template-style",
-        help="Newsletter template style: 'compact' (short, main news focused), 'detailed' (full length with all sections).",
+        help="Newsletter template style: 'compact' (short, main news focused) or 'detailed' (full length with all sections).",
+    ),
+    email_compatible: bool = typer.Option(
+        False,
+        "--email-compatible",
+        help="Apply email compatibility processing (inline CSS, table layout). Recommended for email sending.",
     ),
     drive: bool = typer.Option(
         False,
@@ -110,17 +115,96 @@ def run(
         3, "--max-per-source", min=1, help="Maximum number of articles per source."
     ),
     log_level: str = typer.Option(
-        "INFO",
+        "WARNING",
         "--log-level",
         help="Logging level: DEBUG, INFO, WARNING, ERROR",
     ),
 ):
     """
-    Run the newsletter generation and saving process.
-    Can generate keywords from a domain or use provided keywords, or load from a config file.
+    Generate and optionally send a newsletter based on keywords or domain.
+
+    This command creates a newsletter by searching for recent news articles,
+    processing them using AI, and optionally sending via email or saving to various formats.
     """
-    # 로그 레벨 설정
+    import time
+
+    from . import deliver as news_deliver
+    from . import graph, tools
+
+    # 로깅 레벨 설정
     set_log_level(log_level)
+
+    # 설정 정보 표시
+    console.print(f"\n[bold blue]🚀 Newsletter Generator 시작[/bold blue]")
+    console.print(f"[cyan]템플릿 스타일:[/cyan] {template_style}")
+    console.print(
+        f"[cyan]이메일 호환 모드:[/cyan] {'✅ 활성화' if email_compatible else '❌ 비활성화'}"
+    )
+    console.print(f"[cyan]뉴스 수집 기간:[/cyan] {news_period_days}일")
+
+    # 이메일 발송 설정 확인 및 표시
+    if to:
+        console.print(f"\n[bold yellow]📧 이메일 발송 설정 확인[/bold yellow]")
+        console.print(f"[cyan]수신자:[/cyan] {to}")
+
+        # EMAIL_SENDER 설정 상태 확인 및 표시
+        if config.EMAIL_SENDER:
+            console.print(f"[cyan]발송자:[/cyan] {config.EMAIL_SENDER}")
+            console.print("[green]✅ 이메일 발송자 설정 완료[/green]")
+        else:
+            console.print("[red]❌ EMAIL_SENDER가 설정되지 않았습니다![/red]")
+            console.print("[yellow]이메일 발송을 위해 다음 설정이 필요합니다:[/yellow]")
+            console.print("[cyan].env 파일에 다음을 추가하세요:[/cyan]")
+            console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
+            console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_token[/cyan]")
+            console.print(
+                "\n[yellow]참고: Postmark에서 발송자 이메일 주소가 인증되어야 합니다.[/yellow]"
+            )
+            raise typer.Exit(code=1)
+
+        # POSTMARK_SERVER_TOKEN 설정 상태 확인
+        if config.POSTMARK_SERVER_TOKEN:
+            console.print("[green]✅ Postmark 토큰 설정 완료[/green]")
+        else:
+            console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
+            console.print(
+                "[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]"
+            )
+            console.print(
+                "[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]"
+            )
+            raise typer.Exit(code=1)
+
+        # 이메일 호환 모드 권장
+        if not email_compatible:
+            console.print(
+                "[yellow]💡 이메일 발송 시 --email-compatible 옵션 사용을 권장합니다.[/yellow]"
+            )
+            console.print(
+                "[yellow]   이 옵션은 이메일 클라이언트 호환성을 개선합니다.[/yellow]"
+            )
+
+    elif email_compatible:
+        console.print(
+            "[yellow]💡 --email-compatible 옵션이 활성화되었지만 이메일 수신자가 지정되지 않았습니다.[/yellow]"
+        )
+        console.print(
+            "[yellow]   이메일 발송을 원하시면 --to 옵션을 추가하세요.[/yellow]"
+        )
+
+    # 출력 형식 표시
+    if output_format:
+        console.print(f"[cyan]출력 형식:[/cyan] {output_format}")
+    elif drive:
+        console.print(f"[cyan]출력:[/cyan] Google Drive 저장")
+    else:
+        console.print(f"[cyan]출력:[/cyan] 로컬 HTML 파일")
+
+    console.print("")  # 빈 줄 추가
+
+    # 나머지 기존 로직 계속...
+
+    # 로거 초기화
     logger = get_logger()
 
     # 나머지 코드는 그대로 유지
@@ -185,6 +269,14 @@ def run(
                     logger.warning(
                         f"Invalid template_style in config file: {config_template_style}. Using default: {template_style}"
                     )
+
+            # Email compatibility from config
+            config_email_compatible = newsletter_settings.get("email_compatible")
+            if config_email_compatible is not None:
+                email_compatible = bool(config_email_compatible)
+                logger.success(
+                    f"Using email_compatible from config file: {email_compatible}"
+                )
 
             # Extract and log output directory from config
             output_directory = newsletter_settings.get(
@@ -296,6 +388,7 @@ def run(
         news_period_days,
         domain=domain,
         template_style=template_style,  # 템플릿 스타일 추가
+        email_compatible=email_compatible,  # 이메일 호환성 옵션 추가
     )
 
     if status == "error":
@@ -367,15 +460,20 @@ def run(
     # 파일 이름에 안전한 주제 문자열 생성
     safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
 
-    # 기본 스타일 설정 (output_format이 있으면 그에 맞춘 확장자 처리)
-    default_style = "detailed"  # 기본값
+    # 실제 파라미터를 반영한 스타일 설정
+    effective_style = template_style
+    if email_compatible:
+        # email_compatible인 경우 "email_compatible"를 사용하되 파일명에는 original style 반영
+        file_style = f"{template_style}_email_compatible"
+    else:
+        file_style = template_style
 
     # output_format이 지정된 경우 통일된 함수 사용
     if output_format:
         # 통일된 파일명 생성 (확장자 제외)
         full_file_path = generate_unified_newsletter_filename(
             topic=safe_topic,
-            style=default_style,
+            style=file_style,
             timestamp=f"{datetime.now().strftime('%Y%m%d')}_{current_time_str}",
             use_current_date=True,
             generation_type="original",
@@ -384,7 +482,8 @@ def run(
         filename_base = os.path.splitext(os.path.basename(full_file_path))[0]
     else:
         # output_format이 없으면 기존 방식 호환성 유지 (새로운 날짜 형식 적용)
-        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}"
+        style_suffix = f"_{file_style}" if file_style != "detailed" else ""
+        filename_base = f"{current_date_str}_{current_time_str}_newsletter_{safe_topic}{style_suffix}"
 
     # 뉴스레터 파일 저장
     if output_format:
@@ -429,12 +528,21 @@ def run(
             email_subject = (
                 f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
             )
+
+            # 이메일 발송 시 발송자 정보 다시 확인 및 표시
+            console.print(f"\n[cyan]📤 이메일 발송 중...[/cyan]")
+            console.print(f"[info]발송자: {config.EMAIL_SENDER}[/info]")
+            console.print(f"[info]수신자: {to}[/info]")
+            console.print(f"[info]제목: {email_subject}[/info]")
+
             if news_deliver.send_email(
                 to_email=to, subject=email_subject, html_content=html_content
             ):
                 logger.success(f"Email sent successfully to {to}")
+                console.print(f"[green]✅ 이메일이 성공적으로 발송되었습니다![/green]")
             else:
                 logger.warning(f"Failed to send email to {to}")
+                console.print(f"[red]❌ 이메일 발송에 실패했습니다.[/red]")
     else:
         logger.info("Email sending skipped as no recipient was provided")
 
@@ -462,7 +570,7 @@ def collect(
         False, "--no-major-sources-filter", help="Don't prioritize major news sources."
     ),
     log_level: str = typer.Option(
-        "INFO",
+        "WARNING",
         "--log-level",
         help="Logging level: DEBUG, INFO, WARNING, ERROR",
     ),
@@ -589,7 +697,12 @@ def test(
     template_style: str = typer.Option(
         "detailed",
         "--template-style",
-        help="Newsletter template style: 'compact' (short, main news focused), 'detailed' (full length with all sections).",
+        help="Newsletter template style: 'compact' (short, main news focused) or 'detailed' (full length with all sections).",
+    ),
+    email_compatible: bool = typer.Option(
+        False,
+        "--email-compatible",
+        help="Apply email compatibility processing (inline CSS, table layout). Recommended for email sending.",
     ),
     track_cost: bool = typer.Option(
         False, "--track-cost", help="Enable LangSmith cost tracking during generation."
@@ -623,15 +736,29 @@ def test(
                 f"[cyan]Running in template mode - just re-rendering existing data with {template_style} style[/cyan]"
             )
 
+            if email_compatible:
+                console.print(f"[cyan]Email compatibility mode enabled[/cyan]")
+
             # 템플릿 스타일에 따른 compose_newsletter 함수 사용
             from .compose import compose_newsletter
 
             template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
 
-            console.print(
-                f"[cyan]Rendering newsletter using {template_style} template...[/cyan]"
-            )
-            html_content = compose_newsletter(data, template_dir, style=template_style)
+            # email_compatible인 경우 데이터에 template_style 정보 추가
+            if email_compatible:
+                if isinstance(data, dict):
+                    data["template_style"] = template_style
+                effective_style = "email_compatible"
+                console.print(
+                    f"[cyan]Rendering newsletter using email-compatible template with {template_style} content style...[/cyan]"
+                )
+            else:
+                effective_style = template_style
+                console.print(
+                    f"[cyan]Rendering newsletter using {template_style} template...[/cyan]"
+                )
+
+            html_content = compose_newsletter(data, template_dir, style=effective_style)
 
             # 파일명 생성 및 저장
             if output is None:
@@ -862,6 +989,8 @@ def test(
                 "news_period_days": news_period_days,
                 "domain": domain,
                 "newsletter_topic": newsletter_topic,
+                "template_style": template_style,
+                "email_compatible": email_compatible,
                 "collected_articles": collected_articles,  # 이미 수집된 기사
                 "processed_articles": None,
                 "article_summaries": None,
@@ -980,6 +1109,184 @@ def test(
     except Exception as e:
         console.print(f"[red]Error in test command: {e}[/red]")
         traceback.print_exc()
+
+
+@app.command()
+def check_config():
+    """현재 설정 상태를 확인합니다 (이메일, LLM, 기타 설정)."""
+    console.print("\n[bold blue]🔧 Newsletter Generator 설정 상태 확인[/bold blue]")
+    console.print("=" * 60)
+
+    # 1. 이메일 설정 확인
+    console.print(f"\n[bold yellow]📧 이메일 발송 설정[/bold yellow]")
+
+    # EMAIL_SENDER 확인
+    if config.EMAIL_SENDER:
+        console.print(f"[green]✅ EMAIL_SENDER:[/green] {config.EMAIL_SENDER}")
+        console.print("   - Postmark에서 인증된 이메일 주소인지 확인하세요")
+    else:
+        console.print("[red]❌ EMAIL_SENDER:[/red] 설정되지 않음")
+        console.print("   - .env 파일에 EMAIL_SENDER=your_email@domain.com 추가 필요")
+
+    # POSTMARK_SERVER_TOKEN 확인
+    if config.POSTMARK_SERVER_TOKEN:
+        # 토큰의 일부만 표시 (보안상 전체 표시 안함)
+        masked_token = (
+            config.POSTMARK_SERVER_TOKEN[:8] + "..." + config.POSTMARK_SERVER_TOKEN[-4:]
+            if len(config.POSTMARK_SERVER_TOKEN) > 12
+            else "***"
+        )
+        console.print(f"[green]✅ POSTMARK_SERVER_TOKEN:[/green] {masked_token}")
+    else:
+        console.print("[red]❌ POSTMARK_SERVER_TOKEN:[/red] 설정되지 않음")
+        console.print("   - .env 파일에 POSTMARK_SERVER_TOKEN=your_token 추가 필요")
+
+    # 이메일 발송 가능 여부 종합 판단
+    email_ready = config.EMAIL_SENDER and config.POSTMARK_SERVER_TOKEN
+    if email_ready:
+        console.print("\n[green]🎉 이메일 발송 설정 완료![/green]")
+        console.print("   newsletter run --to your@email.com 명령어로 이메일 발송 가능")
+    else:
+        console.print("\n[red]⚠️  이메일 발송 설정 미완료[/red]")
+        console.print("   위의 누락된 설정을 .env 파일에 추가해주세요")
+
+    # 2. LLM 설정 확인
+    console.print(f"\n[bold yellow]🤖 LLM 설정[/bold yellow]")
+
+    # Gemini API Key 확인
+    if config.GEMINI_API_KEY:
+        masked_key = (
+            config.GEMINI_API_KEY[:8] + "..." + config.GEMINI_API_KEY[-4:]
+            if len(config.GEMINI_API_KEY) > 12
+            else "***"
+        )
+        console.print(f"[green]✅ GEMINI_API_KEY:[/green] {masked_key}")
+    else:
+        console.print("[red]❌ GEMINI_API_KEY:[/red] 설정되지 않음")
+        console.print("   - Gemini를 사용하려면 .env 파일에 GEMINI_API_KEY 추가 필요")
+
+    # OpenAI API Key 확인 (선택사항)
+    openai_key = os.getenv("OPENAI_API_KEY")
+    if openai_key:
+        masked_key = (
+            openai_key[:8] + "..." + openai_key[-4:] if len(openai_key) > 12 else "***"
+        )
+        console.print(f"[green]✅ OPENAI_API_KEY:[/green] {masked_key}")
+    else:
+        console.print("[yellow]⚪ OPENAI_API_KEY:[/yellow] 설정되지 않음 (선택사항)")
+
+    # Anthropic API Key 확인 (선택사항)
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    if anthropic_key:
+        masked_key = (
+            anthropic_key[:8] + "..." + anthropic_key[-4:]
+            if len(anthropic_key) > 12
+            else "***"
+        )
+        console.print(f"[green]✅ ANTHROPIC_API_KEY:[/green] {masked_key}")
+    else:
+        console.print("[yellow]⚪ ANTHROPIC_API_KEY:[/yellow] 설정되지 않음 (선택사항)")
+
+    # 3. Google Drive 설정 확인 (선택사항)
+    console.print(f"\n[bold yellow]☁️  Google Drive 설정[/bold yellow]")
+
+    credentials_path = "credentials.json"
+    if os.path.exists(credentials_path):
+        console.print(f"[green]✅ credentials.json:[/green] 파일 존재")
+        console.print("   - Google Drive 저장 기능 사용 가능")
+    else:
+        console.print("[yellow]⚪ credentials.json:[/yellow] 파일 없음")
+        console.print("   - Google Drive 저장 기능 비활성화 (선택사항)")
+
+    # 4. 출력 디렉토리 확인
+    console.print(f"\n[bold yellow]📁 출력 디렉토리[/bold yellow]")
+
+    output_dir = "./output"
+    if os.path.exists(output_dir):
+        console.print(f"[green]✅ 출력 디렉토리:[/green] {output_dir}")
+        # 디렉토리 내 파일 수 확인
+        file_count = len(
+            [
+                f
+                for f in os.listdir(output_dir)
+                if os.path.isfile(os.path.join(output_dir, f))
+            ]
+        )
+        console.print(f"   - 저장된 파일 수: {file_count}개")
+    else:
+        console.print(f"[yellow]⚪ 출력 디렉토리:[/yellow] {output_dir} (자동 생성됨)")
+
+    # 5. 설정 파일 확인
+    console.print(f"\n[bold yellow]⚙️  설정 파일[/bold yellow]")
+
+    config_file = "config.yml"
+    if os.path.exists(config_file):
+        console.print(f"[green]✅ config.yml:[/green] 파일 존재")
+        console.print("   - 사용자 정의 설정 적용 가능")
+    else:
+        console.print("[yellow]⚪ config.yml:[/yellow] 파일 없음")
+        console.print("   - 기본 설정 사용 중 (선택사항)")
+
+    env_file = ".env"
+    if os.path.exists(env_file):
+        console.print(f"[green]✅ .env:[/green] 파일 존재")
+    else:
+        console.print("[red]❌ .env:[/red] 파일 없음")
+        console.print("   - .env.example을 복사하여 .env 파일 생성 필요")
+
+    # 6. 종합 상태 요약
+    console.print(f"\n[bold blue]📊 종합 상태 요약[/bold blue]")
+    console.print("=" * 60)
+
+    required_settings = [
+        ("LLM API Key", config.GEMINI_API_KEY or openai_key or anthropic_key),
+    ]
+
+    optional_settings = [
+        ("이메일 발송", email_ready),
+        ("Google Drive", os.path.exists(credentials_path)),
+        ("설정 파일", os.path.exists(config_file)),
+    ]
+
+    # 필수 설정 확인
+    console.print("\n[bold]필수 설정:[/bold]")
+    all_required_ok = True
+    for name, status in required_settings:
+        if status:
+            console.print(f"  [green]✅ {name}[/green]")
+        else:
+            console.print(f"  [red]❌ {name}[/red]")
+            all_required_ok = False
+
+    # 선택 설정 확인
+    console.print("\n[bold]선택 설정:[/bold]")
+    for name, status in optional_settings:
+        if status:
+            console.print(f"  [green]✅ {name}[/green]")
+        else:
+            console.print(f"  [yellow]⚪ {name}[/yellow]")
+
+    # 최종 상태 메시지
+    if all_required_ok:
+        console.print("\n[green]🎉 Newsletter Generator 사용 준비 완료![/green]")
+        console.print("다음 명령어로 뉴스레터를 생성할 수 있습니다:")
+        console.print(
+            '[cyan]newsletter run --keywords "AI,머신러닝" --template-style compact[/cyan]'
+        )
+
+        if email_ready:
+            console.print("\n이메일 발송도 가능합니다:")
+            console.print(
+                '[cyan]newsletter run --keywords "AI,머신러닝" --to your@email.com --email-compatible[/cyan]'
+            )
+    else:
+        console.print("\n[red]⚠️  필수 설정이 미완료되었습니다.[/red]")
+        console.print("위의 누락된 설정을 완료한 후 다시 시도해주세요.")
+        console.print("\n도움이 필요하시면 다음 명령어를 실행하세요:")
+        console.print("[cyan]newsletter check-llm[/cyan]  # LLM 설정 상세 확인")
+        console.print(
+            "[cyan]newsletter test-email --to your@email.com --dry-run[/cyan]  # 이메일 설정 테스트"
+        )
 
 
 @app.command()
@@ -1197,7 +1504,47 @@ def test_email(
     This command allows you to test the email delivery system without generating a full newsletter.
     You can send a simple test message or use an existing HTML file as the email content.
     """
-    console.print(f"[bold blue]Testing email sending to: {to}[/bold blue]")
+    console.print(f"\n[bold blue]📧 이메일 발송 테스트[/bold blue]")
+
+    # EMAIL_SENDER 설정 상태 확인 및 표시
+    console.print(f"\n[bold yellow]📋 이메일 설정 확인[/bold yellow]")
+
+    # EMAIL_SENDER 상태 확인
+    if config.EMAIL_SENDER:
+        console.print(f"[cyan]발송자 이메일:[/cyan] {config.EMAIL_SENDER}")
+        console.print("[green]✅ EMAIL_SENDER 설정 완료[/green]")
+    else:
+        console.print("[red]❌ EMAIL_SENDER가 설정되지 않았습니다![/red]")
+        console.print("[yellow]이메일 발송을 위해 다음 설정이 필요합니다:[/yellow]")
+        console.print("[cyan].env 파일에 다음을 추가하세요:[/cyan]")
+        console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
+        console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_token[/cyan]")
+        console.print(
+            "\n[yellow]참고: EMAIL_SENDER는 Postmark에서 인증된 이메일 주소여야 합니다.[/yellow]"
+        )
+        if not dry_run:
+            raise typer.Exit(code=1)
+
+    # POSTMARK_SERVER_TOKEN 상태 확인
+    if config.POSTMARK_SERVER_TOKEN:
+        console.print("[green]✅ POSTMARK_SERVER_TOKEN 설정 완료[/green]")
+        # 토큰의 일부만 표시 (보안상 전체 표시 안함)
+        masked_token = (
+            config.POSTMARK_SERVER_TOKEN[:8] + "..." + config.POSTMARK_SERVER_TOKEN[-4:]
+            if len(config.POSTMARK_SERVER_TOKEN) > 12
+            else "***"
+        )
+        console.print(f"[cyan]Postmark 토큰:[/cyan] {masked_token}")
+    else:
+        console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
+        console.print(
+            "[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]"
+        )
+        console.print("[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]")
+        if not dry_run:
+            raise typer.Exit(code=1)
+
+    console.print(f"[cyan]수신자:[/cyan] {to}")
 
     # Set default subject if not provided
     if not subject:

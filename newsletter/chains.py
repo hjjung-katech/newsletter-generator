@@ -18,6 +18,7 @@ from . import config
 from .compose import (
     NewsletterConfig,
     compose_compact_newsletter_html,
+    compose_newsletter,
     create_grouped_sections,
     extract_key_definitions_for_compact,
 )
@@ -526,173 +527,197 @@ def create_summarization_chain(is_compact=False):
                     category_articles=formatted_articles,
                 )
 
-            # LLM에 요청
+            # LLM에 요청 (연결 오류에 대한 개별 처리 추가)
             messages = [HumanMessage(content=prompt_content)]
-            summary_result = llm.invoke(messages)
-            summary_text = summary_result.content
 
+            # 개별 카테고리 처리에 try-catch 추가 (연결 문제 대응)
             try:
-                # JSON 추출
-                import re
-
-                json_match = re.search(
-                    r"```(?:json)?\s*(.*?)```", summary_text, re.DOTALL
+                logger.info(
+                    f"카테고리 '{category.get('title', '제목 없음')}' 요약 생성 중..."
                 )
-                if json_match:
-                    json_str = json_match.group(1).strip()
-                else:
-                    # compact 버전에서는 중괄호로 감싸진 JSON도 찾기
-                    if is_compact:
-                        json_match = re.search(r"\{.*\}", summary_text, re.DOTALL)
-                        if json_match:
-                            json_str = json_match.group()
+                summary_result = llm.invoke(messages)
+                summary_text = summary_result.content
+                logger.info(
+                    f"카테고리 '{category.get('title', '제목 없음')}' 요약 생성 완료"
+                )
+
+                # JSON 파싱 시작
+                try:
+                    # JSON 추출
+                    import re
+
+                    json_match = re.search(
+                        r"```(?:json)?\s*(.*?)```", summary_text, re.DOTALL
+                    )
+                    if json_match:
+                        json_str = json_match.group(1).strip()
+                    else:
+                        # compact 버전에서는 중괄호로 감싸진 JSON도 찾기
+                        if is_compact:
+                            json_match = re.search(r"\{.*\}", summary_text, re.DOTALL)
+                            if json_match:
+                                json_str = json_match.group()
+                            else:
+                                json_str = summary_text.strip()
                         else:
                             json_str = summary_text.strip()
+
+                    summary_json = json.loads(json_str)
+
+                    # 카테고리 제목 추가
+                    summary_json["title"] = category.get("title", "제목 없음")
+
+                    # compact 버전에서는 간소화된 형태로 변환
+                    if is_compact:
+                        # intro, definitions, news_links를 기본 형태로 변환
+                        compact_result = {
+                            "title": summary_json["title"],
+                            "intro": summary_json.get("intro", ""),
+                            "definitions": summary_json.get("definitions", []),
+                            "articles": [],
+                        }
+
+                        # definitions가 비어있다면 기본 definition 생성
+                        if not compact_result["definitions"]:
+                            category_title = summary_json["title"]
+                            # 카테고리 제목을 바탕으로 기본 definition 생성
+                            if "자율주행" in category_title:
+                                compact_result["definitions"] = [
+                                    {
+                                        "term": "자율주행",
+                                        "explanation": (
+                                            "운전자의 개입 없이 차량이 스스로 주행하는 기술로, "
+                                            "레벨 0부터 5까지 단계별로 구분됩니다."
+                                        ),
+                                    }
+                                ]
+                            elif any(
+                                keyword in category_title
+                                for keyword in ["기술", "개발"]
+                            ):
+                                compact_result["definitions"] = [
+                                    {
+                                        "term": "R&D",
+                                        "explanation": (
+                                            "연구개발(Research and Development)의 "
+                                            "줄임말로, 새로운 기술이나 제품을 "
+                                            "개발하는 활동입니다."
+                                        ),
+                                    }
+                                ]
+                            elif any(
+                                keyword in category_title
+                                for keyword in ["정책", "규제"]
+                            ):
+                                compact_result["definitions"] = [
+                                    {
+                                        "term": "산업정책",
+                                        "explanation": (
+                                            "정부가 특정 산업의 발전을 위해 "
+                                            "수립하는 정책으로, 규제 완화, "
+                                            "지원책 등을 포함합니다."
+                                        ),
+                                    }
+                                ]
+                            else:
+                                # 일반적인 기본 definition
+                                compact_result["definitions"] = [
+                                    {
+                                        "term": "혁신기술",
+                                        "explanation": (
+                                            "기존 기술을 크게 개선하거나 완전히 새로운 방식의 "
+                                            "기술로, 산업과 사회에 큰 변화를 가져올 수 있는 "
+                                            "기술입니다."
+                                        ),
+                                    }
+                                ]
+
+                        # news_links를 articles로 변환
+                        for link in summary_json.get("news_links", []):
+                            compact_result["articles"].append(
+                                {
+                                    "title": link.get("title", ""),
+                                    "url": link.get("url", "#"),
+                                    "source_and_date": link.get("source_and_date", ""),
+                                }
+                            )
+
+                        results.append(compact_result)
                     else:
-                        json_str = summary_text.strip()
+                        results.append(summary_json)
 
-                summary_json = json.loads(json_str)
-
-                # 카테고리 제목 추가
-                summary_json["title"] = category.get("title", "제목 없음")
-
-                # compact 버전에서는 간소화된 형태로 변환
-                if is_compact:
-                    # intro, definitions, news_links를 기본 형태로 변환
-                    compact_result = {
-                        "title": summary_json["title"],
-                        "intro": summary_json.get("intro", ""),
-                        "definitions": summary_json.get("definitions", []),
-                        "articles": [],
-                    }
-
-                    # definitions가 비어있다면 기본 definitions 생성
-                    if not compact_result["definitions"]:
-                        category_title = summary_json["title"]
-                        # 카테고리 제목을 바탕으로 기본 definition 생성
-                        if "자율주행" in category_title:
-                            compact_result["definitions"] = [
-                                {
-                                    "term": "자율주행",
-                                    "explanation": (
-                                        "운전자의 개입 없이 차량이 스스로 주행하는 기술로, "
-                                        "레벨 0부터 5까지 단계별로 구분됩니다."
-                                    ),
-                                }
-                            ]
-                        elif any(
-                            keyword in category_title for keyword in ["기술", "개발"]
-                        ):
-                            compact_result["definitions"] = [
-                                {
-                                    "term": "R&D",
-                                    "explanation": (
-                                        "연구개발(Research and Development)의 "
-                                        "줄임말로, 새로운 기술이나 제품을 "
-                                        "개발하는 활동입니다."
-                                    ),
-                                }
-                            ]
-                        elif any(
-                            keyword in category_title for keyword in ["정책", "규제"]
-                        ):
-                            compact_result["definitions"] = [
-                                {
-                                    "term": "산업정책",
-                                    "explanation": (
-                                        "정부가 특정 산업의 발전을 위해 "
-                                        "수립하는 정책으로, 규제 완화, "
-                                        "지원책 등을 포함합니다."
-                                    ),
-                                }
-                            ]
-                        else:
-                            # 일반적인 기본 definition
-                            compact_result["definitions"] = [
-                                {
-                                    "term": "혁신기술",
-                                    "explanation": (
-                                        "기존 기술을 크게 개선하거나 완전히 새로운 방식의 "
-                                        "기술로, 산업과 사회에 큰 변화를 가져올 수 있는 "
-                                        "기술입니다."
-                                    ),
-                                }
-                            ]
-
-                    # news_links를 articles로 변환
-                    for link in summary_json.get("news_links", []):
-                        compact_result["articles"].append(
+                except Exception as parse_error:
+                    logger.error(
+                        f"카테고리 '{category.get('title', '제목 없음')}' JSON 파싱 오류: {parse_error}"
+                    )
+                    # JSON 파싱 실패 시 기본 구조 제공
+                    category_title = category.get("title", "제목 없음")
+                    if is_compact:
+                        results.append(
                             {
-                                "title": link.get("title", ""),
-                                "url": link.get("url", "#"),
-                                "source_and_date": link.get("source_and_date", ""),
+                                "title": category_title,
+                                "intro": f"{category_title}에 대한 주요 동향입니다. (JSON 파싱 오류)",
+                                "definitions": [
+                                    {
+                                        "term": "기술동향",
+                                        "explanation": f"{category_title} 분야의 최신 기술 발전 동향입니다.",
+                                    }
+                                ],
+                                "articles": [
+                                    {
+                                        "title": article.get("title", ""),
+                                        "url": article.get("url", "#"),
+                                        "source_and_date": (
+                                            f"{article.get('source', 'Unknown')} · "
+                                            f"{article.get('date', 'Unknown date')}"
+                                        ),
+                                    }
+                                    for article in category_articles
+                                ],
+                            }
+                        )
+                    else:
+                        results.append(
+                            {
+                                "title": category_title,
+                                "summary_paragraphs": [
+                                    f"{category_title} 분야의 주요 동향입니다. (JSON 파싱 오류)"
+                                ],
+                                "definitions": [
+                                    {
+                                        "term": "기술동향",
+                                        "explanation": f"{category_title} 분야의 최신 기술 발전 동향입니다.",
+                                    }
+                                ],
+                                "news_links": [
+                                    {
+                                        "title": article.get("title", ""),
+                                        "url": article.get("url", "#"),
+                                        "source_and_date": (
+                                            f"{article.get('source', 'Unknown')} · "
+                                            f"{article.get('date', 'Unknown date')}"
+                                        ),
+                                    }
+                                    for article in category_articles
+                                ],
                             }
                         )
 
-                    results.append(compact_result)
-                else:
-                    results.append(summary_json)
-
-            except Exception as e:
+            except Exception as llm_error:
                 logger.error(
-                    f"카테고리 '{category.get('title', '제목 없음')}' 요약 파싱 오류: {e}"
+                    f"카테고리 '{category.get('title', '제목 없음')}' LLM 호출 오류: {llm_error}"
                 )
-                # 오류 발생 시 기본 구조 제공
-                if is_compact:
-                    # 파싱 오류 시에도 기본 definitions 제공
-                    category_title = category.get("title", "제목 없음")
-                    fallback_definitions = []
+                # 연결 오류 발생 시 기본 구조로 fallback
+                category_title = category.get("title", "제목 없음")
 
-                    if "자율주행" in category_title:
-                        fallback_definitions = [
-                            {
-                                "term": "자율주행",
-                                "explanation": (
-                                    "운전자의 개입 없이 차량이 스스로 주행하는 기술로, "
-                                    "레벨 0부터 5까지 단계별로 구분됩니다."
-                                ),
-                            },
-                            {
-                                "term": "레벨4",
-                                "explanation": (
-                                    "운전자가 없어도 특정 조건에서 "
-                                    "완전 자율주행이 가능한 수준입니다."
-                                ),
-                            },
-                        ]
-                    elif any(keyword in category_title for keyword in ["기술", "개발"]):
-                        fallback_definitions = [
-                            {
-                                "term": "R&D",
-                                "explanation": (
-                                    "연구개발(Research and Development)의 "
-                                    "줄임말로, 새로운 기술이나 제품을 "
-                                    "개발하는 활동입니다."
-                                ),
-                            }
-                        ]
-                    elif any(keyword in category_title for keyword in ["정책", "규제"]):
-                        fallback_definitions = [
-                            {
-                                "term": "산업정책",
-                                "explanation": (
-                                    "정부가 특정 산업의 발전을 위해 "
-                                    "수립하는 정책으로, 규제 완화, "
-                                    "지원책 등을 포함합니다."
-                                ),
-                            }
-                        ]
-                    else:
-                        fallback_definitions = [
-                            {
-                                "term": "혁신기술",
-                                "explanation": (
-                                    "기존 기술을 크게 개선하거나 완전히 새로운 방식의 "
-                                    "기술로, 산업과 사회에 큰 변화를 가져올 수 있는 "
-                                    "기술입니다."
-                                ),
-                            }
-                        ]
+                if is_compact:
+                    # compact 모드 fallback
+                    fallback_definitions = [
+                        {
+                            "term": "기술동향",
+                            "explanation": f"{category_title} 분야의 최신 기술 발전 동향입니다.",
+                        }
+                    ]
 
                     results.append(
                         {
@@ -713,16 +738,35 @@ def create_summarization_chain(is_compact=False):
                         }
                     )
                 else:
+                    # detailed 모드 fallback
                     results.append(
                         {
-                            "title": category.get("title", "제목 없음"),
+                            "title": category_title,
                             "summary_paragraphs": [
-                                "(요약 생성 중 오류가 발생했습니다)"
+                                f"{category_title} 분야의 주요 동향입니다. (네트워크 연결 문제로 인해 자세한 요약을 생성할 수 없었습니다)"
                             ],
-                            "definitions": [],
-                            "news_links": [],
+                            "definitions": [
+                                {
+                                    "term": "기술동향",
+                                    "explanation": f"{category_title} 분야의 최신 기술 발전 동향입니다.",
+                                }
+                            ],
+                            "news_links": [
+                                {
+                                    "title": article.get("title", ""),
+                                    "url": article.get("url", "#"),
+                                    "source_and_date": (
+                                        f"{article.get('source', 'Unknown')} · "
+                                        f"{article.get('date', 'Unknown date')}"
+                                    ),
+                                }
+                                for article in category_articles
+                            ],
                         }
                     )
+
+                # 다음 카테고리 처리를 위해 continue
+                continue
 
         # compact 버전에서는 추가 처리
         if is_compact:
@@ -961,11 +1005,44 @@ def create_rendering_chain():
                 articles_for_top, top_n=3
             )
 
-        # Jinja2 템플릿 렌더링
-        from jinja2 import Template
+        # email_compatible 처리 확인
+        is_email_compatible = data.get("email_compatible", False)
+        template_style = data.get("template_style", "detailed")
 
-        template = Template(HTML_TEMPLATE)
-        rendered_html = template.render(**combined_data)
+        if is_email_compatible:
+            # email_compatible인 경우 compose_newsletter 함수 사용
+            from .compose import compose_newsletter
+
+            # template_style 정보를 combined_data에 추가 (email_compatible 템플릿에서 필요)
+            combined_data["template_style"] = template_style
+            combined_data["email_compatible"] = True
+
+            # email_compatible용 추가 필드들
+            combined_data["recipient_greeting"] = combined_data.get(
+                "recipient_greeting", "안녕하세요,"
+            )
+            combined_data["introduction_message"] = combined_data.get(
+                "introduction_message",
+                "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
+            )
+            combined_data["closing_message"] = combined_data.get(
+                "closing_message",
+                "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+            )
+            combined_data["editor_signature"] = combined_data.get(
+                "editor_signature", "편집자 드림"
+            )
+
+            template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+            rendered_html = compose_newsletter(
+                combined_data, template_dir, "email_compatible"
+            )
+        else:
+            # 기존 방식: Jinja2 템플릿 렌더링
+            from jinja2 import Template
+
+            template = Template(HTML_TEMPLATE)
+            rendered_html = template.render(**combined_data)
 
         return rendered_html, combined_data
 
@@ -1055,9 +1132,26 @@ def get_newsletter_chain(is_compact=False):
                     max_articles=config["max_articles"],
                 )
 
-                definitions = extract_key_definitions_for_compact(
-                    sections_data.get("sections", [])
-                )
+                # email_compatible 모드인지 확인
+                is_email_compatible = data.get("email_compatible", False)
+
+                if is_email_compatible:
+                    # email_compatible 모드에서는 grouped_sections에서 definitions 추출
+                    definitions = []
+                    for group in grouped_sections:
+                        group_definitions = group.get("definitions", [])
+                        for definition in group_definitions:
+                            # 중복 제거
+                            if definition not in definitions:
+                                definitions.append(definition)
+                    # 최대 3개로 제한
+                    definitions = definitions[:3]
+                    logger.info(
+                        f"[DEBUG] Email-compatible: extracted {len(definitions)} definitions from grouped_sections"
+                    )
+                else:
+                    # 일반 compact 모드에서는 전체 definitions를 빈 배열로 설정 (그룹별 definitions만 사용)
+                    definitions = []
 
                 # 템플릿 매니저로부터 메타데이터 가져오기
                 template_manager = TemplateManager()
@@ -1083,6 +1177,29 @@ def get_newsletter_chain(is_compact=False):
                 current_date = datetime.date.today().strftime("%Y년 %m월 %d일")
                 current_time = datetime.datetime.now().strftime("%H:%M")
 
+                # 주제별 동적 "생각해 볼 거리" 생성 (compact용 - 문자열로)
+                def create_food_for_thought_compact(topic):
+                    """주제에 따른 동적 생각해 볼 거리 생성 (compact용)"""
+                    topic_messages = {
+                        "AI": "인공지능 기술의 발전 속도를 고려했을 때, 우리 조직의 AI 도입 전략과 인재 양성 방안에 대한 논의가 필요한 시점입니다.",
+                        "반도체": "인공지능과 양자 컴퓨팅 기술의 발전 속도를 고려했을 때, 국내 반도체 산업의 경쟁력 확보를 위해서는 선제적인 연구 개발과 투자가 필수적입니다. 차세대 반도체 기술 선점을 위한 국가 차원의 전략 수립 및 산학연 협력 강화 방안에 대한 논의가 필요한 시점입니다.",
+                        "바이오": "바이오헬스 분야의 기술 융복합화가 가속화되는 시점에서, 우리나라가 글로벌 바이오헬스 시장을 선도하기 위한 전략적 접근이 필요합니다.",
+                        "친환경": "탄소중립 시대에 맞춰 친환경 기술의 상용화와 확산을 위한 정책적 지원과 민간 투자 활성화 방안을 모색해야 할 시점입니다.",
+                        "친환경차": "전기차 및 친환경차 시장의 급속한 성장에 대응하기 위해 배터리 기술 개발, 충전 인프라 구축, 그리고 관련 정책 지원 체계의 통합적 접근이 필요합니다.",
+                        "이차전지": "전기차 시장의 일시적 침체에도 불구하고 차세대 배터리 기술 개발과 원자재 확보, 재활용 생태계 구축 등 장기적인 관점에서의 전략적 투자와 정책 지원이 필요한 시점입니다.",
+                        "배터리": "전기차 시장의 일시적 침체에도 불구하고 차세대 배터리 기술 개발과 원자재 확보, 재활용 생태계 구축 등 장기적인 관점에서의 전략적 투자와 정책 지원이 필요한 시점입니다.",
+                        "우주": "우주산업의 민간 참여가 확대되는 시점에서, 우리나라 우주산업 생태계 구축과 관련 기술 개발에 대한 전략적 투자가 필요합니다.",
+                        "로봇": "로봇 기술과 AI의 융합이 가속화되는 시점에서, 제조업을 넘어 서비스업까지 확장되는 로봇 활용 전략을 수립해야 합니다.",
+                    }
+
+                    # 주제에서 키워드 추출
+                    for key, message in topic_messages.items():
+                        if key in topic:
+                            return message
+
+                    # 기본 메시지
+                    return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다. 이번 주 뉴스들을 통해 업계 동향을 파악하고, 우리 조직의 전략과 방향성을 점검해보시기 바랍니다."
+
                 # 최종 데이터 구조 생성
                 result_data = {
                     "top_articles": top_articles[:3],
@@ -1091,8 +1208,21 @@ def get_newsletter_chain(is_compact=False):
                     "newsletter_topic": newsletter_topic,
                     "generation_date": current_date,
                     "generation_time": current_time,
+                    "search_keywords": (
+                        ", ".join(keywords)
+                        if isinstance(keywords, list)
+                        else str(keywords)
+                    ),
+                    "food_for_thought": {
+                        "message": create_food_for_thought_compact(newsletter_topic)
+                    },
+                    # 이메일 템플릿용 기본 메시지들
+                    "recipient_greeting": "안녕하세요,",
+                    "introduction_message": "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
+                    "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
+                    "editor_signature": "편집자 드림",
                     "company_name": template_manager.get(
-                        "company.name", "Your Newsletter Co."
+                        "company.name", "산업통상자원 R&D 전략기획단"
                     ),
                     "company_logo_url": template_manager.get(
                         "company.logo_url", "/static/logo.png"
@@ -1121,25 +1251,47 @@ def get_newsletter_chain(is_compact=False):
                 }
 
                 logger.debug("Compact 최종 데이터 구조:")
-                logger.debug("  - top_articles: %d개", len(result_data["top_articles"]))
+                logger.debug(f"  - top_articles: {len(result_data['top_articles'])}개")
                 logger.debug(
-                    "  - grouped_sections: %d개", len(result_data["grouped_sections"])
+                    f"  - grouped_sections: {len(result_data['grouped_sections'])}개"
                 )
-                logger.debug("  - definitions: %d개", len(result_data["definitions"]))
+                logger.debug(f"  - definitions: {len(result_data['definitions'])}개")
 
                 # 템플릿 렌더링
                 logger.step("HTML 템플릿 렌더링", "rendering")
 
                 # 템플릿 렌더링
                 logger.info(
-                    "Composing compact newsletter for topic: %s", newsletter_topic
+                    f"Composing compact newsletter for topic: {newsletter_topic}"
                 )
                 template_dir = os.path.join(
                     os.path.dirname(__file__), "..", "templates"
                 )
-                html_content = compose_compact_newsletter_html(
-                    result_data, template_dir
+
+                # email_compatible 정보를 데이터에 추가
+                logger.info(
+                    f"[DEBUG] Original data email_compatible: {data.get('email_compatible', 'NOT_FOUND')}"
                 )
+                result_data["email_compatible"] = data.get("email_compatible", False)
+                result_data["template_style"] = data.get("template_style", "compact")
+                logger.info(
+                    f"[DEBUG] Set result_data email_compatible: {result_data['email_compatible']}"
+                )
+
+                # email_compatible 처리를 위해 통합된 compose_newsletter 함수 사용
+                is_email_compatible = result_data.get("email_compatible", False)
+                logger.info(f"[DEBUG] Final email_compatible: {is_email_compatible}")
+
+                if is_email_compatible:
+                    logger.info("[DEBUG] Using email_compatible template")
+                    html_content = compose_newsletter(
+                        result_data, template_dir, "email_compatible"
+                    )
+                else:
+                    logger.info("[DEBUG] Using compact template")
+                    html_content = compose_newsletter(
+                        result_data, template_dir, "compact"
+                    )
 
                 logger.success("Compact 뉴스레터 생성 완료!")
 
@@ -1170,6 +1322,8 @@ def get_newsletter_chain(is_compact=False):
                     "domain": data.get("domain", ""),
                     "ranked_articles": data.get("ranked_articles", []),
                     "processed_articles": data.get("processed_articles", []),
+                    "email_compatible": data.get("email_compatible", False),
+                    "template_style": data.get("template_style", "detailed"),
                 }
 
                 # 렌더링 체인 호출
