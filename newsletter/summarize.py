@@ -3,6 +3,10 @@ import uuid
 from typing import Any, Dict, List, Union
 
 from . import config  # Import config module
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
 
 SYSTEM_INSTRUCTION = """
 Role: 당신은 뉴스들을 분석하고 요약하여, 제공된 HTML 템플릿 형식으로 "주간 산업동향 뉴스레터"를 작성하는 전문 편집자입니다.
@@ -120,7 +124,7 @@ def summarize_articles(
 
     # Check if we have any articles to summarize
     if not articles:
-        print("No articles to summarize.")
+        logger.warning("요약할 기사가 없습니다.")
         # 비어있는 기사 목록에 대해 Gemini API를 호출하지 않고 즉시 결과 반환
         # Ensure run_id is handled even if no articles are present, though callbacks might not be invoked.
         run_id_no_articles = uuid.uuid4()
@@ -131,8 +135,8 @@ def summarize_articles(
                         serialized={}, prompts=[], run_id=run_id_no_articles
                     )
                 except Exception as e_start:
-                    print(
-                        f"Warning: Callback on_llm_start (no articles) failed: {e_start}"
+                    logger.debug(
+                        f"Callback on_llm_start (기사 없음) 실행 실패: {e_start}"
                     )
             if hasattr(cb, "on_llm_end"):  # or on_chain_end if it's a chain
                 try:
@@ -148,7 +152,7 @@ def summarize_articles(
                     )()
                     cb.on_llm_end(mock_response_no_articles, run_id=run_id_no_articles)
                 except Exception as e_end:
-                    print(f"Warning: Callback on_llm_end (no articles) failed: {e_end}")
+                    logger.debug(f"Callback on_llm_end (기사 없음) 실행 실패: {e_end}")
         return "<html><body>No articles summary</body></html>"
 
     # 기사 수 계산
@@ -161,13 +165,14 @@ def summarize_articles(
     # 키워드가 비어있는지 확인
     keyword_display = ", ".join(keywords) if keywords else ""
 
-    print(
-        f"Summarizing {article_count} articles for keywords: {keyword_display} using Gemini Pro..."
+    logger.step(
+        f"{article_count}개 기사 요약 중 (키워드: {keyword_display})",
+        "summarize_articles",
     )
 
     # Check if Gemini API is available
     if genai is None:
-        print("ERROR: google.generativeai module is not available.")
+        logger.error("google.generativeai 모듈을 사용할 수 없습니다.")
         error_html = """
         <html>
         <body>
@@ -185,8 +190,11 @@ def summarize_articles(
         return error_html
 
     # Check API key
-    if not hasattr(config, "GEMINI_API_KEY") or not config.GEMINI_API_KEY:
-        print("ERROR: GEMINI_API_KEY is not set. Cannot generate newsletter.")
+    api_key = getattr(config, "GEMINI_API_KEY", None)
+    if not api_key:
+        logger.error(
+            "GEMINI_API_KEY가 설정되지 않았습니다. 뉴스레터를 생성할 수 없습니다."
+        )
         error_html = """
         <html>
         <body>
@@ -214,7 +222,7 @@ def summarize_articles(
             )
             system_prompt = SYSTEM_INSTRUCTION
         except (ImportError, AttributeError) as e:
-            print(
+            logger.warning(
                 f"Warning: LLM factory failed for news summarization, using fallback: {e}"
             )
             # Fallback to original Gemini implementation
@@ -290,12 +298,12 @@ def summarize_articles(
                                     serialized={}, prompts=[prompt], run_id=run_id
                                 )
                             except Exception as e_start_fallback:
-                                print(
-                                    f"Warning: Callback on_llm_start (fallback) failed: {e_start_fallback}"
+                                logger.debug(
+                                    f"Callback on_llm_start (fallback) 실행 실패: {e_start_fallback}"
                                 )
                         except Exception as e_start:
-                            print(
-                                f"Warning: Callback on_llm_start (initial) failed: {e_start}"
+                            logger.debug(
+                                f"Callback on_llm_start (initial) 실행 실패: {e_start}"
                             )
 
                 # Generate the summary using Gemini Pro
@@ -305,22 +313,15 @@ def summarize_articles(
                         try:
                             cb.on_llm_end(response, run_id=run_id)
                         except Exception as e_end:
-                            print(f"Warning: Callback on_llm_end failed: {e_end}")
+                            logger.debug(
+                                f"Callback on_llm_end (기사 없음) 실행 실패: {e_end}"
+                            )
 
                 if hasattr(response, "text"):
                     html_content = response.text
                     return html_content
                 else:
-                    print("Error: Could not get text from Gemini response.")
-                    error_html = f"""
-                    <html>
-                    <body>
-                    <h1>오류 발생</h1>
-                    <p>키워드 '{keyword_display}'에 대한 뉴스레터 요약 중 오류가 발생했습니다: 응답에서 텍스트를 가져올 수 없습니다.</p>
-                    </body>
-                    </html>
-                    """
-                    return error_html
+                    logger.error("Gemini 응답에서 텍스트를 가져올 수 없습니다.")
 
         except Exception as e:
             if "run_id" in locals():
@@ -329,9 +330,9 @@ def summarize_articles(
                         try:
                             cb.on_llm_error(e, run_id=run_id)
                         except Exception as e_error:
-                            print(f"Warning: Callback on_llm_error failed: {e_error}")
+                            logger.debug(f"Callback on_llm_error 실행 실패: {e_error}")
 
-            print(f"Error calling LLM API: {e}")
+            logger.error(f"LLM API 호출 중 오류 발생: {e}")
             error_html = f"""
             <html>
             <body>
@@ -342,7 +343,7 @@ def summarize_articles(
             """
             return error_html
     except Exception as e:
-        print(f"General error in summarization process: {e}")
+        logger.error(f"요약 처리 중 일반적인 오류 발생: {e}")
         error_html = f"""
         <html>
         <body>

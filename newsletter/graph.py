@@ -20,7 +20,13 @@ from . import config
 from .chains import get_newsletter_chain
 from .date_utils import parse_date_string
 from .utils.file_naming import generate_unified_newsletter_filename
-from .utils.logger import get_logger
+from .utils.logger import (
+    get_logger,
+    step_brief,
+    show_filter_brief,
+    step_result,
+    show_final_brief,
+)
 
 # 로거 초기화
 logger = get_logger()
@@ -86,7 +92,7 @@ def collect_articles_node(
     """
     from .tools import search_news_articles
 
-    logger.info("\n[cyan]Step: Collecting articles...[/cyan]")
+    step_brief("뉴스 기사 수집 중")
     start_time = time.time()
 
     try:
@@ -118,242 +124,118 @@ def collect_articles_node(
 
 # New node for processing articles
 def process_articles_node(state: NewsletterState) -> NewsletterState:
-    logger.info(
-        "\n[cyan]Step: Processing collected articles (filtering, sorting, deduplicating)...[/cyan]"
-    )
-    start_time = time.time()
-    collected_articles = state.get("collected_articles")
+    """
+    수집된 기사들을 처리하는 노드 (날짜 필터링, 중복 제거, 정렬)
+    """
+    from .utils.logger import step_brief, show_filter_brief, step_result
 
-    if not collected_articles or not isinstance(collected_articles, list):
+    step_brief("기사 처리 중")
+    start_time = time.time()
+
+    collected_articles = state.get("collected_articles", [])
+    if not collected_articles:
         logger.warning(
-            "[yellow]Warning: No articles collected or 'collected_articles' is not a list. Skipping processing.[/yellow]"
+            "[yellow]Warning: No articles found to process. Check if collection was successful.[/yellow]"
         )
-        step_times = state.get("step_times", {})
-        step_times["process_articles"] = time.time() - start_time
         return {
             **state,
             "processed_articles": [],
-            "error": "수집된 기사가 없거나 형식이 잘못되어 처리할 수 없습니다.",
             "status": "error",
-            "step_times": step_times,
+            "error": "수집된 기사가 없습니다.",
         }
 
-    logger.info(f"Total articles received for processing: {len(collected_articles)}")
+    logger.info(
+        f"Processing {len(collected_articles)} articles with {state.get('news_period_days', 7)} day filter..."
+    )
 
-    output_dir = os.path.join(os.getcwd(), "output", "intermediate_processing")
-    os.makedirs(output_dir, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    raw_output_filename = f"{timestamp}_articles_raw.json"
-    raw_output_path = os.path.join(output_dir, raw_output_filename)
+    # Save raw articles with unified naming
     try:
-        # Create a dictionary that includes metadata for raw articles too
-        raw_data_with_metadata = {
-            "keywords": state.get("keywords", []),
-            "domain": state.get("domain"),
-            "news_period_days": state.get("news_period_days", 14),
-            "articles": collected_articles,
-        }
+        keywords_str = "_".join(state["keywords"]) if state["keywords"] else "unknown"
+        domain_str = (
+            state["domain"].replace(" ", "_") if state.get("domain") else "general"
+        )
+
+        # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{domain_str}_raw_articles.json"
+        raw_output_path = os.path.join("output", "intermediate_processing", filename)
+        os.makedirs(os.path.dirname(raw_output_path), exist_ok=True)
 
         with open(raw_output_path, "w", encoding="utf-8") as f:
-            json.dump(raw_data_with_metadata, f, ensure_ascii=False, indent=4)
+            json.dump(collected_articles, f, indent=2, ensure_ascii=False)
+
         logger.info(f"Saved raw collected articles to {raw_output_path}")
     except Exception as e:
-        logger.error(f"[red]Error saving raw articles: {e}[/red]")
-    now_utc = datetime.now(timezone.utc)
-    news_period_days = state.get("news_period_days", 14)  # 기본값은 14일(2주)로 설정
-    news_period_ago_utc = now_utc - timedelta(days=news_period_days)
+        logger.warning(f"Warning: Failed to save raw articles: {e}")
 
-    recent_articles = []
-    articles_with_date = (
-        0  # Count of articles where a date string was present and parsing was attempted
-    )
-    articles_missing_date = (
-        0  # Count of articles where date string was initially missing
-    )
-    articles_unparseable_date = (
-        0  # Count of articles where date string was present but unparseable
+    # 1. 날짜 기반 필터링
+    articles_within_date_range = []
+    articles_with_missing_date = []
+    articles_with_unparseable_date = []
+    articles_with_date = 0
+    articles_unparseable_date = 0
+    cutoff_date = datetime.now(timezone.utc) - timedelta(
+        days=state.get("news_period_days", 7)
     )
 
-    # Counters for articles kept or discarded
-    articles_kept_recent_date = 0
-    articles_kept_missing_date = 0
-    articles_kept_unparseable_date = 0
-    articles_discarded_old_date = 0
+    initial_count = len(collected_articles)
 
     for article in collected_articles:
-        if not isinstance(article, dict):
-            logger.warning(
-                f"Warning: Skipping non-dictionary item in collected_articles: {article}"
-            )
+        date_str = article.get("date")
+        if not date_str or date_str == "날짜 없음":
+            articles_with_missing_date.append(article)
             continue
 
-        article_title_for_log = article.get("title", "N/A")  # For cleaner logs
-        article_date_str = article.get("date")
-
-        if not article_date_str or str(article_date_str).strip() == "날짜 없음":
-            articles_missing_date += 1
-            logger.info(
-                f"Debug: Article has missing date: '{article_title_for_log}'. Including by default."
-            )
-            recent_articles.append(article)
-            articles_kept_missing_date += 1
-            continue  # Process next article
-
-        # At this point, article_date_str is present and not "날짜 없음"
-        article_date_obj = parse_article_date_for_graph(article_date_str)
-
-        if article_date_obj:
-            articles_with_date += 1  # Incremented because parsing was successful
-            # Ensure timezone-aware comparison
-            if (
-                article_date_obj.tzinfo is None
-                or article_date_obj.tzinfo.utcoffset(article_date_obj) is None
-            ):
-                # Assuming naive datetimes from parsing are UTC. Adjust if this assumption is wrong.
-                article_date_obj = article_date_obj.replace(tzinfo=timezone.utc)
-            if article_date_obj >= news_period_ago_utc:
-                recent_articles.append(article)
-                articles_kept_recent_date += 1
-            else:
-                articles_discarded_old_date += 1
-                logger.info(
-                    f"Debug: Article too old: '{article_title_for_log}', Date: {article_date_obj.isoformat()}. Discarding."
-                )
-        else:
-            # article_date_str was present, but parse_article_date_for_graph returned None
+        parsed_date = parse_article_date_for_graph(date_str)
+        if parsed_date is None:
             articles_unparseable_date += 1
-            logger.info(
-                f"Debug: Article with unparseable date: '{article_title_for_log}', Date string: '{article_date_str}'. Including by default."
-            )
-            recent_articles.append(article)
-            articles_kept_unparseable_date += 1
+            articles_with_unparseable_date.append(article)
+            continue
 
-    logger.info(f"\nArticle date processing summary:")
-    logger.info(f"  Total collected articles: {len(collected_articles)}")
-    logger.info(
-        f"  Articles with a date string provided: {articles_with_date + articles_unparseable_date}"
-    )
-    logger.info(f"    Successfully parsed dates: {articles_with_date}")
-    logger.info(f"    Unparseable date strings: {articles_unparseable_date}")
-    logger.info(
-        f"  Articles with missing date string (initially): {articles_missing_date}"
-    )
-    logger.info(
-        f"  Total articles included for further processing (recent_articles): {len(recent_articles)}"
-    )
-    logger.info(f"    Kept (recent with valid date): {articles_kept_recent_date}")
-    logger.info(f"    Kept (due to missing date): {articles_kept_missing_date}")
-    logger.info(f"    Kept (due to unparseable date): {articles_kept_unparseable_date}")
-    logger.info(
-        f"  Articles discarded (parseable but too old): {articles_discarded_old_date}\n"
+        articles_with_date += 1
+        if parsed_date >= cutoff_date:
+            articles_within_date_range.append(article)
+
+    # Combine kept articles (recent + missing + unparseable dates)
+    filtered_articles = (
+        articles_within_date_range
+        + articles_with_missing_date
+        + articles_with_unparseable_date
     )
 
-    if not recent_articles:
+    show_filter_brief(initial_count, len(filtered_articles), "날짜 필터링")
+
+    # 2. 중복 제거
+    if not filtered_articles:
         logger.warning(
-            "[yellow]Warning: No articles retained after recency filter.[/yellow]"
+            "[yellow]No articles remaining after date filtering. Proceeding with empty list.[/yellow]"
         )
-        # Optionally, save an empty processed file or skip
-        processed_output_filename = f"{timestamp}_articles_processed_EMPTY.json"
-        processed_output_path = os.path.join(output_dir, processed_output_filename)
-        try:
-            with open(processed_output_path, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False, indent=4)
-            logger.info(
-                f"Saved empty processed articles list to {processed_output_path}"
-            )
-        except Exception as e:
-            logger.error(f"[red]Error saving empty processed articles list: {e}[/red]")
+        deduplicated_articles = []
+    else:
+        from . import article_filter
 
-        return {
-            **state,
-            "processed_articles": [],
-            "error": f"최근 {news_period_days}일 내 기사가 없거나, 기사 날짜 정보를 파싱할 수 없어 요약할 내용이 없습니다.",
-            "status": "error",
-        }
+        deduplicated_articles = article_filter.remove_duplicate_articles(
+            filtered_articles
+        )
 
-    unique_articles_dict = {}
-    for article in recent_articles:
-        url = article.get("url")
-        # Ensure URL is a string and not empty before processing
-        if url and isinstance(url, str) and url.strip():
-            normalized_url = (
-                url.lower().strip().rstrip("/")
-            )  # Normalize by lowercasing and removing trailing slash
-            if normalized_url not in unique_articles_dict:
-                unique_articles_dict[normalized_url] = article
-            else:
-                logger.info(
-                    f"Debug: Deduplicated article (URL already seen): {article.get('title', 'N/A')}, URL: {url}"
-                )
-        else:
-            logger.warning(
-                f"Warning: Article missing URL or URL is not a string, cannot deduplicate: {article.get('title', 'N/A')}"
-            )
-            # Decide how to handle articles without URLs: include them, or skip them for deduplication.
-            # For now, let's include them if they passed the date filter, but they won't be part of URL-based deduplication.
-            # To ensure they are added if no URL, generate a unique key or handle separately.
-            # A simple way: if no URL, use a unique ID if available, or just add it (might lead to duplicates if content is same but no URL)
-            # For this implementation, if no valid URL, it won't be added to unique_articles_dict, effectively skipping it from deduplicated list.
-            # If you want to keep them, you'd need a different strategy.
+    show_filter_brief(len(filtered_articles), len(deduplicated_articles), "중복 제거")
 
-    deduplicated_articles = list(unique_articles_dict.values())
-    logger.info(f"Retained {len(deduplicated_articles)} articles after deduplication.")
-
+    # 3. 날짜순 정렬
     if not deduplicated_articles:
         logger.warning(
-            "[yellow]Warning: No articles retained after deduplication.[/yellow]"
+            "[yellow]No articles remaining after deduplication. Proceeding with empty list.[/yellow]"
         )
-        # Optionally, save an empty processed file or skip
-        processed_output_filename = f"{timestamp}_articles_processed_EMPTY_DEDUP.json"
-        processed_output_path = os.path.join(output_dir, processed_output_filename)
-        try:
-            with open(processed_output_path, "w", encoding="utf-8") as f:
-                json.dump([], f, ensure_ascii=False, indent=4)
-            logger.info(
-                f"Saved empty processed articles list (post-dedup) to {processed_output_path}"
-            )
-        except Exception as e:
-            logger.error(f"[red]Error saving empty processed articles list: {e}[/red]")
-
-        return {
-            **state,
-            "processed_articles": [],
-            "error": "기사 중복 제거 후 요약할 내용이 없습니다.",
-            "status": "error",
-        }
-
-    def get_sort_key(article_dict_item: Dict) -> datetime:
-        dt = parse_article_date_for_graph(article_dict_item.get("date"))
-        if dt:
-            if dt.tzinfo is None or dt.tzinfo.utcoffset(dt) is None:
-                return dt.replace(tzinfo=timezone.utc)
-            return dt
-        return datetime.min.replace(tzinfo=timezone.utc)
-
-    processed_articles_sorted = sorted(
-        deduplicated_articles, key=get_sort_key, reverse=True
-    )
-    logger.info(f"Sorted {len(processed_articles_sorted)} articles by date.")
-
-    processed_output_filename = f"{timestamp}_articles_processed.json"
-    processed_output_path = os.path.join(output_dir, processed_output_filename)
-    try:
-        # Create a dictionary that includes metadata
-        processed_data_with_metadata = {
-            "keywords": state.get("keywords", []),
-            "domain": state.get("domain"),
-            "news_period_days": state.get("news_period_days", 14),
-            "articles": processed_articles_sorted,
-        }
-
-        with open(processed_output_path, "w", encoding="utf-8") as f:
-            json.dump(processed_data_with_metadata, f, ensure_ascii=False, indent=4)
-        logger.info(
-            f"Saved processed articles with metadata to {processed_output_path}"
+        processed_articles_sorted = []
+    else:
+        # Article sorting
+        processed_articles_sorted = sorted(
+            deduplicated_articles,
+            key=lambda x: parse_article_date_for_graph(x.get("date", ""))
+            or datetime.min.replace(tzinfo=timezone.utc),
+            reverse=True,
         )
-    except Exception as e:
-        logger.error(f"[red]Error saving processed articles: {e}[/red]")
+
+    step_result("기사 처리 완료", len(processed_articles_sorted))
 
     step_times = state.get("step_times", {})
     step_times["process_articles"] = time.time() - start_time
@@ -366,533 +248,282 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
 
 def score_articles_node(state: NewsletterState) -> NewsletterState:
-    """Score articles using LLM to rank priority."""
-    from .scoring import load_scoring_weights_from_config, score_articles
+    """
+    기사들에 점수를 매기고 순위를 매기는 노드
+    """
+    from .utils.logger import step_brief, step_result
 
-    logger.info("\n[cyan]Step: Scoring articles...[/cyan]")
+    step_brief("기사 스코어링 중")
     start_time = time.time()
 
-    processed = state.get("processed_articles") or []
-    if not processed:
+    processed_articles = state.get("processed_articles", [])
+    if not processed_articles:
         logger.warning("[yellow]No articles to score.[/yellow]")
         step_times = state.get("step_times", {})
         step_times["score_articles"] = time.time() - start_time
         return {
             **state,
-            "error": "기사 점수를 매길 데이터가 없습니다.",
+            "ranked_articles": [],
             "status": "error",
-            "step_times": step_times,
-        }
-
-    domain = state.get("domain", "")
-    keywords = state.get("keywords", [])
-    news_period_days = state.get("news_period_days", 14)
-
-    # Load scoring weights from config.yml
-    scoring_weights = load_scoring_weights_from_config()
-    logger.info(f"[cyan]Using scoring weights: {scoring_weights}[/cyan]")
-
-    # Get full ranked list for saving; top 10 will be passed forward
-    ranked = score_articles(processed, domain, top_n=None, weights=scoring_weights)
-
-    output_dir = os.path.join(os.getcwd(), "output", "intermediate_processing")
-    os.makedirs(output_dir, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    scored_path = os.path.join(output_dir, f"{timestamp}_articles_scored.json")
-    try:
-        with open(scored_path, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "keywords": keywords,
-                    "domain": domain,
-                    "news_period_days": news_period_days,
-                    "articles": ranked,
-                },
-                f,
-                ensure_ascii=False,
-                indent=4,
-            )
-        logger.info(f"Saved scored articles to {scored_path}")
-    except Exception as e:
-        logger.error(f"[red]Error saving scored articles: {e}[/red]")
-
-    step_times = state.get("step_times", {})
-    step_times["score_articles"] = time.time() - start_time
-    return {
-        **state,
-        "ranked_articles": ranked[:10],
-        "status": "summarizing",
-        "step_times": step_times,
-    }
-
-
-def summarize_articles_node(
-    state: NewsletterState,
-) -> NewsletterState:  # Renamed for clarity
-    """
-    수집된 기사를 요약하는 노드
-    """
-    import os
-
-    from .chains import get_newsletter_chain
-
-    logger.info("\n[cyan]Step: Summarizing articles...[/cyan]")
-    start_time = time.time()
-
-    articles_for_summary = state.get("ranked_articles") or state.get(
-        "processed_articles"
-    )
-    if not articles_for_summary:
-        logger.warning("[yellow]No articles to summarize.[/yellow]")
-        step_times = state.get("step_times", {})
-        step_times["summarize_articles"] = time.time() - start_time
-        return {
-            **state,
-            "error": "요약할 기사가 없습니다.",
-            "status": "error",
-            "step_times": step_times,
-        }
-
-    template_style = state.get("template_style", "compact")
-
-    try:
-        # 비용 추적 설정 (ENABLE_COST_TRACKING 환경 변수 설정된 경우에만)
-        callbacks = []
-
-        if os.environ.get("ENABLE_COST_TRACKING") or os.environ.get(
-            "LANGCHAIN_TRACING_V2"
-        ):
-            try:
-                from .cost_tracking import (
-                    get_tracking_callbacks,
-                    register_recent_callbacks,
-                )
-
-                callbacks = get_tracking_callbacks()
-                register_recent_callbacks(callbacks)
-            except Exception as e:
-                logger.warning(
-                    f"[yellow]Cost tracking setup error: {e}. Continuing without tracking.[/yellow]"
-                )
-
-        # template_style에 따라 compact 또는 detailed 체인 사용
-        is_compact = template_style == "compact"
-
-        if is_compact:
-            logger.info(
-                "[cyan]Using compact processing - running compact newsletter chain...[/cyan]"
-            )
-        else:
-            logger.info(
-                "[cyan]Using detailed processing - running full summarization chain...[/cyan]"
-            )
-
-        # 통합된 체인 가져오기 및 실행
-        newsletter_chain = get_newsletter_chain(is_compact=is_compact)
-
-        # 데이터 형식 맞추기: processed_articles를 'articles' 키를 가진 딕셔너리로 감싸기
-        input_data = {
-            "articles": articles_for_summary,
-            "keywords": state.get("keywords", ""),
-            "email_compatible": state.get("email_compatible", False),
-            "template_style": state.get("template_style", "compact"),
-            "domain": state.get("domain"),
-        }
-
-        chain_result = newsletter_chain.invoke(input_data)
-
-        # chains에서 반환되는 새로운 형태 처리
-        if isinstance(chain_result, dict) and "html" in chain_result:
-            # 새로운 형태: {"html": ..., "structured_data": ..., "sections": ..., "mode": ...}
-            category_summaries = chain_result["structured_data"]
-            html_content = chain_result["html"]
-            sections = chain_result.get("sections", [])
-
-            logger.info(
-                f"[green]Successfully processed {chain_result['mode']} mode newsletter[/green]"
-            )
-            logger.info(
-                f"[cyan]Structured data keys: {list(category_summaries.keys())}[/cyan]"
-            )
-        elif isinstance(chain_result, str):
-            # 기존 형태: HTML 문자열 (하위 호환성)
-            category_summaries = chain_result
-            html_content = chain_result
-            sections = []
-            logger.info(f"[yellow]Received HTML string (legacy format)[/yellow]")
-        else:
-            # 예상치 못한 형태
-            logger.error(
-                f"[red]Unexpected chain result type: {type(chain_result)}[/red]"
-            )
-            category_summaries = chain_result
-            html_content = None
-            sections = []
-
-        if not category_summaries:
-            return {
-                **state,
-                "error": "카테고리 요약 생성에 실패했습니다.",
-                "status": "error",
-            }
-
-        step_times = state.get("step_times", {})
-        step_times["summarize_articles"] = time.time() - start_time
-        return {
-            **state,
-            "category_summaries": category_summaries,
-            "newsletter_html": html_content,  # 생성된 HTML도 저장
-            "sections": sections,  # sections 데이터 추가
-            "status": "composing",  # Changed to composing to indicate next step
-            "step_times": step_times,
-        }
-    except Exception as e:
-        import traceback
-
-        error_msg = f"기사 요약 중 오류가 발생했습니다: {str(e)}"
-        logger.error(f"[bold red]Error in summarization: {str(e)}[/bold red]")
-        traceback.print_exc()
-        step_times = state.get("step_times", {})
-        step_times["summarize_articles"] = time.time() - start_time
-        return {
-            **state,
-            "error": error_msg,
-            "status": "error",
-            "step_times": step_times,
-        }
-
-
-def compose_newsletter_node(
-    state: NewsletterState,
-) -> NewsletterState:
-    """
-    카테고리 요약에서 최종 뉴스레터 HTML을 생성하는 노드
-    """
-    import os
-    from datetime import datetime  # Import datetime for timestamp
-
-    from .compose import compose_newsletter
-
-    logger.info("\n[cyan]Step: Composing final newsletter...[/cyan]")
-    start_time = time.time()
-
-    category_summaries = state.get("category_summaries")
-    if not category_summaries:
-        logger.warning("[yellow]No category summaries to compose newsletter.[/yellow]")
-        step_times = state.get("step_times", {})
-        step_times["compose_newsletter"] = time.time() - start_time
-        return {
-            **state,
-            "error": "카테고리 요약이 없어 뉴스레터를 생성할 수 없습니다.",
-            "status": "error",
+            "error": "스코어링할 기사가 없습니다.",
             "step_times": step_times,
         }
 
     try:
-        # 변수들을 조건문 외부에서 미리 정의
-        template_style = state.get("template_style", "compact")
-        email_compatible = state.get("email_compatible", False)
+        from . import scoring
 
-        # 이미 생성된 HTML이 있는지 확인 (summarize_articles_node에서 생성된 경우)
-        newsletter_html = state.get("newsletter_html")
+        # 스코어링 가중치 로드
+        scoring_weights = scoring.load_scoring_weights_from_config()
+        logger.info(f"[cyan]Using scoring weights: {scoring_weights}[/cyan]")
 
-        if newsletter_html:
-            logger.info(f"[cyan]Using pre-generated HTML from chains[/cyan]")
-        else:
-            # HTML이 없으면 직접 생성
-            if isinstance(category_summaries, str):
-                # If it's already HTML, just use it
-                newsletter_html = category_summaries
-            else:
-                # If it's structured data, render with appropriate template using unified function
-                template_dir = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)), "templates"
-                )
+        # 도메인/주제 결정
+        domain = state.get("domain", "") or ", ".join(state.get("keywords", []))
 
-                # email_compatible인 경우 원래 template_style 정보를 데이터에 포함
-                if email_compatible:
-                    # 데이터에 template_style 정보 추가 (compose.py에서 사용)
-                    if isinstance(category_summaries, dict):
-                        category_summaries["template_style"] = template_style
-
-                    effective_style = "email_compatible"
-                    logger.info(
-                        f"[cyan]Using email-compatible template with {template_style} content style...[/cyan]"
-                    )
-                else:
-                    effective_style = template_style
-                    logger.info(
-                        f"[cyan]Using {template_style} newsletter template...[/cyan]"
-                    )
-
-                newsletter_html = compose_newsletter(
-                    category_summaries, template_dir, effective_style
-                )
-
-        # 뉴스레터 HTML 저장
-        def save_newsletter_html(html_content, topic, style):
-            """
-            생성된 뉴스레터 HTML을 파일로 저장합니다.
-
-            Args:
-                html_content: 저장할 HTML 내용
-                topic: 뉴스레터 주제 (파일명 생성에 사용)
-                style: 템플릿 스타일 (파일명에 추가)
-
-            Returns:
-                str: 저장된 파일 경로
-            """
-            # 통일된 파일명 생성 함수 사용
-            from .utils.file_naming import generate_unified_newsletter_filename
-
-            # 현재 타임스탬프 생성
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-            # 통일된 파일명으로 경로 생성
-            file_path = generate_unified_newsletter_filename(
-                topic=topic,
-                style=style,
-                timestamp=timestamp,
-                use_current_date=True,
-                generation_type="original",
-            )
-
-            # 파일 저장
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(html_content)
-
-            logger.info(f"[green]Newsletter saved to {file_path}[/green]")
-            return file_path
-
-        # 뉴스레터 저장
-        newsletter_topic = state.get("newsletter_topic", "뉴스레터")
-        save_path = save_newsletter_html(
-            newsletter_html, newsletter_topic, template_style
+        # 기사 스코어링
+        ranked_articles = scoring.score_articles(
+            processed_articles, domain, top_n=None, weights=scoring_weights
         )
 
-        # 렌더 데이터 저장 (재사용 및 테스트용)
-        def save_render_data(state_data, topic, timestamp_override=None):
-            """
-            뉴스레터 렌더링 데이터를 JSON 파일로 저장합니다.
+        step_result("기사 스코어링 완료", len(ranked_articles))
 
-            Args:
-                state_data: 저장할 상태 데이터
-                topic: 뉴스레터 주제
-                timestamp_override: 선택적 타임스탬프 덮어쓰기
-
-            Returns:
-                str: 저장된 파일 경로
-            """
-            from .utils.file_naming import generate_render_data_filename
-
-            # 타임스탬프 생성 (통일성을 위해 같은 시간 사용)
-            if timestamp_override:
-                timestamp = timestamp_override
-            else:
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-            # 렌더 데이터 파일 경로 생성
-            render_data_path = generate_render_data_filename(topic, timestamp)
-
-            # 현재 시간 정보
-            current_date = datetime.now().strftime("%Y-%m-%d")
-            current_time = datetime.now().strftime("%H:%M:%S")
-
-            # 저장할 렌더 데이터 구성 (template 모드에서 재사용 가능한 형태)
-            render_data = {
-                "newsletter_topic": state_data.get("newsletter_topic", topic),
-                "generation_date": current_date,
-                "generation_timestamp": current_time,
-                "search_keywords": state_data.get("keywords", []),
-                "domain": state_data.get("domain"),
-                "template_style": state_data.get("template_style", "compact"),
-                "news_period_days": state_data.get("news_period_days", 14),
-                # 카테고리 요약 데이터를 sections로 변환
-                "sections": [],
-                # top_articles 추가
-                "top_articles": [],
-                # grouped_sections 추가 (compact 모드용)
-                "grouped_sections": [],
-                # definitions 추가
-                "definitions": [],
-                # food_for_thought 추가
-                "food_for_thought": {},
-                # 기본 메타데이터 - LLM 생성 내용이 있으면 우선 사용
-                "recipient_greeting": "안녕하세요,",
-                "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
-                "editor_signature": "편집자 드림",
-                "company_name": "산업통상자원 R&D 전략기획단",
-                "copyright_year": datetime.now().strftime("%Y"),
-                "company_tagline": "최신 기술 동향을 한눈에",
-                "footer_contact": "문의사항: hjjung2@osp.re.kr",
-                "footer_disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
-                "editor_name": "Google Gemini",
-                "editor_email": "hjjung2@osp.re.kr",
-            }
-
-            # category_summaries에서 구조화된 데이터 추출
-            category_summaries = state_data.get("category_summaries", {})
-            sections_from_state = state_data.get("sections", [])
-
-            logger.info(
-                f"[cyan]Debug: category_summaries type: {type(category_summaries)}[/cyan]"
+        # 파일 저장
+        try:
+            keywords_str = (
+                "_".join(state["keywords"]) if state["keywords"] else "unknown"
             )
-            logger.info(
-                f"[cyan]Debug: sections from state: {len(sections_from_state)} sections[/cyan]"
+            domain_str = (
+                state["domain"].replace(" ", "_") if state.get("domain") else "general"
             )
 
-            # structured_data에서 완전한 정보 추출
-            if isinstance(category_summaries, dict):
-                # LLM이 생성한 내용들을 우선 사용
-                for key in [
-                    "newsletter_topic",
-                    "generation_date",
-                    "recipient_greeting",
-                    "introduction_message",
-                    "closing_message",
-                    "editor_signature",
-                    "company_name",
-                ]:
-                    if key in category_summaries:
-                        render_data[key] = category_summaries[key]
-                        logger.info(
-                            f"[green]LLM 생성 내용 사용: {key} = {category_summaries[key][:100] if isinstance(category_summaries[key], str) and len(category_summaries[key]) > 100 else category_summaries[key]}[/green]"
-                        )
+            # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{timestamp}_{domain_str}_scored_articles.json"
+            scored_path = os.path.join("output", "intermediate_processing", filename)
+            os.makedirs(os.path.dirname(scored_path), exist_ok=True)
 
-                # food_for_thought 추출
-                if "food_for_thought" in category_summaries:
-                    render_data["food_for_thought"] = category_summaries[
-                        "food_for_thought"
-                    ]
-                    logger.info(f"[green]Found food_for_thought[/green]")
+            with open(scored_path, "w", encoding="utf-8") as f:
+                json.dump(ranked_articles, f, indent=2, ensure_ascii=False)
 
-                # top_articles 추출
-                if "top_articles" in category_summaries:
-                    render_data["top_articles"] = category_summaries["top_articles"]
-                    logger.info(
-                        f"[green]Found top_articles: {len(render_data['top_articles'])} articles[/green]"
-                    )
-
-                # grouped_sections 추출 (compact 모드)
-                if "grouped_sections" in category_summaries:
-                    render_data["grouped_sections"] = category_summaries[
-                        "grouped_sections"
-                    ]
-                    logger.info(
-                        f"[green]Found grouped_sections: {len(render_data['grouped_sections'])} groups[/green]"
-                    )
-
-                # definitions 추출
-                if "definitions" in category_summaries:
-                    render_data["definitions"] = category_summaries["definitions"]
-                    logger.info(
-                        f"[green]Found definitions: {len(render_data['definitions'])} definitions[/green]"
-                    )
-
-            # introduction_message가 없으면 주제 기반으로 생성
-            if (
-                "introduction_message" not in render_data
-                or not render_data["introduction_message"]
-            ):
-                newsletter_topic = render_data.get("newsletter_topic", topic)
-                render_data["introduction_message"] = (
-                    f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                )
-                logger.info(
-                    f"[yellow]기본 introduction_message 생성: {render_data['introduction_message']}[/yellow]"
-                )
-
-            # sections 데이터 우선순위: state의 sections > category_summaries의 sections
-            if sections_from_state:
-                # sections_from_state에서 완전한 정보 추출
-                complete_sections = []
-                for section in sections_from_state:
-                    complete_section = {
-                        "title": section.get("title", ""),
-                        "summary_paragraphs": section.get("summary_paragraphs", []),
-                        "definitions": section.get("definitions", []),
-                        "news_links": section.get("news_links", []),
-                    }
-
-                    # intro 필드가 있으면 summary_paragraphs로 변환
-                    if (
-                        "intro" in section
-                        and not complete_section["summary_paragraphs"]
-                    ):
-                        complete_section["summary_paragraphs"] = [section["intro"]]
-
-                    # articles 필드가 있으면 news_links로 변환
-                    if "articles" in section and not complete_section["news_links"]:
-                        complete_section["news_links"] = [
-                            {
-                                "title": article.get("title", ""),
-                                "url": article.get("url", "#"),
-                                "source_and_date": article.get("source_and_date", ""),
-                            }
-                            for article in section.get("articles", [])
-                        ]
-
-                    complete_sections.append(complete_section)
-
-                render_data["sections"] = complete_sections
-                logger.info(
-                    f"[green]Using sections from state: {len(complete_sections)} sections[/green]"
-                )
-
-                # sections에서 definitions도 추출 (아직 없는 경우)
-                if not render_data["definitions"]:
-                    all_definitions = []
-                    for section in complete_sections:
-                        all_definitions.extend(section.get("definitions", []))
-                    render_data["definitions"] = all_definitions[:3]  # 최대 3개
-
-            elif (
-                isinstance(category_summaries, dict)
-                and "sections" in category_summaries
-            ):
-                render_data["sections"] = category_summaries["sections"]
-                logger.info(
-                    f"[green]Found sections data in category_summaries: {len(render_data['sections'])} sections[/green]"
-                )
-
-            # 파일 저장
-            try:
-                with open(render_data_path, "w", encoding="utf-8") as f:
-                    json.dump(render_data, f, ensure_ascii=False, indent=2)
-                logger.info(
-                    f"[green]Enhanced render data saved to {render_data_path}[/green]"
-                )
-                logger.info(
-                    f"[cyan]Render data contains: {len(render_data['sections'])} sections, {len(render_data['top_articles'])} top articles, {len(render_data['definitions'])} definitions[/cyan]"
-                )
-                return render_data_path
-            except Exception as e:
-                logger.error(f"[red]Error saving render data: {e}[/red]")
-                return None
-
-        # 렌더 데이터 저장 실행
-        render_data_path = save_render_data(state, newsletter_topic)
+            logger.info(f"Saved scored articles to {scored_path}")
+        except Exception as e:
+            logger.warning(f"Warning: Failed to save scored articles: {e}")
 
         step_times = state.get("step_times", {})
-        step_times["compose_newsletter"] = time.time() - start_time
+        step_times["score_articles"] = time.time() - start_time
+
+        return {
+            **state,
+            "ranked_articles": ranked_articles,
+            "status": "scoring_complete",
+            "step_times": step_times,
+        }
+
+    except Exception as e:
+        logger.error(f"Error during article scoring: {e}")
+        step_times = state.get("step_times", {})
+        step_times["score_articles"] = time.time() - start_time
+        return {
+            **state,
+            "ranked_articles": [],
+            "status": "error",
+            "error": f"기사 스코어링 중 오류: {str(e)}",
+            "step_times": step_times,
+        }
+
+
+def summarize_articles_node(state: NewsletterState) -> NewsletterState:
+    """
+    기사들을 요약하여 뉴스레터를 생성하는 노드
+    """
+    from .utils.logger import step_brief, show_final_brief
+
+    step_brief("뉴스레터 생성 중")
+    start_time = time.time()
+
+    ranked_articles = state.get("ranked_articles", [])
+    if not ranked_articles:
+        logger.warning("[yellow]No articles to summarize.[/yellow]")
+        step_times = state.get("step_times", {})
+        step_times["summarize"] = time.time() - start_time
+        return {
+            **state,
+            "newsletter_html": None,
+            "status": "error",
+            "error": "요약할 기사가 없습니다.",
+            "step_times": step_times,
+        }
+
+    try:
+        # 사용할 체인 결정
+        template_style = state.get("template_style", "detailed")
+        is_compact = template_style == "compact"
+        newsletter_chain = get_newsletter_chain(is_compact=is_compact)
+
+        # 체인 실행을 위한 데이터 준비
+        chain_data = {
+            "articles": ranked_articles,
+            "keywords": state.get("keywords", []),
+            "domain": state.get("domain", ""),
+            "email_compatible": state.get("email_compatible", False),
+            "template_style": template_style,
+        }
+
+        logger.info(
+            f"Generating newsletter using {template_style} style for {len(ranked_articles)} articles"
+        )
+
+        # 최종 활용 기사 수 표시
+        show_final_brief(len(ranked_articles))
+
+        # 체인 실행
+        result = newsletter_chain.invoke(chain_data)
+
+        if isinstance(result, str):
+            # 레거시 형식 (HTML 문자열)
+            logger.info(f"[yellow]Received HTML string (legacy format)[/yellow]")
+            newsletter_html = result
+            structured_data = {
+                "newsletter_topic": state.get("domain", ""),
+                "keywords": state.get("keywords", []),
+                "generation_date": datetime.now().strftime("%Y-%m-%d"),
+                "articles_count": len(ranked_articles),
+            }
+            sections = []
+            mode = template_style
+        elif isinstance(result, dict):
+            # 새로운 형식 (구조화된 결과)
+            newsletter_html = result.get("html", "")
+            structured_data = result.get("structured_data", {})
+            sections = result.get("sections", [])
+            mode = result.get("mode", template_style)
+
+            # 주요 메타데이터 추가
+            structured_data.update(
+                {
+                    "keywords": state.get("keywords", []),
+                    "domain": state.get("domain", ""),
+                    "template_style": template_style,
+                    "email_compatible": state.get("email_compatible", False),
+                    "articles_count": len(ranked_articles),
+                    "generation_timestamp": datetime.now().isoformat(),
+                }
+            )
+        else:
+            raise ValueError(
+                f"Unexpected result type from newsletter chain: {type(result)}"
+            )
+
+        step_times = state.get("step_times", {})
+        step_times["summarize"] = time.time() - start_time
+
         return {
             **state,
             "newsletter_html": newsletter_html,
-            "status": "complete",  # Final status
+            "category_summaries": {
+                "sections": sections,
+                "structured_data": structured_data,
+            },
+            "newsletter_topic": structured_data.get(
+                "newsletter_topic", state.get("domain", "")
+            ),
+            "status": "summarizing_complete",
             "step_times": step_times,
         }
+
     except Exception as e:
+        logger.error(f"Error during article summarization: {e}")
         import traceback
 
-        error_msg = f"뉴스레터 생성 중 오류가 발생했습니다: {str(e)}"
-        logger.error(f"[bold red]Error in newsletter composition: {str(e)}[/bold red]")
-        traceback.print_exc()
+        logger.debug(f"Traceback: {traceback.format_exc()}")
+
         step_times = state.get("step_times", {})
-        step_times["compose_newsletter"] = time.time() - start_time
+        step_times["summarize"] = time.time() - start_time
         return {
             **state,
-            "error": error_msg,
+            "newsletter_html": None,
             "status": "error",
+            "error": f"기사 요약 중 오류: {str(e)}",
+            "step_times": step_times,
+        }
+
+
+def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
+    """
+    최종 뉴스레터를 구성하고 파일로 저장하는 노드
+    """
+    from .utils.logger import step_brief, step_result
+
+    step_brief("뉴스레터 구성 중")
+    start_time = time.time()
+
+    category_summaries = state.get("category_summaries")
+    newsletter_html = state.get("newsletter_html")
+
+    if not category_summaries and not newsletter_html:
+        logger.warning("[yellow]No category summaries to compose newsletter.[/yellow]")
+        step_times = state.get("step_times", {})
+        step_times["compose"] = time.time() - start_time
+        return {
+            **state,
+            "status": "error",
+            "error": "구성할 뉴스레터 데이터가 없습니다.",
+            "step_times": step_times,
+        }
+
+    try:
+        # 이미 체인에서 HTML이 생성된 경우 그대로 사용
+        if newsletter_html:
+            logger.info(f"[cyan]Using pre-generated HTML from chains[/cyan]")
+            final_html = newsletter_html
+        else:
+            # Fallback: 기존 로직으로 HTML 생성 (현재는 체인이 담당)
+            final_html = "<html><body>Newsletter generation failed</body></html>"
+
+        # 파일 저장
+        try:
+            keywords_str = (
+                "_".join(state["keywords"]) if state["keywords"] else "unknown"
+            )
+            domain_str = (
+                state["domain"].replace(" ", "_") if state.get("domain") else "general"
+            )
+            template_style = state.get("template_style", "detailed")
+
+            # generate_unified_newsletter_filename이 이미 전체 경로를 반환함
+            file_path = generate_unified_newsletter_filename(
+                domain_str, f"newsletter_{template_style}", keywords_str, "html"
+            )
+
+            # 디렉토리 존재 확인 (파일 경로에서 디렉토리 부분 추출)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(final_html)
+
+            step_result("뉴스레터 저장 완료")
+            logger.info(f"[green]Newsletter saved to {file_path}[/green]")
+
+        except Exception as e:
+            logger.error(f"Error saving newsletter: {e}")
+
+        step_times = state.get("step_times", {})
+        step_times["compose"] = time.time() - start_time
+
+        return {
+            **state,
+            "newsletter_html": final_html,
+            "status": "complete",
+            "step_times": step_times,
+        }
+
+    except Exception as e:
+        logger.error(f"Error composing newsletter: {e}")
+        step_times = state.get("step_times", {})
+        step_times["compose"] = time.time() - start_time
+        return {
+            **state,
+            "status": "error",
+            "error": f"뉴스레터 구성 중 오류: {str(e)}",
             "step_times": step_times,
         }
 

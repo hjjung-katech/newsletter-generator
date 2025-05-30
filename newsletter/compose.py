@@ -12,6 +12,10 @@ from .date_utils import (
     format_date_for_display,
     standardize_date,
 )
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
 
 
 # 뉴스레터 스타일 설정
@@ -404,9 +408,9 @@ def render_newsletter_template(
     )
 
     template_name = config["template_name"]
-    print(f"[DEBUG] Loading template: {template_name}")
+    logger.debug(f"템플릿 로딩 중: {template_name}")
     template = env.get_template(template_name)
-    print(f"[DEBUG] Template loaded successfully: {template_name}")
+    logger.debug(f"템플릿 로딩 완료: {template_name}")
 
     # 현재 날짜와 시간 가져오기
     current_date = datetime.now().strftime("%Y-%m-%d")
@@ -701,8 +705,8 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
     Returns:
         Dict: 간결한 버전용으로 변환된 데이터
     """
-    print(
-        f"[DEBUG] process_compact_newsletter_data input keys: {list(newsletter_data.keys())}"
+    logger.debug(
+        f"process_compact_newsletter_data 입력 키들: {list(newsletter_data.keys())}"
     )
 
     compact_data = {
@@ -717,11 +721,11 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
 
     # 상위 중요 기사 처리 (최대 3개)
     top_articles = newsletter_data.get("top_articles", [])
-    print(f"[DEBUG] Found top_articles: {len(top_articles)}")
+    logger.debug(f"상위 기사를 찾았습니다: {len(top_articles)}개")
 
     if not top_articles and "sections" in newsletter_data:
         # top_articles가 없으면 각 섹션에서 첫 번째 기사들을 선택
-        print(f"[DEBUG] No top_articles, extracting from sections")
+        logger.debug("상위 기사가 없어 섹션에서 추출합니다")
         top_articles = extract_top_articles_from_sections(newsletter_data["sections"])
 
     # 상위 3개로 제한하고 요약 추가
@@ -729,12 +733,12 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
 
     # Check if grouped_sections already exist in the input data
     if "grouped_sections" in newsletter_data:
-        print(
-            f"[DEBUG] Using existing grouped_sections: {len(newsletter_data['grouped_sections'])}"
+        logger.debug(
+            f"기존 그룹화된 섹션을 사용합니다: {len(newsletter_data['grouped_sections'])}개"
         )
         compact_data["grouped_sections"] = newsletter_data["grouped_sections"]
     else:
-        print(f"[DEBUG] Creating grouped_sections from sections")
+        logger.debug("섹션에서 그룹화된 섹션을 생성합니다")
         # 나머지 기사들을 그룹별로 정리
         compact_data["grouped_sections"] = prepare_grouped_sections_for_compact(
             newsletter_data.get("sections", []),
@@ -743,12 +747,10 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
 
     # 용어 설명 처리 (최대 3개까지만)
     if "definitions" in newsletter_data:
-        print(
-            f"[DEBUG] Using existing definitions: {len(newsletter_data['definitions'])}"
-        )
+        logger.debug(f"기존 정의를 사용합니다: {len(newsletter_data['definitions'])}개")
         compact_data["definitions"] = newsletter_data["definitions"]
     else:
-        print(f"[DEBUG] Creating definitions from sections")
+        logger.debug("섹션에서 정의를 생성합니다")
         compact_data["definitions"] = extract_key_definitions_for_compact(
             newsletter_data.get("sections", [])
         )

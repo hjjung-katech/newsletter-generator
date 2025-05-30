@@ -109,6 +109,59 @@ class NewsletterLogger:
             console.print(f"[bold green]✅ {message}[/bold green]", **kwargs)
         self.logger.info(f"STEP_COMPLETE: {message}")
 
+    def step_brief(self, message: str, count: Optional[int] = None, **kwargs):
+        """간결한 단계 진행 상황 표시 (핵심 정보만)"""
+        if count is not None:
+            console.print(
+                f"[cyan]🔄 {message}[/cyan] [bold]({count}개)[/bold]", **kwargs
+            )
+        else:
+            console.print(f"[cyan]🔄 {message}[/cyan]", **kwargs)
+        self.logger.info(f"STEP_BRIEF: {message}")
+
+    def step_result(self, message: str, count: Optional[int] = None, **kwargs):
+        """단계 결과 간결 표시"""
+        if count is not None:
+            console.print(
+                f"[green]→ {message}[/green] [bold white]({count}개)[/bold white]",
+                **kwargs,
+            )
+        else:
+            console.print(f"[green]→ {message}[/green]", **kwargs)
+        self.logger.info(f"STEP_RESULT: {message}")
+
+    def show_collection_brief(self, keyword_counts: Dict[str, int]):
+        """키워드별 수집 결과 간략 표시"""
+        total_articles = sum(keyword_counts.values())
+
+        console.print(f"[cyan]📰 뉴스 수집 결과:[/cyan]")
+        for keyword, count in keyword_counts.items():
+            console.print(f"  • [white]{keyword}:[/white] [bold]{count}개[/bold]")
+        console.print(f"[bold cyan]  총 {total_articles}개 수집[/bold cyan]")
+
+        self.update_statistics("total_collected_articles", total_articles)
+        self.update_statistics("keyword_article_counts", keyword_counts)
+
+    def show_filter_brief(self, before: int, after: int, step_name: str = ""):
+        """필터링 결과 간략 표시"""
+        filtered_count = before - after
+        if filtered_count > 0:
+            console.print(
+                f"[yellow]📋 {step_name}:[/yellow] [white]{before}개[/white] → [bold green]{after}개[/bold green] "
+                f"[dim](-{filtered_count}개)[/dim]"
+            )
+        else:
+            console.print(
+                f"[yellow]📋 {step_name}:[/yellow] [bold green]{after}개[/bold green]"
+            )
+
+        self.logger.info(f"FILTER: {step_name} - {before} → {after}")
+
+    def show_final_brief(self, final_count: int):
+        """최종 활용 기사 수 간략 표시"""
+        console.print(f"[bold green]🎯 최종 활용 기사: {final_count}개[/bold green]")
+        self.update_statistics("final_articles_count", final_count)
+
     def start_step(self, step_name: str):
         """단계 시작 시간 기록"""
         self.step_start_times[step_name] = time.time()
@@ -332,3 +385,28 @@ def step(message: str, step_name: Optional[str] = None, **kwargs):
 def step_complete(message: str, step_name: Optional[str] = None, **kwargs):
     """단계 완료 메시지"""
     get_logger().step_complete(message, step_name, **kwargs)
+
+
+def step_brief(message: str, count: Optional[int] = None, **kwargs):
+    """간결한 단계 진행 메시지"""
+    get_logger().step_brief(message, count, **kwargs)
+
+
+def step_result(message: str, count: Optional[int] = None, **kwargs):
+    """단계 결과 간결 표시"""
+    get_logger().step_result(message, count, **kwargs)
+
+
+def show_collection_brief(keyword_counts: Dict[str, int]):
+    """키워드별 수집 결과 간략 표시"""
+    get_logger().show_collection_brief(keyword_counts)
+
+
+def show_filter_brief(before: int, after: int, step_name: str = ""):
+    """필터링 결과 간략 표시"""
+    get_logger().show_filter_brief(before, after, step_name)
+
+
+def show_final_brief(final_count: int):
+    """최종 활용 기사 수 간략 표시"""
+    get_logger().show_final_brief(final_count)

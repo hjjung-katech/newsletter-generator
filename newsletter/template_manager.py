@@ -1,6 +1,11 @@
 import json
 import os
 
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
+
 
 class TemplateManager:
     """템플릿 설정 관리를 담당하는 클래스"""
@@ -41,9 +46,9 @@ class TemplateManager:
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
                     self._config = json.load(f)
-                print(f"설정 파일 로드됨: {config_path}")
+                logger.info(f"설정 파일 로드됨: {config_path}")
             except Exception as e:
-                print(f"설정 파일 로드 실패: {e}")
+                logger.error(f"설정 파일 로드 실패: {e}")
                 self._config = self._default_config()
 
     def _default_config(self):
