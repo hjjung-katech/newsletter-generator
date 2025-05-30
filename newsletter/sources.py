@@ -17,7 +17,7 @@ from rich.console import Console
 
 from . import config
 from .date_utils import parse_date_string, standardize_date
-from .utils.logger import get_logger
+from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
@@ -82,9 +82,7 @@ class SerperAPISource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """Serper.dev API를 통해 뉴스 기사를 검색"""
         if not self.api_key:
-            console.print(
-                "[bold red]Error: SERPER_API_KEY not found. Please set it in the .env file.[/bold red]"
-            )
+            logger.error("SERPER_API_KEY를 찾을 수 없습니다. .env 파일에 설정해주세요.")
             return []
 
         all_articles = []
@@ -93,8 +91,8 @@ class SerperAPISource(NewsSource):
         url = "https://google.serper.dev/news"
 
         for keyword in keywords:
-            console.print(
-                f"[cyan]Searching articles for keyword: '{keyword}' using Serper.dev[/cyan]"
+            logger.info(
+                f"Serper.dev를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다"
             )
             payload = json.dumps(
                 {"q": keyword, "gl": "kr", "num": num_results}  # 한국 지역 결과
@@ -144,20 +142,22 @@ class SerperAPISource(NewsSource):
 
                 num_found = len(articles_for_keyword)
                 keyword_article_counts[keyword] = num_found
-                console.print(
-                    f"[green]Found {num_found} articles for keyword: '{keyword}' from Serper.dev[/green]"
+                logger.info(
+                    f"Serper.dev를 통해 키워드 '{keyword}'에 대해 {num_found}개의 기사를 찾았습니다"
                 )
                 all_articles.extend(articles_for_keyword)
 
             except requests.exceptions.RequestException as e:
-                console.print(
-                    f"[bold red]Error fetching articles for keyword '{keyword}' from Serper.dev: {e}[/bold red]"
+                logger.error(
+                    f"Serper.dev를 통해 키워드 '{keyword}'에 대한 기사를 가져오는 중 오류가 발생했습니다: {e}"
                 )
             except json.JSONDecodeError:
-                console.print(
-                    f"[bold red]Error decoding JSON response for keyword '{keyword}' from Serper.dev.[/bold red]"
+                logger.error(
+                    f"Serper.dev를 통해 키워드 '{keyword}'에 대한 JSON 응답을 디코딩하는 중 오류가 발생했습니다."
                 )
 
+        # 키워드별 수집 결과 저장 (소스별 집계용)
+        self._last_keyword_counts = keyword_article_counts
         return all_articles
 
 
@@ -177,17 +177,17 @@ class RSSFeedSource(NewsSource):
 
         for feed_url in self.feed_urls:
             try:
-                console.print(f"[cyan]Fetching RSS feed: {feed_url}[/cyan]")
+                logger.info(f"RSS 피드를 가져오는 중: {feed_url}")
                 feed = feedparser.parse(feed_url)
 
                 if getattr(feed, "status", 200) != 200:
-                    console.print(
-                        f"[yellow]Warning: Could not fetch RSS feed {feed_url}, status: {getattr(feed, 'status', 'unknown')}[/yellow]"
+                    logger.warning(
+                        f"RSS 피드 {feed_url}를 가져오는 데 실패했습니다, 상태: {getattr(feed, 'status', 'unknown')}"
                     )
                     continue
 
-                console.print(
-                    f"[green]Successfully fetched RSS feed: {feed_url} - {len(feed.entries)} entries[/green]"
+                logger.info(
+                    f"RSS 피드를 성공적으로 가져왔습니다: {feed_url} - {len(feed.entries)} entries"
                 )
 
                 matched_entries = []
@@ -268,21 +268,21 @@ class RSSFeedSource(NewsSource):
                 for article in matched_entries[:num_results]:
                     all_articles.append(self._standardize_article(article))
 
-                console.print(
-                    f"[green]Found {len(matched_entries)} matching articles from {feed_url}[/green]"
+                logger.info(
+                    f"{feed_url}에서 {len(matched_entries)}개의 일치하는 기사를 찾았습니다"
                 )
 
             except Exception as e:
-                console.print(
-                    f"[bold red]Error fetching RSS feed {feed_url}: {e}[/bold red]"
+                logger.error(
+                    f"RSS 피드 {feed_url}를 가져오는 중 오류가 발생했습니다: {e}"
                 )
 
         # 키워드별 수집한 기사 수 출력
         for keyword, count in keyword_article_counts.items():
-            console.print(
-                f"[cyan]- '{keyword}': {count} articles from RSS feeds[/cyan]"
-            )
+            logger.info(f"'{keyword}': RSS 피드에서 {count}개의 기사를 수집했습니다")
 
+        # 키워드별 수집 결과 저장 (소스별 집계용)
+        self._last_keyword_counts = keyword_article_counts
         return all_articles
 
     def _parse_rss_date(self, entry) -> str:
@@ -334,8 +334,8 @@ class NaverNewsAPISource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """네이버 뉴스 API를 통해 뉴스 기사를 검색"""
         if not self.client_id or not self.client_secret:
-            console.print(
-                "[bold yellow]Warning: Naver API credentials not found. Skipping Naver news source.[/bold yellow]"
+            logger.warning(
+                "Naver API 자격 증명을 찾을 수 없습니다. Naver 뉴스 소스를 건너뜁니다."
             )
             return []
 
@@ -343,8 +343,8 @@ class NaverNewsAPISource(NewsSource):
         keyword_article_counts = {}
 
         for keyword in keywords:
-            console.print(
-                f"[cyan]Searching articles for keyword: '{keyword}' using Naver News API[/cyan]"
+            logger.info(
+                f"Naver News API를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다"
             )
 
             url = f"https://openapi.naver.com/v1/search/news.json?query={keyword}&display={num_results}&sort=date"
@@ -382,16 +382,18 @@ class NaverNewsAPISource(NewsSource):
 
                 num_found = len(articles_for_keyword)
                 keyword_article_counts[keyword] = num_found
-                console.print(
-                    f"[green]Found {num_found} articles for keyword: '{keyword}' from Naver News API[/green]"
+                logger.info(
+                    f"Naver News API를 통해 키워드 '{keyword}'에 대해 {num_found}개의 기사를 찾았습니다"
                 )
                 all_articles.extend(articles_for_keyword)
 
             except requests.exceptions.RequestException as e:
-                console.print(
-                    f"[bold red]Error fetching articles for keyword '{keyword}' from Naver News API: {e}[/bold red]"
+                logger.error(
+                    f"Naver News API를 통해 키워드 '{keyword}'에 대한 기사를 가져오는 중 오류가 발생했습니다: {e}"
                 )
 
+        # 키워드별 수집 결과 저장 (소스별 집계용)
+        self._last_keyword_counts = keyword_article_counts
         return all_articles
 
 
@@ -415,21 +417,27 @@ class NewsSourceManager:
         else:
             keywords_list = keywords
 
-        console.print(
-            f"[bold green]Fetching news for keywords: {keywords_list}[/bold green]"
-        )
+        logger.info(f"키워드: {keywords_list}에 대한 뉴스를 수집중입니다")
 
         all_articles = []
         for source in self.sources:
-            console.print(
-                f"[bold]Fetching news from {source.get_source_name()}...[/bold]"
-            )
+            logger.info(f"{source.get_source_name()}에서 뉴스를 수집중입니다...")
             articles = source.fetch_news(keywords_list, num_results_per_source)
             all_articles.extend(articles)
 
-        console.print(
-            f"[bold green]Total articles collected from all sources: {len(all_articles)}[/bold green]"
-        )
+        logger.info(f"모든 소스에서 수집한 총 기사 수: {len(all_articles)}")
+
+        # 키워드별 수집 결과 간략 표시
+        # 키워드별 기사 수 집계
+        keyword_counts = {}
+        for source in self.sources:
+            if hasattr(source, "_last_keyword_counts"):
+                for keyword, count in source._last_keyword_counts.items():
+                    keyword_counts[keyword] = keyword_counts.get(keyword, 0) + count
+
+        if keyword_counts:
+            show_collection_brief(keyword_counts)
+
         return all_articles
 
     def remove_duplicates(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -461,8 +469,8 @@ class NewsSourceManager:
 
             unique_articles.append(article)
 
-        console.print(
-            f"[cyan]Removed {len(articles) - len(unique_articles)} duplicate articles[/cyan]"
+        logger.info(
+            f"{len(articles) - len(unique_articles)}개의 중복된 기사를 제거했습니다"
         )
         return unique_articles
 

@@ -9,15 +9,20 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+from .utils.logger import get_logger
+
+# 로거 초기화
+logger = get_logger()
+
 # Google Cloud 인증 문제 해결
 # 시스템에 잘못된 GOOGLE_APPLICATION_CREDENTIALS가 설정되어 있는 경우 처리
 google_creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
 if google_creds_path and not os.path.exists(google_creds_path):
     # 파일이 존재하지 않으면 환경변수 제거
-    print(
-        f"Warning: GOOGLE_APPLICATION_CREDENTIALS points to non-existent file: {google_creds_path}"
+    logger.warning(
+        f"GOOGLE_APPLICATION_CREDENTIALS이 존재하지 않는 파일을 가리킵니다: {google_creds_path}"
     )
-    print("Disabling Google Cloud authentication to use API key only.")
+    logger.info("Google Cloud 인증을 비활성화하고 API 키만 사용합니다.")
     os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
 # Google Cloud 기본 인증 파일 검색 완전 비활성화
@@ -94,8 +99,8 @@ class LLMWithFallback(Runnable):
                 or "overloaded" in error_str
             ):
 
-                print(
-                    f"[WARNING] API error ({e}) for {type(self.primary_llm).__name__}. Attempting fallback..."
+                logger.warning(
+                    f"API 오류 ({e}) - {type(self.primary_llm).__name__}에서 발생. 대체 모델을 시도합니다..."
                 )
 
                 # Fallback LLM 생성 (한 번만)
@@ -103,8 +108,8 @@ class LLMWithFallback(Runnable):
                     self.fallback_llm = self._get_fallback_llm()
 
                 if self.fallback_llm:
-                    print(
-                        f"[INFO] Using fallback LLM: {type(self.fallback_llm).__name__}"
+                    logger.info(
+                        f"대체 LLM을 사용합니다: {type(self.fallback_llm).__name__}"
                     )
                     return self.fallback_llm.invoke(input_data, config=config, **kwargs)
                 else:
@@ -192,7 +197,9 @@ class LLMWithFallback(Runnable):
         primary_provider = type(self.primary_llm).__name__
         primary_model = getattr(self.primary_llm, "model", "unknown")
 
-        print(f"[INFO] Looking for fallback for {primary_provider} ({primary_model})")
+        logger.info(
+            f"{primary_provider} ({primary_model})에 대한 대체 모델을 찾는 중입니다"
+        )
 
         # 1. 같은 제공자 내에서 안정적인 모델로 fallback 시도
         if "gemini" in primary_provider.lower():
@@ -201,7 +208,9 @@ class LLMWithFallback(Runnable):
             for stable_model in stable_models:
                 if stable_model != primary_model:  # 동일한 모델이 아닌 경우만
                     try:
-                        print(f"[INFO] Trying stable Gemini model: {stable_model}")
+                        logger.info(
+                            f"안정적인 Gemini 모델을 시도합니다: {stable_model}"
+                        )
                         fallback_config = {
                             "provider": "gemini",
                             "model": stable_model,
@@ -226,8 +235,8 @@ class LLMWithFallback(Runnable):
                                 fallback_config, fallback_callbacks
                             )
                     except Exception as e:
-                        print(
-                            f"[WARNING] Failed to create stable Gemini model {stable_model}: {e}"
+                        logger.warning(
+                            f"안정적인 Gemini 모델 {stable_model} 생성에 실패했습니다: {e}"
                         )
                         continue
 
@@ -252,8 +261,8 @@ class LLMWithFallback(Runnable):
                     provider_name, self.factory._get_default_model(provider_name)
                 )
 
-                print(
-                    f"[INFO] Trying different provider: {provider_name} with model {fallback_model}"
+                logger.info(
+                    f"다른 제공자를 시도합니다: {provider_name} (모델: {fallback_model})"
                 )
 
                 fallback_config = {
@@ -269,18 +278,18 @@ class LLMWithFallback(Runnable):
                 try:
                     cost_callback = get_cost_callback_for_provider(provider_name)
                     fallback_callbacks.append(cost_callback)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        f"비용 추적 추가에 실패했습니다 ({provider_name}): {e}"
+                    )
 
                 return provider.create_model(fallback_config, fallback_callbacks)
 
             except Exception as e:
-                print(
-                    f"[WARNING] Failed to create fallback LLM with {provider_name}: {e}"
-                )
+                logger.warning(f"{provider_name}으로 대체 LLM 생성에 실패했습니다: {e}")
                 continue
 
-        print("[WARNING] No fallback LLM could be created")
+        logger.warning("대체 LLM을 생성할 수 없습니다")
         return None
 
     def __getattr__(self, name):
@@ -449,14 +458,16 @@ class LLMFactory:
             cost_callback = get_cost_callback_for_provider(provider_name)
             final_callbacks.append(cost_callback)
         except Exception as e:
-            print(f"Warning: Failed to add cost tracking for {provider_name}: {e}")
+            logger.warning(
+                f"Warning: Failed to add cost tracking for {provider_name}: {e}"
+            )
 
         if not provider.is_available():
             # Fallback to available provider
             for fallback_name, fallback_provider in self.providers.items():
                 if fallback_provider.is_available():
-                    print(
-                        f"Warning: {provider_name} not available, falling back to {fallback_name}"
+                    logger.warning(
+                        f"{provider_name}을 사용할 수 없어 {fallback_name}으로 대체합니다"
                     )
                     model_config = model_config.copy()
                     model_config["provider"] = fallback_name
@@ -468,8 +479,8 @@ class LLMFactory:
                         cost_callback = get_cost_callback_for_provider(fallback_name)
                         final_callbacks.append(cost_callback)
                     except Exception as e:
-                        print(
-                            f"Warning: Failed to add cost tracking for {fallback_name}: {e}"
+                        logger.warning(
+                            f"비용 추적 추가에 실패했습니다 ({fallback_name}): {e}"
                         )
 
                     llm = fallback_provider.create_model(model_config, final_callbacks)

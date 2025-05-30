@@ -14,6 +14,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from . import config
 from .chains import get_llm
 from .date_utils import parse_date_string
+from .utils.logger import get_logger
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {
@@ -23,6 +24,9 @@ DEFAULT_WEIGHTS = {
     "source_tier": 0.20,
     "recency": 0.05,
 }
+
+# 로거 초기화
+logger = get_logger()
 
 
 def load_scoring_weights_from_config(
@@ -57,17 +61,17 @@ def load_scoring_weights_from_config(
                     if abs(total - 1.0) < 0.01:  # Allow small floating point errors
                         return weights
                     else:
-                        print(
-                            f"[yellow]Warning: Scoring weights sum to {total:.3f}, not 1.0. Using defaults.[/yellow]"
+                        logger.warning(
+                            f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
                         )
                 else:
                     missing_keys = required_keys - config_keys
-                    print(
-                        f"[yellow]Warning: Missing scoring weight keys: {missing_keys}. Using defaults.[/yellow]"
+                    logger.warning(
+                        f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
                     )
     except Exception as e:
-        print(
-            f"[yellow]Warning: Could not load scoring weights from {config_file}: {e}. Using defaults.[/yellow]"
+        logger.warning(
+            f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
         )
 
     return DEFAULT_WEIGHTS
@@ -220,10 +224,6 @@ def score_articles(
     scored_list.sort(key=lambda a: a["priority_score"], reverse=True)
 
     # Tier별 통계 출력
-    from .utils.logger import get_logger
-
-    logger = get_logger()
-
     tier_stats = {}
     for article in scored_list:
         tier_name = article.get("source_tier_name", "Unknown")

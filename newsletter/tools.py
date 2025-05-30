@@ -24,7 +24,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from rich.console import Console
 
 from . import config
-from .utils.logger import get_logger
+from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
@@ -151,10 +151,14 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
             )
             # Continue to next keyword
 
-    logger.info("\nSummary of articles collected per keyword:")
-    for kw, count in keyword_article_counts.items():
-        logger.info(f"- '{kw}': {count} articles")
-    logger.info(f"Total articles collected: {len(all_collected_articles)}\n")
+    # 검색 결과 간결 표시
+    total_collected = len(all_collected_articles)
+    if keyword_article_counts and total_collected > 0:
+        show_collection_brief(keyword_article_counts)
+    elif total_collected > 0:
+        logger.info(f"📰 총 {total_collected}개 기사 수집 완료")
+    else:
+        logger.warning("⚠️  수집된 기사가 없습니다")
 
     return all_collected_articles
 
@@ -524,7 +528,9 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
     )
 
     if not has_any_api_key:
-        print("No API keys available. Using simple fallback for theme extraction.")
+        logger.warning(
+            "API 키가 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다."
+        )
         return extract_common_theme_fallback(keywords)
 
     try:
@@ -567,13 +573,13 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
             return extracted_theme.strip()
 
         except Exception as e:
-            print(
-                f"Warning: LLM factory failed for theme extraction, using fallback: {e}"
+            logger.warning(
+                f"LLM 팩토리를 통한 테마 추출이 실패했습니다. 대체 방법을 사용합니다: {e}"
             )
             # Check if API key is available before trying Gemini fallback
             if not api_key:
-                print(
-                    "GEMINI_API_KEY not found. Using simple fallback for theme extraction."
+                logger.warning(
+                    "GEMINI_API_KEY를 찾을 수 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다."
                 )
                 return extract_common_theme_fallback(keywords)
 
@@ -602,7 +608,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                             run_id=run_id,
                         )
                     except Exception as e_start:
-                        print(f"Warning: Callback on_llm_start failed: {e_start}")
+                        logger.debug(f"Callback on_llm_start 실행 실패: {e_start}")
 
         genai_model = genai.GenerativeModel(model_name)
         response = genai_model.generate_content(
@@ -636,7 +642,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                     try:
                         cb.on_llm_end(llm_result, run_id=run_id)
                     except Exception as e_cb:
-                        print(f"Warning: Callback on_llm_end failed: {e_cb}")
+                        logger.debug(f"Callback on_llm_end 실행 실패: {e_cb}")
 
         return extracted_theme
 
@@ -648,8 +654,8 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                     try:
                         cb.on_llm_error(e, run_id=run_id_error)
                     except Exception as e_err_cb:
-                        print(f"Warning: Callback on_llm_error failed: {e_err_cb}")
-        print(f"Error in extract_common_theme_from_keywords with Gemini: {e}")
+                        logger.debug(f"Callback on_llm_error 실행 실패: {e_err_cb}")
+        logger.error(f"Gemini를 사용한 테마 추출 중 오류 발생: {e}")
         return extract_common_theme_fallback(keywords)
 
 
@@ -813,17 +819,18 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
         return paragraphs[:3]
 
     except Exception as e:
-        print(
-            f"Warning: LLM factory failed for section regeneration, using fallback: {e}"
+        logger.warning(
+            f"LLM 팩토리를 통한 섹션 재생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
         )
-        # Fallback to original Gemini implementation
-        import google.generativeai as genai
 
-        if not config.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+    # Fallback to original Gemini implementation
+    import google.generativeai as genai
 
-        genai.configure(api_key=config.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-pro")
+    if not config.GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
+
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-pro")
 
     # 뉴스 링크 정보를 문자열로 변환 - 수정된 형식으로
     news_links_text = ""
@@ -876,8 +883,8 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     except Exception as e:
         import traceback
 
-        print(f"Error generating content with Gemini: {e}")
-        print(f"Error details: {traceback.format_exc()}")
+        logger.error(f"Gemini를 사용한 콘텐츠 생성 중 오류 발생: {e}")
+        logger.debug(f"오류 세부 정보: {traceback.format_exc()}")
         return [
             "요약 생성 중 오류가 발생했습니다.",
             "추가 정보가 필요합니다.",
@@ -940,8 +947,8 @@ def generate_introduction_with_gemini(
         return response.content.strip()
 
     except Exception as e:
-        print(
-            f"Warning: LLM factory failed for introduction generation, using fallback: {e}"
+        logger.warning(
+            f"LLM 팩토리를 통한 소개 생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
         )
         # Fallback to original Gemini implementation
         import google.generativeai as genai
@@ -989,6 +996,6 @@ def generate_introduction_with_gemini(
     except Exception as e:
         import traceback
 
-        print(f"Error generating introduction with Gemini: {e}")
-        print(f"Error details: {traceback.format_exc()}")
+        logger.error(f"Gemini를 사용한 소개 생성 중 오류 발생: {e}")
+        logger.debug(f"오류 세부 정보: {traceback.format_exc()}")
         return f"금주 {safe_topic} 관련 최신 동향과 주요 뉴스를 정리하여 제공합니다. 본 뉴스레터가 업무에 도움이 되기를 바랍니다."

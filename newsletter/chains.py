@@ -1318,8 +1318,8 @@ def get_newsletter_chain(is_compact=False):
                                 definitions.append(definition)
                     # 최대 3개로 제한
                     definitions = definitions[:3]
-                    logger.info(
-                        f"[DEBUG] Email-compatible: extracted {len(definitions)} definitions from grouped_sections"
+                    logger.debug(
+                        f"이메일 호환 모드: grouped_sections에서 {len(definitions)}개의 정의를 추출했습니다"
                     )
                 else:
                     # 일반 compact 모드에서는 전체 definitions를 빈 배열로 설정 (그룹별 definitions만 사용)
@@ -1480,26 +1480,26 @@ R&D 전략기획단 전문위원들을 대상으로, 이번 주 뉴스레터의 
                 )
 
                 # email_compatible 정보를 데이터에 추가
-                logger.info(
-                    f"[DEBUG] Original data email_compatible: {data.get('email_compatible', 'NOT_FOUND')}"
+                logger.debug(
+                    f"원본 데이터 email_compatible: {data.get('email_compatible', 'NOT_FOUND')}"
                 )
                 result_data["email_compatible"] = data.get("email_compatible", False)
                 result_data["template_style"] = data.get("template_style", "compact")
-                logger.info(
-                    f"[DEBUG] Set result_data email_compatible: {result_data['email_compatible']}"
+                logger.debug(
+                    f"결과 데이터 email_compatible 설정: {result_data['email_compatible']}"
                 )
 
                 # email_compatible 처리를 위해 통합된 compose_newsletter 함수 사용
                 is_email_compatible = result_data.get("email_compatible", False)
-                logger.info(f"[DEBUG] Final email_compatible: {is_email_compatible}")
+                logger.debug(f"최종 email_compatible: {is_email_compatible}")
 
                 if is_email_compatible:
-                    logger.info("[DEBUG] Using email_compatible template")
+                    logger.debug("이메일 호환 템플릿을 사용합니다")
                     html_content = compose_newsletter(
                         result_data, template_dir, "email_compatible"
                     )
                 else:
-                    logger.info("[DEBUG] Using compact template")
+                    logger.debug("간결한 템플릿을 사용합니다")
                     html_content = compose_newsletter(
                         result_data, template_dir, "compact"
                     )
