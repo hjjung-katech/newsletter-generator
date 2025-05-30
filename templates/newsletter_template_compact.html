@@ -112,7 +112,16 @@ footer{font-size:0.8em; color:#888; text-align:center; margin-top:40px;}
 {% if food_for_thought %}
 <section class="group">
 <h3>💡 생각해 볼 거리</h3>
+{% if food_for_thought.message %}
+<blockquote>{{ food_for_thought.message }}</blockquote>
+{% elif food_for_thought.quote %}
+<blockquote>{{ food_for_thought.quote }}</blockquote>
+{% if food_for_thought.author %}
+<cite>- {{ food_for_thought.author }}</cite>
+{% endif %}
+{% else %}
 <blockquote>{{ food_for_thought }}</blockquote>
+{% endif %}
 </section>
 {% endif %}
 
