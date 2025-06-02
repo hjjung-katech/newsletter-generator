@@ -80,6 +80,7 @@ flowchart LR
 ```
 
 * **정기 예약 발송** : Redis‑RQ + Railway Cron (kick every 15 min) → Worker pull RRULE schedule.
+* **워커 실행** : `python web/worker.py` 또는 `rq worker --path ./web` 명령으로 실행하며, 기본 큐(`default`) 이름을 맞추어야 한다.
 * **예약 현황** : `schedules` 테이블 + endpoint `/api/schedules`.
 
 ---

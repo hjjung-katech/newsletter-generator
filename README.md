@@ -71,6 +71,19 @@ python tests/test_email_integration.py --to user@example.com
 newsletter list-providers
 ```
 
+### 백그라운드 작업 실행
+
+웹 서비스에서 예약 발송 등을 처리하려면 Redis‑RQ 워커를 별도로 실행해야 합니다.
+워커는 기본 큐(`default`)를 사용하므로 웹 애플리케이션과 동일한 큐 이름으로
+작업을 넣어야 합니다.
+
+```bash
+# 웹 서비스용 워커 실행
+python web/worker.py
+# 또는
+rq worker --path ./web
+```
+
 ## 🏗️ 아키텍처 개요
 
 Newsletter Generator는 **통합 아키텍처**를 사용하여 Compact와 Detailed 두 가지 스타일의 뉴스레터를 하나의 코드베이스로 생성합니다.

@@ -14,6 +14,9 @@ from datetime import datetime
 import uuid
 import json
 
+# Import task function for RQ
+from tasks import generate_newsletter_task
+
 # Add the parent directory to the path to import newsletter modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -609,7 +612,7 @@ def generate_newsletter():
     # If Redis is available, queue the task
     if task_queue:
         print(f"📤 Queueing task with Redis")
-        job = task_queue.enqueue("tasks.generate_newsletter_task", data, job_id)
+        job = task_queue.enqueue(generate_newsletter_task, data, job_id)
         return jsonify({"job_id": job_id, "status": "queued"})
     else:
         print(f"🔄 Processing in-memory (Redis not available)")
