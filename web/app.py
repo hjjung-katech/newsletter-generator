@@ -25,6 +25,14 @@ import subprocess
 import tempfile
 import logging
 
+# 현재 디렉토리를 파이썬 패스에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+# 프로젝트 루트를 파이썬 패스에 추가
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
+
 
 class RealNewsletterCLI:
     def __init__(self):
@@ -65,7 +73,7 @@ class RealNewsletterCLI:
     ):
         """실제 CLI를 사용하여 뉴스레터 생성"""
         try:
-            # CLI 명령어 구성 - 더 안정적인 방식으로 개선
+            # CLI 명령어 구성 - --output 옵션 제거
             cmd = [
                 sys.executable,
                 "-m",
@@ -99,31 +107,19 @@ class RealNewsletterCLI:
             if email_compatible:
                 cmd.append("--email-compatible")
 
-            # 고유한 output 디렉토리 생성 (여러 요청 동시 처리를 위해)
-            import time
-
-            timestamp = int(time.time() * 1000)  # 밀리초 타임스탬프
-            unique_output_dir = os.path.join(
-                self.project_root, "output", f"web_request_{timestamp}"
-            )
-            os.makedirs(unique_output_dir, exist_ok=True)
-
-            # 고유한 출력 파일 경로 지정
-            output_filename = f"newsletter_web_{timestamp}.html"
-            output_filepath = os.path.join(unique_output_dir, output_filename)
-
-            # CLI 명령어에 출력 경로 추가
-            cmd.extend(["--output", output_filepath])
-
-            # CLI 실행 환경 설정
+            # CLI 실행 환경 설정 - 한국어 인코딩 문제 해결
             env = dict(os.environ)
             env["PYTHONPATH"] = self.project_root
+            # UTF-8 인코딩 강제 설정
+            env["PYTHONIOENCODING"] = "utf-8"
+            env["PYTHONUTF8"] = "1"
+            # Windows CMD 인코딩 설정
+            env["CHCP"] = "65001"
 
             # CLI 실행
             logging.info(f"Executing CLI command: {' '.join(cmd)}")
             logging.info(f"Working directory: {self.project_root}")
             logging.info(f"Input: {input_description}")
-            logging.info(f"Output directory: {unique_output_dir}")
 
             result = subprocess.run(
                 cmd,
@@ -132,6 +128,8 @@ class RealNewsletterCLI:
                 text=True,
                 timeout=self.timeout,
                 env=env,
+                encoding="utf-8",  # 명시적 UTF-8 인코딩
+                errors="replace",  # 인코딩 에러 시 문자 대체
             )
 
             logging.info(
@@ -147,30 +145,9 @@ class RealNewsletterCLI:
                 logging.error(f"CLI stdout: {result.stdout}")
                 return self._fallback_response(keywords or domain, error_msg)
 
-            # 지정된 출력 파일이 생성되었는지 먼저 확인
-            html_content = None
-            if os.path.exists(output_filepath):
-                try:
-                    with open(output_filepath, "r", encoding="utf-8") as f:
-                        html_content = f.read()
-                    logging.info(f"Successfully read output file: {output_filepath}")
-                except Exception as e:
-                    logging.error(f"Failed to read output file {output_filepath}: {e}")
-
-            # 지정된 파일이 없으면 디렉토리에서 최신 파일 검색 (폴백)
-            if not html_content:
-                logging.warning(
-                    "Specified output file not found, searching in directory..."
-                )
-                html_content = self._find_latest_html_file(unique_output_dir)
-
-            # 고유 디렉토리에서도 못찾으면 기본 output 디렉토리에서 검색 (마지막 폴백)
-            if not html_content:
-                default_output_dir = os.path.join(self.project_root, "output")
-                html_content = self._find_latest_html_file(default_output_dir)
-                logging.warning(
-                    f"HTML not found in unique directory, found in default: {html_content is not None}"
-                )
+            # CLI가 자동으로 생성한 HTML 파일 찾기
+            default_output_dir = os.path.join(self.project_root, "output")
+            html_content = self._find_latest_html_file(default_output_dir, keywords)
 
             if html_content:
                 # 제목 추출
@@ -200,19 +177,9 @@ class RealNewsletterCLI:
                     },
                 }
 
-                # 임시 디렉토리 정리
-                try:
-                    import shutil
-
-                    shutil.rmtree(unique_output_dir, ignore_errors=True)
-                except Exception as cleanup_error:
-                    logging.warning(
-                        f"Failed to cleanup temporary directory: {cleanup_error}"
-                    )
-
                 return response
             else:
-                error_msg = f"No HTML output file found in {unique_output_dir} or default output directory"
+                error_msg = f"No HTML output file found in {default_output_dir}"
                 logging.error(error_msg)
                 return self._fallback_response(keywords or domain, error_msg)
 
@@ -226,24 +193,64 @@ class RealNewsletterCLI:
             logging.error(error_msg, exc_info=True)  # 스택 트레이스 포함
             return self._fallback_response(keywords or domain, error_msg)
 
-    def _find_latest_html_file(self, output_dir):
+    def _find_latest_html_file(self, output_dir, keywords=None):
         """output 디렉토리에서 최신 HTML 파일 찾기"""
         try:
             if not os.path.exists(output_dir):
+                logging.error(f"Output directory does not exist: {output_dir}")
                 return None
 
             html_files = [f for f in os.listdir(output_dir) if f.endswith(".html")]
             if not html_files:
+                logging.error(f"No HTML files found in {output_dir}")
                 return None
 
-            # 최신 파일 찾기
+            logging.info(f"Found {len(html_files)} HTML files in {output_dir}")
+
+            # 키워드가 있으면 해당 키워드가 포함된 파일을 우선적으로 찾기
+            if keywords:
+                keyword_str = (
+                    keywords if isinstance(keywords, str) else ",".join(keywords)
+                )
+                keyword_files = [
+                    f
+                    for f in html_files
+                    if any(
+                        kw.strip().lower() in f.lower() for kw in keyword_str.split(",")
+                    )
+                ]
+                if keyword_files:
+                    html_files = keyword_files
+                    logging.info(
+                        f"Filtered to {len(keyword_files)} files matching keywords: {keyword_str}"
+                    )
+
+            # 최신 파일 찾기 (생성 시간 기준)
             latest_file = max(
                 html_files, key=lambda x: os.path.getctime(os.path.join(output_dir, x))
             )
             file_path = os.path.join(output_dir, latest_file)
 
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
+            logging.info(f"Reading latest HTML file: {latest_file}")
+            logging.info(f"File path: {file_path}")
+            logging.info(f"File size: {os.path.getsize(file_path)} bytes")
+
+            # 여러 인코딩으로 시도
+            encodings = ["utf-8", "utf-8-sig", "cp949", "euc-kr", "latin1"]
+
+            for encoding in encodings:
+                try:
+                    with open(file_path, "r", encoding=encoding) as f:
+                        content = f.read()
+                        logging.info(f"Successfully read file with {encoding} encoding")
+                        logging.info(f"Content length: {len(content)} characters")
+                        return content
+                except UnicodeDecodeError:
+                    logging.warning(f"Failed to read with {encoding} encoding")
+                    continue
+
+            logging.error(f"Failed to read file with any encoding")
+            return None
 
         except Exception as e:
             logging.error(f"Error reading HTML file: {e}")
@@ -517,10 +524,18 @@ QUEUE_NAME = os.getenv("RQ_QUEUE", "default")
 
 # Redis connection with fallback to in-memory processing
 try:
-    redis_conn = redis.from_url(app.config["REDIS_URL"])
-    redis_conn.ping()  # Test connection
-    task_queue = Queue(QUEUE_NAME, connection=redis_conn)
-    print("Redis connected successfully")
+    import platform
+
+    # Windows에서는 RQ Worker가 제대로 작동하지 않으므로 직접 처리 사용
+    if platform.system() == "Windows":
+        print("Windows detected: Using direct processing instead of Redis Queue")
+        redis_conn = None
+        task_queue = None
+    else:
+        redis_conn = redis.from_url(app.config["REDIS_URL"])
+        redis_conn.ping()  # Test connection
+        task_queue = Queue(QUEUE_NAME, connection=redis_conn)
+        print("Redis connected successfully")
 except Exception as e:
     print(f"Redis connection failed: {e}. Using in-memory processing.")
     redis_conn = None
@@ -673,6 +688,7 @@ def process_newsletter_sync(data):
     """Process newsletter synchronously (fallback when Redis is not available)"""
     try:
         print(f"🔄 Starting synchronous newsletter processing")
+        print(f"📊 Current newsletter_cli type: {type(newsletter_cli).__name__}")
 
         # Extract parameters
         keywords = data.get("keywords", "")
@@ -680,6 +696,7 @@ def process_newsletter_sync(data):
         template_style = data.get("template_style", "compact")
         email_compatible = data.get("email_compatible", False)
         period = data.get("period", 14)
+        email = data.get("email", "")  # 이메일 주소 추가
 
         print(f"📋 Processing parameters:")
         print(f"   Keywords: {keywords}")
@@ -687,28 +704,47 @@ def process_newsletter_sync(data):
         print(f"   Template style: {template_style}")
         print(f"   Email compatible: {email_compatible}")
         print(f"   Period: {period}")
+        print(f"   Email: {email}")
 
         # Use newsletter CLI with proper parameters
-        if keywords:
-            print(f"🔧 Generating newsletter with keywords")
-            result = newsletter_cli.generate_newsletter(
-                keywords=keywords,
-                template_style=template_style,
-                email_compatible=email_compatible,
-                period=period,
-            )
-        elif domain:
-            print(f"🔧 Generating newsletter with domain")
-            result = newsletter_cli.generate_newsletter(
-                domain=domain,
-                template_style=template_style,
-                email_compatible=email_compatible,
-                period=period,
-            )
-        else:
-            raise ValueError("Either keywords or domain must be provided")
+        try:
+            if keywords:
+                print(
+                    f"🔧 Generating newsletter with keywords using {type(newsletter_cli).__name__}"
+                )
+                result = newsletter_cli.generate_newsletter(
+                    keywords=keywords,
+                    template_style=template_style,
+                    email_compatible=email_compatible,
+                    period=period,
+                )
+            elif domain:
+                print(
+                    f"🔧 Generating newsletter with domain using {type(newsletter_cli).__name__}"
+                )
+                result = newsletter_cli.generate_newsletter(
+                    domain=domain,
+                    template_style=template_style,
+                    email_compatible=email_compatible,
+                    period=period,
+                )
+            else:
+                raise ValueError("Either keywords or domain must be provided")
 
-        print(f"📊 CLI result status: {result['status']}")
+            print(f"📊 CLI result status: {result['status']}")
+            print(f"📊 CLI result type: {type(result)}")
+            print(
+                f"📊 CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            )
+
+        except Exception as cli_error:
+            print(f"❌ CLI generation failed: {str(cli_error)}")
+            print(f"❌ CLI error type: {type(cli_error).__name__}")
+            import traceback
+
+            print(f"❌ CLI error traceback: {traceback.format_exc()}")
+            # Set result to error status for fallback logic
+            result = {"status": "error", "error": str(cli_error)}
 
         # Handle different result formats
         if result["status"] == "error":
@@ -732,6 +768,46 @@ def process_newsletter_sync(data):
                     )
                 print(f"📊 Mock fallback result status: {result['status']}")
 
+        # 이메일 발송 기능 추가
+        email_sent = False
+        if email and result.get("content") and not data.get("preview_only"):
+            try:
+                print(f"📧 Attempting to send email to {email}")
+                # 이메일 발송 - try-except로 import 처리
+                try:
+                    import mail
+
+                    send_email_func = mail.send_email
+                except ImportError:
+                    try:
+                        from . import mail
+
+                        send_email_func = mail.send_email
+                    except ImportError:
+                        return (
+                            jsonify(
+                                {
+                                    "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
+                                }
+                            ),
+                            500,
+                        )
+
+                # 제목 생성
+                subject = result.get("title", "Newsletter")
+                if keywords:
+                    subject = f"Newsletter: {keywords}"
+                elif domain:
+                    subject = f"Newsletter: {domain} Insights"
+
+                # 이메일 발송
+                send_email_func(to=email, subject=subject, html=result["content"])
+                email_sent = True
+                print(f"✅ Successfully sent email to {email}")
+            except Exception as e:
+                print(f"❌ Failed to send email to {email}: {str(e)}")
+                # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
+
         response = {
             "html_content": result["content"],
             "subject": result["title"],
@@ -744,6 +820,7 @@ def process_newsletter_sync(data):
             "generation_stats": result.get("generation_stats", {}),
             "input_params": result.get("input_params", {}),
             "html_size": len(result["content"]) if result.get("content") else 0,
+            "email_sent": email_sent,  # 이메일 발송 상태 추가
             "processing_info": {
                 "using_real_cli": isinstance(newsletter_cli, RealNewsletterCLI),
                 "template_style": template_style,
@@ -952,6 +1029,160 @@ def test_api():
 def manual_test():
     """Manual test page for newsletter generation workflow"""
     return render_template("manual_test.html")
+
+
+@app.route("/api/send-email", methods=["POST"])
+def send_email_api():
+    """생성된 뉴스레터를 이메일로 발송"""
+    try:
+        data = request.get_json()
+        job_id = data.get("job_id")
+        email = data.get("email")
+
+        if not job_id or not email:
+            return jsonify({"error": "job_id와 email이 필요합니다"}), 400
+
+        # 작업 상태 확인
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT status, result, params FROM history WHERE id = ?", (job_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({"error": "작업을 찾을 수 없습니다"}), 404
+
+        status, result_json, params_json = row
+        if status != "completed":
+            return jsonify({"error": "완료되지 않은 작업입니다"}), 400
+
+        result = json.loads(result_json) if result_json else {}
+        params = json.loads(params_json) if params_json else {}
+
+        html_content = result.get("html_content")
+        if not html_content:
+            return jsonify({"error": "발송할 콘텐츠가 없습니다"}), 400
+
+        # 이메일 발송 - try-except로 import 처리
+        try:
+            import mail
+
+            send_email_func = mail.send_email
+        except ImportError:
+            try:
+                from . import mail
+
+                send_email_func = mail.send_email
+            except ImportError:
+                return (
+                    jsonify(
+                        {
+                            "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
+                        }
+                    ),
+                    500,
+                )
+
+        # 제목 생성
+        keywords = params.get("keywords", [])
+        if isinstance(keywords, str):
+            keywords = [keywords]
+
+        subject = (
+            f"Newsletter: {', '.join(keywords) if keywords else 'Your Newsletter'}"
+        )
+
+        # 이메일 발송
+        send_email_func(to=email, subject=subject, html=html_content)
+
+        return jsonify(
+            {"success": True, "message": "이메일이 성공적으로 발송되었습니다"}
+        )
+
+    except Exception as e:
+        logging.error(f"Email sending failed: {e}")
+        return jsonify({"error": f"이메일 발송 실패: {str(e)}"}), 500
+
+
+@app.route("/api/email-config")
+def check_email_config():
+    """이메일 설정 상태를 확인"""
+    try:
+        # 이메일 설정 확인 함수 import
+        try:
+            import mail
+
+            check_config_func = mail.check_email_configuration
+        except ImportError:
+            try:
+                from . import mail
+
+                check_config_func = mail.check_email_configuration
+            except ImportError:
+                return jsonify({"error": "이메일 모듈을 찾을 수 없습니다."}), 500
+
+        config_status = check_config_func()
+
+        return jsonify(
+            {
+                "postmark_token_configured": config_status["postmark_token_configured"],
+                "from_email_configured": config_status["from_email_configured"],
+                "ready": config_status["ready"],
+                "message": (
+                    "이메일 발송 준비 완료"
+                    if config_status["ready"]
+                    else "환경변수 설정이 필요합니다"
+                ),
+            }
+        )
+
+    except Exception as e:
+        logging.error(f"Email config check failed: {e}")
+        return jsonify({"error": f"설정 확인 실패: {str(e)}"}), 500
+
+
+@app.route("/api/test-email", methods=["POST"])
+def send_test_email_api():
+    """테스트 이메일을 발송"""
+    try:
+        data = request.get_json()
+        email = data.get("email")
+
+        if not email:
+            return jsonify({"error": "이메일 주소가 필요합니다"}), 400
+
+        # 이메일 형식 간단 검증
+        if "@" not in email or "." not in email:
+            return jsonify({"error": "유효한 이메일 주소를 입력해주세요"}), 400
+
+        # 테스트 이메일 발송 함수 import
+        try:
+            import mail
+
+            send_test_func = mail.send_test_email
+        except ImportError:
+            try:
+                from . import mail
+
+                send_test_func = mail.send_test_email
+            except ImportError:
+                return jsonify({"error": "이메일 모듈을 찾을 수 없습니다."}), 500
+
+        response = send_test_func(to=email)
+
+        return jsonify(
+            {
+                "success": True,
+                "message": f"테스트 이메일이 {email}로 발송되었습니다",
+                "message_id": response.get("MessageID") if response else None,
+            }
+        )
+
+    except Exception as e:
+        logging.error(f"Test email sending failed: {e}")
+        return jsonify({"error": f"테스트 이메일 발송 실패: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

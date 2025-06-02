@@ -42,6 +42,7 @@ class NewsletterApp {
         document.getElementById('previewBtn').addEventListener('click', () => this.previewNewsletter());
         document.getElementById('downloadBtn').addEventListener('click', () => this.downloadNewsletter());
         document.getElementById('sendEmailBtn').addEventListener('click', () => this.sendEmail());
+        document.getElementById('emailConfigBtn').addEventListener('click', () => this.checkEmailConfiguration());
 
         // Navigation buttons
         document.getElementById('historyBtn').addEventListener('click', () => this.switchTab('historyTab'));
@@ -615,9 +616,109 @@ class NewsletterApp {
         alert('다운로드 기능은 추후 구현됩니다.');
     }
 
-    sendEmail() {
-        // This would send the newsletter via email
-        alert('이메일 발송 기능은 추후 구현됩니다.');
+    async sendEmail() {
+        if (!this.currentJobId) {
+            alert('발송할 뉴스레터가 없습니다.');
+            return;
+        }
+
+        const email = document.getElementById('email').value.trim();
+        if (!email) {
+            alert('이메일 주소를 입력해주세요.');
+            return;
+        }
+
+        // 이메일 설정 확인
+        try {
+            const configResponse = await fetch('/api/email-config');
+            const configResult = await configResponse.json();
+            
+            if (!configResult.ready) {
+                if (confirm('이메일 설정이 완료되지 않았습니다. 테스트 이메일을 발송해보시겠습니까?')) {
+                    await this.sendTestEmail(email);
+                    return;
+                } else {
+                    alert('이메일 발송을 위해 환경변수 설정이 필요합니다:\n- POSTMARK_SERVER_TOKEN\n- POSTMARK_FROM_EMAIL');
+                    return;
+                }
+            }
+        } catch (error) {
+            console.error('Email config check failed:', error);
+        }
+
+        try {
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    job_id: this.currentJobId,
+                    email: email
+                })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert('이메일이 성공적으로 발송되었습니다!');
+            } else {
+                alert('이메일 발송 실패: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Network error: ' + error.message);
+        }
+    }
+
+    async sendTestEmail(email) {
+        if (!email) {
+            email = prompt('테스트 이메일을 받을 주소를 입력하세요:');
+            if (!email) return;
+        }
+
+        try {
+            const response = await fetch('/api/test-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: email })
+            });
+
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert(`테스트 이메일이 ${email}로 발송되었습니다!\n메시지 ID: ${result.message_id || 'N/A'}`);
+            } else {
+                alert('테스트 이메일 발송 실패: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Network error: ' + error.message);
+        }
+    }
+
+    async checkEmailConfiguration() {
+        try {
+            const response = await fetch('/api/email-config');
+            const result = await response.json();
+            
+            let message = '이메일 설정 상태:\n';
+            message += `Postmark 토큰: ${result.postmark_token_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;
+            message += `발신자 이메일: ${result.from_email_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;
+            message += `전체 상태: ${result.ready ? '✓ 준비 완료' : '✗ 설정 필요'}`;
+            
+            alert(message);
+            
+            if (!result.ready) {
+                const testEmail = prompt('테스트 이메일을 발송해보시겠습니까? (이메일 주소 입력)');
+                if (testEmail) {
+                    await this.sendTestEmail(testEmail);
+                }
+            }
+            
+        } catch (error) {
+            alert('설정 확인 실패: ' + error.message);
+        }
     }
 }
 

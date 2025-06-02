@@ -20,92 +20,162 @@
 
 ## 🚀 빠른 시작
 
-### 설치
+### 1. 환경 설정
+
+**자동 설정 (추천):**
+```bash
+python setup_env.py
+```
+
+**수동 설정:**
+1. `.env` 파일을 루트 디렉토리에 생성
+2. 필수 환경변수 설정:
+
+```env
+# 필수 API 키
+SERPER_API_KEY=your_serper_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# 이메일 발송 (필수 - 이메일 기능 사용시)
+POSTMARK_SERVER_TOKEN=your_postmark_server_token_here
+EMAIL_SENDER=your_verified_email@yourdomain.com
+POSTMARK_FROM_EMAIL=your_verified_email@yourdomain.com
+
+# 선택사항
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+```
+
+### 2. API 키 발급 방법
+
+#### 🔍 Serper API (필수 - 뉴스 검색)
+- https://serper.dev 방문
+- 구글 계정으로 로그인
+- Dashboard에서 API 키 발급
+- 월 2,500회 무료 사용 가능
+
+#### 🤖 Google Gemini API (필수 - AI 처리)
+- https://aistudio.google.com 방문
+- Google 계정으로 로그인
+- 'Get API Key' 클릭하여 발급
+- 무료 할당량 제공
+
+#### 📧 Postmark (필수 - 이메일 발송)
+- https://postmarkapp.com 방문
+- 계정 생성 (월 100개 이메일 무료)
+- Server → API Tokens에서 토큰 발급
+- Signatures에서 발송자 이메일 인증 필수
+
+### 3. 설치 및 실행
 
 ```bash
-git clone https://github.com/username/newsletter-generator.git
-cd newsletter-generator
-pip install -e .
+# 의존성 설치
+pip install -r requirements.txt
+
+# 이메일 발송 테스트
+python -m newsletter test-email --to your@email.com
+
+# 뉴스레터 생성
+python -m newsletter run --keywords "AI,자동화,기술"
+
+# 웹 인터페이스 실행
+python test_server.py
 ```
 
-### 환경 설정
+## 📧 이메일 발송 문제 해결
+
+### 문제: "이메일 설정이 완료되지 않았습니다"
+
+**해결방법:**
+
+1. **환경변수 확인:**
+   ```bash
+   # 환경변수가 제대로 설정되었는지 확인
+   python -c "import os; print('POSTMARK_SERVER_TOKEN:', bool(os.getenv('POSTMARK_SERVER_TOKEN'))); print('EMAIL_SENDER:', bool(os.getenv('EMAIL_SENDER')))"
+   ```
+
+2. **Postmark 설정 확인:**
+   - Postmark 대시보드에서 토큰이 유효한지 확인
+   - Signatures에서 발송자 이메일이 인증되었는지 확인
+   - 월 발송 한도를 초과하지 않았는지 확인
+
+3. **환경변수 재설정:**
+   ```bash
+   python setup_env.py
+   ```
+
+4. **테스트 이메일 발송:**
+   ```bash
+   python -m newsletter test-email --to your@email.com
+   ```
+
+### 문제: "이메일 모듈을 찾을 수 없습니다"
+
+**해결방법:**
+
+1. **web 디렉토리에서 실행:**
+   ```bash
+   cd web
+   python app.py
+   ```
+
+2. **또는 프로젝트 루트에서 실행:**
+   ```bash
+   python test_server.py
+   ```
+
+### 문제: Postmark 오류 코드별 해결방법
+
+- **오류 406 (비활성화된 이메일):**
+  - 다른 이메일 주소로 테스트
+  - Postmark Suppressions에서 이메일 재활성화
+
+- **오류 300 (잘못된 발송자):**
+  - EMAIL_SENDER가 Postmark에서 인증된 이메일인지 확인
+  - Signatures에서 발송자 서명 인증
+
+- **오류 401 (인증 실패):**
+  - POSTMARK_SERVER_TOKEN이 올바른지 확인
+  - Server Token인지 확인 (Account Token 아님)
+
+## 🌐 웹 인터페이스
+
+웹 인터페이스를 통해 뉴스레터를 생성하고 이메일로 발송할 수 있습니다:
 
 ```bash
-cp .env.example .env
-# .env 파일을 편집하여 API 키 설정
+python test_server.py
 ```
 
-필요한 API 키:
-- **필수**: Google Gemini API (기본 LLM), Serper API (뉴스 검색)
-- **멀티 LLM**: Anthropic API (Claude 모델), OpenAI API (GPT 모델)
-- **기타**: Postmark (이메일), Google Drive API (저장)
+브라우저에서 http://localhost:5000 접속
 
-### 큐 이름 설정
+### 웹 인터페이스 기능:
+- 🔍 키워드/도메인 기반 뉴스레터 생성
+- 📊 실시간 생성 상태 모니터링
+- 📧 이메일 발송 및 테스트
+- 📈 생성 히스토리 관리
+- ⚙️ 이메일 설정 상태 확인
 
-웹 서비스와 백그라운드 워커가 동일한 Redis Queue를 사용하도록
-`RQ_QUEUE` 환경 변수를 지정할 수 있습니다. 기본값은 `default`입니다.
+## 💡 사용 팁
 
-```bash
-export RQ_QUEUE=newsletter
-```
+1. **환경변수 우선순위:**
+   - `.env` 파일의 설정이 우선 적용됩니다
+   - `config.yml`은 LLM 모델 설정에만 사용됩니다
 
-### 기본 사용법
+2. **이메일 발송:**
+   - CLI와 웹 인터페이스 모두 동일한 환경변수를 사용합니다
+   - `EMAIL_SENDER`와 `POSTMARK_FROM_EMAIL`은 동일하게 설정하세요
 
-```bash
-# 키워드로 뉴스레터 생성
-newsletter run --keywords "AI,머신러닝" --output-format html
+3. **API 키 관리:**
+   - `.env` 파일을 `.gitignore`에 추가하여 버전 관리에서 제외하세요
+   - API 키는 절대 공개 저장소에 커밋하지 마세요
 
-# 도메인 기반 키워드 자동 생성
-newsletter run --domain "자율주행" --to user@example.com
+## 🔧 개발자 정보
 
-# 간결한 스타일로 생성
-newsletter run --keywords "반도체" --template-style compact
+자세한 기술 문서는 `docs/` 디렉토리를 참고하세요.
 
-# 이메일 호환 템플릿으로 생성 (모든 이메일 클라이언트에서 호환)
-newsletter run --keywords "AI,머신러닝" --template-style detailed --email-compatible
-
-# 이메일 호환 + 바로 전송
-newsletter run --keywords "배터리,이차전지" --template-style compact --email-compatible --to user@example.com
-
-# 이메일 발송 기능 테스트
-newsletter test-email --to user@example.com --dry-run
-
-# 기존 뉴스레터 파일로 이메일 테스트
-newsletter test-email --to user@example.com --template output/newsletter.html
-
-# 통합 이메일 테스트 (상세한 검증)
-python tests/test_email_integration.py --to user@example.com
-
-# LLM 제공자 정보 확인
-newsletter list-providers
-```
-
-### 백그라운드 작업 실행
-
-웹 서비스에서 예약 발송 등을 처리하려면 Redis‑RQ 워커를 별도로 실행해야 합니다.
-워커는 기본 큐(`default`)를 사용하므로 웹 애플리케이션과 동일한 큐 이름으로
-작업을 넣어야 합니다.
-
-```bash
-# 웹 서비스용 워커 실행
-python web/worker.py
-# 또는
-rq worker --path ./web
-```
-
-## 🏗️ 아키텍처 개요
-
-Newsletter Generator는 **통합 아키텍처**를 사용하여 Compact와 Detailed 두 가지 스타일의 뉴스레터를 하나의 코드베이스로 생성합니다.
-
-```mermaid
-flowchart LR
-    A[키워드 입력] --> B[뉴스 수집]
-    B --> C[필터링 & 그룹화]
-    C --> D[AI 요약]
-    D --> E[HTML 생성]
-    E --> F[이메일 발송]
-    E --> G[Drive 저장]
-```
+- [설치 가이드](docs/setup/INSTALLATION.md)
+- [CLI 레퍼런스](docs/user/CLI_REFERENCE.md)
+- [아키텍처](docs/ARCHITECTURE.md)
 
 ## 🧪 테스트
 
