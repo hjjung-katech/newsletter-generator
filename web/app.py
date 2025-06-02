@@ -360,7 +360,10 @@ class MockNewsletterCLI:
     ):
         """Mock newsletter generation with more realistic content"""
         if keywords:
-            keyword_list = [k.strip() for k in keywords.split(",")]
+            if isinstance(keywords, list):
+                keyword_list = [k.strip() for k in keywords]
+            else:
+                keyword_list = [k.strip() for k in keywords.split(",")]
             title = f"Newsletter: {', '.join(keyword_list)} (Mock)"
 
             content = f"""
