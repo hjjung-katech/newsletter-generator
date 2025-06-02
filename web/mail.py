@@ -2,10 +2,20 @@
 from postmarker.core import PostmarkClient
 import os
 import logging
+import sys
+from pathlib import Path
 
-# newsletter.config에서 환경변수 가져오기
+# 프로젝트 루트를 sys.path에 추가
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
+# ConfigManager 사용
 try:
-    from newsletter.config import POSTMARK_SERVER_TOKEN, EMAIL_SENDER
+    from newsletter.config_manager import config_manager
+
+    POSTMARK_SERVER_TOKEN = config_manager.POSTMARK_SERVER_TOKEN
+    EMAIL_SENDER = config_manager.EMAIL_SENDER
 except ImportError:
     # Fallback to direct env access
     POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
@@ -14,11 +24,9 @@ except ImportError:
 
 def send_email(to: str, subject: str, html: str, **kwargs):
     """단일 수신자용 Postmark 발송 래퍼."""
-    # 환경변수 재확인 (newsletter.config 우선)
-    token = POSTMARK_SERVER_TOKEN or os.getenv("POSTMARK_SERVER_TOKEN")
-    from_email = (
-        EMAIL_SENDER or os.getenv("POSTMARK_FROM_EMAIL") or os.getenv("EMAIL_SENDER")
-    )
+    # ConfigManager 우선 사용
+    token = POSTMARK_SERVER_TOKEN
+    from_email = EMAIL_SENDER
 
     if not token:
         error_msg = (
@@ -31,7 +39,7 @@ def send_email(to: str, subject: str, html: str, **kwargs):
 
     if not from_email:
         error_msg = (
-            "EMAIL_SENDER 또는 POSTMARK_FROM_EMAIL 환경변수가 설정되지 않았습니다. "
+            "EMAIL_SENDER 환경변수가 설정되지 않았습니다. "
             "발신자 이메일 주소를 설정해주세요."
         )
         logging.error(error_msg)
@@ -60,35 +68,37 @@ def send_email(to: str, subject: str, html: str, **kwargs):
 
 def check_email_configuration():
     """이메일 설정 상태를 확인합니다."""
-    # 환경변수 재확인 (newsletter.config 우선)
-    token = POSTMARK_SERVER_TOKEN or os.getenv("POSTMARK_SERVER_TOKEN")
-    from_email = (
-        EMAIL_SENDER or os.getenv("POSTMARK_FROM_EMAIL") or os.getenv("EMAIL_SENDER")
-    )
+    try:
+        # ConfigManager 사용
+        return config_manager.validate_email_config()
+    except NameError:
+        # Fallback 로직
+        token = POSTMARK_SERVER_TOKEN
+        from_email = EMAIL_SENDER
 
-    return {
-        "postmark_token_configured": bool(
-            token
-            and token != "your_postmark_server_token_here"
-            and token != "your-postmark-server-token-here"
-        ),
-        "from_email_configured": bool(
-            from_email
-            and from_email != "noreply@yourdomain.com"
-            and from_email != "your_verified_email@yourdomain.com"
-        ),
-        "ready": bool(
-            token
-            and from_email
-            and token
-            not in [
-                "your_postmark_server_token_here",
-                "your-postmark-server-token-here",
-            ]
-            and from_email
-            not in ["noreply@yourdomain.com", "your_verified_email@yourdomain.com"]
-        ),
-    }
+        return {
+            "postmark_token_configured": bool(
+                token
+                and token != "your_postmark_server_token_here"
+                and token != "your-postmark-server-token-here"
+            ),
+            "from_email_configured": bool(
+                from_email
+                and from_email != "noreply@yourdomain.com"
+                and from_email != "your_verified_email@yourdomain.com"
+            ),
+            "ready": bool(
+                token
+                and from_email
+                and token
+                not in [
+                    "your_postmark_server_token_here",
+                    "your-postmark-server-token-here",
+                ]
+                and from_email
+                not in ["noreply@yourdomain.com", "your_verified_email@yourdomain.com"]
+            ),
+        }
 
 
 def send_test_email(to: str):
@@ -111,14 +121,10 @@ def send_test_email(to: str):
     </html>
     """.format(
         timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        sender=EMAIL_SENDER
-        or os.getenv("POSTMARK_FROM_EMAIL")
-        or os.getenv("EMAIL_SENDER")
-        or "Unknown",
+        sender=EMAIL_SENDER or "Unknown",
         token_masked=(
-            "***"
-            + (POSTMARK_SERVER_TOKEN or os.getenv("POSTMARK_SERVER_TOKEN") or "")[-4:]
-            if (POSTMARK_SERVER_TOKEN or os.getenv("POSTMARK_SERVER_TOKEN"))
+            "***" + (POSTMARK_SERVER_TOKEN or "")[-4:]
+            if POSTMARK_SERVER_TOKEN
             else "Not Set"
         ),
     )

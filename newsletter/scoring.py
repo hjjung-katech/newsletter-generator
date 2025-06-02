@@ -35,46 +35,59 @@ def load_scoring_weights_from_config(
     """Load scoring weights from config.yml file.
 
     Args:
-        config_file: Path to the config file
+        config_file: Path to config file (kept for compatibility)
 
     Returns:
-        Dict containing scoring weights, defaults to DEFAULT_WEIGHTS if file not found or invalid
+        Dict[str, float]: Scoring weights dictionary
     """
     try:
-        import yaml
+        from .config_manager import config_manager
 
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as f:
-                config_data = yaml.safe_load(f)
+        return config_manager.get_scoring_weights()
+    except ImportError:
+        # Fallback to original implementation
+        DEFAULT_WEIGHTS = {
+            "recency": 0.3,
+            "relevance": 0.4,
+            "credibility": 0.2,
+            "diversity": 0.1,
+        }
 
-            scoring_config = config_data.get("scoring", {})
-            if scoring_config:
-                # Validate that all required keys exist and are numeric
-                required_keys = set(DEFAULT_WEIGHTS.keys())
-                config_keys = set(scoring_config.keys())
+        try:
+            import yaml
 
-                if required_keys.issubset(config_keys):
-                    # Ensure all values are numeric and sum to 1.0 (approximately)
-                    weights = {k: float(scoring_config[k]) for k in required_keys}
-                    total = sum(weights.values())
+            if os.path.exists(config_file):
+                with open(config_file, "r", encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f)
 
-                    if abs(total - 1.0) < 0.01:  # Allow small floating point errors
-                        return weights
+                scoring_config = config_data.get("scoring", {})
+                if scoring_config:
+                    # Validate that all required keys exist and are numeric
+                    required_keys = set(DEFAULT_WEIGHTS.keys())
+                    config_keys = set(scoring_config.keys())
+
+                    if required_keys.issubset(config_keys):
+                        # Ensure all values are numeric and sum to 1.0 (approximately)
+                        weights = {k: float(scoring_config[k]) for k in required_keys}
+                        total = sum(weights.values())
+
+                        if abs(total - 1.0) < 0.01:  # Allow small floating point errors
+                            return weights
+                        else:
+                            logger.warning(
+                                f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
+                            )
                     else:
+                        missing_keys = required_keys - config_keys
                         logger.warning(
-                            f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
+                            f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
                         )
-                else:
-                    missing_keys = required_keys - config_keys
-                    logger.warning(
-                        f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
-                    )
-    except Exception as e:
-        logger.warning(
-            f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
-        )
+        except Exception as e:
+            logger.warning(
+                f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
+            )
 
-    return DEFAULT_WEIGHTS
+        return DEFAULT_WEIGHTS
 
 
 SCORE_PROMPT = """
