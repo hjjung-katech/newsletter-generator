@@ -35,10 +35,19 @@ cp .env.example .env
 # .env 파일을 편집하여 API 키 설정
 ```
 
-필요한 API 키: 
+필요한 API 키:
 - **필수**: Google Gemini API (기본 LLM), Serper API (뉴스 검색)
 - **멀티 LLM**: Anthropic API (Claude 모델), OpenAI API (GPT 모델)
 - **기타**: Postmark (이메일), Google Drive API (저장)
+
+### 큐 이름 설정
+
+웹 서비스와 백그라운드 워커가 동일한 Redis Queue를 사용하도록
+`RQ_QUEUE` 환경 변수를 지정할 수 있습니다. 기본값은 `default`입니다.
+
+```bash
+export RQ_QUEUE=newsletter
+```
 
 ### 기본 사용법
 

@@ -509,11 +509,14 @@ print("🔧 Flask app initialized with detailed logging")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
 app.config["REDIS_URL"] = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
+# Queue name can be customized via environment variable
+QUEUE_NAME = os.getenv("RQ_QUEUE", "default")
+
 # Redis connection with fallback to in-memory processing
 try:
     redis_conn = redis.from_url(app.config["REDIS_URL"])
     redis_conn.ping()  # Test connection
-    task_queue = Queue(connection=redis_conn)
+    task_queue = Queue(QUEUE_NAME, connection=redis_conn)
     print("Redis connected successfully")
 except Exception as e:
     print(f"Redis connection failed: {e}. Using in-memory processing.")
