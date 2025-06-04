@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "newsletter-generator"
-version = "0.1.0"
+version = "0.5.0"
 description = "내부 연구원을 위한 뉴스레터 생성 CLI 도구 - LangChain 및 LangGraph 사용"
 readme = "README.md"
 authors = [
@@ -135,9 +135,23 @@ no_implicit_optional = true
 strict_optional = false
 
 [tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q --tb=short"
-testpaths = ["tests"]
+minversion = "6.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+    "-m", "not manual",
+]
+testpaths = [
+    "tests",
+]
+markers = [
+    "real_api: tests that require real API calls and network connectivity",
+    "mock_api: tests that use mocked API responses",
+    "integration: integration tests that require full system setup",
+    "manual: manual tests that require specific setup or user interaction",
+]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

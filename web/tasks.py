@@ -1,0 +1,293 @@
+"""
+Background tasks for newsletter generation
+Uses Redis Queue (RQ) for asynchronous processing
+"""
+
+import os
+import sys
+import json
+import sqlite3
+from datetime import datetime, timedelta
+import subprocess
+
+# Add the parent directory to the path to import newsletter modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
+
+
+def update_job_status(job_id, status, result=None):
+    """Update job status in database"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    if result:
+        cursor.execute(
+            "UPDATE history SET status = ?, result = ? WHERE id = ?",
+            (status, json.dumps(result), job_id),
+        )
+    else:
+        cursor.execute("UPDATE history SET status = ? WHERE id = ?", (status, job_id))
+
+    conn.commit()
+    conn.close()
+
+
+def generate_newsletter_task(data, job_id):
+    """Redis Worker에서 실행되는 뉴스레터 생성 작업"""
+
+    print(f"🔄 Redis Worker: Starting newsletter generation for job {job_id}")
+    print(f"📊 Input data: {data}")
+
+    try:
+        update_job_status(job_id, "processing")
+
+        # CLI 명령어 구성
+        keywords = data.get("keywords", "")
+        domain = data.get("domain", "")
+        template_style = data.get("template_style", "compact")
+        email_compatible = data.get("email_compatible", False)
+        period = data.get("period", 14)
+        email = data.get("email", "")
+
+        # CLI 명령어 구성
+        cmd = [
+            sys.executable,
+            "-m",
+            "newsletter.cli",
+            "run",
+            "--output-format",
+            "html",
+            "--template-style",
+            template_style,
+            "--period",
+            str(period),
+            "--log-level",
+            "INFO",
+        ]
+
+        # 키워드 또는 도메인 추가
+        if keywords:
+            keyword_str = keywords if isinstance(keywords, str) else ",".join(keywords)
+            cmd.extend(["--keywords", keyword_str])
+        elif domain:
+            cmd.extend(["--domain", domain])
+        else:
+            raise ValueError("키워드 또는 도메인이 필요합니다")
+
+        print(f"🚀 Executing CLI command: {' '.join(cmd)}")
+
+        # CLI 실행 환경 설정
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONPATH"] = os.path.dirname(os.path.dirname(__file__))
+
+        # CLI 실행
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(os.path.dirname(__file__)),
+            env=env,
+            timeout=300,
+        )
+
+        print(f"✅ CLI execution completed")
+        print(f"📝 CLI stdout: {result.stdout[:500]}...")
+        if result.stderr:
+            print(f"⚠️ CLI stderr: {result.stderr[:500]}...")
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"CLI failed with return code {result.returncode}: {result.stderr}"
+            )
+
+        # 생성된 HTML 파일 찾기
+        output_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "output")
+
+        # 키워드 기반으로 최신 파일 찾기
+        search_terms = []
+        if keywords:
+            if isinstance(keywords, str):
+                search_terms = [kw.strip().lower() for kw in keywords.split(",")]
+            else:
+                search_terms = [str(kw).strip().lower() for kw in keywords]
+        elif domain:
+            search_terms = [domain.lower()]
+
+        html_files = [f for f in os.listdir(output_dir) if f.endswith(".html")]
+
+        # 검색어가 포함된 파일 필터링
+        matching_files = []
+        for file in html_files:
+            file_lower = file.lower()
+            for term in search_terms:
+                if term in file_lower:
+                    matching_files.append(file)
+                    break
+
+        if matching_files:
+            html_files = matching_files
+            print(
+                f"📁 Found {len(matching_files)} files matching search terms: {search_terms}"
+            )
+        else:
+            print(f"⚠️ No files found matching search terms, using all HTML files")
+
+        if not html_files:
+            raise FileNotFoundError("생성된 HTML 파일을 찾을 수 없습니다")
+
+        # 최신 파일 선택
+        latest_file = max(
+            html_files, key=lambda x: os.path.getctime(os.path.join(output_dir, x))
+        )
+        file_path = os.path.join(output_dir, latest_file)
+
+        print(f"📄 Reading HTML file: {latest_file}")
+        print(f"📂 File path: {file_path}")
+        print(f"📏 File size: {os.path.getsize(file_path)} bytes")
+
+        # 다양한 인코딩으로 파일 읽기 시도
+        encodings = ["utf-8", "utf-8-sig", "cp949", "euc-kr", "latin1"]
+        html_content = None
+
+        for encoding in encodings:
+            try:
+                with open(file_path, "r", encoding=encoding) as f:
+                    html_content = f.read()
+                    print(f"✅ Successfully read file with {encoding} encoding")
+                    print(f"📊 Content length: {len(html_content)} characters")
+                    break
+            except UnicodeDecodeError:
+                print(f"❌ Failed to read with {encoding} encoding")
+                continue
+
+        if not html_content:
+            raise RuntimeError("모든 인코딩으로 파일 읽기에 실패했습니다")
+
+        # 결과 구성
+        result_data = {
+            "status": "success",
+            "html_content": html_content,
+            "file_path": latest_file,
+            "file_size": len(html_content),
+            "encoding_used": encoding,
+            "cli_mode": "Real CLI",
+            "template_style": template_style,
+            "email_compatible": email_compatible,
+            "period": f"{period} days",
+            "keywords": keywords,
+            "domain": domain,
+        }
+
+        # 이메일 발송 (옵션)
+        if email:
+            print(f"📧 Sending email to: {email}")
+            try:
+                # 이메일 모듈 import - 다양한 방법으로 시도
+                try:
+                    import mail
+
+                    send_email_func = mail.send_email
+                except ImportError:
+                    try:
+                        from . import mail
+
+                        send_email_func = mail.send_email
+                    except ImportError:
+                        # 프로젝트 루트에서 web.mail 시도
+                        try:
+                            from web.mail import send_email
+
+                            send_email_func = send_email
+                        except ImportError:
+                            # 절대 경로로 시도
+                            import sys
+                            import os
+
+                            current_dir = os.path.dirname(os.path.abspath(__file__))
+                            sys.path.insert(0, current_dir)
+                            import mail
+
+                            send_email_func = mail.send_email
+
+                # 제목 생성
+                if keywords:
+                    subject_keywords = (
+                        keywords if isinstance(keywords, str) else ", ".join(keywords)
+                    )
+                    subject = f"Newsletter: {subject_keywords}"
+                else:
+                    subject = f"Newsletter: {domain}"
+
+                send_email_func(to=email, subject=subject, html=html_content)
+                result_data["email_sent"] = True
+                result_data["email_to"] = email
+                print(f"✅ Email sent successfully to {email}")
+            except Exception as e:
+                print(f"❌ Email sending failed: {e}")
+                result_data["email_sent"] = False
+                result_data["email_error"] = str(e)
+
+        # 성공 상태로 업데이트
+        update_job_status(job_id, "completed", result_data)
+        print(f"🎉 Newsletter generation completed successfully for job {job_id}")
+
+        return result_data
+
+    except Exception as e:
+        error_msg = f"Newsletter generation failed: {str(e)}"
+        print(f"❌ Error in generate_newsletter_task: {error_msg}")
+
+        # 실패 상태로 업데이트
+        update_job_status(job_id, "failed", {"error": error_msg})
+
+        # 예외를 다시 발생시켜 RQ가 처리하도록 함
+        raise
+
+
+def generate_subject(params):
+    """Generate newsletter subject based on parameters"""
+    if "keywords" in params:
+        keywords = params["keywords"]
+        if isinstance(keywords, list):
+            keywords_str = ", ".join(keywords[:3])  # First 3 keywords
+        else:
+            keywords_str = keywords
+        return f"Newsletter: {keywords_str}"
+    elif "domain" in params:
+        return f"Newsletter: {params['domain']} Insights"
+    else:
+        return f"Newsletter - {datetime.now().strftime('%Y-%m-%d')}"
+
+
+def create_schedule_entry(params, job_id):
+    """Create a scheduled newsletter entry"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+
+    schedule_id = f"schedule_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Calculate next run time (simplified - would use proper RRULE parsing in production)
+    next_run = datetime.now() + timedelta(days=7)  # Default to weekly
+
+    cursor.execute(
+        """
+        INSERT INTO schedules (id, params, rrule, next_run)
+        VALUES (?, ?, ?, ?)
+    """,
+        (schedule_id, json.dumps(params), params.get("rrule", "FREQ=WEEKLY"), next_run),
+    )
+
+    conn.commit()
+    conn.close()
+
+    return schedule_id
+
+
+# Worker entry point for RQ
+if __name__ == "__main__":
+    # This can be used to test tasks locally
+    test_params = {"keywords": "AI, machine learning", "email": "test@example.com"}
+    result = generate_newsletter_task(test_params, "test-job-id")
+    print("Task result:", result)

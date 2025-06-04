@@ -1,0 +1,20 @@
+{
+  "deploy": {
+    "startCommand": "cd web && gunicorn --bind 0.0.0.0:$PORT app:app",
+    "buildCommand": "cd web && pip install -r requirements.txt"
+  },
+  "phases": {
+    "build": {
+      "dependsOn": ["install"],
+      "cmds": ["echo 'Build phase completed'"]
+    },
+    "install": {
+      "cmds": [
+        "pip install --upgrade pip"
+      ]
+    }
+  },
+  "variables": {
+    "PYTHONPATH": "/app:/app/web"
+  }
+}

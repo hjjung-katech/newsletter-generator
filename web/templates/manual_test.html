@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter Generator Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .results {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Newsletter Generator Test Interface</h1>
+        
+        <div class="test-section">
+            <h3>1. Health Check</h3>
+            <button onclick="testHealth()">Test Health Endpoint</button>
+            <div id="healthResult" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>2. Generate Newsletter (Keywords)</h3>
+            <input type="text" id="keywords" placeholder="Enter keywords (comma-separated)" 
+                   value="artificial intelligence, machine learning, technology">
+            <br>
+            <button onclick="generateKeywords()">Generate from Keywords</button>
+            <div id="keywordsResult" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>3. Generate Newsletter (Domain)</h3>
+            <input type="text" id="domain" placeholder="Enter domain URL" 
+                   value="https://example.com">
+            <br>
+            <button onclick="generateDomain()">Generate from Domain</button>
+            <div id="domainResult" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>4. Check Job Status</h3>
+            <input type="text" id="jobId" placeholder="Enter job ID">
+            <br>
+            <button onclick="checkStatus()">Check Status</button>
+            <div id="statusResult" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>5. View History</h3>
+            <button onclick="viewHistory()">View All Newsletters</button>
+            <div id="historyResult" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobId = null;
+
+        async function testHealth() {
+            const resultDiv = document.getElementById('healthResult');
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                resultDiv.textContent = `Status: ${response.status}\nResponse: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function generateKeywords() {
+            const resultDiv = document.getElementById('keywordsResult');
+            const keywords = document.getElementById('keywords').value.split(',').map(k => k.trim());
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: 'keywords',
+                        keywords: keywords
+                    })
+                });
+                
+                const data = await response.json();
+                currentJobId = data.job_id;
+                document.getElementById('jobId').value = currentJobId;
+                resultDiv.textContent = `Status: ${response.status}\nJob ID: ${data.job_id}\nMessage: ${data.message}`;
+                
+                // Auto-check status after 3 seconds
+                setTimeout(() => checkStatus(), 3000);
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function generateDomain() {
+            const resultDiv = document.getElementById('domainResult');
+            const domain = document.getElementById('domain').value;
+            
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: 'domain',
+                        domain: domain
+                    })
+                });
+                
+                const data = await response.json();
+                currentJobId = data.job_id;
+                document.getElementById('jobId').value = currentJobId;
+                resultDiv.textContent = `Status: ${response.status}\nJob ID: ${data.job_id}\nMessage: ${data.message}`;
+                
+                // Auto-check status after 3 seconds
+                setTimeout(() => checkStatus(), 3000);
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function checkStatus() {
+            const resultDiv = document.getElementById('statusResult');
+            const jobId = document.getElementById('jobId').value;
+            
+            if (!jobId) {
+                resultDiv.textContent = 'Please enter a job ID';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/status/${jobId}`);
+                const data = await response.json();
+                resultDiv.textContent = `Status: ${response.status}\nJob Status: ${data.status}\nDetails: ${JSON.stringify(data, null, 2)}`;
+                
+                // If job is still running, check again in 2 seconds
+                if (data.status === 'running' || data.status === 'pending') {
+                    setTimeout(() => checkStatus(), 2000);
+                }
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function viewHistory() {
+            const resultDiv = document.getElementById('historyResult');
+            
+            try {
+                const response = await fetch('/api/history');
+                const data = await response.json();
+                resultDiv.textContent = `Status: ${response.status}\nHistory: ${JSON.stringify(data, null, 2)}`;
+            } catch (error) {
+                resultDiv.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        // Auto-test health on page load
+        window.onload = function() {
+            testHealth();
+        };
+    </script>
+</body>
+</html>

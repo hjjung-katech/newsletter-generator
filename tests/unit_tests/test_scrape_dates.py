@@ -11,12 +11,8 @@ class TestScrapeDates(unittest.TestCase):
         print("뉴스 스크래핑 단계 테스트")
         print("=" * 80)
 
-    @patch("newsletter.sources.console")
-    def test_scrape_dates_functionality(self, mock_console):
+    def test_scrape_dates_functionality(self):
         """뉴스 스크래핑 날짜 기능 테스트"""
-        # Mock console to prevent AttributeError
-        mock_console.print = MagicMock()
-
         from newsletter.date_utils import format_date_for_display, standardize_date
         from newsletter.sources import NewsSourceManager, SerperAPISource
 
@@ -140,8 +136,8 @@ class TestScrapeDates(unittest.TestCase):
         self.assertGreater(len(articles), 0, "기사가 수집되어야 합니다")
         self.assertTrue(os.path.exists(output_file), "결과 파일이 생성되어야 합니다")
 
-        # Mock이 호출되었는지 확인
-        mock_console.print.assert_called()
+        # 날짜 형식이 제대로 분류되었는지 확인
+        self.assertGreater(len(date_formats), 0, "날짜 형식이 분류되어야 합니다")
 
 
 if __name__ == "__main__":

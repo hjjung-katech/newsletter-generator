@@ -1,153 +1,49 @@
 import os
 from pathlib import Path
 
-import yaml
-from dotenv import load_dotenv
+from .config_manager import config_manager
 
-# 환경 변수 로드
-load_dotenv()
+# 하위 호환성을 위한 변수들 (ConfigManager에서 가져옴)
+SERPER_API_KEY = config_manager.SERPER_API_KEY
+GEMINI_API_KEY = config_manager.GEMINI_API_KEY
+OPENAI_API_KEY = config_manager.OPENAI_API_KEY
+ANTHROPIC_API_KEY = config_manager.ANTHROPIC_API_KEY
+GOOGLE_APPLICATION_CREDENTIALS = config_manager.GOOGLE_APPLICATION_CREDENTIALS
+NAVER_CLIENT_ID = config_manager.NAVER_CLIENT_ID
+NAVER_CLIENT_SECRET = config_manager.NAVER_CLIENT_SECRET
+ADDITIONAL_RSS_FEEDS = config_manager.ADDITIONAL_RSS_FEEDS
 
-# 로깅 시스템 import (config 로드 후)
-try:
-    from .utils.logger import get_logger
+# 이메일 발송 설정 (통합)
+POSTMARK_SERVER_TOKEN = config_manager.POSTMARK_SERVER_TOKEN
+EMAIL_SENDER = config_manager.EMAIL_SENDER
 
-    logger = get_logger()
-except ImportError:
-    # config.py가 먼저 로드되는 경우를 위한 fallback
-    logger = None
+# Google Drive 설정
+GOOGLE_CLIENT_ID = config_manager.GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET = config_manager.GOOGLE_CLIENT_SECRET
+
+# LLM 설정
+LLM_CONFIG = config_manager.get_llm_config()
+
+# 주요 언론사 설정
+MAJOR_NEWS_SOURCES = config_manager.get_major_news_sources()
+
+# 호환성을 위한 flat한 주요 언론사 목록 (tier1 + tier2)
+ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2"]
 
 
+# 경고 메시지 출력 (ConfigManager에서 처리하므로 간소화)
 def log_message(level, message):
     """로거가 없는 경우를 위한 fallback 함수"""
-    if logger:
+    try:
+        from .utils.logger import get_logger
+
+        logger = get_logger()
         getattr(logger, level)(message)
-    else:
+    except ImportError:
         print(f"[{level.upper()}] {message}")
 
 
-# 기존 API 키 설정
-SERPER_API_KEY = os.getenv("SERPER_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")  # 통합된 API 키
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # OpenAI API 키 추가
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")  # Anthropic API 키 추가
-GOOGLE_APPLICATION_CREDENTIALS = os.getenv(
-    "GOOGLE_APPLICATION_CREDENTIALS"
-)  # 새로 추가
-
-# 새로운 API 키 설정
-NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")  # 네이버 API 클라이언트 ID
-NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")  # 네이버 API 클라이언트 시크릿
-ADDITIONAL_RSS_FEEDS = os.getenv(
-    "ADDITIONAL_RSS_FEEDS", ""
-)  # 추가 RSS 피드 URL (쉼표로 구분)
-
-# 이메일 발송 설정 (Postmark)
-POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
-EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-
-# Google Drive 설정
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
-
-
-# LLM 설정을 위한 config.yml 로드
-def load_llm_config():
-    """config.yml에서 LLM 설정을 로드합니다."""
-    try:
-        with open("config.yml", "r", encoding="utf-8") as f:
-            config_data = yaml.safe_load(f)
-            return config_data.get("llm_settings", {})
-    except FileNotFoundError:
-        log_message(
-            "warning", "Warning: config.yml not found. Using default LLM settings."
-        )
-        return get_default_llm_config()
-    except Exception as e:
-        log_message(
-            "warning",
-            f"Warning: Error loading config.yml: {e}. Using default LLM settings.",
-        )
-        return get_default_llm_config()
-
-
-def get_default_llm_config():
-    """기본 LLM 설정을 반환합니다."""
-    return {
-        "default_provider": "gemini",
-        "api_keys": {
-            "gemini": "GEMINI_API_KEY",
-            "openai": "OPENAI_API_KEY",
-            "anthropic": "ANTHROPIC_API_KEY",
-        },
-        "models": {
-            "keyword_generation": {
-                "provider": "gemini",
-                "model": "gemini-2.5-pro-preview-03-25",
-                "temperature": 0.7,
-                "max_retries": 2,
-                "timeout": 60,
-            },
-            "theme_extraction": {
-                "provider": "gemini",
-                "model": "gemini-1.5-flash-latest",
-                "temperature": 0.2,
-                "max_retries": 2,
-                "timeout": 60,
-            },
-            "news_summarization": {
-                "provider": "gemini",
-                "model": "gemini-2.5-pro-preview-03-25",
-                "temperature": 0.3,
-                "max_retries": 3,
-                "timeout": 120,
-            },
-            "section_regeneration": {
-                "provider": "gemini",
-                "model": "gemini-1.5-pro",
-                "temperature": 0.3,
-                "max_retries": 2,
-                "timeout": 120,
-            },
-            "introduction_generation": {
-                "provider": "gemini",
-                "model": "gemini-1.5-pro",
-                "temperature": 0.4,
-                "max_retries": 2,
-                "timeout": 60,
-            },
-            "html_generation": {
-                "provider": "gemini",
-                "model": "gemini-2.5-pro-preview-03-25",
-                "temperature": 0.2,
-                "max_retries": 3,
-                "timeout": 180,
-            },
-        },
-        "provider_models": {
-            "gemini": {
-                "fast": "gemini-1.5-flash-latest",
-                "standard": "gemini-1.5-pro",
-                "advanced": "gemini-2.5-pro-preview-03-25",
-            },
-            "openai": {
-                "fast": "gpt-4o-mini",
-                "standard": "gpt-4o",
-                "advanced": "gpt-4o",
-            },
-            "anthropic": {
-                "fast": "claude-3-haiku-20240307",
-                "standard": "claude-3-sonnet-20240229",
-                "advanced": "claude-3-5-sonnet-20241022",
-            },
-        },
-    }
-
-
-# LLM 설정 로드
-LLM_CONFIG = load_llm_config()
-
-# 경고 메시지 출력
-# 필수 API 키
+# 필수 API 키 검증
 if not SERPER_API_KEY:
     log_message("warning", "Warning: SERPER_API_KEY not found in .env file.")
 if not GEMINI_API_KEY:
@@ -188,65 +84,3 @@ if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
         "info",
         "Note: Naver News API credentials not found. Naver News API source will be disabled.",
     )
-
-# 주요 언론사 티어 설정 (중앙 집중식 관리)
-MAJOR_NEWS_SOURCES = {
-    # 티어 1: 최우선 포함 주요 언론사 (신뢰도 가중치: 1.0)
-    "tier1": [
-        # 국내 주요 일간지
-        "조선일보",
-        "중앙일보",
-        "동아일보",
-        "한국일보",
-        "한겨레",
-        "경향신문",
-        # 국내 주요 경제지
-        "매일경제",
-        "한국경제",
-        "서울경제",
-        "파이낸셜뉴스",
-        # 국내 주요 방송/통신사
-        "연합뉴스",
-        "YTN",
-        "KBS",
-        "MBC",
-        "SBS",
-        "JTBC",
-        # 해외 주요 언론사
-        "Bloomberg",
-        "Reuters",
-        "Wall Street Journal",
-        "Financial Times",
-        "The Economist",
-    ],
-    # 티어 2: 보조 언론사 (신뢰도 가중치: 0.6)
-    "tier2": [
-        # 국내 주요 통신사
-        "뉴시스",
-        "뉴스1",
-        # 국내 경제/산업 전문지
-        "아시아경제",
-        "아주경제",
-        "이데일리",
-        "머니투데이",
-        "비즈니스워치",
-        # 국내 IT/기술 전문지
-        "디지털타임스",
-        "전자신문",
-        "IT조선",
-        "ZDNet Korea",
-        "디지털데일리",
-        "테크M",
-        "블로터",
-        # 국내 기타 방송사
-        "채널A",
-        "MBN",
-        "TV조선",
-        # 해외 기술 전문지
-        "TechCrunch",
-        "Wired",
-    ],
-}
-
-# 호환성을 위한 flat한 주요 언론사 목록 (tier1 + tier2)
-ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2"]

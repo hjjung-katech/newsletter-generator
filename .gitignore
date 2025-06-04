@@ -267,3 +267,8 @@ temp_*.json
 *.log
 debug_*.txt
 trace_*.txt
+
+# Cursor
+.cursor
+*.cursorrules
+*.mdc

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter API Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { background: #f5f5f5; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { background: white; padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+        input[type="text"], input[type="email"] { width: 100%; padding: 8px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Newsletter Generator API Test</h1>
+    
+    <div class="test-section">
+        <h3>Health Check</h3>
+        <button onclick="testHealthCheck()">Test Health Check</button>
+        <div id="health-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Generate Newsletter</h3>
+        <div>
+            <label>Keywords:</label>
+            <input type="text" id="keywords" placeholder="e.g., AI, machine learning" value="AI, machine learning">
+        </div>
+        <div>
+            <label>Email (optional):</label>
+            <input type="email" id="email" placeholder="test@example.com">
+        </div>
+        <button onclick="testGenerateNewsletter()">Generate Newsletter</button>
+        <div id="generate-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>History</h3>
+        <button onclick="testGetHistory()">Get History</button>
+        <div id="history-result" class="result"></div>
+    </div>
+
+    <script>
+        async function testHealthCheck() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('/health');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✓ Health check passed<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `✗ Health check failed: ${response.status}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `✗ Error: ${error.message}`;
+            }
+        }
+        
+        async function testGenerateNewsletter() {
+            const resultDiv = document.getElementById('generate-result');
+            const keywords = document.getElementById('keywords').value;
+            const email = document.getElementById('email').value;
+            
+            resultDiv.innerHTML = 'Generating newsletter...';
+            
+            try {
+                const requestData = { keywords };
+                if (email) requestData.email = email;
+                
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `✓ Newsletter generation started<br>Job ID: ${data.job_id}`;
+                    
+                    // Poll for results
+                    if (data.job_id) {
+                        pollJobStatus(data.job_id, resultDiv);
+                    }
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `✗ Generation failed: ${data.error || response.status}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `✗ Error: ${error.message}`;
+            }
+        }
+        
+        async function pollJobStatus(jobId, resultDiv) {
+            for (let i = 0; i < 30; i++) {
+                try {
+                    const response = await fetch(`/api/status/${jobId}`);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        const status = data.status;
+                        resultDiv.innerHTML = `Job ID: ${jobId}<br>Status: ${status}`;
+                        
+                        if (status === 'completed') {
+                            resultDiv.className = 'result success';
+                            resultDiv.innerHTML = `✓ Newsletter completed!<br>Articles: ${data.articles_count}<br>Subject: ${data.subject}`;
+                            break;
+                        } else if (status === 'failed') {
+                            resultDiv.className = 'result error';
+                            resultDiv.innerHTML = `✗ Newsletter failed: ${data.error || 'Unknown error'}`;
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+        
+        async function testGetHistory() {
+            const resultDiv = document.getElementById('history-result');
+            resultDiv.innerHTML = 'Loading history...';
+            
+            try {
+                const response = await fetch('/api/history');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.className = 'result success';
+                    if (data.length === 0) {
+                        resultDiv.innerHTML = '✓ No history items found';
+                    } else {
+                        resultDiv.innerHTML = `✓ Found ${data.length} history items<br><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    }
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `✗ Failed to load history: ${response.status}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `✗ Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

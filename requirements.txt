@@ -61,3 +61,6 @@ pytest-mock>=3.10.0
 
 # Email compatibility (optional)
 premailer>=3.10.0  # CSS inlining for email compatibility
+
+# Email sending
+postmarker>=1.0
