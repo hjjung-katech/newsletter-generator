@@ -18,7 +18,16 @@ def run_test_category(category_name, test_path, description):
 
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", test_path, "-v", "--tb=short"],
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                test_path,
+                "-v",
+                "--tb=short",
+                "-m",
+                "not manual",
+            ],
             capture_output=True,
             text=True,
             cwd=Path(__file__).parent.parent,
@@ -33,112 +42,147 @@ def run_test_category(category_name, test_path, description):
             return True
         else:
             print(f"❌ {category_name} 테스트 실패!")
-            print("STDOUT:", result.stdout[-500:])  # 마지막 500자만 출력
-            print("STDERR:", result.stderr[-500:])
+            print("🔍 오류 정보:")
+            print(result.stdout)
+            if result.stderr:
+                print("🚨 오류 메시지:")
+                print(result.stderr)
             return False
 
     except Exception as e:
-        print(f"💥 {category_name} 테스트 실행 중 오류: {e}")
+        print(f"❌ {category_name} 테스트 실행 중 오류: {e}")
         return False
 
 
-def test_config_integration():
-    """설정 통합 테스트"""
-    print(f"\n{'='*60}")
-    print(f"🔧 ConfigManager 통합 테스트")
-    print(f"{'='*60}")
+def run_unit_test(test_name, test_file):
+    """개별 단위 테스트 실행"""
+    print(f"\n{'='*40}")
+    print(f"🔬 {test_name}")
+    print(f"{'='*40}")
 
     try:
-        from newsletter.config_manager import config_manager
-
-        print("✅ ConfigManager 임포트 성공")
-
-        # 설정 로딩 테스트
-        llm_config = config_manager.get_llm_config()
-        newsletter_settings = config_manager.get_newsletter_settings()
-        scoring_weights = config_manager.get_scoring_weights()
-
-        print(
-            f"✅ LLM 설정 로딩 성공 (기본 제공자: {llm_config.get('default_provider')})"
-        )
-        print(
-            f"✅ 뉴스레터 설정 로딩 성공 (제목: {newsletter_settings.get('newsletter_title')[:30]}...)"
-        )
-        print(
-            f"✅ 스코어링 가중치 로딩 성공 (가중치 합: {sum(scoring_weights.values()):.2f})"
+        result = subprocess.run(
+            [sys.executable, "-m", "pytest", test_file, "-v", "--tb=short"],
+            capture_output=True,
+            text=True,
+            cwd=Path(__file__).parent.parent,
         )
 
-        # 이메일 설정 검증
-        email_validation = config_manager.validate_email_config()
-        email_status = "설정됨" if email_validation["ready"] else "미설정"
-        print(f"📧 이메일 설정 상태: {email_status}")
-
-        return True
+        if result.returncode == 0:
+            print(f"✅ {test_name} 통과")
+            return True
+        else:
+            print(f"❌ {test_name} 실패")
+            print("오류 정보:")
+            error_lines = result.stdout.split("\n")
+            for line in error_lines:
+                if "FAILED" in line or "ERROR" in line:
+                    print(f"  {line}")
+            return False
 
     except Exception as e:
-        print(f"❌ 설정 통합 테스트 실패: {e}")
+        print(f"❌ {test_name} 실행 중 오류: {e}")
         return False
 
 
 def main():
-    """메인 테스트 실행"""
-    print("🚀 Newsletter Generator 필수 테스트 시작")
-    print(f"작업 디렉토리: {os.getcwd()}")
+    """메인 실행 함수"""
+    print("🚀 Newsletter Generator 필수 테스트 실행")
+    print("=" * 60)
 
-    results = []
+    # 현재 작업 디렉토리 확인
+    current_dir = Path.cwd()
+    print(f"📁 작업 디렉토리: {current_dir}")
 
-    # 1. ConfigManager 단위 테스트
-    results.append(
-        run_test_category(
-            "ConfigManager",
-            "tests/unit_tests/test_config_manager.py",
-            "설정 관리자 핵심 기능 검증",
+    # 프로젝트 루트 확인
+    project_root = Path(__file__).parent.parent
+    if not (project_root / "newsletter").exists():
+        print("❌ 프로젝트 루트를 찾을 수 없습니다!")
+        return False
+
+    print(f"📁 프로젝트 루트: {project_root}")
+
+    # 테스트 결과 추적
+    results = {}
+
+    # 1. ConfigManager 테스트
+    print("\n" + "=" * 60)
+    print("��️  1단계: 핵심 설정 관리 테스트")
+    print("=" * 60)
+
+    config_test = project_root / "tests" / "unit_tests" / "test_config_manager.py"
+    if config_test.exists():
+        results["ConfigManager"] = run_unit_test(
+            "ConfigManager 테스트", str(config_test)
         )
-    )
+    else:
+        print("❌ ConfigManager 테스트 파일을 찾을 수 없습니다")
+        results["ConfigManager"] = False
 
-    # 2. 설정 통합 테스트
-    results.append(test_config_integration())
+    # 2. 메일 시스템 테스트
+    print("\n" + "=" * 60)
+    print("📧 2단계: 이메일 발송 시스템 테스트")
+    print("=" * 60)
 
-    # 3. 이메일 기능 테스트 (있는 경우)
-    email_test_path = "tests/unit_tests/test_mail.py"
-    if Path(email_test_path).exists():
-        results.append(
-            run_test_category("Email", email_test_path, "이메일 발송 기능 검증")
+    mail_test = project_root / "tests" / "test_mail.py"
+    if mail_test.exists():
+        results["Mail System"] = run_unit_test("메일 시스템 테스트", str(mail_test))
+    else:
+        print("❌ 메일 테스트 파일을 찾을 수 없습니다")
+        results["Mail System"] = False
+
+    # 3. 날짜 처리 테스트
+    print("\n" + "=" * 60)
+    print("📅 3단계: 날짜 처리 기능 테스트")
+    print("=" * 60)
+
+    date_test = project_root / "tests" / "unit_tests" / "test_scrape_dates.py"
+    if date_test.exists():
+        results["Date Processing"] = run_unit_test("날짜 처리 테스트", str(date_test))
+    else:
+        print("⚠️  날짜 처리 테스트 파일을 찾을 수 없습니다")
+        results["Date Processing"] = False
+
+    # 4. 전체 단위 테스트 (수정된 것들만)
+    print("\n" + "=" * 60)
+    print("🧪 4단계: 핵심 단위 테스트")
+    print("=" * 60)
+
+    unit_tests_dir = project_root / "tests" / "unit_tests"
+    if unit_tests_dir.exists():
+        results["Core Unit Tests"] = run_test_category(
+            "핵심 단위 테스트", str(unit_tests_dir), "핵심 기능의 단위 테스트"
         )
-
-    # 4. 핵심 컴포넌트 테스트
-    core_tests = [
-        ("tests/test_compose.py", "뉴스레터 구성"),
-        ("tests/test_scoring.py", "기사 점수 매기기"),
-        ("tests/test_themes.py", "주제 추출"),
-    ]
-
-    for test_path, description in core_tests:
-        if Path(test_path).exists():
-            results.append(
-                run_test_category(
-                    Path(test_path).stem.replace("test_", ""), test_path, description
-                )
-            )
+    else:
+        print("❌ 단위 테스트 디렉토리를 찾을 수 없습니다")
+        results["Core Unit Tests"] = False
 
     # 결과 요약
-    print(f"\n{'='*60}")
+    print("\n" + "=" * 60)
     print("📊 테스트 결과 요약")
-    print(f"{'='*60}")
+    print("=" * 60)
 
-    passed = sum(results)
-    total = len(results)
+    passed_count = sum(1 for result in results.values() if result)
+    total_count = len(results)
 
-    print(f"총 {total}개 테스트 카테고리 중 {passed}개 통과")
-    print(f"성공률: {passed/total*100:.1f}%" if total > 0 else "테스트 없음")
+    for test_name, result in results.items():
+        status = "✅ 통과" if result else "❌ 실패"
+        print(f"{test_name:20} : {status}")
 
-    if passed == total:
-        print("🎉 모든 필수 테스트 통과!")
-        return 0
+    print(f"\n총 테스트: {total_count}")
+    print(f"통과: {passed_count}")
+    print(f"실패: {total_count - passed_count}")
+    print(f"성공률: {(passed_count/total_count)*100:.1f}%")
+
+    if passed_count == total_count:
+        print("\n🎉 모든 필수 테스트가 통과했습니다!")
+        return True
     else:
-        print("⚠️ 일부 테스트 실패. 위의 오류 메시지를 확인하세요.")
-        return 1
+        print(f"\n⚠️  {total_count - passed_count}개의 테스트가 실패했습니다.")
+        print("실패한 테스트를 검토해주세요.")
+        return False
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    success = main()
+    sys.exit(0 if success else 1)

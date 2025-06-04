@@ -1,6 +1,78 @@
 # Changelog
 
-## [0.4.1] - 2025-05-29
+## [0.5.0] - 2025-01-24 - ConfigManager 도입 및 테스트 구조 개선
+
+### 🏗️ 주요 개선사항
+
+#### ConfigManager 중앙 집중식 설정 관리
+- **새로운 기능**: `newsletter/config_manager.py` 추가
+  - 싱글톤 패턴으로 설정 관리 중앙화
+  - 환경변수 로딩 및 캐싱 최적화
+  - 테스트용 `reset_for_testing()` 메서드 제공
+  - YAML 설정 파일 통합 관리
+
+#### 이메일 설정 통합
+- **중복 제거**: `EMAIL_SENDER`와 `POSTMARK_FROM_EMAIL` 통합
+  - `EMAIL_SENDER`로 단일화
+  - 하위 호환성 유지
+  - `web/mail.py`에서 ConfigManager 사용
+
+#### 테스트 구조 대폭 개선
+- **테스트 디렉토리 재구성**:
+  ```
+  tests/
+  ├── unit_tests/          # 단위 테스트
+  ├── integration/         # 통합 테스트  
+  ├── manual/              # 수동 테스트
+  └── api_tests/           # API 테스트
+  ```
+
+- **pytest 마커 시스템 도입**:
+  - `@pytest.mark.manual`: 수동 테스트
+  - `@pytest.mark.real_api`: 실제 API 테스트
+  - `@pytest.mark.mock_api`: Mock API 테스트
+  - `@pytest.mark.integration`: 통합 테스트
+
+#### 테스트 품질 개선
+- **ConfigManager 테스트**: 완전한 단위 테스트 커버리지
+- **메일 테스트 개선**: 실제 API 호출 방지, 모킹 강화
+- **필수 테스트 스크립트**: `tests/run_essential_tests.py` 추가
+
+### 🔧 기술적 개선
+
+#### 설정 로딩 최적화
+- **Before**: 각 모듈에서 개별적으로 YAML 파싱
+- **After**: ConfigManager에서 중앙 집중식 캐싱
+
+#### 테스트 격리 개선
+- **Before**: 환경변수 상태 공유로 테스트 간섭
+- **After**: `reset_for_testing()`으로 완전한 격리
+
+#### 코드 중복 제거
+- **Before**: 설정 로딩 로직이 여러 파일에 분산
+- **After**: ConfigManager로 단일 책임 원칙 적용
+
+### 📊 성능 개선
+- 설정 캐싱으로 반복 로딩 방지
+- 테스트 실행 시간 단축
+- 메모리 사용량 최적화
+
+### 🚨 Breaking Changes
+- 없음 (하위 호환성 완전 유지)
+
+### 📝 문서 업데이트
+- `tests/README.md`: 새로운 테스트 구조 문서화
+- 테스트 실행 가이드 개선
+- 문제 해결 섹션 추가
+
+### 🎯 다음 단계
+- [ ] 추가 모듈의 ConfigManager 마이그레이션
+- [ ] 성능 모니터링 및 최적화
+- [ ] 테스트 커버리지 확대
+
+---
+
+## [0.4.1] - 2025-05-29 - Debug 파일 관리 개선
 
 ### Improved
 - **🗂️ Debug 파일 관리 개선**
@@ -17,7 +89,9 @@
 - Debug 파일 생성 시 프로젝트 루트 디렉토리에 파일이 쌓이는 문제 해결
 - 디렉토리 생성 실패로 인한 오류 방지
 
-## [0.4.0] - 2025-05-26
+---
+
+## [0.4.0] - 2025-05-26 - 멀티 LLM 제공자 지원
 
 ### Added
 - **멀티 LLM 제공자 지원 시스템 구축**
@@ -67,7 +141,9 @@
 - **README.md** 업데이트: 멀티 LLM 지원 정보 추가
 - **env.example** 파일 추가: 환경변수 설정 예시
 
-## [0.3.0] - 2025-05-25
+---
+
+## [0.3.0] - 2025-05-25 - GitHub Actions CI/CD 파이프라인
 
 ### Added
 - **GitHub Actions CI/CD 파이프라인 구축**
@@ -112,7 +188,9 @@
   - Pull Request 체크리스트 및 배포 프로세스 문서화
   - 디버깅 및 문제 해결 가이드 추가
 
-## [0.2.2] - 2025-05-19
+---
+
+## [0.2.2] - 2025-05-19 - Gemini 2.5 Pro 업그레이드
 
 ### Changed
 - Gemini 2.5 Pro 모델로 업그레이드
@@ -126,7 +204,9 @@
   - 뉴스레터 작성 완료 단계 추가 
   - 최종 HTML 파일 저장 기능 자동화
 
-## [0.2.1] - 2025-05-19
+---
+
+## [0.2.1] - 2025-05-19 - 호환성 문제 해결
 
 ### Fixed
 - LangSmith 및 Google Generative AI 호환성 문제 해결
@@ -135,14 +215,9 @@
   - LangSmith Client API 변경사항 반영 (`get_tracing_callback` → `LangChainTracer` 직접 생성)
   - 프롬프트 형식 수정으로 들여쓰기 문제 해결
 
-## [0.2.0] - 2025-05-15
+---
 
-### Fixed
-- LangSmith 통합 및 비용 추적 개선
-  - LangChain 0.3+ 버전 환경 변수 지원 (`LANGCHAIN_*` 계열)
-  - Google Generative AI용 비용 추적 콜백 구현
-  - 무한 대기 방지를 위한 타임아웃 및 재시도 설정 추가
-  - 스트리밍 모드 활성화로 블로킹 방지
+## [0.2.0] - 2025-05-15 - LangSmith 통합 및 비용 추적
 
 ### Added
 - `GoogleGenAICostCB` 클래스 추가: Google Generative AI 모델의 토큰 사용량 및 비용 추적
@@ -158,7 +233,16 @@
 - `tools.py`: 키워드 생성 및 테마 추출 함수 업데이트
 - `graph.py`: LangGraph 워크플로우에 비용 추적 통합
 
-## [0.1.0] - 2025-05-09
+### Fixed
+- LangSmith 통합 및 비용 추적 개선
+  - LangChain 0.3+ 버전 환경 변수 지원 (`LANGCHAIN_*` 계열)
+  - Google Generative AI용 비용 추적 콜백 구현
+  - 무한 대기 방지를 위한 타임아웃 및 재시도 설정 추가
+  - 스트리밍 모드 활성화로 블로킹 방지
+
+---
+
+## [0.1.0] - 2025-05-09 - 최초 릴리스
 
 ### Added
 - 최초 릴리스

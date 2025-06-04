@@ -24,6 +24,12 @@ class ConfigManager:
             self._initialized = True
             self._load_environment_variables()
 
+    @classmethod
+    def reset_for_testing(cls):
+        """테스트용으로 싱글톤 인스턴스와 캐시를 리셋합니다."""
+        cls._instance = None
+        cls._config_cache = {}
+
     def _load_environment_variables(self):
         """환경 변수 로딩"""
         # API 키들

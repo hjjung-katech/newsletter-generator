@@ -19,8 +19,7 @@ class TestConfigManager(unittest.TestCase):
     def setUp(self):
         """테스트 전 설정"""
         # 싱글톤 인스턴스 초기화
-        ConfigManager._instance = None
-        ConfigManager._config_cache = {}
+        ConfigManager.reset_for_testing()
 
     def test_singleton_pattern(self):
         """싱글톤 패턴 테스트"""
@@ -35,9 +34,11 @@ class TestConfigManager(unittest.TestCase):
             "POSTMARK_SERVER_TOKEN": "test_token",
             "GEMINI_API_KEY": "test_gemini_key",
         },
+        clear=True,
     )
     def test_environment_variables_loading(self):
         """환경 변수 로딩 테스트"""
+        ConfigManager.reset_for_testing()
         manager = ConfigManager()
         self.assertEqual(manager.EMAIL_SENDER, "test@example.com")
         self.assertEqual(manager.POSTMARK_SERVER_TOKEN, "test_token")
@@ -46,15 +47,18 @@ class TestConfigManager(unittest.TestCase):
     @patch.dict(os.environ, {"POSTMARK_FROM_EMAIL": "old@example.com"}, clear=True)
     def test_email_compatibility_fallback(self):
         """이메일 호환성 fallback 테스트"""
+        ConfigManager.reset_for_testing()
         manager = ConfigManager()
         self.assertEqual(manager.EMAIL_SENDER, "old@example.com")
 
     @patch.dict(
         os.environ,
         {"EMAIL_SENDER": "new@example.com", "POSTMARK_FROM_EMAIL": "old@example.com"},
+        clear=True,
     )
     def test_email_sender_priority(self):
         """EMAIL_SENDER 우선순위 테스트"""
+        ConfigManager.reset_for_testing()
         manager = ConfigManager()
         self.assertEqual(manager.EMAIL_SENDER, "new@example.com")
 
@@ -164,9 +168,11 @@ llm_settings:
     @patch.dict(
         os.environ,
         {"POSTMARK_SERVER_TOKEN": "valid_token", "EMAIL_SENDER": "valid@example.com"},
+        clear=True,
     )
     def test_validate_email_config_valid(self):
         """유효한 이메일 설정 검증 테스트"""
+        ConfigManager.reset_for_testing()
         manager = ConfigManager()
         validation = manager.validate_email_config()
 
@@ -180,9 +186,11 @@ llm_settings:
             "POSTMARK_SERVER_TOKEN": "your_postmark_server_token_here",
             "EMAIL_SENDER": "noreply@yourdomain.com",
         },
+        clear=True,
     )
     def test_validate_email_config_invalid(self):
         """무효한 이메일 설정 검증 테스트"""
+        ConfigManager.reset_for_testing()
         manager = ConfigManager()
         validation = manager.validate_email_config()
 
@@ -207,6 +215,18 @@ llm_settings:
             # 캐시에서 가져왔으므로 파일은 한 번만 열려야 함
             mock_file.assert_called_once()
             self.assertEqual(config1, config2)
+
+    def test_reset_for_testing(self):
+        """테스트용 리셋 기능 테스트"""
+        # 첫 번째 인스턴스 생성
+        manager1 = ConfigManager()
+
+        # 리셋 후 새 인스턴스 생성
+        ConfigManager.reset_for_testing()
+        manager2 = ConfigManager()
+
+        # 다른 인스턴스여야 함
+        self.assertIsNot(manager1, manager2)
 
 
 if __name__ == "__main__":

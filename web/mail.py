@@ -10,23 +10,24 @@ project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# ConfigManager 사용
-try:
-    from newsletter.config_manager import config_manager
 
-    POSTMARK_SERVER_TOKEN = config_manager.POSTMARK_SERVER_TOKEN
-    EMAIL_SENDER = config_manager.EMAIL_SENDER
-except ImportError:
-    # Fallback to direct env access
-    POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
-    EMAIL_SENDER = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
+def _get_email_config():
+    """이메일 설정을 동적으로 가져옵니다 (테스트 호환성 고려)"""
+    try:
+        from newsletter.config_manager import config_manager
+
+        return config_manager.POSTMARK_SERVER_TOKEN, config_manager.EMAIL_SENDER
+    except (ImportError, AttributeError):
+        # Fallback to direct env access
+        postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
+        email_sender = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
+        return postmark_token, email_sender
 
 
 def send_email(to: str, subject: str, html: str, **kwargs):
     """단일 수신자용 Postmark 발송 래퍼."""
-    # ConfigManager 우선 사용
-    token = POSTMARK_SERVER_TOKEN
-    from_email = EMAIL_SENDER
+    # 동적으로 설정 가져오기
+    token, from_email = _get_email_config()
 
     if not token:
         error_msg = (
@@ -69,12 +70,12 @@ def send_email(to: str, subject: str, html: str, **kwargs):
 def check_email_configuration():
     """이메일 설정 상태를 확인합니다."""
     try:
-        # ConfigManager 사용
+        from newsletter.config_manager import config_manager
+
         return config_manager.validate_email_config()
-    except NameError:
+    except (ImportError, AttributeError):
         # Fallback 로직
-        token = POSTMARK_SERVER_TOKEN
-        from_email = EMAIL_SENDER
+        token, from_email = _get_email_config()
 
         return {
             "postmark_token_configured": bool(
@@ -105,6 +106,8 @@ def send_test_email(to: str):
     """테스트 이메일을 발송합니다."""
     import datetime
 
+    token, from_email = _get_email_config()
+
     test_html = """
     <html>
     <body>
@@ -121,12 +124,8 @@ def send_test_email(to: str):
     </html>
     """.format(
         timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        sender=EMAIL_SENDER or "Unknown",
-        token_masked=(
-            "***" + (POSTMARK_SERVER_TOKEN or "")[-4:]
-            if POSTMARK_SERVER_TOKEN
-            else "Not Set"
-        ),
+        sender=from_email or "Unknown",
+        token_masked=("***" + (token or "")[-4:] if token else "Not Set"),
     )
 
     return send_email(
