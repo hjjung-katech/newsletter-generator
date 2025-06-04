@@ -1,7 +1,8 @@
 import os
-import pytest
-from unittest import mock
 import sys
+from unittest import mock
+
+import pytest
 
 # Add web directory to path for importing mail module
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "web"))

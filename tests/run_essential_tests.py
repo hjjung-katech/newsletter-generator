@@ -4,9 +4,9 @@
 핵심 기능의 정상 작동을 검증합니다.
 """
 
-import sys
-import subprocess
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 

@@ -2,9 +2,10 @@ from flask import Flask
 
 app = Flask(__name__)
 
-@app.route('/')
+
+@app.route("/")
 def hello():
-    return '''
+    return """
     <!DOCTYPE html>
     <html>
     <head>
@@ -19,12 +20,14 @@ def hello():
         </script>
     </body>
     </html>
-    '''
+    """
 
-@app.route('/health')
+
+@app.route("/health")
 def health():
-    return {'status': 'ok', 'message': 'Test server is running'}
+    return {"status": "ok", "message": "Test server is running"}
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     print("Starting test Flask server on http://localhost:5000")
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
