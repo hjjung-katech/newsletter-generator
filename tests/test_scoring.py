@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from langchain_core.messages import AIMessage
 
-from newsletter.scoring import DEFAULT_WEIGHTS, score_articles
+from newsletter.scoring import load_scoring_weights_from_config, score_articles
 
 
 class TestScoring(unittest.TestCase):
@@ -24,9 +24,10 @@ class TestScoring(unittest.TestCase):
             AIMessage(content='{"relevance":1,"impact":1,"novelty":1}'),
         ]
 
-        ranked = score_articles(
-            articles, "AI", top_n=2, weights=DEFAULT_WEIGHTS, llm=llm
-        )
+        # config에서 가중치 로드
+        weights = load_scoring_weights_from_config()
+
+        ranked = score_articles(articles, "AI", top_n=2, weights=weights, llm=llm)
         self.assertEqual(len(ranked), 2)
         self.assertGreaterEqual(
             ranked[0]["priority_score"], ranked[1]["priority_score"]
@@ -51,9 +52,10 @@ class TestScoring(unittest.TestCase):
             AIMessage(content='{"relevance":3,"impact":3,"novelty":3}'),
         ]
 
-        ranked = score_articles(
-            articles, "AI", top_n=None, weights=DEFAULT_WEIGHTS, llm=llm
-        )
+        # config에서 가중치 로드
+        weights = load_scoring_weights_from_config()
+
+        ranked = score_articles(articles, "AI", top_n=None, weights=weights, llm=llm)
         self.assertEqual(len(ranked), 2)
         self.assertTrue(all("priority_score" in a for a in ranked))
 

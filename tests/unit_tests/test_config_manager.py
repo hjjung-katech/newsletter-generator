@@ -133,7 +133,7 @@ llm_settings:
         with patch.object(manager, "load_config_file", return_value={}):
             weights = manager.get_scoring_weights()
 
-        expected_keys = {"recency", "relevance", "credibility", "diversity"}
+        expected_keys = {"relevance", "impact", "novelty", "source_tier", "recency"}
         self.assertEqual(set(weights.keys()), expected_keys)
         self.assertAlmostEqual(sum(weights.values()), 1.0)
 
@@ -142,10 +142,11 @@ llm_settings:
         manager = ConfigManager()
         config_data = {
             "scoring": {
+                "relevance": 0.5,
+                "impact": 0.5,  # 합계가 1.0이 아님
+                "novelty": 0.5,
+                "source_tier": 0.5,
                 "recency": 0.5,
-                "relevance": 0.5,  # 합계가 1.0이 아님
-                "credibility": 0.5,
-                "diversity": 0.5,
             }
         }
 

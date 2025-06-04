@@ -122,11 +122,13 @@ class ConfigManager:
         config_data = self.load_config_file()
         scoring_config = config_data.get("scoring", {})
 
+        # 새로운 가중치 구조 사용 (config.yml과 일치)
         default_weights = {
-            "recency": 0.3,
-            "relevance": 0.4,
-            "credibility": 0.2,
-            "diversity": 0.1,
+            "relevance": 0.35,
+            "impact": 0.25,
+            "novelty": 0.15,
+            "source_tier": 0.15,
+            "recency": 0.10,
         }
 
         if not scoring_config:

@@ -52,8 +52,10 @@ llm_settings:
   models:
     # 키워드 생성 (도메인 → 키워드) - 창의성이 중요하므로 Anthropic 사용
     keyword_generation:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-latest"
+      provider: "gemini"
+      model: "gemini-2.5-pro-preview-03-25"
+      # provider: "anthropic"
+      # model: "claude-3-7-sonnet-latest"
       temperature: 0.7
       max_retries: 2
       timeout: 60
@@ -76,16 +78,20 @@ llm_settings:
     
     # 섹션 재생성 (뉴스 링크 → 섹션 요약) - 구조화된 작업이므로 Anthropic 사용
     section_regeneration:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-latest"
+      # provider: "anthropic"
+      # model: "claude-3-7-sonnet-latest"
+      provider: "gemini"
+      model: "gemini-2.5-pro-preview-03-25"
       temperature: 0.3
       max_retries: 2
       timeout: 120
     
     # 뉴스레터 소개 생성 - 자연스러운 글쓰기를 위해 Anthropic 사용
     introduction_generation:
-      provider: "anthropic"
-      model: "claude-3-7-sonnet-latest"
+      # provider: "anthropic"
+      # model: "claude-3-7-sonnet-latest"
+      provider: "gemini"
+      model: "gemini-2.5-flash-preview-05-20"
       temperature: 0.4
       max_retries: 2
       timeout: 60
@@ -149,8 +155,8 @@ distribution:
 
 # Article scoring weights
 scoring:
-  relevance: 0.40
+  relevance: 0.35
   impact: 0.25
   novelty: 0.15
-  source_tier: 0.10
+  source_tier: 0.15
   recency: 0.10

@@ -18,11 +18,11 @@ from .utils.logger import get_logger
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {
-    "relevance": 0.35,
+    "relevance": 0.40,
     "impact": 0.25,
     "novelty": 0.15,
-    "source_tier": 0.20,
-    "recency": 0.05,
+    "source_tier": 0.10,
+    "recency": 0.10,
 }
 
 # 로거 초기화
@@ -40,54 +40,70 @@ def load_scoring_weights_from_config(
     Returns:
         Dict[str, float]: Scoring weights dictionary
     """
+    # 1순위: config_manager 사용 (권장)
     try:
         from .config_manager import config_manager
 
-        return config_manager.get_scoring_weights()
+        weights = config_manager.get_scoring_weights()
+        logger.info("✅ 스코어링 가중치를 config_manager에서 로드했습니다.")
+        return weights
     except ImportError:
-        # Fallback to original implementation
-        DEFAULT_WEIGHTS = {
-            "recency": 0.3,
-            "relevance": 0.4,
-            "credibility": 0.2,
-            "diversity": 0.1,
-        }
+        logger.warning(
+            "config_manager를 가져올 수 없습니다. fallback 모드로 전환합니다."
+        )
+    except Exception as e:
+        logger.warning(
+            f"config_manager에서 가중치 로드 실패: {e}. fallback 모드로 전환합니다."
+        )
 
-        try:
-            import yaml
+    # 2순위: 직접 yaml 파일 읽기 (fallback)
+    fallback_weights = {
+        "relevance": 0.35,
+        "impact": 0.25,
+        "novelty": 0.15,
+        "source_tier": 0.15,
+        "recency": 0.10,
+    }
 
-            if os.path.exists(config_file):
-                with open(config_file, "r", encoding="utf-8") as f:
-                    config_data = yaml.safe_load(f)
+    try:
+        import yaml
 
-                scoring_config = config_data.get("scoring", {})
-                if scoring_config:
-                    # Validate that all required keys exist and are numeric
-                    required_keys = set(DEFAULT_WEIGHTS.keys())
-                    config_keys = set(scoring_config.keys())
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
 
-                    if required_keys.issubset(config_keys):
-                        # Ensure all values are numeric and sum to 1.0 (approximately)
-                        weights = {k: float(scoring_config[k]) for k in required_keys}
-                        total = sum(weights.values())
+            scoring_config = config_data.get("scoring", {})
+            if scoring_config:
+                # Validate that all required keys exist and are numeric
+                required_keys = set(fallback_weights.keys())
+                config_keys = set(scoring_config.keys())
 
-                        if abs(total - 1.0) < 0.01:  # Allow small floating point errors
-                            return weights
-                        else:
-                            logger.warning(
-                                f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
-                            )
-                    else:
-                        missing_keys = required_keys - config_keys
-                        logger.warning(
-                            f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
+                if required_keys.issubset(config_keys):
+                    # Ensure all values are numeric and sum to 1.0 (approximately)
+                    weights = {k: float(scoring_config[k]) for k in required_keys}
+                    total = sum(weights.values())
+
+                    if abs(total - 1.0) < 0.01:  # Allow small floating point errors
+                        logger.info(
+                            f"✅ 스코어링 가중치를 {config_file}에서 로드했습니다."
                         )
-        except Exception as e:
-            logger.warning(
-                f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
-            )
+                        return weights
+                    else:
+                        logger.warning(
+                            f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
+                        )
+                else:
+                    missing_keys = required_keys - config_keys
+                    logger.warning(
+                        f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
+                    )
+    except Exception as e:
+        logger.warning(
+            f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
+        )
 
-        return DEFAULT_WEIGHTS
+    logger.info("⚠️  기본 스코어링 가중치를 사용합니다.")
+    return fallback_weights
 
 
 SCORE_PROMPT = """
@@ -174,7 +190,7 @@ def calculate_priority_score(
     """
 
     if weights is None:
-        weights = DEFAULT_WEIGHTS
+        weights = load_scoring_weights_from_config()
 
     scores = request_llm_scores(article, domain, llm=llm)
     # Save raw scores for later reuse
@@ -227,6 +243,9 @@ def score_articles(
     list of dict
         The scored (and sorted) articles.
     """
+
+    if weights is None:
+        weights = load_scoring_weights_from_config()
 
     scored_list = []
     for article in articles:
