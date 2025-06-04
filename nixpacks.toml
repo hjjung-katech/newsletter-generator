@@ -1,20 +1,25 @@
-{
-  "deploy": {
-    "startCommand": "cd web && gunicorn --bind 0.0.0.0:$PORT app:app",
-    "buildCommand": "cd web && pip install -r requirements.txt"
-  },
-  "phases": {
-    "build": {
-      "dependsOn": ["install"],
-      "cmds": ["echo 'Build phase completed'"]
-    },
-    "install": {
-      "cmds": [
-        "pip install --upgrade pip"
-      ]
-    }
-  },
-  "variables": {
-    "PYTHONPATH": "/app:/app/web"
-  }
-}
+[providers]
+python = "3.11"
+
+[variables]
+PYTHONPATH = "/app"
+NIXPACKS_PYTHON_VERSION = "3.11"
+
+[phases.setup]
+nixPkgs = ["nodejs", "npm"]
+
+[phases.install]
+cmds = [
+    "pip install --upgrade pip",
+    "pip install -r requirements.txt",
+    "pip install gunicorn redis rq"
+]
+
+[phases.build]
+cmds = [
+    "python web/init_database.py --force",
+    "echo 'Database initialized for production'"
+]
+
+[start]
+cmd = "cd web && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 app:app"

@@ -4,6 +4,7 @@
 [![Code Quality](https://github.com/hjjung-katech/newsletter-generator/workflows/Code%20Quality/badge.svg)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/newsletter-generator)
 
 **Newsletter Generator**는 키워드 기반으로 최신 뉴스를 수집·요약하여 HTML 뉴스레터를 생성하고 이메일로 발송하는 Python CLI 도구입니다.
 
@@ -17,6 +18,66 @@
 - 📱 **두 가지 스타일**: Compact(간결) / Detailed(상세) 뉴스레터 지원
 - 📧 **이메일 호환성**: 모든 이메일 클라이언트에서 완벽 렌더링되는 Email-Compatible 템플릿 지원
 - 💰 **비용 추적**: 제공자별 토큰 사용량 및 비용 자동 추적
+- 🌐 **웹 인터페이스**: Flask 기반 웹 애플리케이션 제공
+- ⏰ **정기 발송**: RRULE 기반 스케줄링으로 정기적인 뉴스레터 발송
+- ☁️ **클라우드 배포**: Railway PaaS 원클릭 배포 지원
+
+## 🚀 Railway 클라우드 배포
+
+### 원클릭 배포
+
+[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/newsletter-generator)
+
+### 수동 배포
+
+1. **Repository 연결**
+   ```bash
+   git clone https://github.com/hjjung-katech/newsletter-generator.git
+   cd newsletter-generator
+   ```
+
+2. **Railway CLI 설치**
+   ```bash
+   npm install -g @railway/cli
+   railway login
+   ```
+
+3. **프로젝트 생성 및 배포**
+   ```bash
+   railway deploy
+   ```
+
+4. **환경변수 설정**
+   Railway 대시보드에서 다음 환경변수를 설정하세요:
+   ```
+   OPENAI_API_KEY=sk-...
+   SENDGRID_API_KEY=SG.xxx
+   FROM_EMAIL=newsletter@yourdomain.com
+   SECRET_KEY=your-secret-key-here
+   FLASK_ENV=production
+   ```
+
+### 서비스 구성
+
+Railway에서는 다음 4개 서비스가 자동으로 배포됩니다:
+
+- **web**: Flask 웹 애플리케이션 (메인 API 서버)
+- **worker**: Redis-RQ 백그라운드 워커 (뉴스레터 생성)
+- **scheduler**: RRULE 기반 스케줄 실행기 (정기 발송)
+- **redis**: Redis 인스턴스 (작업 큐 및 캐시)
+
+### 배포 후 테스트
+
+```bash
+# 로컬에서 배포된 서비스 테스트
+python test_railway.py --url https://your-app.railway.app
+
+# 또는 환경변수 설정 후
+export RAILWAY_PRODUCTION_URL=https://your-app.railway.app
+python test_railway.py --production
+```
+
+자세한 배포 가이드는 [Railway 배포 문서](docs/setup/RAILWAY_DEPLOYMENT.md)를 참고하세요.
 
 ## 🚀 빠른 시작
 
@@ -82,6 +143,53 @@ python -m newsletter run --keywords "AI,자동화,기술"
 python test_server.py
 ```
 
+## 🌐 웹 인터페이스
+
+웹 인터페이스를 통해 뉴스레터를 생성하고 이메일로 발송할 수 있습니다:
+
+```bash
+python test_server.py
+```
+
+브라우저에서 http://localhost:5000 접속
+
+### 웹 인터페이스 기능:
+- 🔍 키워드/도메인 기반 뉴스레터 생성
+- 📊 실시간 생성 상태 모니터링
+- 📧 이메일 발송 및 테스트
+- ⏰ **정기 발송 예약**: RRULE 기반 스케줄링
+- 📈 **예약 관리**: 활성 스케줄 조회, 취소, 즉시 실행
+- 📈 생성 히스토리 관리
+- ⚙️ 이메일 설정 상태 확인
+
+### API 엔드포인트
+
+#### 뉴스레터 생성
+```bash
+POST /api/generate
+{
+  "keywords": ["AI", "tech"],
+  "email": "user@example.com"
+}
+```
+
+#### 정기 발송 예약
+```bash
+POST /api/schedule
+{
+  "keywords": ["AI", "tech"],
+  "email": "user@example.com",
+  "rrule": "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9"
+}
+```
+
+#### 예약 관리
+```bash
+GET /api/schedules              # 활성 예약 목록
+DELETE /api/schedule/{id}       # 예약 취소
+POST /api/schedule/{id}/run     # 즉시 실행
+```
+
 ## 📧 이메일 발송 문제 해결
 
 ### 문제: "이메일 설정이 완료되지 않았습니다"
@@ -137,23 +245,6 @@ python test_server.py
 - **오류 401 (인증 실패):**
   - POSTMARK_SERVER_TOKEN이 올바른지 확인
   - Server Token인지 확인 (Account Token 아님)
-
-## 🌐 웹 인터페이스
-
-웹 인터페이스를 통해 뉴스레터를 생성하고 이메일로 발송할 수 있습니다:
-
-```bash
-python test_server.py
-```
-
-브라우저에서 http://localhost:5000 접속
-
-### 웹 인터페이스 기능:
-- 🔍 키워드/도메인 기반 뉴스레터 생성
-- 📊 실시간 생성 상태 모니터링
-- 📧 이메일 발송 및 테스트
-- 📈 생성 히스토리 관리
-- ⚙️ 이메일 설정 상태 확인
 
 ## 💡 사용 팁
 

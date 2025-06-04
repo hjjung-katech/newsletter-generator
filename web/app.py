@@ -930,22 +930,55 @@ def create_schedule():
     if not data or not data.get("rrule") or not data.get("email"):
         return jsonify({"error": "Missing required fields: rrule, email"}), 400
 
+    # Keywords나 domain 중 하나는 필수
+    if not data.get("keywords") and not data.get("domain"):
+        return jsonify({"error": "Either keywords or domain is required"}), 400
+
+    try:
+        # RRULE 파싱 및 다음 실행 시간 계산
+        from dateutil.rrule import rrulestr
+
+        rrule_str = data["rrule"]
+        rrule = rrulestr(rrule_str, dtstart=datetime.now())
+        next_run = rrule.after(datetime.now())
+
+        if not next_run:
+            return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
+
     schedule_id = str(uuid.uuid4())
 
-    # Parse RRULE to calculate next_run (simplified for now)
-    # In production, use proper RRULE library
-    next_run = datetime.now().isoformat()
+    # 스케줄 데이터 준비
+    schedule_params = {
+        "keywords": data.get("keywords"),
+        "domain": data.get("domain"),
+        "email": data["email"],
+        "template_style": data.get("template_style", "compact"),
+        "email_compatible": data.get("email_compatible", True),
+        "period": data.get("period", 14),
+    }
 
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO schedules (id, params, rrule, next_run) VALUES (?, ?, ?, ?)",
-        (schedule_id, json.dumps(data), data["rrule"], next_run),
+        (schedule_id, json.dumps(schedule_params), rrule_str, next_run.isoformat()),
     )
     conn.commit()
     conn.close()
 
-    return jsonify({"status": "scheduled", "schedule_id": schedule_id}), 201
+    return (
+        jsonify(
+            {
+                "status": "scheduled",
+                "schedule_id": schedule_id,
+                "next_run": next_run.isoformat(),
+            }
+        ),
+        201,
+    )
 
 
 @app.route("/api/schedules")
@@ -954,7 +987,7 @@ def get_schedules():
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, params, rrule, next_run, created_at, enabled FROM schedules WHERE enabled = 1"
+        "SELECT id, params, rrule, next_run, created_at, enabled FROM schedules WHERE enabled = 1 ORDER BY next_run ASC"
     )
     rows = cursor.fetchall()
     conn.close()
@@ -990,6 +1023,51 @@ def delete_schedule(schedule_id):
         return jsonify({"error": "Schedule not found"}), 404
 
     return jsonify({"status": "cancelled"})
+
+
+@app.route("/api/schedule/<schedule_id>/run", methods=["POST"])
+def run_schedule_now(schedule_id):
+    """Immediately execute a scheduled newsletter"""
+    try:
+        # 스케줄 정보 조회
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT params, enabled FROM schedules WHERE id = ?", (schedule_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({"error": "Schedule not found"}), 404
+
+        params_json, enabled = row
+        if not enabled:
+            return jsonify({"error": "Schedule is disabled"}), 400
+
+        params = json.loads(params_json)
+
+        # 즉시 뉴스레터 생성 작업 큐에 추가
+        if redis_conn and task_queue:
+            job = task_queue.enqueue(
+                generate_newsletter_task, params, job_timeout="10m"
+            )
+
+            return jsonify(
+                {
+                    "status": "queued",
+                    "job_id": job.id,
+                    "message": "Newsletter generation started",
+                }
+            )
+        else:
+            # Redis가 없는 경우 직접 실행
+            result = generate_newsletter_task(params)
+            return jsonify({"status": "completed", "result": result})
+
+    except Exception as e:
+        logging.error(f"Failed to run schedule {schedule_id}: {e}")
+        return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500
 
 
 @app.route("/health")
