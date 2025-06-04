@@ -43,6 +43,7 @@ coverage_html_report/
 # Debug files
 template_debug_*.txt
 debug_files/
+!debug_files/.gitkeep
 
 # OS files
 .DS_Store
@@ -222,6 +223,8 @@ credentials.json
 
 # 출력문서 폴더
 output/
+!output/.gitkeep
+!output/*/.gitkeep
 output/*.html
 
 # 테스트 결과 파일
@@ -272,3 +275,24 @@ trace_*.txt
 .cursor
 *.cursorrules
 *.mdc
+
+# Web application specific files
+web/storage.db
+web/*.db
+web/*.sqlite
+web/*.sqlite3
+web/.env
+web/__pycache__/
+**/storage.db
+
+# Additional runtime files
+*.pid
+*.log.* 
+temp_*.json
+*.tmp
+debug_*.json
+
+# Database files (additional patterns)
+*.db-journal
+*.db-wal
+*.db-shm
