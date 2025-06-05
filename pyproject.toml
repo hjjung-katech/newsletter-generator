@@ -151,6 +151,7 @@ markers = [
     "mock_api: tests that use mocked API responses",
     "integration: integration tests that require full system setup",
     "manual: manual tests that require specific setup or user interaction",
+    "asyncio: async tests that require asyncio event loop",
 ]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]

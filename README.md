@@ -1,10 +1,10 @@
 # Newsletter Generator
 
-[![CI](https://github.com/hjjung-katech/newsletter-generator/workflows/CI/badge.svg)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml)
+[![CI/CD Pipeline](https://github.com/hjjung-katech/newsletter-generator/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml)
 [![Code Quality](https://github.com/hjjung-katech/newsletter-generator/workflows/Code%20Quality/badge.svg)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/newsletter-generator)
+[![Deploy on Railway](https://railway.app/button.svg)](https://newsletter-generator-production-73b6.up.railway.app/)
 
 **Newsletter Generator**는 키워드 기반으로 최신 뉴스를 수집·요약하여 HTML 뉴스레터를 생성하고 이메일로 발송하는 Python CLI 도구입니다.
 
@@ -21,12 +21,16 @@
 - 🌐 **웹 인터페이스**: Flask 기반 웹 애플리케이션 제공
 - ⏰ **정기 발송**: RRULE 기반 스케줄링으로 정기적인 뉴스레터 발송
 - ☁️ **클라우드 배포**: Railway PaaS 원클릭 배포 지원
+- 🔧 **Mock Mode**: 개발 및 테스트를 위한 Mock 데이터 지원
+- 📊 **Health Check**: 시스템 상태 및 의존성 모니터링
+- 🚨 **통합 모니터링**: Sentry를 통한 에러 추적 및 성능 모니터링
+- 📝 **구조화 로깅**: JSON 포맷 로깅으로 운영 환경 모니터링 최적화
 
 ## 🚀 Railway 클라우드 배포
 
 ### 원클릭 배포
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/template/newsletter-generator)
+[![Deploy on Railway](https://railway.app/button.svg)](https://newsletter-generator-production-73b6.up.railway.app/)
 
 ### 수동 배포
 
@@ -50,11 +54,25 @@
 4. **환경변수 설정**
    Railway 대시보드에서 다음 환경변수를 설정하세요:
    ```
+   # 필수 API 키
+   SERPER_API_KEY=your_serper_key_here
    OPENAI_API_KEY=sk-...
-   SENDGRID_API_KEY=SG.xxx
-   FROM_EMAIL=newsletter@yourdomain.com
+   
+   # 이메일 발송 (Postmark)
+   POSTMARK_SERVER_TOKEN=your_postmark_token
+   EMAIL_SENDER=newsletter@yourdomain.com
+   
+   # 웹 애플리케이션
    SECRET_KEY=your-secret-key-here
    FLASK_ENV=production
+   PORT=8080
+   
+   # 선택사항 - 모니터링
+   SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+   LOG_LEVEL=INFO
+   
+   # 개발/테스트 모드 (운영환경에서는 false)
+   MOCK_MODE=false
    ```
 
 ### 서비스 구성
@@ -71,6 +89,12 @@ Railway에서는 다음 4개 서비스가 자동으로 배포됩니다:
 ```bash
 # 로컬에서 배포된 서비스 테스트
 python test_railway.py --url https://your-app.railway.app
+
+# Health Check 엔드포인트 확인
+curl https://your-app.railway.app/health
+
+# 뉴스레터 생성 테스트 (Mock 모드가 비활성화된 상태)
+curl "https://your-app.railway.app/newsletter?period=7&keywords=AI,tech"
 
 # 또는 환경변수 설정 후
 export RAILWAY_PRODUCTION_URL=https://your-app.railway.app
@@ -95,16 +119,25 @@ python setup_env.py
 ```env
 # 필수 API 키
 SERPER_API_KEY=your_serper_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
+OPENAI_API_KEY=your_openai_api_key_here
 
 # 이메일 발송 (필수 - 이메일 기능 사용시)
 POSTMARK_SERVER_TOKEN=your_postmark_server_token_here
 EMAIL_SENDER=your_verified_email@yourdomain.com
-POSTMARK_FROM_EMAIL=your_verified_email@yourdomain.com
 
-# 선택사항
-OPENAI_API_KEY=your_openai_api_key_here
+# 웹 애플리케이션
+SECRET_KEY=your-secret-key-here
+
+# 선택사항 - 추가 기능
+GEMINI_API_KEY=your_gemini_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# 모니터링 (선택사항)
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
+
+# 개발/테스트 모드
+MOCK_MODE=false  # 운영환경에서는 false, 개발시에는 true
 ```
 
 ### 2. API 키 발급 방법
@@ -124,8 +157,18 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 #### 📧 Postmark (필수 - 이메일 발송)
 - https://postmarkapp.com 방문
 - 계정 생성 (월 100개 이메일 무료)
-- Server → API Tokens에서 토큰 발급
+- Server Token 발급 후 POSTMARK_SERVER_TOKEN에 설정
 - Signatures에서 발송자 이메일 인증 필수
+
+#### 🤖 OpenAI API (선택사항항 - AI 처리)
+- https://platform.openai.com 방문
+- API 키 발급 후 OPENAI_API_KEY에 설정
+- 사용량에 따른 과금
+
+#### 🚨 Sentry (선택사항 - 에러 모니터링)
+- https://sentry.io 방문
+- 프로젝트 생성 후 DSN 확인
+- SENTRY_DSN에 설정하면 자동으로 에러 추적 활성화
 
 ### 3. 설치 및 실행
 
@@ -164,13 +207,36 @@ python test_server.py
 
 ### API 엔드포인트
 
-#### 뉴스레터 생성
+#### Health Check
+```bash
+GET /health
+# 응답: 시스템 상태 및 의존성 확인
+{
+  "status": "healthy",
+  "timestamp": "2024-01-20T10:30:00Z",
+  "dependencies": {
+    "openai": {"status": "healthy", "latency": 120},
+    "serper": {"status": "healthy", "latency": 85},
+    "sentry": {"status": "healthy", "config": "enabled"}
+  }
+}
+```
+
+#### 뉴스레터 생성 (API)
 ```bash
 POST /api/generate
 {
   "keywords": ["AI", "tech"],
+  "period": 7,  # 1, 7, 14, 30일만 허용
   "email": "user@example.com"
 }
+```
+
+#### 뉴스레터 생성 (GET)
+```bash
+GET /newsletter?keywords=AI,tech&period=7
+# Mock 모드가 비활성화된 경우 실제 뉴스 데이터 반환
+# Mock 모드가 활성화된 경우 테스트 데이터 반환
 ```
 
 #### 정기 발송 예약
@@ -276,6 +342,16 @@ POST /api/schedule/{id}/run     # 즉시 실행
 # 전체 테스트 실행
 pytest
 
+# 웹 API 통합 테스트
+pytest tests/test_api.py -v
+
+# Mock 모드 및 Period 검증 테스트
+pytest tests/test_api.py::test_newsletter_get_endpoint -v
+pytest tests/test_api.py::test_period_validation -v
+
+# Health Check 엔드포인트 테스트
+pytest tests/test_api.py::test_health_endpoint -v
+
 # Email-Compatible 기능 테스트
 pytest tests/test_email_compatibility.py -v
 
@@ -286,41 +362,20 @@ pytest tests/test_email_compatibility_integration.py -v
 pytest tests/test_compose.py::test_email_compatible_rendering -v
 ```
 
-### Email-Compatible 기능 테스트
+### 코드 품질 검사
 
 ```bash
-# 이메일 호환성 테스트 보고서 생성
-pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityReport::test_generate_compatibility_report -v
+# Pre-commit hooks 설치
+pre-commit install
 
-# 실제 이메일 전송 테스트 (환경변수 설정 필요)
-export TEST_EMAIL_RECIPIENT="your-email@example.com"
-pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityIntegration::test_email_sending_detailed -v
+# 모든 파일에 대해 코드 품질 검사 실행
+pre-commit run --all-files
 
-# 중복 파일 생성 방지 테스트
-pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityIntegration::test_no_duplicate_files_generated -v
+# 개별 도구 실행
+black --check newsletter tests
+isort --check-only --profile black newsletter tests
+flake8 newsletter tests --max-line-length=88 --ignore=E203,W503
 ```
-
-### 수동 테스트
-
-```bash
-# 4가지 조합 모두 테스트
-newsletter run --keywords "AI,테스트" --template-style detailed              # 일반 Detailed
-newsletter run --keywords "AI,테스트" --template-style compact               # 일반 Compact  
-newsletter run --keywords "AI,테스트" --template-style detailed --email-compatible  # Email-Compatible Detailed
-newsletter run --keywords "AI,테스트" --template-style compact --email-compatible   # Email-Compatible Compact
-
-# 실제 이메일 전송 테스트
-newsletter run --keywords "AI,테스트" --template-style detailed --email-compatible --to your-email@example.com
-```
-
-### 테스트 커버리지
-
-현재 테스트 커버리지:
-- ✅ **Email-Compatible 템플릿 렌더링**: HTML 구조, CSS 인라인, 호환성 검증
-- ✅ **중복 파일 생성 방지**: 단일 파일 생성 확인
-- ✅ **콘텐츠 무결성**: "이런 뜻이에요", "생각해 볼 거리" 섹션 포함 확인
-- ✅ **크로스 플랫폼 호환성**: Gmail, Outlook, 모바일 클라이언트 호환성
-- ✅ **실제 이메일 전송**: Postmark 통합 테스트
 
 ## 📚 문서
 

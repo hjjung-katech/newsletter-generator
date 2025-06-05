@@ -13,7 +13,7 @@ NAVER_CLIENT_ID = config_manager.NAVER_CLIENT_ID
 NAVER_CLIENT_SECRET = config_manager.NAVER_CLIENT_SECRET
 ADDITIONAL_RSS_FEEDS = config_manager.ADDITIONAL_RSS_FEEDS
 
-# 이메일 발송 설정 (통합)
+# 이메일 발송 설정 (Postmark 사용)
 POSTMARK_SERVER_TOKEN = config_manager.POSTMARK_SERVER_TOKEN
 EMAIL_SENDER = config_manager.EMAIL_SENDER
 
@@ -83,4 +83,11 @@ if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
     log_message(
         "info",
         "Note: Naver News API credentials not found. Naver News API source will be disabled.",
+    )
+
+# Mock 모드 설정 - 환경 변수에서 로드, 기본값은 False
+MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
+if MOCK_MODE:
+    log_message(
+        "warning", "Running in MOCK MODE - using sample data instead of real API calls"
     )
