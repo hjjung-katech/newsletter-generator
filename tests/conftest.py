@@ -53,6 +53,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "manual: tests that require manual intervention or special setup"
     )
+    config.addinivalue_line(
+        "markers", "korean: tests with Korean language content and encoding"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -164,6 +167,18 @@ def test_articles():
             "content": "This is another test article about machine learning.",
         },
     ]
+
+
+@pytest.fixture
+def korean_keywords():
+    """Korean test keywords fixture"""
+    return ["토요타", "삼성전자", "AI", "반도체"]
+
+
+@pytest.fixture
+def mixed_language_keywords():
+    """Mixed language test keywords fixture"""
+    return ["반도체,semiconductor", "AI,인공지능", "토요타,Toyota"]
 
 
 def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

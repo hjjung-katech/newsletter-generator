@@ -251,6 +251,7 @@ class NewsletterApp {
     }
 
     startPolling(jobId) {
+        this.currentJobId = jobId; // Store current job ID
         this.pollInterval = setInterval(async () => {
             try {
                 const response = await fetch(`/api/status/${jobId}`);
@@ -258,6 +259,10 @@ class NewsletterApp {
 
                 if (result.status === 'completed') {
                     this.stopPolling();
+                    // Add job_id to result for iframe src
+                    if (result.result) {
+                        result.result.job_id = jobId;
+                    }
                     this.showResults(result.result);
                 } else if (result.status === 'failed') {
                     this.stopPolling();
@@ -391,13 +396,42 @@ class NewsletterApp {
                 <h4 class="text-lg font-semibold text-gray-800 mb-3">
                     <i class="fas fa-newspaper mr-2"></i>Newsletter Content
                 </h4>
-                <div class="border rounded p-4 bg-gray-50 max-h-96 overflow-y-auto">
-                    ${result.html_content || '<p class="text-gray-500">Newsletter content could not be loaded.</p>'}
+                <div class="border rounded bg-gray-50">
+                    ${result.html_content ? 
+                        (result.job_id ? 
+                            `<iframe id="newsletterFrame" 
+                                     style="width: 100%; height: 600px; border: none;" 
+                                     src="/api/newsletter-html/${result.job_id}"
+                                     sandbox="allow-same-origin allow-scripts">
+                             </iframe>` :
+                            `<iframe id="newsletterFrame" 
+                                     style="width: 100%; height: 600px; border: none;" 
+                                     sandbox="allow-same-origin allow-scripts">
+                             </iframe>`) :
+                        '<p class="text-gray-500 p-4">Newsletter content could not be loaded.</p>'
+                    }
                 </div>
             </div>
         `;
 
         preview.innerHTML = detailsHtml;
+
+        // Load HTML content using blob URL if no job_id available
+        if (result.html_content && !result.job_id) {
+            setTimeout(() => {
+                const iframe = document.getElementById('newsletterFrame');
+                if (iframe) {
+                    const blob = new Blob([result.html_content], { type: 'text/html; charset=utf-8' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    iframe.src = blobUrl;
+                    
+                    // Clean up blob URL after iframe loads
+                    iframe.onload = () => {
+                        URL.revokeObjectURL(blobUrl);
+                    };
+                }
+            }, 100);
+        }
 
         // Update button states
         this.updateResultButtons(result);
@@ -571,15 +605,26 @@ class NewsletterApp {
 
     async viewHistoryItem(itemId) {
         try {
+            console.log('viewHistoryItem called with itemId:', itemId);
             const response = await fetch(`/api/status/${itemId}`);
             const result = await response.json();
+            console.log('API response:', result);
 
             if (result.result?.html_content) {
+                console.log('HTML content found, switching to generate tab');
+                // Add job_id to result for iframe src
+                result.result.job_id = itemId;
+                this.currentJobId = itemId;
                 // Switch to generate tab and show the result
                 this.switchTab('generateTab');
                 this.showResults(result.result);
+                console.log('Results displayed successfully');
+            } else {
+                console.log('No HTML content found in result');
+                alert('뉴스레터 콘텐츠를 찾을 수 없습니다.');
             }
         } catch (error) {
+            console.error('Error in viewHistoryItem:', error);
             alert('Failed to load item: ' + error.message);
         }
     }
@@ -612,8 +657,26 @@ class NewsletterApp {
     }
 
     downloadNewsletter() {
-        // This would download the generated newsletter as HTML file
-        alert('다운로드 기능은 추후 구현됩니다.');
+        if (!this.currentJobId) {
+            // Try to get HTML content from current result
+            const iframe = document.getElementById('newsletterFrame');
+            if (iframe && iframe.src && iframe.src.startsWith('blob:')) {
+                alert('다운로드 기능을 위해 페이지를 새로고침하거나 뉴스레터를 다시 생성해주세요.');
+                return;
+            }
+            
+            alert('다운로드할 뉴스레터가 없습니다.');
+            return;
+        }
+
+        // Create a link to download from the API endpoint
+        const downloadUrl = `/api/newsletter-html/${this.currentJobId}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `newsletter_${this.currentJobId}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     async sendEmail() {
@@ -719,6 +782,17 @@ class NewsletterApp {
         } catch (error) {
             alert('설정 확인 실패: ' + error.message);
         }
+    }
+
+    escapeHtmlForSrcdoc(html) {
+        return html
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r');
     }
 }
 

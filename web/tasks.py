@@ -71,6 +71,14 @@ def generate_newsletter_task(data, job_id):
         # 키워드 또는 도메인 추가
         if keywords:
             keyword_str = keywords if isinstance(keywords, str) else ",".join(keywords)
+            # 한국어 키워드를 UTF-8로 안전하게 처리
+            try:
+                keyword_str.encode("utf-8")  # UTF-8 인코딩 가능한지 확인
+            except UnicodeEncodeError:
+                print(f"⚠️ Keyword encoding issue, trying to normalize: {keyword_str}")
+                keyword_str = keyword_str.encode("utf-8", errors="ignore").decode(
+                    "utf-8"
+                )
             cmd.extend(["--keywords", keyword_str])
         elif domain:
             cmd.extend(["--domain", domain])
@@ -83,16 +91,54 @@ def generate_newsletter_task(data, job_id):
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONPATH"] = os.path.dirname(os.path.dirname(__file__))
+        # 한국어 인코딩 관련 환경 변수 설정
+        env["LC_ALL"] = "en_US.UTF-8"
+        env["LANG"] = "en_US.UTF-8"
+        env["PYTHONUTF8"] = "1"
 
-        # CLI 실행
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=os.path.dirname(os.path.dirname(__file__)),
-            env=env,
-            timeout=300,
-        )
+        # CLI 실행 - 바이트 모드로 처리 후 안전하게 디코딩
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=False,  # 바이트 모드 사용
+                cwd=os.path.dirname(os.path.dirname(__file__)),
+                env=env,
+                timeout=300,
+            )
+
+            # 안전한 UTF-8 디코딩
+            stdout_text = ""
+            stderr_text = ""
+
+            if result.stdout:
+                try:
+                    stdout_text = result.stdout.decode("utf-8")
+                except UnicodeDecodeError:
+                    # CP949/EUC-KR로 시도
+                    try:
+                        stdout_text = result.stdout.decode("cp949")
+                    except UnicodeDecodeError:
+                        # 마지막으로 latin1으로 안전하게 디코딩
+                        stdout_text = result.stdout.decode("latin1")
+
+            if result.stderr:
+                try:
+                    stderr_text = result.stderr.decode("utf-8")
+                except UnicodeDecodeError:
+                    try:
+                        stderr_text = result.stderr.decode("cp949")
+                    except UnicodeDecodeError:
+                        stderr_text = result.stderr.decode("latin1")
+
+            # 결과 객체에 디코딩된 텍스트 할당
+            result.stdout = stdout_text
+            result.stderr = stderr_text
+
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("CLI 실행이 시간 초과되었습니다 (300초)")
+        except Exception as e:
+            raise RuntimeError(f"CLI 실행 중 오류 발생: {str(e)}")
 
         print(f"✅ CLI execution completed")
         print(f"📝 CLI stdout: {result.stdout[:500]}...")

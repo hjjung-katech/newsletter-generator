@@ -3,6 +3,11 @@
 ## 개요
 Newsletter Generator를 Railway PaaS에 배포하기 위한 완전한 가이드입니다.
 
+> **💡 로컬 개발 vs 프로덕션 배포**
+> 
+> - **로컬 개발**: Redis 불필요, `python web/app.py`만으로 실행 가능
+> - **프로덕션 배포**: Redis + 멀티 서비스 구성으로 확장성 및 안정성 확보
+
 ## 서비스 구성
 Railway에서 다음과 같은 서비스들이 실행됩니다:
 
@@ -10,6 +15,16 @@ Railway에서 다음과 같은 서비스들이 실행됩니다:
 - **worker**: Redis-RQ 백그라운드 워커 (뉴스레터 생성)
 - **scheduler**: RRULE 기반 스케줄 실행기 (정기 발송)
 - **redis**: Redis 인스턴스 (작업 큐 및 캐시)
+
+### 로컬 개발 환경과의 차이점
+
+| 구성 요소 | 로컬 개발 | Railway 프로덕션 |
+|-----------|-----------|------------------|
+| **웹 서버** | `python web/app.py` | Gunicorn + 다중 워커 |
+| **Redis** | 선택사항 (자동 fallback) | 필수 (별도 서비스) |
+| **백그라운드 작업** | 스레드 기반 처리 | Redis Queue + 별도 워커 |
+| **스케줄링** | 사용 불가 | scheduler 서비스로 처리 |
+| **확장성** | 단일 프로세스 | 멀티 서비스 수평 확장 |
 
 ## 필수 환경변수 설정
 
@@ -83,13 +98,50 @@ services:
 1. Railway에서 제공하는 임시 도메인 확인
 2. 커스텀 도메인 연결 (선택사항)
 
+## 프로덕션 vs 로컬 개발 실행 방법
+
+### 로컬 개발 (간단한 방법)
+```bash
+# 1. 환경 설정
+cd newsletter-generator
+python setup_env.py
+
+# 2. 데이터베이스 초기화
+cd web
+python init_database.py
+
+# 3. 웹 서버 실행 (Redis 불필요)
+python app.py
+# → http://localhost:5000에서 접속
+```
+
+### Railway 프로덕션 (멀티 서비스)
+```yaml
+# railway.yml에 정의된 서비스들이 자동 실행
+services:
+  redis:
+    image: redis:latest
+    
+  web:
+    build: ./web
+    start: gunicorn app:app --workers 2
+    
+  worker:
+    build: ./web  
+    start: python worker.py
+    
+  scheduler:
+    build: ./web
+    start: python schedule_runner.py
+```
+
 ## 파일 구조
 ```
 project/
 ├── web/
 │   ├── app.py              # Flask 메인 애플리케이션
-│   ├── worker.py           # RQ 워커
-│   ├── schedule_runner.py  # 스케줄 실행기
+│   ├── worker.py           # RQ 워커 (프로덕션용)
+│   ├── schedule_runner.py  # 스케줄 실행기 (프로덕션용)
 │   ├── tasks.py            # 백그라운드 작업 정의
 │   ├── mail.py             # 이메일 발송 모듈
 │   ├── init_database.py    # DB 초기화
@@ -140,6 +192,49 @@ python worker.py
 ```bash
 # 5분마다 스케줄 체크
 python schedule_runner.py --interval 300
+```
+
+### 5. 로컬 테스트에서 Redis 오류
+로컬에서 프로덕션 모드를 테스트하려면:
+
+**Windows:**
+```powershell
+# Redis 설치 및 실행
+choco install redis-64
+redis-server
+
+# 워커와 스케줄러를 별도 터미널에서 실행
+cd web
+python worker.py     # 터미널 1
+python schedule_runner.py  # 터미널 2
+python app.py        # 터미널 3
+```
+
+**macOS:**
+```bash
+# Redis 설치 및 실행
+brew install redis
+brew services start redis
+
+# 워커와 스케줄러를 별도 터미널에서 실행
+cd web
+python worker.py     # 터미널 1
+python schedule_runner.py  # 터미널 2
+python app.py        # 터미널 3
+```
+
+**Linux:**
+```bash
+# Redis 설치 및 실행
+sudo apt update
+sudo apt install redis-server
+sudo systemctl start redis
+
+# 워커와 스케줄러를 별도 터미널에서 실행
+cd web
+python worker.py     # 터미널 1
+python schedule_runner.py  # 터미널 2
+python app.py        # 터미널 3
 ```
 
 ## API 엔드포인트
@@ -204,4 +299,39 @@ FREQ=MONTHLY;BYMONTHDAY=1;BYHOUR=10;BYMINUTE=0
 ## 보안 고려사항
 - 모든 API 키는 환경변수로 관리
 - HTTPS 자동 적용 (Railway 기본 제공)
-- 데이터베이스는 서비스 내부에만 접근 가능 
+- 데이터베이스는 서비스 내부에만 접근 가능
+
+## 개발 워크플로우 권장사항
+
+### 1. 로컬 개발
+```bash
+# 간단한 개발 및 테스트
+cd web
+python app.py
+```
+
+### 2. 프로덕션 테스트
+
+**Windows:**
+```powershell
+# Redis + 워커와 함께 로컬에서 테스트
+Start-Process redis-server
+Start-Process -NoNewWindow python worker.py
+Start-Process -NoNewWindow python schedule_runner.py
+python app.py
+```
+
+**macOS/Linux:**
+```bash
+# Redis + 워커와 함께 로컬에서 테스트
+redis-server &
+python worker.py &
+python schedule_runner.py &
+python app.py
+```
+
+### 3. Railway 배포
+```bash
+# Git push로 자동 배포
+git push origin main
+``` 

@@ -178,16 +178,41 @@ class RealNewsletterCLI:
             logging.info(f"Working directory: {self.project_root}")
             logging.info(f"Input: {input_description}")
 
+            # 바이트 모드로 실행하여 인코딩 문제 방지
             result = subprocess.run(
                 cmd,
                 cwd=self.project_root,
                 capture_output=True,
-                text=True,
+                text=False,  # 바이트 모드 사용
                 timeout=self.timeout,
                 env=env,
-                encoding="utf-8",  # 명시적 UTF-8 인코딩
-                errors="replace",  # 인코딩 에러 시 문자 대체
             )
+
+            # 안전한 디코딩
+            stdout_text = ""
+            stderr_text = ""
+
+            if result.stdout:
+                try:
+                    stdout_text = result.stdout.decode("utf-8")
+                except UnicodeDecodeError:
+                    try:
+                        stdout_text = result.stdout.decode("cp949")
+                    except UnicodeDecodeError:
+                        stdout_text = result.stdout.decode("latin1")
+
+            if result.stderr:
+                try:
+                    stderr_text = result.stderr.decode("utf-8")
+                except UnicodeDecodeError:
+                    try:
+                        stderr_text = result.stderr.decode("cp949")
+                    except UnicodeDecodeError:
+                        stderr_text = result.stderr.decode("latin1")
+
+            # 결과 객체에 디코딩된 텍스트 할당
+            result.stdout = stdout_text
+            result.stderr = stderr_text
 
             logging.info(
                 f"CLI execution completed with return code: {result.returncode}"
@@ -651,10 +676,10 @@ def index():
     try:
         print(f"Template folder: {app.template_folder}")
         print(f"App root path: {app.root_path}")
-        template_path = os.path.join(app.template_folder, "index_en.html")
+        template_path = os.path.join(app.template_folder, "index.html")
         print(f"Template path: {template_path}")
         print(f"Template exists: {os.path.exists(template_path)}")
-        return render_template("index_en.html")
+        return render_template("index.html")
     except Exception as e:
         print(f"Template rendering error: {e}")
         return f"Template error: {str(e)}", 500
@@ -1491,6 +1516,48 @@ def send_test_email_api():
     except Exception as e:
         logging.error(f"Test email sending failed: {e}")
         return jsonify({"error": f"테스트 이메일 발송 실패: {str(e)}"}), 500
+
+
+@app.route("/api/newsletter-html/<job_id>")
+def get_newsletter_html(job_id):
+    """작업 ID에 해당하는 뉴스레터 HTML을 직접 반환"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT status, result FROM history WHERE id = ?", (job_id,))
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return "<html><body><h1>뉴스레터를 찾을 수 없습니다</h1></body></html>", 404
+
+        status, result_json = row
+        if status != "completed":
+            return (
+                "<html><body><h1>뉴스레터 생성이 완료되지 않았습니다</h1></body></html>",
+                400,
+            )
+
+        result = json.loads(result_json) if result_json else {}
+        html_content = result.get("html_content", "")
+
+        if not html_content:
+            return "<html><body><h1>뉴스레터 콘텐츠가 없습니다</h1></body></html>", 404
+
+        # HTML 콘텐츠를 직접 반환 (UTF-8 인코딩 명시)
+        return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
+
+    except Exception as e:
+        error_html = f"""
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body>
+            <h1>오류 발생</h1>
+            <p>뉴스레터를 불러오는 중 오류가 발생했습니다: {str(e)}</p>
+        </body>
+        </html>
+        """
+        return error_html, 500, {"Content-Type": "text/html; charset=utf-8"}
 
 
 if __name__ == "__main__":
