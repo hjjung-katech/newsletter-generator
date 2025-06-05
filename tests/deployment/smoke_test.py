@@ -7,13 +7,14 @@ Railway 배포 후 기본적인 기능들이 정상 작동하는지 확인합니
 독립 실행 스크립트로 설계되어 pytest fixture에 의존하지 않습니다.
 """
 
+import argparse
+import json
 import os
 import sys
-import requests
-import json
-import argparse
-from typing import Dict, Any
+from typing import Any, Dict
+
 import pytest
+import requests
 
 
 @pytest.mark.deployment

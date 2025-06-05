@@ -2,11 +2,12 @@
 Web API 통합 테스트
 """
 
-import pytest
 import json
 import sys
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+
+import pytest
 
 # 테스트를 위해 sys.path 설정
 project_root = Path(__file__).parent.parent
@@ -210,8 +211,9 @@ class TestMockModeValidation:
     def test_mock_mode_disabled(self, client):
         """Mock 모드가 비활성화되었는지 확인"""
         # 환경 변수를 다시 로드하기 위해 config 모듈 재임포트
-        from newsletter import config
         import importlib
+
+        from newsletter import config
 
         importlib.reload(config)
 

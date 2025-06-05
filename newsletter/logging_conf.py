@@ -3,13 +3,13 @@
 JSON 포맷으로 로그를 출력하고 환경 변수로 레벨 조정
 """
 
-import os
-import sys
+import json
 import logging
 import logging.config
-import json
+import os
+import sys
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class JSONFormatter(logging.Formatter):

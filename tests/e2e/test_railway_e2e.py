@@ -6,16 +6,17 @@ Railway 배포 End-to-End 테스트
 실행 전 웹 서버를 시작해주세요: cd web && python app.py
 """
 
-import pytest
-import httpx
 import asyncio
 import json
-import time
-import requests
-from datetime import datetime, timedelta
-from typing import Dict, Any, Generator
 import os
+import time
+from datetime import datetime, timedelta
+from typing import Any, Dict, Generator
+
+import httpx
+import pytest
 import pytest_asyncio
+import requests
 
 
 def check_web_server(base_url="http://localhost:5000"):
@@ -311,8 +312,8 @@ class TestRailwayE2E:
 
     def test_concurrent_requests(self, client: httpx.Client, test_email: str):
         """동시 요청 처리 테스트"""
-        import threading
         import queue
+        import threading
 
         results = queue.Queue()
 
