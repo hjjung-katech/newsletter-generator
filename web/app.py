@@ -14,6 +14,63 @@ from datetime import datetime
 import uuid
 import json
 
+# Sentry 통합 - 환경 변수가 있을 때만 초기화
+if os.getenv("SENTRY_DSN"):
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        # 로깅 통합 설정
+        logging_integration = LoggingIntegration(
+            level=logging.INFO,  # Capture info and above as breadcrumbs
+            event_level=logging.ERROR,  # Send errors as events
+        )
+
+        sentry_sdk.init(
+            dsn=os.getenv("SENTRY_DSN"),
+            integrations=[
+                FlaskIntegration(transaction_style="endpoint"),
+                logging_integration,
+            ],
+            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+            environment=os.getenv("ENVIRONMENT", "production"),
+            release=os.getenv("APP_VERSION", "1.0.0"),
+            # 성능 모니터링 설정
+            profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
+            # 추가 컨텍스트
+            before_send=lambda event, hint: (
+                event if event.get("level") != "info" else None
+            ),
+        )
+        print("✅ Sentry initialized successfully")
+
+        # 사용자 컨텍스트 설정을 위한 헬퍼 함수
+        def set_sentry_user_context(user_id=None, email=None, **kwargs):
+            """Sentry에 사용자 컨텍스트 설정"""
+            sentry_sdk.set_user({"id": user_id, "email": email, **kwargs})
+
+        # 태그 설정을 위한 헬퍼 함수
+        def set_sentry_tags(**tags):
+            """Sentry에 태그 설정"""
+            for key, value in tags.items():
+                sentry_sdk.set_tag(key, value)
+
+    except ImportError:
+        print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+    except Exception as e:
+        print(f"⚠️  Sentry initialization failed: {e}")
+else:
+    print("ℹ️  Sentry DSN not configured, skipping Sentry integration")
+
+    # Sentry 함수들의 더미 구현
+    def set_sentry_user_context(*args, **kwargs):
+        pass
+
+    def set_sentry_tags(**kwargs):
+        pass
+
+
 # Import task function for RQ
 from tasks import generate_newsletter_task
 
@@ -614,6 +671,14 @@ def generate_newsletter():
         print("❌ No data provided in request")
         return jsonify({"error": "No data provided"}), 400
 
+    # 기간 파라미터 검증
+    period = data.get("period", 14)
+    if period not in [1, 7, 14, 30]:
+        return (
+            jsonify({"error": "Invalid period. Must be one of: 1, 7, 14, 30 days"}),
+            400,
+        )
+
     print(f"📋 Request data: {data}")
 
     # Create unique job ID
@@ -682,6 +747,58 @@ def generate_newsletter():
         thread.start()
 
         return jsonify({"job_id": job_id, "status": "processing"})
+
+
+@app.route("/newsletter", methods=["GET"])
+def get_newsletter():
+    """Generate newsletter directly with GET parameters"""
+    try:
+        # 파라미터 추출
+        topic = request.args.get("topic", "")
+        keywords = request.args.get("keywords", topic)  # topic을 keywords로도 받음
+        period = request.args.get("period", 14, type=int)
+        template_style = request.args.get("template_style", "compact")
+
+        # 기간 파라미터 검증
+        if period not in [1, 7, 14, 30]:
+            return (
+                jsonify({"error": "Invalid period. Must be one of: 1, 7, 14, 30 days"}),
+                400,
+            )
+
+        # 키워드가 없으면 에러
+        if not keywords:
+            return (
+                jsonify({"error": "Missing required parameter: topic or keywords"}),
+                400,
+            )
+
+        print(f"🔍 Newsletter request - Keywords: {keywords}, Period: {period}")
+
+        # 뉴스레터 생성
+        result = newsletter_cli.generate_newsletter(
+            keywords=keywords,
+            template_style=template_style,
+            email_compatible=False,
+            period=period,
+        )
+
+        if result["status"] == "success":
+            # HTML 응답으로 직접 반환
+            return result["content"], 200, {"Content-Type": "text/html; charset=utf-8"}
+        else:
+            return (
+                jsonify(
+                    {
+                        "error": f"Newsletter generation failed: {result.get('error', 'Unknown error')}"
+                    }
+                ),
+                500,
+            )
+
+    except Exception as e:
+        print(f"❌ Error in newsletter endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 def process_newsletter_sync(data):
@@ -930,22 +1047,55 @@ def create_schedule():
     if not data or not data.get("rrule") or not data.get("email"):
         return jsonify({"error": "Missing required fields: rrule, email"}), 400
 
+    # Keywords나 domain 중 하나는 필수
+    if not data.get("keywords") and not data.get("domain"):
+        return jsonify({"error": "Either keywords or domain is required"}), 400
+
+    try:
+        # RRULE 파싱 및 다음 실행 시간 계산
+        from dateutil.rrule import rrulestr
+
+        rrule_str = data["rrule"]
+        rrule = rrulestr(rrule_str, dtstart=datetime.now())
+        next_run = rrule.after(datetime.now())
+
+        if not next_run:
+            return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
+
+    except Exception as e:
+        return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
+
     schedule_id = str(uuid.uuid4())
 
-    # Parse RRULE to calculate next_run (simplified for now)
-    # In production, use proper RRULE library
-    next_run = datetime.now().isoformat()
+    # 스케줄 데이터 준비
+    schedule_params = {
+        "keywords": data.get("keywords"),
+        "domain": data.get("domain"),
+        "email": data["email"],
+        "template_style": data.get("template_style", "compact"),
+        "email_compatible": data.get("email_compatible", True),
+        "period": data.get("period", 14),
+    }
 
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO schedules (id, params, rrule, next_run) VALUES (?, ?, ?, ?)",
-        (schedule_id, json.dumps(data), data["rrule"], next_run),
+        (schedule_id, json.dumps(schedule_params), rrule_str, next_run.isoformat()),
     )
     conn.commit()
     conn.close()
 
-    return jsonify({"status": "scheduled", "schedule_id": schedule_id}), 201
+    return (
+        jsonify(
+            {
+                "status": "scheduled",
+                "schedule_id": schedule_id,
+                "next_run": next_run.isoformat(),
+            }
+        ),
+        201,
+    )
 
 
 @app.route("/api/schedules")
@@ -954,7 +1104,7 @@ def get_schedules():
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, params, rrule, next_run, created_at, enabled FROM schedules WHERE enabled = 1"
+        "SELECT id, params, rrule, next_run, created_at, enabled FROM schedules WHERE enabled = 1 ORDER BY next_run ASC"
     )
     rows = cursor.fetchall()
     conn.close()
@@ -992,16 +1142,174 @@ def delete_schedule(schedule_id):
     return jsonify({"status": "cancelled"})
 
 
+@app.route("/api/schedule/<schedule_id>/run", methods=["POST"])
+def run_schedule_now(schedule_id):
+    """Immediately execute a scheduled newsletter"""
+    try:
+        # 스케줄 정보 조회
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT params, enabled FROM schedules WHERE id = ?", (schedule_id,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return jsonify({"error": "Schedule not found"}), 404
+
+        params_json, enabled = row
+        if not enabled:
+            return jsonify({"error": "Schedule is disabled"}), 400
+
+        params = json.loads(params_json)
+
+        # 즉시 뉴스레터 생성 작업 큐에 추가
+        if redis_conn and task_queue:
+            job = task_queue.enqueue(
+                generate_newsletter_task, params, job_timeout="10m"
+            )
+
+            return jsonify(
+                {
+                    "status": "queued",
+                    "job_id": job.id,
+                    "message": "Newsletter generation started",
+                }
+            )
+        else:
+            # Redis가 없는 경우 직접 실행
+            result = generate_newsletter_task(params)
+            return jsonify({"status": "completed", "result": result})
+
+    except Exception as e:
+        logging.error(f"Failed to run schedule {schedule_id}: {e}")
+        return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500
+
+
 @app.route("/health")
 def health_check():
-    """Health check endpoint for Railway"""
-    return jsonify(
-        {
-            "status": "healthy",
-            "redis_connected": redis_conn is not None,
-            "database": "sqlite",
+    """Enhanced health check endpoint for Railway"""
+    import os
+
+    # 기본 상태
+    health_status = {
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "service": "newsletter-generator",
+        "version": "1.0.0",
+    }
+
+    # 의존성 상태 체크
+    deps = {}
+    overall_status = "ok"
+
+    # Redis 연결 상태
+    try:
+        if redis_conn:
+            redis_conn.ping()
+            deps["redis"] = {"status": "connected", "message": "Redis is healthy"}
+        else:
+            deps["redis"] = {"status": "unavailable", "message": "Redis not configured"}
+    except Exception as e:
+        deps["redis"] = {"status": "error", "message": f"Redis error: {str(e)}"}
+        overall_status = "degraded"
+
+    # 데이터베이스 상태
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        conn.close()
+        deps["database"] = {
+            "status": "connected",
+            "message": "SQLite database is healthy",
         }
-    )
+    except Exception as e:
+        deps["database"] = {"status": "error", "message": f"Database error: {str(e)}"}
+        overall_status = "error"
+
+    # 환경 변수 체크
+    env_vars = {
+        "SERPER_API_KEY": bool(os.getenv("SERPER_API_KEY")),
+        "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
+        "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
+        "SENTRY_DSN": bool(os.getenv("SENTRY_DSN")),
+    }
+
+    # 최소 요구사항 확인
+    has_serper = env_vars["SERPER_API_KEY"]
+    has_llm = any([env_vars["OPENAI_API_KEY"], env_vars["GEMINI_API_KEY"]])
+
+    if has_serper and has_llm:
+        deps["config"] = {
+            "status": "ok",
+            "message": "Required environment variables are set",
+        }
+    else:
+        missing = []
+        if not has_serper:
+            missing.append("SERPER_API_KEY")
+        if not has_llm:
+            missing.append("LLM API key (OpenAI or Gemini)")
+
+        deps["config"] = {
+            "status": "warning",
+            "message": f"Missing required variables: {', '.join(missing)}",
+        }
+        if overall_status == "ok":
+            overall_status = "degraded"
+
+    # Mock 모드 체크
+    mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+    deps["mock_mode"] = {
+        "status": "info",
+        "enabled": mock_mode,
+        "message": (
+            "Running in mock mode" if mock_mode else "Running in production mode"
+        ),
+    }
+
+    # 뉴스레터 CLI 상태
+    try:
+        cli_type = type(newsletter_cli).__name__
+        deps["newsletter_cli"] = {
+            "status": "ok",
+            "type": cli_type,
+            "message": f"Newsletter CLI is ready ({cli_type})",
+        }
+    except Exception as e:
+        deps["newsletter_cli"] = {"status": "error", "message": f"CLI error: {str(e)}"}
+        overall_status = "error"
+
+    # 파일 시스템 체크
+    try:
+        output_dir = os.path.join(os.path.dirname(__file__), "..", "output")
+        os.makedirs(output_dir, exist_ok=True)
+        test_file = os.path.join(output_dir, "health_check.txt")
+        with open(test_file, "w") as f:
+            f.write("health check")
+        os.remove(test_file)
+        deps["filesystem"] = {"status": "ok", "message": "File system is writable"}
+    except Exception as e:
+        deps["filesystem"] = {
+            "status": "error",
+            "message": f"File system error: {str(e)}",
+        }
+        overall_status = "error"
+
+    health_status["status"] = overall_status
+    health_status["dependencies"] = deps
+
+    # HTTP 상태 코드 결정
+    status_code = 200
+    if overall_status == "error":
+        status_code = 503
+    elif overall_status == "degraded":
+        status_code = 200  # 여전히 서비스 가능하므로 200
+
+    return jsonify(health_status), status_code
 
 
 @app.route("/test")

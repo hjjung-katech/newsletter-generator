@@ -89,6 +89,7 @@ def collect_articles_node(
 ) -> NewsletterState:  # Renamed for clarity
     """
     키워드를 기반으로 기사를 수집하는 노드
+    기존 Serper API를 사용하여 뉴스 수집
     """
     from .tools import search_news_articles
 
@@ -96,10 +97,13 @@ def collect_articles_node(
     start_time = time.time()
 
     try:
+        # 기존 Serper API 방식 사용
         keyword_str = ", ".join(state["keywords"])
         articles = search_news_articles.invoke(
             {"keywords": keyword_str, "num_results": 10}
         )
+
+        logger.info(f"Serper API에서 {len(articles)}개 기사 수집 완료")
 
         step_times = state.get("step_times", {})
         step_times["collect_articles"] = time.time() - start_time

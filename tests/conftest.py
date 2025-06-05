@@ -43,6 +43,16 @@ def pytest_configure(config):
     )
     config.addinivalue_line("markers", "requires_quota: tests that consume API quota")
     config.addinivalue_line("markers", "slow: tests that take a long time to run")
+    config.addinivalue_line(
+        "markers", "e2e: end-to-end tests that require running web server"
+    )
+    config.addinivalue_line(
+        "markers",
+        "deployment: deployment verification tests for production environments",
+    )
+    config.addinivalue_line(
+        "markers", "manual: tests that require manual intervention or special setup"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -52,6 +62,7 @@ def pytest_collection_modifyitems(config, items):
     run_real_api = os.getenv("RUN_REAL_API_TESTS", "0") == "1"
     run_mock_api = os.getenv("RUN_MOCK_API_TESTS", "1") == "1"
     run_integration = os.getenv("RUN_INTEGRATION_TESTS", "0") == "1"
+    run_deployment = os.getenv("RUN_DEPLOYMENT_TESTS", "0") == "1"
 
     # API 키 존재 여부 확인
     has_gemini_key = bool(os.getenv("GEMINI_API_KEY"))
@@ -59,8 +70,23 @@ def pytest_collection_modifyitems(config, items):
     has_postmark_key = bool(os.getenv("POSTMARK_SERVER_TOKEN"))
 
     for item in items:
+        # Deployment 테스트 처리
+        if "deployment" in item.keywords:
+            if not run_deployment:
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Deployment tests disabled. Set RUN_DEPLOYMENT_TESTS=1 to enable"
+                    )
+                )
+            elif not os.getenv("TEST_BASE_URL"):
+                item.add_marker(
+                    pytest.mark.skip(
+                        reason="Missing TEST_BASE_URL for deployment tests"
+                    )
+                )
+
         # Integration 테스트 처리 (실제 API 호출 포함)
-        if "integration" in item.keywords:
+        elif "integration" in item.keywords:
             if not run_integration:
                 item.add_marker(
                     pytest.mark.skip(
@@ -109,6 +135,12 @@ def pytest_collection_modifyitems(config, items):
                         reason="Legacy API test. Set RUN_REAL_API_TESTS=1 to enable or migrate to mock_api"
                     )
                 )
+
+
+@pytest.fixture
+def base_url():
+    """Base URL for deployment tests"""
+    return os.getenv("TEST_BASE_URL", "http://localhost:5000")
 
 
 @pytest.fixture

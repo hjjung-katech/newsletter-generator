@@ -13,6 +13,7 @@ sendgrid>=6.11.0
 
 # Date/Time handling for RRULE
 python-dateutil>=2.8.0
+recurring-ical-events>=2.1.0
 
 # JSON Web Tokens (for admin auth)
 PyJWT>=2.8.0
@@ -22,3 +23,12 @@ requests>=2.31.0
 
 # Environment variables
 python-decouple>=3.8
+
+# RRULE scheduling support
+icalendar>=5.0.0
+croniter>=1.4.0
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0

@@ -4,14 +4,14 @@ Uses Redis Queue (RQ) for asynchronous processing
 """
 
 import os
-import sys
 import json
 import sqlite3
 from datetime import datetime, timedelta
 import subprocess
+import traceback
 
 # Add the parent directory to the path to import newsletter modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
 
@@ -52,7 +52,9 @@ def generate_newsletter_task(data, job_id):
 
         # CLI 명령어 구성
         cmd = [
-            sys.executable,
+            os.path.join(
+                os.path.dirname(__file__), "..", ".venv", "Scripts", "python.exe"
+            ),
             "-m",
             "newsletter.cli",
             "run",
@@ -184,32 +186,8 @@ def generate_newsletter_task(data, job_id):
         if email:
             print(f"📧 Sending email to: {email}")
             try:
-                # 이메일 모듈 import - 다양한 방법으로 시도
-                try:
-                    import mail
-
-                    send_email_func = mail.send_email
-                except ImportError:
-                    try:
-                        from . import mail
-
-                        send_email_func = mail.send_email
-                    except ImportError:
-                        # 프로젝트 루트에서 web.mail 시도
-                        try:
-                            from web.mail import send_email
-
-                            send_email_func = send_email
-                        except ImportError:
-                            # 절대 경로로 시도
-                            import sys
-                            import os
-
-                            current_dir = os.path.dirname(os.path.abspath(__file__))
-                            sys.path.insert(0, current_dir)
-                            import mail
-
-                            send_email_func = mail.send_email
+                # 간단한 이메일 모듈 import
+                from web.mail import send_email
 
                 # 제목 생성
                 if keywords:
@@ -220,10 +198,15 @@ def generate_newsletter_task(data, job_id):
                 else:
                     subject = f"Newsletter: {domain}"
 
-                send_email_func(to=email, subject=subject, html=html_content)
+                send_email(to=email, subject=subject, html=html_content)
                 result_data["email_sent"] = True
                 result_data["email_to"] = email
                 print(f"✅ Email sent successfully to {email}")
+
+            except ImportError as e:
+                print(f"⚠️ Email module not available: {e}")
+                result_data["email_sent"] = False
+                result_data["email_error"] = f"Mail module not available: {e}"
             except Exception as e:
                 print(f"❌ Email sending failed: {e}")
                 result_data["email_sent"] = False
@@ -236,11 +219,30 @@ def generate_newsletter_task(data, job_id):
         return result_data
 
     except Exception as e:
+        # 전체 스택트레이스 캡처
+        full_traceback = traceback.format_exc()
         error_msg = f"Newsletter generation failed: {str(e)}"
-        print(f"❌ Error in generate_newsletter_task: {error_msg}")
 
-        # 실패 상태로 업데이트
-        update_job_status(job_id, "failed", {"error": error_msg})
+        print(f"❌ Error in generate_newsletter_task: {error_msg}")
+        print(f"🔍 Full traceback:\n{full_traceback}")
+
+        # sys 변수 상태 확인
+        try:
+            python_executable = os.path.join(
+                os.path.dirname(__file__), "..", ".venv", "Scripts", "python.exe"
+            )
+            print(f"🐍 Python executable: {python_executable}")
+            print(f"🐍 Current working directory: {os.getcwd()}")
+        except Exception as sys_check_error:
+            print(f"❌ Python executable check failed: {sys_check_error}")
+
+        # 실패 상태로 업데이트 (더 자세한 에러 정보 포함)
+        detailed_error_info = {
+            "error": error_msg,
+            "traceback": full_traceback,
+            "error_type": type(e).__name__,
+        }
+        update_job_status(job_id, "failed", detailed_error_info)
 
         # 예외를 다시 발생시켜 RQ가 처리하도록 함
         raise

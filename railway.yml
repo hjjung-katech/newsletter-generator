@@ -2,35 +2,37 @@ version: "3"
 
 services:
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - PORT=$PORT
-      - FLASK_ENV=production
-      - SECRET_KEY=$SECRET_KEY
-      - REDIS_URL=$REDIS_URL
-      - SENDGRID_API_KEY=$SENDGRID_API_KEY
-      - FROM_EMAIL=$FROM_EMAIL
-      - OPENAI_API_KEY=$OPENAI_API_KEY
-    ports:
-      - "$PORT:$PORT"
-    depends_on:
-      - redis
-      
+    source: .
+    start: cd web && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 app:app
+    variables:
+      PYTHONPATH: /app
+      WEB_CONCURRENCY: 2
+    healthcheck:
+      path: /health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      - REDIS_URL=$REDIS_URL
-      - OPENAI_API_KEY=$OPENAI_API_KEY
-      - SENDGRID_API_KEY=$SENDGRID_API_KEY
-    command: "python web/worker.py"
+    source: .
+    start: cd web && python worker.py
+    variables:
+      PYTHONPATH: /app
+      RQ_QUEUE: default
     depends_on:
       - redis
-      
+
+  scheduler:
+    source: .
+    start: cd web && python schedule_runner.py --interval 300
+    variables:
+      PYTHONPATH: /app
+    depends_on:
+      - redis
+      - web
+
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    restart_policy: 
+      condition: on-failure
+      max_attempts: 3

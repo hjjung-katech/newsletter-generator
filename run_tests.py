@@ -53,24 +53,35 @@ def setup_environment_variables(env_type):
         os.environ["RUN_REAL_API_TESTS"] = "0"
         os.environ["RUN_MOCK_API_TESTS"] = "1"
         os.environ["RUN_INTEGRATION_TESTS"] = "0"
+        os.environ["RUN_DEPLOYMENT_TESTS"] = "0"
 
     elif env_type == "ci":
         # CI/CD 환경: Mock API + 단위 테스트 (GitHub Actions 안전)
         os.environ["RUN_REAL_API_TESTS"] = "0"
         os.environ["RUN_MOCK_API_TESTS"] = "1"
         os.environ["RUN_INTEGRATION_TESTS"] = "0"
+        os.environ["RUN_DEPLOYMENT_TESTS"] = "0"
 
     elif env_type == "integration":
         # 통합 환경: 실제 API 테스트 포함 (API 키 필요)
         os.environ["RUN_REAL_API_TESTS"] = "1"
         os.environ["RUN_MOCK_API_TESTS"] = "1"
         os.environ["RUN_INTEGRATION_TESTS"] = "1"
+        os.environ["RUN_DEPLOYMENT_TESTS"] = "0"
 
     elif env_type == "unit":
         # 단위 테스트만: API 테스트 모두 비활성화
         os.environ["RUN_REAL_API_TESTS"] = "0"
         os.environ["RUN_MOCK_API_TESTS"] = "0"
         os.environ["RUN_INTEGRATION_TESTS"] = "0"
+        os.environ["RUN_DEPLOYMENT_TESTS"] = "0"
+
+    elif env_type == "deployment":
+        # 배포 테스트만: 실제 서버 테스트
+        os.environ["RUN_REAL_API_TESTS"] = "0"
+        os.environ["RUN_MOCK_API_TESTS"] = "0"
+        os.environ["RUN_INTEGRATION_TESTS"] = "0"
+        os.environ["RUN_DEPLOYMENT_TESTS"] = "1"
 
 
 def run_code_formatting():
@@ -262,8 +273,8 @@ def main():
     parser.add_argument(
         "env",
         nargs="?",
-        choices=["dev", "ci", "integration", "unit"],
-        help="실행할 테스트 환경 (dev: 개발용, ci: CI/CD용, integration: 통합 테스트, unit: 단위 테스트만)",
+        choices=["dev", "ci", "integration", "unit", "deployment"],
+        help="실행할 테스트 환경 (dev: 개발용, ci: CI/CD용, integration: 통합 테스트, unit: 단위 테스트만, deployment: 배포 테스트)",
     )
 
     # 디렉토리별 실행 옵션
@@ -339,27 +350,33 @@ def main():
 
     # 환경별 테스트 실행
     if args.env == "dev":
-        # 개발 환경: 빠른 피드백을 위한 핵심 테스트만
+        # 개발 환경: 빠른 피드백을 위한 핵심 테스트만 (E2E/배포/수동 제외)
         cmd = pytest_cmd + [
             "tests/",
             "-m",
-            "not real_api",
+            "not real_api and not e2e and not deployment and not manual",
             "--tb=short",
             "--disable-warnings",
         ]
         return run_command(
-            cmd, f"{args.env.upper()} 환경 테스트 (Mock API + 단위 테스트)"
+            cmd,
+            f"{args.env.upper()} 환경 테스트 (Mock API + 단위 테스트, 서버 의존성 제외)",
         )
 
     elif args.env == "ci":
-        # CI/CD 환경: 전체 검증 (실제 API 제외)
-        cmd = pytest_cmd + ["tests/", "-m", "not real_api", "--tb=line"]
+        # CI/CD 환경: 전체 검증 (실제 API 및 서버 의존성 제외)
+        cmd = pytest_cmd + [
+            "tests/",
+            "-m",
+            "not real_api and not e2e and not deployment and not manual",
+            "--tb=line",
+        ]
         return run_command(
-            cmd, f"{args.env.upper()} 환경 테스트 (전체 검증, Real API 제외)"
+            cmd, f"{args.env.upper()} 환경 테스트 (전체 검증, 서버 의존성 제외)"
         )
 
     elif args.env == "integration":
-        # 통합 환경: 모든 테스트 실행
+        # 통합 환경: 모든 테스트 실행 (E2E 제외, 실제 API 포함)
         print("⚠️  통합 테스트는 실제 API를 호출하여 할당량을 소모할 수 있습니다.")
 
         # API 키 확인
@@ -374,9 +391,10 @@ def main():
             print("   통합 테스트를 실행하려면 환경 변수에 API 키를 설정하세요.")
             return 1
 
-        cmd = pytest_cmd + ["tests/", "--tb=short"]
+        cmd = pytest_cmd + ["tests/", "-m", "not e2e and not deployment", "--tb=short"]
         return run_command(
-            cmd, f"{args.env.upper()} 환경 테스트 (전체 테스트, 실제 API 포함)"
+            cmd,
+            f"{args.env.upper()} 환경 테스트 (전체 테스트, 실제 API 포함, E2E 제외)",
         )
 
     elif args.env == "unit":
@@ -384,11 +402,32 @@ def main():
         cmd = pytest_cmd + [
             "tests/",
             "-m",
-            "unit or (not api and not mock_api and not real_api)",
+            "unit or (not api and not mock_api and not real_api and not e2e and not deployment)",
             "--tb=short",
             "--disable-warnings",
         ]
         return run_command(cmd, f"{args.env.upper()} 환경 테스트 (순수 단위 테스트만)")
+
+    elif args.env == "deployment":
+        # 배포 테스트: 실제 서버 대상 smoke test
+        test_base_url = os.getenv("TEST_BASE_URL")
+        if not test_base_url:
+            print("❌ TEST_BASE_URL 환경 변수가 설정되지 않았습니다.")
+            print("   예: export TEST_BASE_URL=http://localhost:5000")
+            return 1
+
+        print(f"🎯 배포 테스트 대상 URL: {test_base_url}")
+        cmd = pytest_cmd + [
+            "tests/deployment/",
+            "-m",
+            "deployment",
+            "--tb=short",
+        ]
+        return run_command(cmd, f"{args.env.upper()} 환경 테스트 (배포 서버 검증)")
+
+    else:
+        print(f"❌ 알 수 없는 환경: {args.env}")
+        return 1
 
 
 if __name__ == "__main__":
