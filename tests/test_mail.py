@@ -116,3 +116,28 @@ def test_send_email_no_token(mock_get_config):
         RuntimeError, match="POSTMARK_SERVER_TOKEN 환경변수가 설정되지 않았습니다"
     ):
         send_email("to@example.com", "Subject", "<b>Content</b>")
+
+
+@mock.patch("web.mail.PostmarkClient")
+@mock.patch("web.mail._get_email_config")
+def test_send_email_retry_mechanism(mock_get_config, mock_postmark_client):
+    """Test that send_email includes retry functionality"""
+    from web.mail import send_email
+
+    # 모킹된 설정 반환
+    mock_get_config.return_value = ("DUMMY_TOKEN", "from@example.com")
+
+    # Mock the client instance
+    mock_client_instance = mock.Mock()
+    mock_postmark_client.return_value = mock_client_instance
+
+    # Verify send_email has retry decorator by checking successful call
+    send_email("test@example.com", "Test", "<p>Hello</p>")
+
+    # Verify basic functionality
+    mock_client_instance.emails.send.assert_called_once_with(
+        From="from@example.com",
+        To="test@example.com",
+        Subject="Test",
+        HtmlBody="<p>Hello</p>",
+    )

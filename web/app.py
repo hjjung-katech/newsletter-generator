@@ -1560,6 +1560,12 @@ def get_newsletter_html(job_id):
         return error_html, 500, {"Content-Type": "text/html; charset=utf-8"}
 
 
+# Blueprint imports
+from suggest import bp as suggest_bp
+
+# Register blueprints
+app.register_blueprint(suggest_bp)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"

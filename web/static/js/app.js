@@ -794,6 +794,88 @@ class NewsletterApp {
             .replace(/\n/g, '\\n')
             .replace(/\r/g, '\\r');
     }
+
+    async suggestKeywords() {
+        const domainInput = document.getElementById('domain');
+        const domain = domainInput.value.trim();
+        const resultDiv = document.getElementById('keywords-result');
+        const button = document.getElementById('btn-suggest');
+
+        if (!domain) {
+            resultDiv.innerHTML = '<div class="text-red-600 text-sm">도메인을 입력해주세요.</div>';
+            return;
+        }
+
+        // Show loading state
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>추천 중...';
+        resultDiv.innerHTML = '<div class="text-blue-600 text-sm">키워드를 생성하고 있습니다...</div>';
+
+        try {
+            const response = await fetch('/api/suggest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ domain: domain })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.keywords && data.keywords.length > 0) {
+                // Display suggested keywords
+                const keywordsList = data.keywords.map(keyword => 
+                    `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2 mb-2 cursor-pointer hover:bg-blue-200" onclick="app.addKeywordToInput('${keyword}')">${keyword}</span>`
+                ).join('');
+                
+                resultDiv.innerHTML = `
+                    <div class="text-sm text-gray-700 mb-2">추천 키워드 (클릭하여 추가):</div>
+                    <div class="flex flex-wrap">${keywordsList}</div>
+                    <button onclick="app.useAllKeywords(${JSON.stringify(data.keywords).replace(/"/g, '&quot;')})" 
+                            class="mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
+                        모든 키워드 사용
+                    </button>
+                `;
+            } else {
+                resultDiv.innerHTML = '<div class="text-yellow-600 text-sm">키워드를 생성할 수 없습니다. 다른 도메인을 시도해보세요.</div>';
+            }
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="text-red-600 text-sm">오류가 발생했습니다: ' + error.message + '</div>';
+        } finally {
+            // Restore button state
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-lightbulb mr-1"></i>추천받기';
+        }
+    }
+
+    addKeywordToInput(keyword) {
+        const keywordsInput = document.getElementById('keywords');
+        const currentKeywords = keywordsInput.value.trim();
+        
+        if (currentKeywords) {
+            keywordsInput.value = currentKeywords + ', ' + keyword;
+        } else {
+            keywordsInput.value = keyword;
+        }
+        
+        // Switch to keywords method
+        document.getElementById('keywordsMethod').checked = true;
+        this.toggleInputMethod();
+    }
+
+    useAllKeywords(keywords) {
+        const keywordsInput = document.getElementById('keywords');
+        keywordsInput.value = keywords.join(', ');
+        
+        // Switch to keywords method
+        document.getElementById('keywordsMethod').checked = true;
+        this.toggleInputMethod();
+    }
+}
+
+// Global function for onclick handlers
+function suggestKeywords() {
+    app.suggestKeywords();
 }
 
 // Initialize app when DOM is loaded

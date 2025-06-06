@@ -1740,5 +1740,27 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         raise typer.Exit(code=1)
 
 
+# API wrapper functions for web interface
+def suggest_keywords(domain: str, count: int = 10) -> list[str]:
+    """
+    Wrapper function for web API to suggest keywords for a given domain.
+    Uses the existing tools.generate_keywords_with_gemini function.
+
+    Args:
+        domain: Domain to suggest keywords for
+        count: Number of keywords to generate (default: 10)
+
+    Returns:
+        List of suggested keywords
+
+    Raises:
+        Exception: If keyword generation fails
+    """
+    from . import tools
+
+    # 기존 검증된 키워드 생성 함수 사용
+    return tools.generate_keywords_with_gemini(domain, count=count)
+
+
 if __name__ == "__main__":
     app()

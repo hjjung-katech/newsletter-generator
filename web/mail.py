@@ -4,6 +4,7 @@ import os
 import logging
 import sys
 from pathlib import Path
+from tenacity import retry, stop_after_attempt
 
 # 프로젝트 루트를 sys.path에 추가
 project_root = Path(__file__).parent.parent
@@ -24,6 +25,7 @@ def _get_email_config():
         return postmark_token, email_sender
 
 
+@retry(stop=stop_after_attempt(3))
 def send_email(to: str, subject: str, html: str, **kwargs):
     """단일 수신자용 Postmark 발송 래퍼."""
     # 동적으로 설정 가져오기

@@ -64,3 +64,4 @@ premailer>=3.10.0  # CSS inlining for email compatibility
 
 # Email sending
 postmarker>=1.0
+tenacity>=8.0.0  # Retry functionality

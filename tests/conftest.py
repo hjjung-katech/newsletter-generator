@@ -170,6 +170,29 @@ def test_articles():
 
 
 @pytest.fixture
+def client():
+    """Flask test client fixture"""
+    import sys
+    from pathlib import Path
+
+    # Add web directory to path temporarily
+    web_dir = Path(__file__).parent.parent / "web"
+    if str(web_dir) not in sys.path:
+        sys.path.insert(0, str(web_dir))
+
+    try:
+        from app import app
+
+        app.config["TESTING"] = True
+        with app.test_client() as client:
+            yield client
+    finally:
+        # Clean up path
+        if str(web_dir) in sys.path:
+            sys.path.remove(str(web_dir))
+
+
+@pytest.fixture
 def korean_keywords():
     """Korean test keywords fixture"""
     return ["토요타", "삼성전자", "AI", "반도체"]
