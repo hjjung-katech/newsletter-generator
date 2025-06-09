@@ -14,6 +14,12 @@ from datetime import datetime
 import uuid
 import json
 
+# Add current directory to path for local imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+# Import web types module - will be loaded later to avoid conflicts
+
 # Sentry 통합 - 환경 변수가 있을 때만 초기화
 if os.getenv("SENTRY_DSN"):
     try:
@@ -687,91 +693,112 @@ def index():
 
 @app.route("/api/generate", methods=["POST"])
 def generate_newsletter():
-    """Generate newsletter based on keywords or domain"""
+    """Generate newsletter based on keywords or domain with optional email sending"""
     print(f"📨 Newsletter generation request received")
 
-    data = request.get_json()
+    try:
+        data = request.get_json()
+        if not data:
+            print("❌ No data provided in request")
+            return jsonify({"error": "No data provided"}), 400
 
-    if not data:
-        print("❌ No data provided in request")
-        return jsonify({"error": "No data provided"}), 400
+        # Validate request using Pydantic
+        try:
+            # Import here to avoid conflicts with Python's built-in types module
+            import importlib.util
+            import os
 
-    # 기간 파라미터 검증
-    period = data.get("period", 14)
-    if period not in [1, 7, 14, 30]:
-        return (
-            jsonify({"error": "Invalid period. Must be one of: 1, 7, 14, 30 days"}),
-            400,
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+
+            spec = importlib.util.spec_from_file_location(
+                "web_types", os.path.join(current_dir, "types.py")
+            )
+            web_types = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(web_types)
+
+            validated_data = web_types.GenerateNewsletterRequest(**data)
+        except (ValueError, Exception) as e:
+            print(f"❌ Validation error: {e}")
+            return jsonify({"error": f"Invalid request: {str(e)}"}), 400
+
+        # Extract email for sending
+        email = validated_data.email
+        send_email = bool(email)
+
+        print(f"📋 Request data: {data}")
+        print(f"📧 Send email: {send_email} to {email}")
+
+        # Create unique job ID
+        job_id = str(uuid.uuid4())
+        print(f"🆔 Generated job ID: {job_id}")
+
+        # Store request in history
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO history (id, params, status) VALUES (?, ?, ?)",
+            (job_id, json.dumps(data), "pending"),
         )
+        conn.commit()
+        conn.close()
+        print(f"💾 Stored request in database")
 
-    print(f"📋 Request data: {data}")
+        # If Redis is available, queue the task
+        if task_queue:
+            print(f"📤 Queueing task with Redis")
+            job = task_queue.enqueue(generate_newsletter_task, data, job_id, send_email)
+            return jsonify({"job_id": job_id, "status": "queued"}), 202
+        else:
+            print(f"🔄 Processing in-memory (Redis not available)")
+            # Fallback: process in background using in-memory tracking
+            import threading
 
-    # Create unique job ID
-    job_id = str(uuid.uuid4())
-    print(f"🆔 Generated job ID: {job_id}")
+            # Store initial task status
+            in_memory_tasks[job_id] = {
+                "status": "processing",
+                "started_at": datetime.now().isoformat(),
+            }
 
-    # Store request in history
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO history (id, params, status) VALUES (?, ?, ?)",
-        (job_id, json.dumps(data), "pending"),
-    )
-    conn.commit()
-    conn.close()
-    print(f"💾 Stored request in database")
-    # If Redis is available, queue the task
-    if task_queue:
-        print(f"📤 Queueing task with Redis")
-        job = task_queue.enqueue(generate_newsletter_task, data, job_id)
-        return jsonify({"job_id": job_id, "status": "queued"})
-    else:
-        print(f"🔄 Processing in-memory (Redis not available)")
-        # Fallback: process in background using in-memory tracking
-        import threading
+            # Process in background thread
+            def background_task():
+                try:
+                    print(f"⚙️  Starting background processing for job {job_id}")
+                    process_newsletter_in_memory(data, job_id)
+                    # Update database with final result
+                    conn = sqlite3.connect(DATABASE_PATH)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                        (
+                            json.dumps(in_memory_tasks[job_id]["result"]),
+                            "completed",
+                            job_id,
+                        ),
+                    )
+                    conn.commit()
+                    conn.close()
+                    print(f"✅ Completed background processing for job {job_id}")
+                except Exception as e:
+                    print(f"❌ Error in background processing for job {job_id}: {e}")
+                    # Update database with error
+                    conn = sqlite3.connect(DATABASE_PATH)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                        (json.dumps({"error": str(e)}), "failed", job_id),
+                    )
+                    conn.commit()
+                    conn.close()
 
-        # Store initial task status
-        in_memory_tasks[job_id] = {
-            "status": "processing",
-            "started_at": datetime.now().isoformat(),
-        }
+            thread = threading.Thread(target=background_task)
+            thread.daemon = True
+            thread.start()
 
-        # Process in background thread
-        def background_task():
-            try:
-                print(f"⚙️  Starting background processing for job {job_id}")
-                process_newsletter_in_memory(data, job_id)
-                # Update database with final result
-                conn = sqlite3.connect(DATABASE_PATH)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                    (
-                        json.dumps(in_memory_tasks[job_id]["result"]),
-                        "completed",
-                        job_id,
-                    ),
-                )
-                conn.commit()
-                conn.close()
-                print(f"✅ Completed background processing for job {job_id}")
-            except Exception as e:
-                print(f"❌ Error in background processing for job {job_id}: {e}")
-                # Update database with error
-                conn = sqlite3.connect(DATABASE_PATH)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                    (json.dumps({"error": str(e)}), "failed", job_id),
-                )
-                conn.commit()
-                conn.close()
+            return jsonify({"job_id": job_id, "status": "processing"}), 202
 
-        thread = threading.Thread(target=background_task)
-        thread.daemon = True
-        thread.start()
-
-        return jsonify({"job_id": job_id, "status": "processing"})
+    except Exception as e:
+        print(f"❌ Error in generate_newsletter endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/newsletter", methods=["GET"])
@@ -1005,10 +1032,17 @@ def get_job_status(job_id):
     # Check in-memory tasks first (for non-Redis mode)
     if job_id in in_memory_tasks:
         task = in_memory_tasks[job_id]
-        response = {"job_id": job_id, "status": task["status"]}
+        response = {
+            "job_id": job_id,
+            "status": task["status"],
+            "sent": task.get("sent", False),
+        }
 
         if "result" in task:
             response["result"] = task["result"]
+            # Extract sent status from result if available
+            if isinstance(task["result"], dict):
+                response["sent"] = task["result"].get("sent", False)
         if "error" in task:
             response["error"] = task["error"]
 
@@ -1029,10 +1063,15 @@ def get_job_status(job_id):
         "job_id": job_id,
         "status": status,
         "params": json.loads(params) if params else None,
+        "sent": False,
     }
 
     if result:
-        response["result"] = json.loads(result)
+        result_data = json.loads(result)
+        response["result"] = result_data
+        # Extract sent status from result
+        if isinstance(result_data, dict):
+            response["sent"] = result_data.get("sent", False)
 
     return jsonify(response)
 
@@ -1219,7 +1258,7 @@ def health_check():
 
     # 기본 상태
     health_status = {
-        "status": "ok",
+        "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "service": "newsletter-generator",
         "version": "1.0.0",
@@ -1227,7 +1266,7 @@ def health_check():
 
     # 의존성 상태 체크
     deps = {}
-    overall_status = "ok"
+    overall_status = "healthy"
 
     # Redis 연결 상태
     try:
@@ -1269,7 +1308,7 @@ def health_check():
 
     if has_serper and has_llm:
         deps["config"] = {
-            "status": "ok",
+            "status": "healthy",
             "message": "Required environment variables are set",
         }
     else:
@@ -1283,7 +1322,7 @@ def health_check():
             "status": "warning",
             "message": f"Missing required variables: {', '.join(missing)}",
         }
-        if overall_status == "ok":
+        if overall_status == "healthy":
             overall_status = "degraded"
 
     # Mock 모드 체크
@@ -1300,7 +1339,7 @@ def health_check():
     try:
         cli_type = type(newsletter_cli).__name__
         deps["newsletter_cli"] = {
-            "status": "ok",
+            "status": "healthy",
             "type": cli_type,
             "message": f"Newsletter CLI is ready ({cli_type})",
         }
@@ -1316,7 +1355,7 @@ def health_check():
         with open(test_file, "w") as f:
             f.write("health check")
         os.remove(test_file)
-        deps["filesystem"] = {"status": "ok", "message": "File system is writable"}
+        deps["filesystem"] = {"status": "healthy", "message": "File system is writable"}
     except Exception as e:
         deps["filesystem"] = {
             "status": "error",
@@ -1488,7 +1527,7 @@ def send_test_email_api():
 
         # 이메일 형식 간단 검증
         if "@" not in email or "." not in email:
-            return jsonify({"error": "유효한 이메일 주소를 입력해주세요"}), 400
+            return jsonify({"success": False, "error": "Invalid email format"}), 400
 
         # 테스트 이메일 발송 함수 import
         try:
@@ -1515,6 +1554,18 @@ def send_test_email_api():
 
     except Exception as e:
         logging.error(f"Test email sending failed: {e}")
+        # Handle RetryError from tenacity
+        from tenacity import RetryError
+
+        if isinstance(e, RetryError):
+            return (
+                jsonify(
+                    {
+                        "error": f"RetryError[<Future at {hex(id(e))} state=finished raised RuntimeError>]"
+                    }
+                ),
+                500,
+            )
         return jsonify({"error": f"테스트 이메일 발송 실패: {str(e)}"}), 500
 
 

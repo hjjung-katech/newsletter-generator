@@ -33,11 +33,12 @@ def update_job_status(job_id, status, result=None):
     conn.close()
 
 
-def generate_newsletter_task(data, job_id):
+def generate_newsletter_task(data, job_id, send_email=False):
     """Redis Worker에서 실행되는 뉴스레터 생성 작업"""
 
     print(f"🔄 Redis Worker: Starting newsletter generation for job {job_id}")
     print(f"📊 Input data: {data}")
+    print(f"📧 Send email: {send_email}")
 
     try:
         update_job_status(job_id, "processing")
@@ -229,11 +230,12 @@ def generate_newsletter_task(data, job_id):
         }
 
         # 이메일 발송 (옵션)
-        if email:
+        email_sent = False
+        if send_email and email:
             print(f"📧 Sending email to: {email}")
             try:
-                # 간단한 이메일 모듈 import
-                from web.mail import send_email
+                # 이메일 모듈 import
+                from mail import send_email as mail_send_email
 
                 # 제목 생성
                 if keywords:
@@ -244,19 +246,18 @@ def generate_newsletter_task(data, job_id):
                 else:
                     subject = f"Newsletter: {domain}"
 
-                send_email(to=email, subject=subject, html=html_content)
+                mail_send_email(to=email, subject=subject, html=html_content)
                 result_data["email_sent"] = True
                 result_data["email_to"] = email
+                email_sent = True
                 print(f"✅ Email sent successfully to {email}")
 
-            except ImportError as e:
-                print(f"⚠️ Email module not available: {e}")
-                result_data["email_sent"] = False
-                result_data["email_error"] = f"Mail module not available: {e}"
             except Exception as e:
                 print(f"❌ Email sending failed: {e}")
                 result_data["email_sent"] = False
                 result_data["email_error"] = str(e)
+
+        result_data["sent"] = email_sent
 
         # 성공 상태로 업데이트
         update_job_status(job_id, "completed", result_data)

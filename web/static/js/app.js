@@ -257,13 +257,27 @@ class NewsletterApp {
                 const response = await fetch(`/api/status/${jobId}`);
                 const result = await response.json();
 
+                // Update progress text with email status
+                const progressText = document.getElementById('progressText');
+                if (result.sent) {
+                    progressText.textContent = '뉴스레터 생성 완료 및 이메일 발송 완료...';
+                } else {
+                    progressText.textContent = '뉴스레터를 생성하고 있습니다...';
+                }
+
                 if (result.status === 'completed') {
                     this.stopPolling();
                     // Add job_id to result for iframe src
                     if (result.result) {
                         result.result.job_id = jobId;
+                        result.result.sent = result.sent;
                     }
                     this.showResults(result.result);
+                    
+                    // Show email success message
+                    if (result.sent) {
+                        this.showEmailSuccess(result.result?.email_to);
+                    }
                 } else if (result.status === 'failed') {
                     this.stopPolling();
                     this.showError(result.result?.error || 'Generation failed');
@@ -271,7 +285,7 @@ class NewsletterApp {
             } catch (error) {
                 console.error('Polling error:', error);
             }
-        }, 2000);
+        }, 1000); // 1초 간격으로 폴링
     }
 
     stopPolling() {
@@ -486,6 +500,30 @@ class NewsletterApp {
     showError(message) {
         document.getElementById('progressSection').classList.add('hidden');
         alert('오류: ' + message);
+    }
+
+    showEmailSuccess(email) {
+        // Create and show success notification
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                <span>✅ 메일 발송 완료: ${email}</span>
+                <button class="ml-4 text-green-700 hover:text-green-900" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
     }
 
     async loadHistory() {

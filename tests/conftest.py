@@ -130,12 +130,16 @@ def pytest_collection_modifyitems(config, items):
                 )
 
         # Legacy API 마킹 처리 (기존 @pytest.mark.api)
-        elif "api" in item.keywords and "mock_api" not in item.keywords:
-            # 기존 API 테스트들을 real_api로 분류
-            if not run_real_api:
+        elif (
+            "api" in item.keywords
+            and "mock_api" not in item.keywords
+            and "real_api" not in item.keywords
+        ):
+            # 기존 API 테스트들을 mock_api로 분류 (더 안전한 기본값)
+            if not run_mock_api:
                 item.add_marker(
                     pytest.mark.skip(
-                        reason="Legacy API test. Set RUN_REAL_API_TESTS=1 to enable or migrate to mock_api"
+                        reason="Legacy API test. Set RUN_MOCK_API_TESTS=1 to enable or migrate to mock_api"
                     )
                 )
 
