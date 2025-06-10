@@ -1,6 +1,7 @@
-import pytest
-from unittest.mock import patch
 import json
+from unittest.mock import patch
+
+import pytest
 
 
 def test_suggest_ok(client, monkeypatch):

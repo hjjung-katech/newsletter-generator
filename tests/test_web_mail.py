@@ -3,10 +3,11 @@ Unit tests for web mail functionality
 Tests the mail.py module with mocked Postmark responses
 """
 
-import pytest
-from unittest.mock import patch, MagicMock
 import os
 import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -48,8 +49,9 @@ class TestWebMail:
     @patch("web.mail._get_email_config")
     def test_send_email_no_token(self, mock_get_config):
         """Test email sending without token"""
-        from web.mail import send_email
         from tenacity import RetryError
+
+        from web.mail import send_email
 
         # Mock the email config to return no token
         mock_get_config.return_value = (None, "test@example.com")
@@ -60,8 +62,9 @@ class TestWebMail:
     @patch("web.mail._get_email_config")
     def test_send_email_no_sender(self, mock_get_config):
         """Test email sending without sender"""
-        from web.mail import send_email
         from tenacity import RetryError
+
+        from web.mail import send_email
 
         # Mock the email config to return no sender
         mock_get_config.return_value = ("test-token", None)

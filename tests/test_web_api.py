@@ -3,11 +3,12 @@ Integration tests for web API endpoints
 Tests the Flask app with email functionality
 """
 
-import pytest
 import json
 import os
 import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))

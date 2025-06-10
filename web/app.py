@@ -103,7 +103,7 @@ class RealNewsletterCLI:
         self.project_root = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..")
         )
-        self.timeout = 300  # 5분 타임아웃
+        self.timeout = 900  # 15분 타임아웃으로 증가
 
         # 환경 확인
         self._check_environment()
@@ -118,6 +118,10 @@ class RealNewsletterCLI:
         env_file = os.path.join(self.project_root, ".env")
         if not os.path.exists(env_file):
             print(f"⚠️  Warning: .env file not found at {env_file}")
+            print(f"⚠️  This may cause longer processing times or fallback to mock mode")
+
+        # API 키 확인
+        api_keys_status = self._check_api_keys()
 
         print(f"✅ Environment check passed")
         print(f"   Project root: {self.project_root}")
@@ -125,6 +129,30 @@ class RealNewsletterCLI:
             f"   Newsletter module exists: {os.path.exists(os.path.join(self.project_root, 'newsletter'))}"
         )
         print(f"   .env file exists: {os.path.exists(env_file)}")
+        print(f"   API keys configured: {api_keys_status}")
+
+    def _check_api_keys(self):
+        """API 키 설정 상태 확인"""
+        required_keys = {
+            "GEMINI_API_KEY": "Gemini (primary LLM)",
+            "OPENAI_API_KEY": "OpenAI (fallback LLM)",
+            "POSTMARK_TOKEN": "Email service",
+        }
+
+        configured = []
+        missing = []
+
+        for key, description in required_keys.items():
+            if os.getenv(key):
+                configured.append(f"{description} ✅")
+            else:
+                missing.append(f"{description} ❌")
+
+        if missing:
+            print(f"⚠️  Missing API keys: {', '.join(missing)}")
+            print(f"   This may cause slower performance or feature limitations")
+
+        return f"{len(configured)}/{len(required_keys)} configured"
 
     def generate_newsletter(
         self,
@@ -272,8 +300,11 @@ class RealNewsletterCLI:
                 return self._fallback_response(keywords or domain, error_msg)
 
         except subprocess.TimeoutExpired:
-            error_msg = f"CLI execution timed out after {self.timeout} seconds"
-            logging.error(error_msg)
+            error_msg = f"뉴스레터 생성이 {self.timeout}초 후 타임아웃되었습니다. API 키 설정을 확인해주세요."
+            logging.error(f"CLI execution timed out after {self.timeout} seconds")
+            logging.error(
+                "타임아웃 원인: API 키 누락으로 인한 Mock 데이터 사용 또는 외부 API 응답 지연"
+            )
             return self._fallback_response(keywords or domain, error_msg)
 
         except Exception as e:
@@ -591,6 +622,9 @@ try:
     print(f"   Timeout: {newsletter_cli.timeout} seconds")
 except Exception as e:
     print(f"❌ Failed to initialize RealNewsletterCLI: {e}")
+    import traceback
+
+    traceback.print_exc()
     newsletter_cli = MockNewsletterCLI()
     print("⚠️  Falling back to MockNewsletterCLI")
 
@@ -763,32 +797,105 @@ def generate_newsletter():
             def background_task():
                 try:
                     print(f"⚙️  Starting background processing for job {job_id}")
+                    print(f"⚙️  Data: {data}")
+                    print(f"⚙️  Current time: {datetime.now().isoformat()}")
+
+                    # 환경 체크
+                    print(f"⚙️  Using CLI type: {type(newsletter_cli).__name__}")
+
                     process_newsletter_in_memory(data, job_id)
-                    # Update database with final result
-                    conn = sqlite3.connect(DATABASE_PATH)
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                        (
-                            json.dumps(in_memory_tasks[job_id]["result"]),
-                            "completed",
-                            job_id,
-                        ),
-                    )
-                    conn.commit()
-                    conn.close()
-                    print(f"✅ Completed background processing for job {job_id}")
+
+                    # 메모리에서 결과 가져오기
+                    if job_id in in_memory_tasks:
+                        task_result = in_memory_tasks[job_id]
+                        print(f"💾 Updating database for job {job_id}")
+                        print(f"💾 Task status: {task_result.get('status', 'unknown')}")
+
+                        # Update database with final result
+                        conn = sqlite3.connect(DATABASE_PATH)
+                        cursor = conn.cursor()
+
+                        if (
+                            task_result.get("status") == "completed"
+                            and "result" in task_result
+                        ):
+                            # 성공한 경우
+                            try:
+                                result_json = json.dumps(task_result["result"])
+                                cursor.execute(
+                                    "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                                    (result_json, "completed", job_id),
+                                )
+                                print(
+                                    f"💾 Successfully updated database for job {job_id}"
+                                )
+                            except (TypeError, ValueError) as json_error:
+                                print(
+                                    f"❌ JSON serialization error for job {job_id}: {json_error}"
+                                )
+                                # JSON 직렬화 실패 시 기본 응답 저장
+                                fallback_result = {
+                                    "status": "completed",
+                                    "title": "Newsletter Generated",
+                                    "content": task_result["result"].get(
+                                        "content", "Newsletter content available"
+                                    ),
+                                    "error": f"JSON serialization failed: {str(json_error)}",
+                                }
+                                cursor.execute(
+                                    "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                                    (json.dumps(fallback_result), "completed", job_id),
+                                )
+                        else:
+                            # 실패한 경우
+                            error_result = {
+                                "error": task_result.get("error", "Unknown error"),
+                                "status": "failed",
+                            }
+                            cursor.execute(
+                                "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                                (json.dumps(error_result), "failed", job_id),
+                            )
+
+                        conn.commit()
+                        conn.close()
+                        print(f"✅ Completed background processing for job {job_id}")
+                    else:
+                        print(f"❌ Job {job_id} not found in in_memory_tasks")
+                        # 데이터베이스에 실패 상태 업데이트
+                        conn = sqlite3.connect(DATABASE_PATH)
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                            (
+                                json.dumps({"error": "Job not found in memory"}),
+                                "failed",
+                                job_id,
+                            ),
+                        )
+                        conn.commit()
+                        conn.close()
+
                 except Exception as e:
                     print(f"❌ Error in background processing for job {job_id}: {e}")
+                    import traceback
+
+                    print(f"❌ Traceback: {traceback.format_exc()}")
+
                     # Update database with error
-                    conn = sqlite3.connect(DATABASE_PATH)
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                        (json.dumps({"error": str(e)}), "failed", job_id),
-                    )
-                    conn.commit()
-                    conn.close()
+                    try:
+                        conn = sqlite3.connect(DATABASE_PATH)
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "UPDATE history SET result = ?, status = ? WHERE id = ?",
+                            (json.dumps({"error": str(e)}), "failed", job_id),
+                        )
+                        conn.commit()
+                        conn.close()
+                    except Exception as db_error:
+                        print(
+                            f"❌ Failed to update database with error for job {job_id}: {db_error}"
+                        )
 
             thread = threading.Thread(target=background_task)
             thread.daemon = True
@@ -1010,14 +1117,25 @@ def process_newsletter_sync(data):
 def process_newsletter_in_memory(data, job_id):
     """Process newsletter in memory and update task status"""
     try:
+        print(f"📊 Starting newsletter processing for job {job_id}")
         result = process_newsletter_sync(data)
+
+        # 메모리에 결과 저장
         in_memory_tasks[job_id] = {
             "status": "completed",
             "result": result,
             "updated_at": datetime.now().isoformat(),
         }
+
+        print(f"📊 Newsletter processing completed for job {job_id}")
+        print(f"📊 Result status: {result.get('status', 'unknown')}")
+        print(
+            f"📊 Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+        )
+
         return result
     except Exception as e:
+        print(f"❌ Error in process_newsletter_in_memory for job {job_id}: {e}")
         in_memory_tasks[job_id] = {
             "status": "failed",
             "error": str(e),
@@ -1079,27 +1197,60 @@ def get_job_status(job_id):
 @app.route("/api/history")
 def get_history():
     """Get recent newsletter generation history"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT id, params, result, created_at, status FROM history ORDER BY created_at DESC LIMIT 20"
-    )
-    rows = cursor.fetchall()
-    conn.close()
+    print(f"📚 Fetching history from database")
+
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+
+        # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
+        cursor.execute(
+            """
+            SELECT id, params, result, created_at, status 
+            FROM history 
+            ORDER BY 
+                CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
+                created_at DESC
+            LIMIT 20
+        """
+        )
+        rows = cursor.fetchall()
+        conn.close()
+
+        print(f"📚 Found {len(rows)} history records")
+
+    except Exception as e:
+        print(f"❌ Database error in get_history: {e}")
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
     history = []
     for row in rows:
         job_id, params, result, created_at, status = row
+        print(f"📚 Processing history record: {job_id} (status: {status})")
+
+        try:
+            parsed_params = json.loads(params) if params else None
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse params for job {job_id}: {e}")
+            parsed_params = None
+
+        try:
+            parsed_result = json.loads(result) if result else None
+        except json.JSONDecodeError as e:
+            print(f"❌ Failed to parse result for job {job_id}: {e}")
+            parsed_result = None
+
         history.append(
             {
                 "id": job_id,
-                "params": json.loads(params) if params else None,
-                "result": json.loads(result) if result else None,
+                "params": parsed_params,
+                "result": parsed_result,
                 "created_at": created_at,
                 "status": status,
             }
         )
 
+    print(f"📚 Returning {len(history)} history records")
     return jsonify(history)
 
 
@@ -1251,6 +1402,80 @@ def run_schedule_now(schedule_id):
         return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500
 
 
+@app.route("/debug/history-table")
+def debug_history_table():
+    """Debug endpoint to check history table status"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+
+        # Get table info
+        cursor.execute("PRAGMA table_info(history)")
+        table_info = cursor.fetchall()
+
+        # Get record count
+        cursor.execute("SELECT COUNT(*) FROM history")
+        total_count = cursor.fetchone()[0]
+
+        # Get recent records with minimal info
+        cursor.execute(
+            "SELECT id, status, created_at FROM history ORDER BY created_at DESC LIMIT 5"
+        )
+        recent_records = cursor.fetchall()
+
+        # Get status distribution
+        cursor.execute("SELECT status, COUNT(*) FROM history GROUP BY status")
+        status_distribution = cursor.fetchall()
+
+        conn.close()
+
+        return jsonify(
+            {
+                "table_info": table_info,
+                "total_records": total_count,
+                "recent_records": [
+                    {"id": r[0], "status": r[1], "created_at": r[2]}
+                    for r in recent_records
+                ],
+                "status_distribution": [
+                    {"status": r[0], "count": r[1]} for r in status_distribution
+                ],
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/debug/clear-pending")
+def clear_pending_records():
+    """Debug endpoint to clear pending records (개발용)"""
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+
+        # Get pending count before deletion
+        cursor.execute("SELECT COUNT(*) FROM history WHERE status = 'pending'")
+        pending_count = cursor.fetchone()[0]
+
+        # Delete pending records
+        cursor.execute("DELETE FROM history WHERE status = 'pending'")
+        deleted_count = cursor.rowcount
+
+        conn.commit()
+        conn.close()
+
+        return jsonify(
+            {
+                "message": f"Cleared {deleted_count} pending records",
+                "pending_before": pending_count,
+                "deleted": deleted_count,
+            }
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/health")
 def health_check():
     """Enhanced health check endpoint for Railway"""
@@ -1380,6 +1605,19 @@ def health_check():
 def test():
     """Simple test route"""
     return "Flask is working! Template folder: " + str(app.template_folder)
+
+
+@app.route("/test-db")
+def test_db():
+    """Serve the database test HTML page"""
+    try:
+        with open(
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_api.html"),
+            "r",
+        ) as f:
+            return f.read()
+    except FileNotFoundError:
+        return "<h1>Test file not found</h1>", 404
 
 
 @app.route("/test-template")

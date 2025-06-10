@@ -252,8 +252,20 @@ class NewsletterApp {
 
     startPolling(jobId) {
         this.currentJobId = jobId; // Store current job ID
+        this.pollCount = 0; // 폴링 횟수 카운터 추가
+        this.maxPollCount = 900; // 최대 15분 (900초)
+        
         this.pollInterval = setInterval(async () => {
             try {
+                this.pollCount++;
+                
+                // 최대 폴링 횟수 초과 시 중단
+                if (this.pollCount > this.maxPollCount) {
+                    this.stopPolling();
+                    this.showError('처리 시간이 너무 오래 걸립니다. 페이지를 새로고침하고 다시 시도해주세요.');
+                    return;
+                }
+
                 const response = await fetch(`/api/status/${jobId}`);
                 const result = await response.json();
 
@@ -262,11 +274,12 @@ class NewsletterApp {
                 if (result.sent) {
                     progressText.textContent = '뉴스레터 생성 완료 및 이메일 발송 완료...';
                 } else {
-                    progressText.textContent = '뉴스레터를 생성하고 있습니다...';
+                    progressText.textContent = `뉴스레터를 생성하고 있습니다... (${this.pollCount}초 경과)`;
                 }
 
                 if (result.status === 'completed') {
                     this.stopPolling();
+                    console.log(`✅ 폴링 완료: ${this.pollCount}초 후 작업 완료`);
                     // Add job_id to result for iframe src
                     if (result.result) {
                         result.result.job_id = jobId;
@@ -280,10 +293,16 @@ class NewsletterApp {
                     }
                 } else if (result.status === 'failed') {
                     this.stopPolling();
+                    console.log(`❌ 폴링 중단: ${this.pollCount}초 후 작업 실패`);
                     this.showError(result.result?.error || 'Generation failed');
                 }
             } catch (error) {
                 console.error('Polling error:', error);
+                // 연속 오류 발생 시 폴링 중단
+                if (this.pollCount > 10) {
+                    this.stopPolling();
+                    this.showError('서버와의 연결에 문제가 발생했습니다.');
+                }
             }
         }, 1000); // 1초 간격으로 폴링
     }
@@ -292,6 +311,7 @@ class NewsletterApp {
         if (this.pollInterval) {
             clearInterval(this.pollInterval);
             this.pollInterval = null;
+            this.pollCount = 0; // 카운터 리셋
         }
     }
 
@@ -543,7 +563,7 @@ class NewsletterApp {
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
                                 ${item.params?.keywords ? 
-                                  `키워드: ${item.params.keywords.join(', ')}` : 
+                                  `키워드: ${Array.isArray(item.params.keywords) ? item.params.keywords.join(', ') : item.params.keywords}` : 
                                   `도메인: ${item.params?.domain || 'Unknown'}`}
                             </h4>
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
@@ -586,7 +606,7 @@ class NewsletterApp {
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
                                 ${schedule.params?.keywords ? 
-                                  `키워드: ${schedule.params.keywords.join(', ')}` : 
+                                  `키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
                                   `도메인: ${schedule.params?.domain || 'Unknown'}`}
                             </h4>
                             <p class="text-sm text-gray-500">
@@ -676,7 +696,7 @@ class NewsletterApp {
                 // Populate form with historical parameters
                 if (result.params.keywords) {
                     document.getElementById('keywordsMethod').checked = true;
-                    document.getElementById('keywords').value = result.params.keywords.join(', ');
+                    document.getElementById('keywords').value = Array.isArray(result.params.keywords) ? result.params.keywords.join(', ') : result.params.keywords;
                 } else if (result.params.domain) {
                     document.getElementById('domainMethod').checked = true;
                     document.getElementById('domain').value = result.params.domain;

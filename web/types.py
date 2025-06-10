@@ -2,7 +2,7 @@
 Web application common types
 """
 
-from typing import NewType, Optional, Dict, Any, Literal, Union
+from typing import NewType, Optional, Dict, Any, Literal, Union, List
 from pydantic import BaseModel, Field, field_validator, model_validator
 import re
 
@@ -18,7 +18,7 @@ JobStatus = Literal["pending", "processing", "finished", "failed"]
 
 # Newsletter 생성 요청 스키마
 class GenerateNewsletterRequest(BaseModel):
-    keywords: Optional[str] = None
+    keywords: Optional[Union[str, List[str]]] = None
     domain: Optional[str] = None
     template_style: str = Field(
         default="compact", pattern=r"^(compact|detailed|modern)$"
@@ -26,6 +26,19 @@ class GenerateNewsletterRequest(BaseModel):
     email_compatible: bool = False
     period: int = Field(default=14)
     email: Optional[str] = None  # 즉시 발송용 이메일 주소
+
+    @field_validator("keywords")
+    @classmethod
+    def validate_keywords(cls, v: Optional[Union[str, List[str]]]) -> Optional[str]:
+        if v is None:
+            return None
+        if isinstance(v, list):
+            # 리스트로 받은 경우 쉼표로 구분된 문자열로 변환
+            return ", ".join(str(keyword).strip() for keyword in v if keyword)
+        elif isinstance(v, str):
+            return v.strip()
+        else:
+            raise ValueError("Keywords must be a string or list of strings")
 
     @field_validator("period")
     @classmethod

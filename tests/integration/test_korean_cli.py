@@ -4,14 +4,15 @@ Korean CLI Integration Tests
 한국어 키워드를 사용한 뉴스레터 생성 CLI 테스트
 """
 
+import logging
 import os
-import pytest
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-from typing import Optional, Dict, Any
-import logging
+from typing import Any, Dict, Optional
+
+import pytest
 
 # 상수 정의
 TIMEOUT_SECONDS = 300
