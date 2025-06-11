@@ -10,11 +10,9 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-import google.generativeai as genai
 import markdownify
 import requests
 from bs4 import BeautifulSoup
-from google.generativeai import types
 from langchain.prompts import PromptTemplate
 from langchain.tools import tool
 from langchain_core.output_parsers import StrOutputParser
@@ -306,48 +304,8 @@ def save_newsletter_locally(
         raise ToolException(f"Error saving newsletter locally: {e}")
 
 
-def clean_html_markers(html_content: str) -> str:
-    """
-    Removes code markup (```html, ```, ``` etc.) from the beginning and end of an HTML string,
-    as well as file path comments.
-
-    This handles various patterns including:
-    - ```html at the beginning
-    - ``` at the end
-    - ```lang syntax (for any language identifier)
-    - Filepath comments
-    - Multiple backticks (like ````html)
-    """
-    if not html_content:
-        return ""
-
-    content = html_content
-
-    # 1. 파일 경로 주석 제거 (존재하는 경우)
-    # 패턴: 문자열 시작의 공백 + "<!-- filepath: 내용 -->" + 뒤따르는 공백(개행 포함)
-    comment_pattern = r"^\s*<!--\s*filepath:.*?-->\s*"
-    match_comment = re.match(comment_pattern, content, flags=re.IGNORECASE | re.DOTALL)
-    if match_comment:
-        # 주석 및 주석 뒤 공백 이후의 문자열을 가져옴
-        content = content[match_comment.end() :]
-
-    # 2. 시작 부분의 코드 마커 제거 (다양한 언어 식별자 및 여러 개의 백틱 처리)
-    # 더 일반적인 패턴: (새로운) 문자열 시작의 공백 + 하나 이상의 백틱 + 선택적 언어 식별자 + 뒤따르는 공백(개행 포함)
-    start_marker_pattern = r"^\s*(`{1,4})([a-zA-Z]*)\s*"
-    match_start_marker = re.match(start_marker_pattern, content)
-    if match_start_marker:
-        # 코드 마커 및 마커 뒤 공백 이후의 문자열을 가져옴
-        content = content[match_start_marker.end() :]
-
-    # 3. 끝부분 코드 마커 제거 (여러 개의 백틱 처리)
-    content = content.rstrip()  # 먼저 오른쪽 끝 공백 제거
-    end_marker_pattern = r"`{1,4}\s*$"
-    match_end_marker = re.search(end_marker_pattern, content)
-    if match_end_marker:
-        content = content[: match_end_marker.start()]
-
-    # 최종적으로 앞뒤 공백 제거
-    return content.strip()
+# clean_html_markers 함수는 newsletter.html_utils 모듈로 이동했습니다.
+from .html_utils import clean_html_markers
 
 
 def generate_keywords_with_gemini(
@@ -583,11 +541,14 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                 )
                 return extract_common_theme_fallback(keywords)
 
-        # Fallback to original implementation only if API key is available
-        genai.configure(api_key=api_key)
-        model_name = "gemini-1.5-flash-latest"
+        # Fallback using LangChain Google GenAI
+        from langchain_core.messages import HumanMessage
+        from .llm_factory import get_llm_for_task
 
-        final_prompt = f"""
+        try:
+            llm = get_llm_for_task("theme_extraction", callbacks, enable_fallback=True)
+
+            final_prompt = f"""
 다음 키워드들의 공통 분야나 주제를 한국어로 추출해 주세요:
 {', '.join(keywords)}
 
@@ -596,66 +557,21 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
 - 설명이나 부가 정보는 포함하지 마세요
 - 반드시 한국어로 답변해 주세요
 """
-        run_id = uuid.uuid4()
 
-        if callbacks:
-            for cb in callbacks:
-                if hasattr(cb, "on_llm_start"):
-                    try:
-                        cb.on_llm_start(
-                            serialized={"model_name": model_name},
-                            prompts=[final_prompt],
-                            run_id=run_id,
-                        )
-                    except Exception as e_start:
-                        logger.debug(f"Callback on_llm_start 실행 실패: {e_start}")
+            response = llm.invoke([HumanMessage(content=final_prompt)])
+            extracted_theme = response.content.strip()
 
-        genai_model = genai.GenerativeModel(model_name)
-        response = genai_model.generate_content(
-            final_prompt,
-            generation_config=genai.types.GenerationConfig(
-                candidate_count=1,
-                temperature=0.2,  # Kept original temperature for this specific task
-            ),
-            request_options={"timeout": 120},
-        )
+            if len(extracted_theme) > 30:  # Keep the length check
+                extracted_theme = extracted_theme[:30]
 
-        extracted_theme = response.text.strip()
-        if len(extracted_theme) > 30:  # Keep the length check
-            extracted_theme = extracted_theme[:30]
+            return extracted_theme
 
-        if callbacks:
-            llm_output_data = {
-                "token_usage": {
-                    "prompt_token_count": response.usage_metadata.prompt_token_count,
-                    "candidates_token_count": response.usage_metadata.candidates_token_count,
-                    "total_token_count": response.usage_metadata.total_token_count,
-                },
-                "model_name": model_name,
-            }
-            # Ensure 'text' is not None for Generation
-            gen_text = extracted_theme if extracted_theme is not None else ""
-            generations = [[Generation(text=gen_text, generation_info=llm_output_data)]]
-            llm_result = LLMResult(generations=generations, llm_output=llm_output_data)
-            for cb in callbacks:
-                if hasattr(cb, "on_llm_end"):
-                    try:
-                        cb.on_llm_end(llm_result, run_id=run_id)
-                    except Exception as e_cb:
-                        logger.debug(f"Callback on_llm_end 실행 실패: {e_cb}")
-
-        return extracted_theme
+        except Exception as llm_error:
+            logger.warning(f"LLM factory를 통한 테마 추출이 실패했습니다: {llm_error}")
+            return extract_common_theme_fallback(keywords)
 
     except Exception as e:
-        run_id_error = run_id if "run_id" in locals() else uuid.uuid4()
-        if callbacks:
-            for cb in callbacks:
-                if hasattr(cb, "on_llm_error"):
-                    try:
-                        cb.on_llm_error(e, run_id=run_id_error)
-                    except Exception as e_err_cb:
-                        logger.debug(f"Callback on_llm_error 실행 실패: {e_err_cb}")
-        logger.error(f"Gemini를 사용한 테마 추출 중 오류 발생: {e}")
+        logger.error(f"테마 추출 중 오류 발생: {e}")
         return extract_common_theme_fallback(keywords)
 
 
@@ -823,14 +739,14 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
             f"LLM 팩토리를 통한 섹션 재생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
         )
 
-    # Fallback to original Gemini implementation
-    import google.generativeai as genai
+    # Fallback using LangChain Google GenAI
+    from langchain_core.messages import HumanMessage
+    from .llm_factory import get_llm_for_task
 
-    if not config.GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
-
-    genai.configure(api_key=config.GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-pro")
+    try:
+        llm = get_llm_for_task("section_regeneration", enable_fallback=True)
+    except Exception as e:
+        raise ValueError(f"LLM factory 초기화 실패: {e}")
 
     # 뉴스 링크 정보를 문자열로 변환 - 수정된 형식으로
     news_links_text = ""
@@ -867,8 +783,8 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     """
 
     try:
-        response = model.generate_content(prompt)
-        response_text = response.text.strip()
+        response = llm.invoke([HumanMessage(content=prompt)])
+        response_text = response.content.strip()
 
         # 문단으로 분리
         paragraphs = [p.strip() for p in response_text.split("\n\n") if p.strip()]
@@ -883,7 +799,7 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     except Exception as e:
         import traceback
 
-        logger.error(f"Gemini를 사용한 콘텐츠 생성 중 오류 발생: {e}")
+        logger.error(f"LLM을 사용한 콘텐츠 생성 중 오류 발생: {e}")
         logger.debug(f"오류 세부 정보: {traceback.format_exc()}")
         return [
             "요약 생성 중 오류가 발생했습니다.",
@@ -950,14 +866,13 @@ def generate_introduction_with_gemini(
         logger.warning(
             f"LLM 팩토리를 통한 소개 생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
         )
-        # Fallback to original Gemini implementation
-        import google.generativeai as genai
+        # Fallback using LangChain Google GenAI
+        from .llm_factory import get_llm_for_task
 
-        if not config.GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY is not set in the environment variables.")
-
-        genai.configure(api_key=config.GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        try:
+            llm = get_llm_for_task("introduction_generation", enable_fallback=True)
+        except Exception as e:
+            raise ValueError(f"LLM factory 초기화 실패: {e}")
 
     # 섹션 제목을 문자열로 변환
     safe_topic = str(newsletter_topic).replace("{", "{{").replace("}", "}}")
@@ -989,13 +904,13 @@ def generate_introduction_with_gemini(
     """
 
     try:
-        response = model.generate_content(prompt)
-        introduction = response.text.strip()
+        response = llm.invoke([HumanMessage(content=prompt)])
+        introduction = response.content.strip()
 
         return introduction
     except Exception as e:
         import traceback
 
-        logger.error(f"Gemini를 사용한 소개 생성 중 오류 발생: {e}")
+        logger.error(f"LLM을 사용한 소개 생성 중 오류 발생: {e}")
         logger.debug(f"오류 세부 정보: {traceback.format_exc()}")
         return f"금주 {safe_topic} 관련 최신 동향과 주요 뉴스를 정리하여 제공합니다. 본 뉴스레터가 업무에 도움이 되기를 바랍니다."

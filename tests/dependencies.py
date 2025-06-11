@@ -9,7 +9,6 @@ from types import ModuleType
 from unittest.mock import Mock, patch
 
 # Use mocks from tests directory
-from tests.mock_google_generativeai import GenerativeModel
 from tests.mock_langchain_google_genai import MockChatGoogleGenerativeAI
 
 
@@ -26,16 +25,7 @@ def mock_imports():
     if "google" not in sys.modules:
         sys.modules["google"] = create_mock_module("google")
 
-    if "google.generativeai" not in sys.modules:
-        google_generativeai = create_mock_module("google.generativeai")
-        google_generativeai.GenerativeModel = GenerativeModel
-        google_generativeai.configure = lambda *args, **kwargs: None
-        sys.modules["google.generativeai"] = google_generativeai
-
-    if "google.generativeai.caching" not in sys.modules:
-        caching = create_mock_module("google.generativeai.caching")
-        caching.CachedContent = Mock
-        sys.modules["google.generativeai.caching"] = caching
+    # google.generativeai는 더 이상 사용하지 않음 (langchain-google-genai로 대체됨)
 
     # Mock langchain modules
     if "langchain_google_genai" not in sys.modules:
@@ -49,6 +39,5 @@ def mock_imports():
         sys.modules["langchain_google_genai.chat_models"] = chat_models
 
     return {
-        "generative_model": GenerativeModel,
         "chat_google_generative_ai": MockChatGoogleGenerativeAI,
     }

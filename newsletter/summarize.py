@@ -107,10 +107,9 @@ def summarize_articles(
     Returns:
         HTML string containing the summarized newsletter
     """
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        genai = None  # Gemini API 사용 불가 상태로 표시
+    # google.generativeai는 더 이상 직접 사용하지 않음
+    # langchain-google-genai를 통해 LLM 팩토리에서 사용
+    genai = True  # LLM 팩토리가 사용 가능하다고 표시
 
     if callbacks is None:
         callbacks = []
@@ -170,45 +169,48 @@ def summarize_articles(
         "summarize_articles",
     )
 
-    # Check if Gemini API is available
-    if genai is None:
-        logger.error("google.generativeai 모듈을 사용할 수 없습니다.")
+    # LLM 팩토리를 통한 LLM 사용 가능성 확인
+    try:
+        from .llm_factory import get_available_providers
+
+        available_providers = get_available_providers()
+        if not available_providers:
+            logger.error("사용 가능한 LLM 제공자가 없습니다.")
+            error_html = """
+            <html>
+            <body>
+            <h1>오류: 사용 가능한 LLM 제공자가 없습니다.</h1>
+            <p>뉴스레터를 생성하려면 최소 하나의 LLM API 키가 설정되어야 합니다.</p>
+            <p>지원하는 제공자: Gemini (GEMINI_API_KEY), OpenAI (OPENAI_API_KEY), Anthropic (ANTHROPIC_API_KEY)</p>
+            <p>키워드: {}</p>
+            <p>제공된 기사 수: {}</p>
+            </body>
+            </html>
+            """.format(
+                keyword_display,
+                article_count,
+            )
+            return error_html
+    except Exception as e:
+        logger.error(f"LLM 팩토리 확인 중 오류 발생: {e}")
         error_html = """
         <html>
         <body>
-        <h1>오류: google.generativeai 모듈을 찾을 수 없습니다.</h1>
-        <p>뉴스레터를 생성하려면 google-generativeai 패키지가 설치되어 있어야 합니다.</p>
-        <p>설치 방법: pip install google-generativeai</p>
+        <h1>오류: LLM 시스템 초기화 실패</h1>
+        <p>뉴스레터 생성 시스템을 초기화할 수 없습니다.</p>
+        <p>오류: {}</p>
         <p>키워드: {}</p>
         <p>제공된 기사 수: {}</p>
         </body>
         </html>
         """.format(
+            str(e),
             keyword_display,
             article_count,
         )
         return error_html
 
-    # Check API key
-    api_key = getattr(config, "GEMINI_API_KEY", None)
-    if not api_key:
-        logger.error(
-            "GEMINI_API_KEY가 설정되지 않았습니다. 뉴스레터를 생성할 수 없습니다."
-        )
-        error_html = """
-        <html>
-        <body>
-        <h1>오류: GEMINI_API_KEY가 설정되지 않았습니다.</h1>
-        <p>뉴스레터를 생성하려면 Gemini API 키가 필요합니다.</p>
-        <p>키워드: {}</p>
-        <p>제공된 기사 수: {}</p>
-        </body>
-        </html>
-        """.format(
-            keyword_display,
-            article_count,
-        )
-        return error_html
+    # API 키 체크는 LLM 팩토리에서 처리됨
 
     try:
         # LLM 팩토리를 사용하여 뉴스 요약에 최적화된 모델 사용
@@ -222,15 +224,8 @@ def summarize_articles(
             )
             system_prompt = SYSTEM_INSTRUCTION
         except (ImportError, AttributeError) as e:
-            logger.warning(
-                f"Warning: LLM factory failed for news summarization, using fallback: {e}"
-            )
-            # Fallback to original Gemini implementation
-            genai.configure(api_key=config.GEMINI_API_KEY)
-            model = genai.GenerativeModel(
-                model_name="gemini-1.5-pro-latest",
-                system_instruction=SYSTEM_INSTRUCTION,
-            )
+            logger.error(f"LLM factory 초기화 실패: {e}")
+            raise ValueError(f"뉴스 요약을 위한 LLM을 초기화할 수 없습니다: {e}")
 
         # Convert keywords to comma-separated string for prompt
         if not keywords:
@@ -269,69 +264,14 @@ def summarize_articles(
         prompt = f"키워드: {keyword_str}\n\n뉴스 기사 목록:\n\n{articles_text}"
 
         try:
-            # LLM 팩토리를 사용하는 경우의 처리 로직
-            if "llm" in locals():
-                # 시스템 프롬프트와 사용자 프롬프트를 결합
-                full_prompt = f"{system_prompt}\n\n{prompt}"
-                response = llm.invoke([HumanMessage(content=full_prompt)])
-                html_content = response.content
-                return html_content
-            else:
-                # 기존 Gemini 방식 사용
-                run_id = uuid.uuid4()
-                for cb in callbacks:
-                    if hasattr(cb, "on_llm_start"):
-                        try:
-                            cb.on_llm_start(
-                                serialized={},
-                                prompts=[prompt],
-                                run_id=run_id,
-                                name="summarize_articles_llm",
-                                run_type="llm",
-                                tags=[],
-                                metadata={},
-                                parent_run_id=None,
-                            )
-                        except TypeError:
-                            try:
-                                cb.on_llm_start(
-                                    serialized={}, prompts=[prompt], run_id=run_id
-                                )
-                            except Exception as e_start_fallback:
-                                logger.debug(
-                                    f"Callback on_llm_start (fallback) 실행 실패: {e_start_fallback}"
-                                )
-                        except Exception as e_start:
-                            logger.debug(
-                                f"Callback on_llm_start (initial) 실행 실패: {e_start}"
-                            )
-
-                # Generate the summary using Gemini Pro
-                response = model.generate_content([prompt])
-                for cb in callbacks:
-                    if hasattr(cb, "on_llm_end"):
-                        try:
-                            cb.on_llm_end(response, run_id=run_id)
-                        except Exception as e_end:
-                            logger.debug(
-                                f"Callback on_llm_end (기사 없음) 실행 실패: {e_end}"
-                            )
-
-                if hasattr(response, "text"):
-                    html_content = response.text
-                    return html_content
-                else:
-                    logger.error("Gemini 응답에서 텍스트를 가져올 수 없습니다.")
+            # LLM 팩토리를 사용하여 뉴스 요약 생성
+            # 시스템 프롬프트와 사용자 프롬프트를 결합
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+            response = llm.invoke([HumanMessage(content=full_prompt)])
+            html_content = response.content
+            return html_content
 
         except Exception as e:
-            if "run_id" in locals():
-                for cb in callbacks:
-                    if hasattr(cb, "on_llm_error"):
-                        try:
-                            cb.on_llm_error(e, run_id=run_id)
-                        except Exception as e_error:
-                            logger.debug(f"Callback on_llm_error 실행 실패: {e_error}")
-
             logger.error(f"LLM API 호출 중 오류 발생: {e}")
             error_html = f"""
             <html>

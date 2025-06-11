@@ -5,7 +5,7 @@ import markdownify  # For HTML to Markdown conversion
 import requests
 
 from . import config
-from .tools import clean_html_markers  # Import the clean_html_markers function
+from .html_utils import clean_html_markers  # Import the clean_html_markers function
 from .utils.logger import get_logger
 
 # 로거 초기화

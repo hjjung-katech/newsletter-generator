@@ -1,6 +1,6 @@
 import unittest
 
-from newsletter.tools import clean_html_markers
+from newsletter.html_utils import clean_html_markers
 
 
 class TestTools(unittest.TestCase):
