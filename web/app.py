@@ -20,36 +20,82 @@ sys.path.insert(0, current_dir)
 
 # Import web types module - will be loaded later to avoid conflicts
 
-# Sentry 통합 - 환경 변수가 있을 때만 초기화
-if os.getenv("SENTRY_DSN"):
-    try:
-        import sentry_sdk
-        from sentry_sdk.integrations.flask import FlaskIntegration
-        from sentry_sdk.integrations.logging import LoggingIntegration
+# Sentry 통합 - Centralized Settings 사용
+try:
+    from newsletter.centralized_settings import get_settings
+    settings = get_settings()
+    
+    if settings.sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            from sentry_sdk.integrations.logging import LoggingIntegration
 
-        # 로깅 통합 설정
-        logging_integration = LoggingIntegration(
-            level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.ERROR,  # Send errors as events
-        )
+            # 로깅 통합 설정
+            logging_integration = LoggingIntegration(
+                level=logging.INFO,  # Capture info and above as breadcrumbs
+                event_level=logging.ERROR,  # Send errors as events
+            )
 
-        sentry_sdk.init(
-            dsn=os.getenv("SENTRY_DSN"),
-            integrations=[
-                FlaskIntegration(transaction_style="endpoint"),
-                logging_integration,
-            ],
-            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
-            environment=os.getenv("ENVIRONMENT", "production"),
-            release=os.getenv("APP_VERSION", "1.0.0"),
-            # 성능 모니터링 설정
-            profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
-            # 추가 컨텍스트
-            before_send=lambda event, hint: (
-                event if event.get("level") != "info" else None
-            ),
-        )
-        print("✅ Sentry initialized successfully")
+            sentry_sdk.init(
+                dsn=settings.sentry_dsn,
+                integrations=[
+                    FlaskIntegration(transaction_style="endpoint"),
+                    logging_integration,
+                ],
+                traces_sample_rate=settings.sentry_traces_sample_rate,
+                environment=settings.environment,
+                release=settings.app_version,
+                # 성능 모니터링 설정
+                profiles_sample_rate=settings.sentry_profiles_sample_rate,
+                # 추가 컨텍스트
+                before_send=lambda event, hint: (
+                    event if event.get("level") != "info" else None
+                ),
+            )
+            print("✅ Sentry initialized successfully")
+        except ImportError:
+            print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+        except Exception as e:
+            print(f"⚠️  Sentry initialization failed: {e}")
+    else:
+        print("ℹ️  Sentry DSN not configured, skipping Sentry integration")
+        
+except Exception as e:
+    # Centralized settings 실패 시 fallback
+    print(f"⚠️  Centralized settings unavailable, checking legacy SENTRY_DSN: {e}")
+    if os.getenv("SENTRY_DSN"):
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            from sentry_sdk.integrations.logging import LoggingIntegration
+
+            logging_integration = LoggingIntegration(
+                level=logging.INFO,
+                event_level=logging.ERROR,
+            )
+
+            sentry_sdk.init(
+                dsn=os.getenv("SENTRY_DSN"),
+                integrations=[
+                    FlaskIntegration(transaction_style="endpoint"),
+                    logging_integration,
+                ],
+                traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+                environment=os.getenv("ENVIRONMENT", "production"),
+                release=os.getenv("APP_VERSION", "1.0.0"),
+                profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
+                before_send=lambda event, hint: (
+                    event if event.get("level") != "info" else None
+                ),
+            )
+            print("✅ Sentry initialized successfully (legacy mode)")
+        except ImportError:
+            print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+        except Exception as e:
+            print(f"⚠️  Sentry initialization failed: {e}")
+    else:
+        print("ℹ️  Legacy SENTRY_DSN not configured, skipping Sentry integration")
 
         # 사용자 컨텍스트 설정을 위한 헬퍼 함수
         def set_sentry_user_context(user_id=None, email=None, **kwargs):

@@ -1,5 +1,125 @@
 # Changelog
 
+## [0.6.0] - 2025-06-11 - F-14 Centralized Settings Layer 구현
+
+### 🚀 주요 기능
+
+#### 중앙집중식 설정 관리 (F-14)
+- **새로운 기능**: Pydantic 기반 타입 안전 설정 시스템
+  - `newsletter/centralized_settings.py`: 모든 환경변수의 단일 진실 소스
+  - 타입 안전성: int, bool, SecretStr 등 자동 타입 검증 및 변환
+  - Fail-Fast 검증: 앱 시작 시점에 필수 설정 누락/오류 즉시 감지
+  - 환경별 자동 분기: development/testing/production
+
+#### 보안 강화
+- **Secret 마스킹**: 로그에서 API 키 등 시크릿 자동 마스킹
+  - `_SecretFilter` 클래스로 로그 출력 시 자동 마스킹
+  - SecretStr 타입 사용으로 실수로 인한 노출 방지
+  - 시크릿 값 길이 표시로 디버깅 편의성 유지
+
+#### 환경별 설정 지원
+- **Development**: `.env` 파일 자동 로드
+- **Testing**: GitHub Actions 환경변수 우선
+- **Production**: OS 환경변수만 사용, `.env` 파일 무시
+
+#### 호환성 유지
+- **레거시 호환 모듈**: `newsletter/compat_env.py`
+  - 기존 `os.getenv()` 호출을 점진적 마이그레이션
+  - `getenv_compat()` 함수로 중단 없는 전환
+  - 마이그레이션 진행도 추적 도구 제공
+
+### 🔧 기술적 개선
+
+#### 설정 검증 강화
+- **API 키 길이 검증**: 최소 16자 이상 요구
+- **포트 범위 검증**: 1-65535 범위 자동 검증
+- **LLM 키 검증**: OpenAI, Anthropic, Gemini 중 최소 1개 필수
+- **이메일 설정 검증**: POSTMARK_SERVER_TOKEN, EMAIL_SENDER 필수
+
+#### 코드 마이그레이션 완료
+- **핵심 모듈 업데이트**:
+  - `newsletter/config_manager.py`: Centralized Settings 우선 사용
+  - `web/app.py`: Sentry 설정을 Centralized Settings로 교체
+  - `web/worker.py`: Redis 설정을 Centralized Settings로 교체
+  - `web/mail.py`: 이메일 설정을 Centralized Settings로 교체
+
+#### 싱글톤 패턴 적용
+- `@lru_cache` 데코레이터로 설정 인스턴스 캐싱
+- 앱 시작 시 한 번만 로드 & 검증
+- 메모리 효율성 및 성능 최적화
+
+### 📁 파일 시스템 개선
+
+#### Docker 보안 강화
+- **새로운 파일**: `.dockerignore` 추가
+  - `.env*` 패턴으로 환경 파일 누출 방지
+  - 이미지 크기 최적화 및 보안 강화
+
+#### 환경변수 문서화
+- **새로운 파일**: `env.example` 추가
+  - 모든 환경변수 목록과 설명
+  - 필수/선택 구분으로 설정 가이드 제공
+  - 환경별 설정 예시 및 보안 주의사항
+
+### 🧪 테스트 시스템
+
+#### 단위 테스트 완성
+- **새로운 파일**: `tests/unit_tests/test_centralized_settings.py`
+  - 설정 검증 테스트: 필수 필드, 타입 검증, 길이 검증
+  - 환경별 동작 테스트: development, testing, production
+  - 싱글톤 동작 테스트: 캐싱 및 인스턴스 재사용
+  - Secret 마스킹 테스트: 로그 필터 동작 검증
+
+### 📚 문서화 완성
+
+#### README 업데이트
+- **Settings 섹션 추가**: F-14 기능 상세 설명
+  - 환경변수 우선순위 명시
+  - 사용 방법 및 예시 코드
+  - 환경별 설정 가이드
+  - 마이그레이션 가이드
+
+### 🎯 완료된 체크리스트
+
+#### 1-A. Settings Core
+- ✅ 설계 내용 기존 문서에 통합
+- ✅ settings.py 스캐폴딩 (Pydantic 기반)
+- ✅ Fail-Fast 검증 로직 (포트, 키 길이, LLM 키)
+- ✅ 싱글턴 헬퍼 (`@lru_cache get_settings()`)
+- ✅ Secret 마스킹 로거 (`_SecretFilter`)
+- ✅ env-compat shim (`newsletter/compat_env.py`)
+- ✅ 레거시 호출 교체 (핵심 모듈 우선)
+
+#### 1-B. 환경별 분기 & DevOps
+- ✅ `.dockerignore` 추가 (`.env*` 누출 방지)
+- ✅ `env.example` 강화 (상세 설명 및 구역 분리)
+
+#### 1-C. 테스트 & 보안
+- ✅ Unit 테스트 (happy/error/masking 케이스)
+- ✅ Secret 마스킹 검증
+
+#### 1-D. 문서화
+- ✅ README "⚙️ Settings" 섹션 추가
+- ✅ 환경변수 설정 가이드 업데이트
+- ✅ CHANGELOG 항목 추가
+
+### 🔧 Breaking Changes
+- 없음 (완전한 하위 호환성 유지)
+
+### 🌟 검증 결과
+
+#### 환경별 테스트
+- ✅ Development: `.env` 파일 로드 + 자동 검증
+- ✅ Testing: 필수 환경변수 누락 시 즉시 실패
+- ✅ Production: OS 환경변수만 사용, 보안 강화
+
+#### 호환성 테스트
+- ✅ 기존 CLI: `python -m newsletter.cli` 정상 동작
+- ✅ 웹 애플리케이션: 모든 기능 정상 동작
+- ✅ 레거시 코드: `getenv_compat()` 을 통한 안전한 마이그레이션
+
+---
+
 ## [0.5.1] - 2025-06-09 - F-03 즉시 이메일 발송 기능 완성
 
 ### 🚀 주요 기능

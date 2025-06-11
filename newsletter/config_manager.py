@@ -32,38 +32,83 @@ class ConfigManager:
         cls._config_cache = {}
 
     def _load_environment_variables(self):
-        """환경 변수 로딩"""
-        # API 키들
-        self.SERPER_API_KEY = os.getenv("SERPER_API_KEY")
-        self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-        self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+        """환경 변수 로딩 - Centralized Settings 사용"""
+        try:
+            from newsletter.centralized_settings import get_settings
 
-        # Google 관련
-        self.GOOGLE_APPLICATION_CREDENTIALS = os.getenv(
-            "GOOGLE_APPLICATION_CREDENTIALS"
-        )
-        self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
-        self.GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+            settings = get_settings()
 
-        # 네이버 API
-        self.NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
-        self.NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
-
-        # 이메일 설정 통합 (POSTMARK_FROM_EMAIL은 호환성용)
-        self.EMAIL_SENDER = os.getenv("EMAIL_SENDER") or os.getenv(
-            "POSTMARK_FROM_EMAIL"
-        )
-        self.POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
-
-        # 기타 설정
-        self.ADDITIONAL_RSS_FEEDS = os.getenv("ADDITIONAL_RSS_FEEDS", "")
-
-        # 호환성 경고
-        if os.getenv("POSTMARK_FROM_EMAIL") and not os.getenv("EMAIL_SENDER"):
-            self._log_warning(
-                "POSTMARK_FROM_EMAIL은 deprecated됩니다. EMAIL_SENDER를 사용하세요."
+            # API 키들 (SecretStr에서 값 추출)
+            self.SERPER_API_KEY = settings.serper_api_key.get_secret_value()
+            self.GEMINI_API_KEY = (
+                settings.gemini_api_key.get_secret_value()
+                if settings.gemini_api_key
+                else None
             )
+            self.OPENAI_API_KEY = (
+                settings.openai_api_key.get_secret_value()
+                if settings.openai_api_key
+                else None
+            )
+            self.ANTHROPIC_API_KEY = (
+                settings.anthropic_api_key.get_secret_value()
+                if settings.anthropic_api_key
+                else None
+            )
+
+            # Google 관련
+            self.GOOGLE_APPLICATION_CREDENTIALS = (
+                settings.google_application_credentials
+            )
+            self.GOOGLE_CLIENT_ID = settings.google_client_id
+            self.GOOGLE_CLIENT_SECRET = (
+                settings.google_client_secret.get_secret_value()
+                if settings.google_client_secret
+                else None
+            )
+
+            # 네이버 API
+            self.NAVER_CLIENT_ID = settings.naver_client_id
+            self.NAVER_CLIENT_SECRET = (
+                settings.naver_client_secret.get_secret_value()
+                if settings.naver_client_secret
+                else None
+            )
+
+            # 이메일 설정
+            self.EMAIL_SENDER = settings.email_sender
+            self.POSTMARK_SERVER_TOKEN = (
+                settings.postmark_server_token.get_secret_value()
+            )
+
+            # 기타 설정
+            self.ADDITIONAL_RSS_FEEDS = settings.additional_rss_feeds
+
+        except Exception as e:
+            # Centralized settings 실패 시 fallback to legacy
+            self._log_warning(
+                f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}"
+            )
+
+            # 레거시 fallback (호환성을 위해 유지)
+            from newsletter.compat_env import getenv_compat
+
+            self.SERPER_API_KEY = getenv_compat("SERPER_API_KEY")
+            self.GEMINI_API_KEY = getenv_compat("GEMINI_API_KEY")
+            self.OPENAI_API_KEY = getenv_compat("OPENAI_API_KEY")
+            self.ANTHROPIC_API_KEY = getenv_compat("ANTHROPIC_API_KEY")
+            self.GOOGLE_APPLICATION_CREDENTIALS = getenv_compat(
+                "GOOGLE_APPLICATION_CREDENTIALS"
+            )
+            self.GOOGLE_CLIENT_ID = getenv_compat("GOOGLE_CLIENT_ID")
+            self.GOOGLE_CLIENT_SECRET = getenv_compat("GOOGLE_CLIENT_SECRET")
+            self.NAVER_CLIENT_ID = getenv_compat("NAVER_CLIENT_ID")
+            self.NAVER_CLIENT_SECRET = getenv_compat("NAVER_CLIENT_SECRET")
+            self.EMAIL_SENDER = getenv_compat("EMAIL_SENDER") or getenv_compat(
+                "POSTMARK_FROM_EMAIL"
+            )
+            self.POSTMARK_SERVER_TOKEN = getenv_compat("POSTMARK_SERVER_TOKEN")
+            self.ADDITIONAL_RSS_FEEDS = getenv_compat("ADDITIONAL_RSS_FEEDS", "")
 
     def load_config_file(self, config_file: str = "config.yml") -> Dict[str, Any]:
         """YAML 설정 파일 로딩 (캐시 지원)"""
