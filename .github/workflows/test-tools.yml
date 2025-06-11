@@ -60,9 +60,6 @@ jobs:
 
         # Mock external dependencies before any imports
         mock_modules = {
-            'google.generativeai': Mock(),
-            'google.generativeai.caching': Mock(),
-            'google.generativeai.types': Mock(),
             'langchain_google_genai': Mock(),
             'langchain_google_genai.chat_models': Mock(),
         }
@@ -70,7 +67,7 @@ jobs:
         with patch.dict(sys.modules, mock_modules):
             print('✓ Successfully patched external dependencies')
             try:
-                from newsletter.tools import clean_html_markers
+                from newsletter.html_utils import clean_html_markers
                 print('✓ Successfully imported clean_html_markers')
                 
                 # Test the function works

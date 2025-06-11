@@ -14,17 +14,11 @@ from newsletter import config
 class TestSummarize(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
-        self.original_google_generativeai = sys.modules.get("google.generativeai")
+        # google.generativeai는 더 이상 사용하지 않음
+        pass
 
     def tearDown(self):
-        # Restore original google.generativeai module state
-        if self.original_google_generativeai is not None:
-            sys.modules["google.generativeai"] = self.original_google_generativeai
-        elif "google.generativeai" in sys.modules:
-            # If it wasn't there before but got added
-            del sys.modules["google.generativeai"]
-
-        # Clean up other potentially problematic modules that are reloaded
+        # Clean up modules that are reloaded during tests
         for mod_key in [
             "newsletter.summarize",
             "newsletter.llm_factory",
@@ -45,13 +39,9 @@ class TestSummarize(unittest.TestCase):
             "newsletter.summarize",
             "newsletter.llm_factory",
             "langchain_google_genai",
-            "google.generativeai",
         ]:
             if mod_key_to_delete in sys.modules:
                 del sys.modules[mod_key_to_delete]
-
-        mock_genai_module_for_summarize_import = MagicMock()
-        sys.modules["google.generativeai"] = mock_genai_module_for_summarize_import
 
         # Import and reload to ensure we get fresh modules
         import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
@@ -91,35 +81,26 @@ class TestSummarize(unittest.TestCase):
                     "news_summarization", unittest.mock.ANY, enable_fallback=False
                 )
                 mock_llm_instance.invoke.assert_called_once()
-                mock_genai_module_for_summarize_import.GenerativeModel.assert_not_called()
 
     def test_summarize_with_missing_module(self):
-        # Ensure google.generativeai is seen as None by summarize.py
-        if "google.generativeai" in sys.modules:
-            del sys.modules["google.generativeai"]
-        sys.modules["google.generativeai"] = None
-
-        # Reload affected modules
-        for mod_key in [
-            "newsletter.llm_factory",
-            "langchain_core",
-            "langchain_google_genai",
-        ]:
-            if mod_key in sys.modules:
-                del sys.modules[mod_key]
-
-        import newsletter.summarize
-
-        importlib.reload(newsletter.summarize)
-        summarize_articles = newsletter.summarize.summarize_articles
-
+        # LLM 팩토리에서 모든 제공자가 사용 불가능할 때 테스트
         keywords = ["AI"]
         articles = [
             {"title": "Test", "url": "http://test.com", "content": "Test content"}
         ]
-        html_output = summarize_articles(keywords, articles)
-        self.assertIn("오류: google.generativeai 모듈을 찾을 수 없습니다", html_output)
-        self.assertIn("pip install google-generativeai", html_output)
+
+        # API 키를 모두 None으로 설정하여 사용 가능한 제공자가 없도록 함
+        with (
+            unittest.mock.patch.object(config, "GEMINI_API_KEY", None),
+            unittest.mock.patch.object(config, "OPENAI_API_KEY", None),
+            unittest.mock.patch.object(config, "ANTHROPIC_API_KEY", None),
+        ):
+
+            import newsletter.summarize
+
+            html_output = newsletter.summarize.summarize_articles(keywords, articles)
+            self.assertIn("오류: 사용 가능한 LLM 제공자가 없습니다", html_output)
+            self.assertIn("GEMINI_API_KEY", html_output)
 
     def test_summarize_articles_no_api_key(self):
         # Ensure google.generativeai is a benign mock to prevent NameError during its import
@@ -149,7 +130,7 @@ class TestSummarize(unittest.TestCase):
                 {"title": "Test", "url": "http://test.com", "content": "Test content"}
             ]
             html_output = summarize_articles(keywords, articles)
-            self.assertIn("오류: GEMINI_API_KEY가 설정되지 않았습니다", html_output)
+            self.assertIn("오류: 사용 가능한 LLM 제공자가 없습니다", html_output)
             self.assertIn("키워드: 테스트", html_output)
             self.assertIn("제공된 기사 수: 1", html_output)
             # Ensure the direct genai mock wasn't used for generation

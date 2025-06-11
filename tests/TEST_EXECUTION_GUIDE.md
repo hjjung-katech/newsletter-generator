@@ -109,7 +109,37 @@ python -m pytest -m deployment
 
 # 실제 API 테스트만 (API 키 필요)
 python -m pytest -m real_api
+
+# 한국어 인코딩 테스트만
+python -m pytest -m korean
+
+# 느린 테스트 제외하고 실행
+python -m pytest -m "not slow"
 ```
+
+## 🇰🇷 한국어 테스트 실행
+
+한국어 키워드를 사용한 CLI 테스트:
+
+```bash
+# 한국어 테스트만 실행
+python -m pytest tests/integration/test_korean_cli.py -v
+
+# 한국어 테스트 마커로 실행
+python -m pytest -m korean -v
+
+# 한국어 테스트 직접 실행 (단일 테스트)
+python tests/integration/test_korean_cli.py
+
+# 통합 테스트 중 한국어만
+python -m pytest -m "korean and integration" -v
+```
+
+### 한국어 테스트 특징
+- **인코딩 처리**: UTF-8, CP949, EUC-KR 등 안전한 디코딩
+- **키워드 검증**: 한국어 키워드가 결과에 포함되는지 확인
+- **혼합 언어**: 한국어와 영어 키워드 혼합 테스트
+- **특수 문자**: 이모지, 한자 등 특수 문자 인코딩 테스트
 
 ## 🔧 문제 해결
 

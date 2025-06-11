@@ -64,8 +64,8 @@ class TestRailwayE2E:
         assert response.status_code == 200
 
         data = response.json()
-        # 실제 구현에서는 "ok", "degraded", "error" 중 하나를 반환
-        assert data["status"] in ["ok", "degraded", "error"]
+        # 실제 구현에서는 "healthy", "degraded", "error" 중 하나를 반환
+        assert data["status"] in ["healthy", "degraded", "error"]
         assert "dependencies" in data
         assert "timestamp" in data
 
@@ -90,7 +90,7 @@ class TestRailwayE2E:
             # 500 에러는 서버 문제이므로 테스트 스킵
             pytest.skip("Server error - API endpoint may not be available")
 
-        assert response.status_code == 200
+        assert response.status_code == 202
 
         data = response.json()
         # 실제 구현에서는 "queued" 또는 "processing" 상태를 반환할 수 있음

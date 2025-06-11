@@ -251,28 +251,67 @@ class NewsletterApp {
     }
 
     startPolling(jobId) {
+        this.currentJobId = jobId; // Store current job ID
+        this.pollCount = 0; // 폴링 횟수 카운터 추가
+        this.maxPollCount = 900; // 최대 15분 (900초)
+        
         this.pollInterval = setInterval(async () => {
             try {
+                this.pollCount++;
+                
+                // 최대 폴링 횟수 초과 시 중단
+                if (this.pollCount > this.maxPollCount) {
+                    this.stopPolling();
+                    this.showError('처리 시간이 너무 오래 걸립니다. 페이지를 새로고침하고 다시 시도해주세요.');
+                    return;
+                }
+
                 const response = await fetch(`/api/status/${jobId}`);
                 const result = await response.json();
 
+                // Update progress text with email status
+                const progressText = document.getElementById('progressText');
+                if (result.sent) {
+                    progressText.textContent = '뉴스레터 생성 완료 및 이메일 발송 완료...';
+                } else {
+                    progressText.textContent = `뉴스레터를 생성하고 있습니다... (${this.pollCount}초 경과)`;
+                }
+
                 if (result.status === 'completed') {
                     this.stopPolling();
+                    console.log(`✅ 폴링 완료: ${this.pollCount}초 후 작업 완료`);
+                    // Add job_id to result for iframe src
+                    if (result.result) {
+                        result.result.job_id = jobId;
+                        result.result.sent = result.sent;
+                    }
                     this.showResults(result.result);
+                    
+                    // Show email success message
+                    if (result.sent) {
+                        this.showEmailSuccess(result.result?.email_to);
+                    }
                 } else if (result.status === 'failed') {
                     this.stopPolling();
+                    console.log(`❌ 폴링 중단: ${this.pollCount}초 후 작업 실패`);
                     this.showError(result.result?.error || 'Generation failed');
                 }
             } catch (error) {
                 console.error('Polling error:', error);
+                // 연속 오류 발생 시 폴링 중단
+                if (this.pollCount > 10) {
+                    this.stopPolling();
+                    this.showError('서버와의 연결에 문제가 발생했습니다.');
+                }
             }
-        }, 2000);
+        }, 1000); // 1초 간격으로 폴링
     }
 
     stopPolling() {
         if (this.pollInterval) {
             clearInterval(this.pollInterval);
             this.pollInterval = null;
+            this.pollCount = 0; // 카운터 리셋
         }
     }
 
@@ -391,13 +430,42 @@ class NewsletterApp {
                 <h4 class="text-lg font-semibold text-gray-800 mb-3">
                     <i class="fas fa-newspaper mr-2"></i>Newsletter Content
                 </h4>
-                <div class="border rounded p-4 bg-gray-50 max-h-96 overflow-y-auto">
-                    ${result.html_content || '<p class="text-gray-500">Newsletter content could not be loaded.</p>'}
+                <div class="border rounded bg-gray-50">
+                    ${result.html_content ? 
+                        (result.job_id ? 
+                            `<iframe id="newsletterFrame" 
+                                     style="width: 100%; height: 600px; border: none;" 
+                                     src="/api/newsletter-html/${result.job_id}"
+                                     sandbox="allow-same-origin allow-scripts">
+                             </iframe>` :
+                            `<iframe id="newsletterFrame" 
+                                     style="width: 100%; height: 600px; border: none;" 
+                                     sandbox="allow-same-origin allow-scripts">
+                             </iframe>`) :
+                        '<p class="text-gray-500 p-4">Newsletter content could not be loaded.</p>'
+                    }
                 </div>
             </div>
         `;
 
         preview.innerHTML = detailsHtml;
+
+        // Load HTML content using blob URL if no job_id available
+        if (result.html_content && !result.job_id) {
+            setTimeout(() => {
+                const iframe = document.getElementById('newsletterFrame');
+                if (iframe) {
+                    const blob = new Blob([result.html_content], { type: 'text/html; charset=utf-8' });
+                    const blobUrl = URL.createObjectURL(blob);
+                    iframe.src = blobUrl;
+                    
+                    // Clean up blob URL after iframe loads
+                    iframe.onload = () => {
+                        URL.revokeObjectURL(blobUrl);
+                    };
+                }
+            }, 100);
+        }
 
         // Update button states
         this.updateResultButtons(result);
@@ -454,6 +522,30 @@ class NewsletterApp {
         alert('오류: ' + message);
     }
 
+    showEmailSuccess(email) {
+        // Create and show success notification
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <i class="fas fa-check-circle mr-2"></i>
+                <span>✅ 메일 발송 완료: ${email}</span>
+                <button class="ml-4 text-green-700 hover:text-green-900" onclick="this.parentElement.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+    }
+
     async loadHistory() {
         try {
             const response = await fetch('/api/history');
@@ -471,7 +563,7 @@ class NewsletterApp {
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
                                 ${item.params?.keywords ? 
-                                  `키워드: ${item.params.keywords.join(', ')}` : 
+                                  `키워드: ${Array.isArray(item.params.keywords) ? item.params.keywords.join(', ') : item.params.keywords}` : 
                                   `도메인: ${item.params?.domain || 'Unknown'}`}
                             </h4>
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
@@ -514,7 +606,7 @@ class NewsletterApp {
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
                                 ${schedule.params?.keywords ? 
-                                  `키워드: ${schedule.params.keywords.join(', ')}` : 
+                                  `키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
                                   `도메인: ${schedule.params?.domain || 'Unknown'}`}
                             </h4>
                             <p class="text-sm text-gray-500">
@@ -571,15 +663,26 @@ class NewsletterApp {
 
     async viewHistoryItem(itemId) {
         try {
+            console.log('viewHistoryItem called with itemId:', itemId);
             const response = await fetch(`/api/status/${itemId}`);
             const result = await response.json();
+            console.log('API response:', result);
 
             if (result.result?.html_content) {
+                console.log('HTML content found, switching to generate tab');
+                // Add job_id to result for iframe src
+                result.result.job_id = itemId;
+                this.currentJobId = itemId;
                 // Switch to generate tab and show the result
                 this.switchTab('generateTab');
                 this.showResults(result.result);
+                console.log('Results displayed successfully');
+            } else {
+                console.log('No HTML content found in result');
+                alert('뉴스레터 콘텐츠를 찾을 수 없습니다.');
             }
         } catch (error) {
+            console.error('Error in viewHistoryItem:', error);
             alert('Failed to load item: ' + error.message);
         }
     }
@@ -593,7 +696,7 @@ class NewsletterApp {
                 // Populate form with historical parameters
                 if (result.params.keywords) {
                     document.getElementById('keywordsMethod').checked = true;
-                    document.getElementById('keywords').value = result.params.keywords.join(', ');
+                    document.getElementById('keywords').value = Array.isArray(result.params.keywords) ? result.params.keywords.join(', ') : result.params.keywords;
                 } else if (result.params.domain) {
                     document.getElementById('domainMethod').checked = true;
                     document.getElementById('domain').value = result.params.domain;
@@ -612,8 +715,26 @@ class NewsletterApp {
     }
 
     downloadNewsletter() {
-        // This would download the generated newsletter as HTML file
-        alert('다운로드 기능은 추후 구현됩니다.');
+        if (!this.currentJobId) {
+            // Try to get HTML content from current result
+            const iframe = document.getElementById('newsletterFrame');
+            if (iframe && iframe.src && iframe.src.startsWith('blob:')) {
+                alert('다운로드 기능을 위해 페이지를 새로고침하거나 뉴스레터를 다시 생성해주세요.');
+                return;
+            }
+            
+            alert('다운로드할 뉴스레터가 없습니다.');
+            return;
+        }
+
+        // Create a link to download from the API endpoint
+        const downloadUrl = `/api/newsletter-html/${this.currentJobId}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `newsletter_${this.currentJobId}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     async sendEmail() {
@@ -720,6 +841,99 @@ class NewsletterApp {
             alert('설정 확인 실패: ' + error.message);
         }
     }
+
+    escapeHtmlForSrcdoc(html) {
+        return html
+            .replace(/&/g, '&amp;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r');
+    }
+
+    async suggestKeywords() {
+        const domainInput = document.getElementById('domain');
+        const domain = domainInput.value.trim();
+        const resultDiv = document.getElementById('keywords-result');
+        const button = document.getElementById('btn-suggest');
+
+        if (!domain) {
+            resultDiv.innerHTML = '<div class="text-red-600 text-sm">도메인을 입력해주세요.</div>';
+            return;
+        }
+
+        // Show loading state
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>추천 중...';
+        resultDiv.innerHTML = '<div class="text-blue-600 text-sm">키워드를 생성하고 있습니다...</div>';
+
+        try {
+            const response = await fetch('/api/suggest', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ domain: domain })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.keywords && data.keywords.length > 0) {
+                // Display suggested keywords
+                const keywordsList = data.keywords.map(keyword => 
+                    `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2 mb-2 cursor-pointer hover:bg-blue-200" onclick="app.addKeywordToInput('${keyword}')">${keyword}</span>`
+                ).join('');
+                
+                resultDiv.innerHTML = `
+                    <div class="text-sm text-gray-700 mb-2">추천 키워드 (클릭하여 추가):</div>
+                    <div class="flex flex-wrap">${keywordsList}</div>
+                    <button onclick="app.useAllKeywords(${JSON.stringify(data.keywords).replace(/"/g, '&quot;')})" 
+                            class="mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
+                        모든 키워드 사용
+                    </button>
+                `;
+            } else {
+                resultDiv.innerHTML = '<div class="text-yellow-600 text-sm">키워드를 생성할 수 없습니다. 다른 도메인을 시도해보세요.</div>';
+            }
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="text-red-600 text-sm">오류가 발생했습니다: ' + error.message + '</div>';
+        } finally {
+            // Restore button state
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-lightbulb mr-1"></i>추천받기';
+        }
+    }
+
+    addKeywordToInput(keyword) {
+        const keywordsInput = document.getElementById('keywords');
+        const currentKeywords = keywordsInput.value.trim();
+        
+        if (currentKeywords) {
+            keywordsInput.value = currentKeywords + ', ' + keyword;
+        } else {
+            keywordsInput.value = keyword;
+        }
+        
+        // Switch to keywords method
+        document.getElementById('keywordsMethod').checked = true;
+        this.toggleInputMethod();
+    }
+
+    useAllKeywords(keywords) {
+        const keywordsInput = document.getElementById('keywords');
+        keywordsInput.value = keywords.join(', ');
+        
+        // Switch to keywords method
+        document.getElementById('keywordsMethod').checked = true;
+        this.toggleInputMethod();
+    }
+}
+
+// Global function for onclick handlers
+function suggestKeywords() {
+    app.suggestKeywords();
 }
 
 // Initialize app when DOM is loaded

@@ -53,6 +53,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "manual: tests that require manual intervention or special setup"
     )
+    config.addinivalue_line(
+        "markers", "korean: tests with Korean language content and encoding"
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -127,12 +130,16 @@ def pytest_collection_modifyitems(config, items):
                 )
 
         # Legacy API 마킹 처리 (기존 @pytest.mark.api)
-        elif "api" in item.keywords and "mock_api" not in item.keywords:
-            # 기존 API 테스트들을 real_api로 분류
-            if not run_real_api:
+        elif (
+            "api" in item.keywords
+            and "mock_api" not in item.keywords
+            and "real_api" not in item.keywords
+        ):
+            # 기존 API 테스트들을 mock_api로 분류 (더 안전한 기본값)
+            if not run_mock_api:
                 item.add_marker(
                     pytest.mark.skip(
-                        reason="Legacy API test. Set RUN_REAL_API_TESTS=1 to enable or migrate to mock_api"
+                        reason="Legacy API test. Set RUN_MOCK_API_TESTS=1 to enable or migrate to mock_api"
                     )
                 )
 
@@ -164,6 +171,41 @@ def test_articles():
             "content": "This is another test article about machine learning.",
         },
     ]
+
+
+@pytest.fixture
+def client():
+    """Flask test client fixture"""
+    import sys
+    from pathlib import Path
+
+    # Add web directory to path temporarily
+    web_dir = Path(__file__).parent.parent / "web"
+    if str(web_dir) not in sys.path:
+        sys.path.insert(0, str(web_dir))
+
+    try:
+        from app import app
+
+        app.config["TESTING"] = True
+        with app.test_client() as client:
+            yield client
+    finally:
+        # Clean up path
+        if str(web_dir) in sys.path:
+            sys.path.remove(str(web_dir))
+
+
+@pytest.fixture
+def korean_keywords():
+    """Korean test keywords fixture"""
+    return ["토요타", "삼성전자", "AI", "반도체"]
+
+
+@pytest.fixture
+def mixed_language_keywords():
+    """Mixed language test keywords fixture"""
+    return ["반도체,semiconductor", "AI,인공지능", "토요타,Toyota"]
 
 
 def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

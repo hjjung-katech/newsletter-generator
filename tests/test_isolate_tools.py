@@ -16,7 +16,7 @@ mock_langchain_google_genai.ChatGoogleGenerativeAI = Mock()
 
 # Patch imports before importing from newsletter
 with patch.dict(sys.modules, {"langchain_google_genai": mock_langchain_google_genai}):
-    from newsletter.tools import clean_html_markers
+    from newsletter.html_utils import clean_html_markers
 
 
 class TestCleanHtmlMarkers(unittest.TestCase):

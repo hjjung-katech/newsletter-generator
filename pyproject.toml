@@ -152,6 +152,11 @@ markers = [
     "integration: integration tests that require full system setup",
     "manual: manual tests that require specific setup or user interaction",
     "asyncio: async tests that require asyncio event loop",
+    "unit: unit tests that test individual functions in isolation",
+    "api: tests that involve web API endpoints",
+    "email: tests that involve email functionality",
+    "e2e: end-to-end tests that test complete workflows",
+    "deployment: tests related to deployment and infrastructure",
 ]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]

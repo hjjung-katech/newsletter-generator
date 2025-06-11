@@ -11,7 +11,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 # 필요한 모듈을 패치
-with patch.dict("sys.modules", {"google.generativeai": MagicMock()}):
+with patch.dict("sys.modules", {"langchain_google_genai": MagicMock()}):
     from newsletter import article_filter, cli, collect, config
     from newsletter.sources import NewsSourceManager, SerperAPISource
 
