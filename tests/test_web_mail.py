@@ -72,13 +72,17 @@ class TestWebMail:
         with pytest.raises((RuntimeError, RetryError)):
             send_email(to="test@example.com", subject="Test", html="<h1>Test</h1>")
 
-    @patch("web.mail._get_email_config")
-    def test_check_email_configuration_complete(self, mock_get_config):
+    @patch("newsletter.config_manager.config_manager.validate_email_config")
+    def test_check_email_configuration_complete(self, mock_validate_config):
         """Test email configuration check with complete setup"""
         from web.mail import check_email_configuration
 
-        # Mock valid email config
-        mock_get_config.return_value = ("test-token", "test@example.com")
+        # Mock the config_manager.validate_email_config to return valid config
+        mock_validate_config.return_value = {
+            "postmark_token_configured": True,
+            "from_email_configured": True,
+            "ready": True,
+        }
 
         config = check_email_configuration()
 
