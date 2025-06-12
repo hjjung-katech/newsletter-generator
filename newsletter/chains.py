@@ -264,15 +264,45 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
                     disable_streaming=getattr(llm, "disable_streaming", False),
                 )
             else:
-                # OpenAI, Anthropic의 경우
-                return type(llm)(
-                    model=llm.model,
-                    api_key=getattr(llm, "api_key", None),
-                    temperature=temperature,
-                    callbacks=callbacks,
-                    timeout=getattr(llm, "timeout", 60),
-                    max_retries=getattr(llm, "max_retries", 2),
-                )
+                # OpenAI, Anthropic의 경우 - F-14 중앙화된 설정 시스템 적용
+                if "ChatOpenAI" in str(type(llm)):
+                    return type(llm)(
+                        model=getattr(
+                            llm, "model_name", getattr(llm, "model", "gpt-4o-mini")
+                        ),
+                        api_key=getattr(llm, "api_key", None),
+                        temperature=temperature,
+                        callbacks=callbacks,
+                        timeout=getattr(llm, "timeout", 60),
+                        max_retries=getattr(llm, "max_retries", 2),
+                    )
+                elif "ChatAnthropic" in str(type(llm)):
+                    return type(llm)(
+                        model=getattr(
+                            llm,
+                            "model_name",
+                            getattr(llm, "model", "claude-3-haiku-20240307"),
+                        ),
+                        api_key=getattr(llm, "api_key", None),
+                        temperature=temperature,
+                        callbacks=callbacks,
+                        timeout=getattr(llm, "timeout", 60),
+                        max_retries=getattr(llm, "max_retries", 2),
+                    )
+                else:
+                    # 기타 제공자의 경우
+                    return type(llm)(
+                        model=getattr(
+                            llm,
+                            "model_name",
+                            getattr(llm, "model", llm.__class__.__name__),
+                        ),
+                        api_key=getattr(llm, "api_key", None),
+                        temperature=temperature,
+                        callbacks=callbacks,
+                        timeout=getattr(llm, "timeout", 60),
+                        max_retries=getattr(llm, "max_retries", 2),
+                    )
 
         return llm
 
@@ -284,9 +314,9 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
             if os.environ.get("DEBUG_LLM_FACTORY"):
                 logger.debug(f"Debug: LLM factory failed, using fallback: {e}")
         else:
-            # 다른 오류는 출력
+            # 다른 오류는 출력 - F-14 로거 수정
             logger.warning(
-                "Warning: LLM factory failed, falling back to default Gemini: %s", e
+                f"Warning: LLM factory failed, falling back to default Gemini: {e}"
             )
 
         # Fallback to original Gemini implementation

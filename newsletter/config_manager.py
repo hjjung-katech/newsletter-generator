@@ -26,10 +26,19 @@ class ConfigManager:
             self._load_environment_variables()
 
     @classmethod
-    def reset_for_testing(cls):
+    def reset_for_testing(cls, test_env_vars: dict = None):
         """테스트용으로 싱글톤 인스턴스와 캐시를 리셋합니다."""
         cls._instance = None
         cls._config_cache = {}
+
+        # CentralizedSettings 캐시도 클리어하고 테스트 모드 활성화
+        try:
+            from newsletter.centralized_settings import enable_test_mode
+
+            if test_env_vars:
+                enable_test_mode(test_env_vars)
+        except ImportError:
+            pass
 
     def _load_environment_variables(self):
         """환경 변수 로딩 - Centralized Settings 사용"""
@@ -85,6 +94,13 @@ class ConfigManager:
             self.ADDITIONAL_RSS_FEEDS = settings.additional_rss_feeds
 
         except Exception as e:
+            # 테스트 모드에서는 fallback 하지 않음
+            from newsletter.centralized_settings import _test_mode
+
+            if _test_mode:
+                # 테스트 모드에서는 예외를 다시 발생시켜 테스트가 실패하도록 함
+                raise e
+
             # Centralized settings 실패 시 fallback to legacy
             self._log_warning(
                 f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}"

@@ -1,8 +1,47 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import json
 import os
+import sys
 import traceback
 from datetime import datetime
 from typing import List, Optional
+
+# F-14: Windows 한글 인코딩 문제 해결 (강화된 버전)
+if sys.platform.startswith("win"):
+    import locale
+    import io
+
+    # UTF-8 인코딩 강제 설정
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    os.environ["PYTHONUTF8"] = "1"
+
+    # 시스템 기본 인코딩을 UTF-8로 설정
+    try:
+        locale.setlocale(locale.LC_ALL, "ko_KR.UTF-8")
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, ".65001")  # Windows UTF-8 codepage
+        except locale.Error:
+            pass  # 설정할 수 없으면 무시
+
+    # 표준 입출력 스트림을 UTF-8로 재구성
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    else:
+        # 이전 Python 버전을 위한 fallback
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer, encoding="utf-8", errors="replace"
+        )
+
+    # 디폴트 인코딩 설정
+    if hasattr(sys, "_setdefaultencoding"):
+        sys._setdefaultencoding("utf-8")
 
 import typer
 from dotenv import load_dotenv

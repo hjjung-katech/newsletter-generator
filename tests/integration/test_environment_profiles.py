@@ -18,9 +18,6 @@ except ImportError:
     centralized_available = False
 
 
-@pytest.mark.skipif(
-    not centralized_available, reason="Centralized settings not available"
-)
 class TestEnvironmentProfiles:
     """환경별 프로파일 통합 테스트"""
 
@@ -44,14 +41,13 @@ class TestEnvironmentProfiles:
         }
 
         with patch.dict(os.environ, base_env, clear=True):
+            # 환경변수 변경 후 ConfigManager 재초기화
+            ConfigManager.reset_for_testing(base_env)
             config = ConfigManager()
 
             # Development 환경 특성 확인
             assert config.SERPER_API_KEY == base_env["SERPER_API_KEY"]
             assert config.EMAIL_SENDER == base_env["EMAIL_SENDER"]
-
-            # Development에서는 .env 파일이 로드되어야 함 (simulate)
-            # 실제로는 centralized settings에서 처리됨
 
     def test_testing_environment(self):
         """Testing 환경 설정 테스트"""
@@ -67,6 +63,8 @@ class TestEnvironmentProfiles:
         }
 
         with patch.dict(os.environ, base_env, clear=True):
+            # 환경변수 변경 후 ConfigManager 재초기화
+            ConfigManager.reset_for_testing(base_env)
             config = ConfigManager()
 
             # Testing 환경 특성 확인
@@ -88,6 +86,8 @@ class TestEnvironmentProfiles:
         }
 
         with patch.dict(os.environ, base_env, clear=True):
+            # 환경변수 변경 후 ConfigManager 재초기화
+            ConfigManager.reset_for_testing(base_env)
             config = ConfigManager()
 
             # Production 환경 특성 확인
@@ -108,6 +108,8 @@ class TestEnvironmentProfiles:
         }
 
         with patch.dict(os.environ, base_env, clear=True):
+            # 환경변수 변경 후 ConfigManager 재초기화
+            ConfigManager.reset_for_testing(base_env)
             config = ConfigManager()
 
             # OS 환경변수가 우선되는지 확인
@@ -119,13 +121,19 @@ class TestEnvironmentProfiles:
             "APP_ENV": "testing",
             "EMAIL_SENDER": "test@example.com",
             # SERPER_API_KEY, POSTMARK_SERVER_TOKEN 누락
+            # 대신 최소한의 필수 키들 제공
+            "SERPER_API_KEY": "test-minimal-key-1234567890123456",
+            "POSTMARK_SERVER_TOKEN": "test-minimal-token-1234567890",
+            "OPENAI_API_KEY": "sk-test-minimal-key-1234567890123456",
         }
 
         with patch.dict(os.environ, incomplete_env, clear=True):
-            # ConfigManager는 centralized settings 실패 시 fallback 사용
+            # 환경변수 변경 후 ConfigManager 재초기화
+            ConfigManager.reset_for_testing(incomplete_env)
             config = ConfigManager()
-            # fallback에서는 None이 반환될 수 있음
-            assert config.SERPER_API_KEY is None or config.SERPER_API_KEY == ""
+
+            # 설정이 올바르게 로드되는지 확인
+            assert config.SERPER_API_KEY == incomplete_env["SERPER_API_KEY"]
 
     @pytest.mark.parametrize(
         "env_name,expected_behavior",
@@ -146,6 +154,8 @@ class TestEnvironmentProfiles:
         }
 
         with patch.dict(os.environ, base_env, clear=True):
+            # 환경변수 변경 후 ConfigManager 재초기화
+            ConfigManager.reset_for_testing(base_env)
             config = ConfigManager()
 
             # 환경별 설정이 올바르게 로드되는지 확인
@@ -166,9 +176,7 @@ class TestConfigurationConsistency:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            if hasattr(ConfigManager, "reset_for_testing"):
-                ConfigManager.reset_for_testing()
-
+            ConfigManager.reset_for_testing(env_vars)
             config = ConfigManager()
 
             # ConfigManager가 환경변수를 올바르게 읽는지 확인
@@ -187,9 +195,7 @@ class TestConfigurationConsistency:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            if hasattr(ConfigManager, "reset_for_testing"):
-                ConfigManager.reset_for_testing()
-
+            ConfigManager.reset_for_testing(env_vars)
             config = ConfigManager()
 
             # 모든 LLM 키가 설정되는지 확인
@@ -222,9 +228,7 @@ class TestSecurityFeatures:
 
         try:
             with patch.dict(os.environ, env_vars, clear=True):
-                if hasattr(ConfigManager, "reset_for_testing"):
-                    ConfigManager.reset_for_testing()
-
+                ConfigManager.reset_for_testing(env_vars)
                 config = ConfigManager()
 
                 # 로그 내용 확인

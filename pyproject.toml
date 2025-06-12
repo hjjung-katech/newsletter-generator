@@ -198,28 +198,39 @@ exclude_files = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+minversion = "6.0"
 addopts = [
-    "-v",
-    "--tb=short",
+    "-ra",
     "--strict-markers",
     "--strict-config",
     "--cov=newsletter",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-report=html:htmlcov",
+    "--cov-report=term-missing",
+    "--cov-report=html",
     "--cov-report=xml",
+    "--tb=short",
 ]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
-    "api: marks tests as API tests",
-    "email: marks tests that involve email functionality",
-    "real_api: marks tests that require real API calls",
-    "mock_api: marks tests that use mocked API responses",
-    "e2e: marks end-to-end tests",
-    "deployment: marks deployment-related tests",
-    "manual: marks manual tests that require specific setup",
+    "real_api: tests that require real API calls",
+    "e2e: end-to-end tests",
+    "deployment: deployment tests",
+    "slow: slow running tests",
+    "integration: integration tests",
+    "mock_api: tests that use mocked API responses",
+    "email: tests that involve email functionality",
+    "api: tests for API endpoints",
+    "unit: unit tests",
+    "manual: manual tests that require specific setup",
+]
+# asyncio 설정
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+# 경고 필터링
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:.*PytestReturnNotNoneWarning.*",
+    "ignore:.*request_timeout.*:UserWarning",
 ]
