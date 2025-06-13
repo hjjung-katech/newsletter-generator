@@ -234,6 +234,3 @@ filterwarnings = [
     "ignore:.*PytestReturnNotNoneWarning.*",
     "ignore:.*request_timeout.*:UserWarning",
 ]
-
-# pydantic_settings 추가
-pydantic_settings = ">=2.0.0"

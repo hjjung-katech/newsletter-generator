@@ -48,6 +48,8 @@ jobs:
     - name: Run email unit tests (mocked)
       env:
         MOCK_MODE: true
+        POSTMARK_SERVER_TOKEN: dummy-token-for-testing
+        EMAIL_SENDER: test@example.com
         PYTHONPATH: ${{ github.workspace }}
       run: |
         echo "🧪 Running mocked email tests (no real API calls)"

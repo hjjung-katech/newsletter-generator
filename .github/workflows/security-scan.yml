@@ -48,11 +48,11 @@ jobs:
 
       - name: Run detect-secrets scan
         run: |
-          detect-secrets scan --baseline .secrets.baseline --force-use-all-plugins
+          detect-secrets scan .secrets.baseline --force-use-all-plugins
           
       - name: Verify secrets baseline
         run: |
-          detect-secrets audit --baseline .secrets.baseline --diff
+          detect-secrets audit .secrets.baseline --diff
 
       - name: Upload scan results
         if: failure()
