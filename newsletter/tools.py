@@ -513,8 +513,10 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                     from .cost_tracking import get_tracking_callbacks
 
                     callbacks += get_tracking_callbacks()
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.warning(f"get_tracking_callbacks 예외 발생: {e}")
 
             llm = get_llm_for_task("theme_extraction", callbacks, enable_fallback=False)
 

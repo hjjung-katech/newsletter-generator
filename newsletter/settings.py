@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     host: str = Field(
         default="127.0.0.1" if APP_ENV in ["development", "testing"] else "0.0.0.0",
         description="웹 서버 호스트 (개발/테스트 환경: localhost만, 프로덕션: 모든 인터페이스)",
-    )
+    )  # nosec B104
     app_env: Literal["development", "testing", "production"] = APP_ENV
 
     # ── 선택(디폴트) ─────────────────────────────────────
