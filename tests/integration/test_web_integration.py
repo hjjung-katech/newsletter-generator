@@ -5,12 +5,12 @@ Tests the web API with actual CLI integration
 """
 
 import json
+import os
 import sys
 import time
-import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
+import pytest
 import requests
 
 # F-14: 중앙화된 설정 시스템 import

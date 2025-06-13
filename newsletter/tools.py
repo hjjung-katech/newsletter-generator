@@ -543,6 +543,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
 
         # Fallback using LangChain Google GenAI
         from langchain_core.messages import HumanMessage
+
         from .llm_factory import get_llm_for_task
 
         try:
@@ -741,6 +742,7 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
 
     # Fallback using LangChain Google GenAI
     from langchain_core.messages import HumanMessage
+
     from .llm_factory import get_llm_for_task
 
     try:

@@ -4,16 +4,17 @@ Unit tests for F-14 Centralized Settings Layer
 """
 
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 from pydantic import ValidationError
 
 from newsletter.centralized_settings import (
     CentralizedSettings,
-    get_settings,
-    enable_test_mode,
-    disable_test_mode,
     clear_settings_cache,
+    disable_test_mode,
+    enable_test_mode,
+    get_settings,
 )
 
 

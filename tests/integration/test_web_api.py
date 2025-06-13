@@ -4,9 +4,9 @@ Simple test script for the newsletter web API
 """
 
 import json
-import time
-import sys
 import os
+import sys
+import time
 
 import requests
 

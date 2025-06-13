@@ -10,8 +10,8 @@ from typing import List, Optional
 
 # F-14: Windows 한글 인코딩 문제 해결 (강화된 버전)
 if sys.platform.startswith("win"):
-    import locale
     import io
+    import locale
 
     # UTF-8 인코딩 강제 설정
     os.environ["PYTHONIOENCODING"] = "utf-8"
