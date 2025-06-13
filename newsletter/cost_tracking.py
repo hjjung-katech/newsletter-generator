@@ -1,10 +1,12 @@
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+import logging
 
 from langchain.callbacks.base import BaseCallbackHandler
 
 from .utils.logger import get_logger
+from .utils.error_handling import handle_exception
 
 # 로거 초기화
 logger = get_logger()
@@ -333,8 +335,8 @@ def get_tracking_callbacks():
             callbacks.append(GoogleGenAICostCB())
             # 다른 제공자들도 필요에 따라 추가할 수 있음
         except Exception as e:
+            handle_exception(e, "비용 추적 콜백 초기화", log_level=logging.INFO)
             # 첫 번째 초기화에서만 에러 메시지 출력
-            pass
         return callbacks
 
     # LangChain 트레이싱 설정 (LANGCHAIN_TRACING_V2 환경 변수 사용)

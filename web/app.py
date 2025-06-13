@@ -20,61 +20,116 @@ sys.path.insert(0, current_dir)
 
 # Import web types module - will be loaded later to avoid conflicts
 
-# Sentry 통합 - 환경 변수가 있을 때만 초기화
-if os.getenv("SENTRY_DSN"):
-    try:
-        import sentry_sdk
-        from sentry_sdk.integrations.flask import FlaskIntegration
-        from sentry_sdk.integrations.logging import LoggingIntegration
 
-        # 로깅 통합 설정
-        logging_integration = LoggingIntegration(
-            level=logging.INFO,  # Capture info and above as breadcrumbs
-            event_level=logging.ERROR,  # Send errors as events
-        )
+# Sentry 통합 - 더미 함수 먼저 정의
+def set_sentry_user_context(*args, **kwargs):
+    """Sentry 사용자 컨텍스트 설정 (더미)"""
+    pass
 
-        sentry_sdk.init(
-            dsn=os.getenv("SENTRY_DSN"),
-            integrations=[
-                FlaskIntegration(transaction_style="endpoint"),
-                logging_integration,
-            ],
-            traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
-            environment=os.getenv("ENVIRONMENT", "production"),
-            release=os.getenv("APP_VERSION", "1.0.0"),
-            # 성능 모니터링 설정
-            profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
-            # 추가 컨텍스트
-            before_send=lambda event, hint: (
-                event if event.get("level") != "info" else None
-            ),
-        )
-        print("✅ Sentry initialized successfully")
 
-        # 사용자 컨텍스트 설정을 위한 헬퍼 함수
-        def set_sentry_user_context(user_id=None, email=None, **kwargs):
-            """Sentry에 사용자 컨텍스트 설정"""
-            sentry_sdk.set_user({"id": user_id, "email": email, **kwargs})
+def set_sentry_tags(**kwargs):
+    """Sentry 태그 설정 (더미)"""
+    pass
 
-        # 태그 설정을 위한 헬퍼 함수
-        def set_sentry_tags(**tags):
-            """Sentry에 태그 설정"""
-            for key, value in tags.items():
-                sentry_sdk.set_tag(key, value)
 
-    except ImportError:
-        print("⚠️  Sentry SDK not installed, skipping Sentry integration")
-    except Exception as e:
-        print(f"⚠️  Sentry initialization failed: {e}")
-else:
-    print("ℹ️  Sentry DSN not configured, skipping Sentry integration")
+# Centralized Settings 사용한 Sentry 설정
+try:
+    from newsletter.centralized_settings import get_settings
 
-    # Sentry 함수들의 더미 구현
-    def set_sentry_user_context(*args, **kwargs):
-        pass
+    settings = get_settings()
 
-    def set_sentry_tags(**kwargs):
-        pass
+    if settings.sentry_dsn:
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            from sentry_sdk.integrations.logging import LoggingIntegration
+
+            logging_integration = LoggingIntegration(
+                level=logging.INFO,
+                event_level=logging.ERROR,
+            )
+
+            sentry_sdk.init(
+                dsn=settings.sentry_dsn,
+                integrations=[
+                    FlaskIntegration(transaction_style="endpoint"),
+                    logging_integration,
+                ],
+                traces_sample_rate=settings.sentry_traces_sample_rate,
+                environment=settings.environment,
+                release=settings.app_version,
+                profiles_sample_rate=settings.sentry_profiles_sample_rate,
+                before_send=lambda event, hint: (
+                    event if event.get("level") != "info" else None
+                ),
+            )
+            print("✅ Sentry initialized successfully")
+
+            # 실제 Sentry 함수들로 재정의
+            def set_sentry_user_context(user_id=None, email=None, **kwargs):
+                """Sentry에 사용자 컨텍스트 설정"""
+                sentry_sdk.set_user({"id": user_id, "email": email, **kwargs})
+
+            def set_sentry_tags(**tags):
+                """Sentry에 태그 설정"""
+                for key, value in tags.items():
+                    sentry_sdk.set_tag(key, value)
+
+        except ImportError:
+            print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+        except Exception as e:
+            print(f"⚠️  Sentry initialization failed: {e}")
+    else:
+        print("ℹ️  Sentry DSN not configured, skipping Sentry integration")
+
+except Exception as e:
+    # Centralized settings 실패 시 legacy fallback
+    print(f"⚠️  Centralized settings unavailable, checking legacy SENTRY_DSN: {e}")
+    if os.getenv("SENTRY_DSN"):
+        try:
+            import sentry_sdk
+            from sentry_sdk.integrations.flask import FlaskIntegration
+            from sentry_sdk.integrations.logging import LoggingIntegration
+
+            logging_integration = LoggingIntegration(
+                level=logging.INFO,
+                event_level=logging.ERROR,
+            )
+
+            sentry_sdk.init(
+                dsn=os.getenv("SENTRY_DSN"),
+                integrations=[
+                    FlaskIntegration(transaction_style="endpoint"),
+                    logging_integration,
+                ],
+                traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+                environment=os.getenv("ENVIRONMENT", "production"),
+                release=os.getenv("APP_VERSION", "1.0.0"),
+                profiles_sample_rate=float(
+                    os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")
+                ),
+                before_send=lambda event, hint: (
+                    event if event.get("level") != "info" else None
+                ),
+            )
+            print("✅ Sentry initialized successfully (legacy mode)")
+
+            # 실제 Sentry 함수들로 재정의
+            def set_sentry_user_context(user_id=None, email=None, **kwargs):
+                """Sentry에 사용자 컨텍스트 설정"""
+                sentry_sdk.set_user({"id": user_id, "email": email, **kwargs})
+
+            def set_sentry_tags(**tags):
+                """Sentry에 태그 설정"""
+                for key, value in tags.items():
+                    sentry_sdk.set_tag(key, value)
+
+        except ImportError:
+            print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+        except Exception as e:
+            print(f"⚠️  Sentry initialization failed: {e}")
+    else:
+        print("ℹ️  Legacy SENTRY_DSN not configured, skipping Sentry integration")
 
 
 # Import task function for RQ

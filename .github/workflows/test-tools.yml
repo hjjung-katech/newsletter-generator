@@ -45,6 +45,8 @@ jobs:
       run: |
         echo "GEMINI_API_KEY=dummy_key_for_testing" >> $GITHUB_ENV
         echo "SERPER_API_KEY=dummy_key_for_testing" >> $GITHUB_ENV
+        echo "POSTMARK_SERVER_TOKEN=dummy_token_for_testing" >> $GITHUB_ENV
+        echo "EMAIL_SENDER=test@example.com" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
         echo "GRPC_DNS_RESOLVER=native" >> $GITHUB_ENV
         echo "GRPC_POLL_STRATEGY=epoll1" >> $GITHUB_ENV

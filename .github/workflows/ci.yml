@@ -50,6 +50,8 @@ jobs:
         OPENAI_API_KEY: test-key
         SERPER_API_KEY: test-key
         GEMINI_API_KEY: test-key
+        POSTMARK_SERVER_TOKEN: dummy-token-for-testing
+        EMAIL_SENDER: test@example.com
         PYTHONPATH: ${{ github.workspace }}
       run: |
         python -m pytest tests/test_minimal.py -v --tb=short

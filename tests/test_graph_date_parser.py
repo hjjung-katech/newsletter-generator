@@ -19,6 +19,28 @@ from newsletter.graph import parse_article_date_for_graph
 class TestGraphDateParser(unittest.TestCase):
     """그래프 날짜 파싱 기능 테스트 케이스"""
 
+    def setUp(self):
+        """각 테스트 전에 실행되는 설정"""
+        # F-14: 테스트 격리를 위한 설정 클리어
+        from newsletter.centralized_settings import (
+            clear_settings_cache,
+            disable_test_mode,
+        )
+
+        clear_settings_cache()
+        disable_test_mode()
+
+    def tearDown(self):
+        """각 테스트 후에 실행되는 정리"""
+        # F-14: 테스트 격리를 위한 설정 클리어
+        from newsletter.centralized_settings import (
+            clear_settings_cache,
+            disable_test_mode,
+        )
+
+        clear_settings_cache()
+        disable_test_mode()
+
     def test_relative_time_parsing_english(self):
         """영어 상대적 시간 형식 파싱 테스트"""
         now = datetime.now(timezone.utc)
@@ -65,9 +87,27 @@ class TestGraphDateParser(unittest.TestCase):
         expected = datetime(2023, 10, 15, 14, 30, 0, tzinfo=timezone.utc)
         self.assertEqual(result, expected)
 
-        # Common format
-        result = parse_article_date_for_graph("Oct 15, 2023")
-        self.assertIsNotNone(result)
+        # Common format - 더 안정적인 테스트로 변경
+        test_date = "Oct 15, 2023"
+        result = parse_article_date_for_graph(test_date)
+
+        # F-14: 디버깅을 위한 로그 추가
+        if result is None:
+            # 직접 date_utils에서 테스트
+            from newsletter.date_utils import parse_date_string
+
+            direct_result = parse_date_string(test_date)
+            print(f"F-14 Debug: parse_article_date_for_graph('{test_date}') = {result}")
+            print(f"F-14 Debug: parse_date_string('{test_date}') = {direct_result}")
+
+        self.assertIsNotNone(result, f"Failed to parse date: {test_date}")
+
+        # 추가 검증: 결과가 유효한 datetime 객체인지 확인
+        if result is not None:
+            self.assertIsInstance(result, datetime)
+            self.assertEqual(result.year, 2023)
+            self.assertEqual(result.month, 10)
+            self.assertEqual(result.day, 15)
 
 
 if __name__ == "__main__":

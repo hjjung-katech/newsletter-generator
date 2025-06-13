@@ -1,0 +1,71 @@
+# ========================================
+# Docker Ignore for Newsletter Generator
+# F-14 Security: .env 파일 누출 방지
+# ========================================
+
+# Environment files (보안 중요!)
+.env*
+!env.example
+
+# Development files
+*.log
+*.sqlite
+*.db
+.pytest_cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.coverage
+.coverage.*
+htmlcov/
+
+# Git and version control
+.git/
+.gitignore
+.gitattributes
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build and cache
+build/
+dist/
+*.egg-info/
+.cache/
+.mypy_cache/
+.pytest_cache/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Testing artifacts
+tests/
+test_*.py
+*_test.py
+
+# Development configs
+.pre-commit-config.yaml
+tox.ini
+setup.cfg
+
+# Debug files
+debug_files/
+debug_archives/
+*.debug
+
+# Output files (재생성 가능)
+output/
+storage.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp 

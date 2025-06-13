@@ -15,14 +15,22 @@ if str(project_root) not in sys.path:
 def _get_email_config():
     """이메일 설정을 동적으로 가져옵니다 (테스트 호환성 고려)"""
     try:
-        from newsletter.config_manager import config_manager
+        # 1차 시도: Centralized Settings
+        from newsletter.centralized_settings import get_settings
 
-        return config_manager.POSTMARK_SERVER_TOKEN, config_manager.EMAIL_SENDER
-    except (ImportError, AttributeError):
-        # Fallback to direct env access
-        postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
-        email_sender = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
-        return postmark_token, email_sender
+        settings = get_settings()
+        return settings.postmark_server_token.get_secret_value(), settings.email_sender
+    except Exception:
+        try:
+            # 2차 시도: Config Manager
+            from newsletter.config_manager import config_manager
+
+            return config_manager.POSTMARK_SERVER_TOKEN, config_manager.EMAIL_SENDER
+        except (ImportError, AttributeError):
+            # 3차 시도: Direct env access (레거시)
+            postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
+            email_sender = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
+            return postmark_token, email_sender
 
 
 @retry(stop=stop_after_attempt(3))

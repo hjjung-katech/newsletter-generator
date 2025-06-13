@@ -12,7 +12,20 @@ import requests
 BASE_URL = "http://127.0.0.1:5000"
 
 
+def is_server_running():
+    """Check if the server is running"""
+    try:
+        response = requests.get(f"{BASE_URL}/health", timeout=2)
+        return response.status_code == 200
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        return False
+
+
 @pytest.mark.manual
+@pytest.mark.skipif(
+    not is_server_running(),
+    reason="Server not running at http://127.0.0.1:5000 - start server first",
+)
 def test_generate_newsletter():
     """Test newsletter generation with keywords"""
     print("Testing newsletter generation...")
@@ -69,6 +82,10 @@ def poll_job_status(job_id):
 
 
 @pytest.mark.manual
+@pytest.mark.skipif(
+    not is_server_running(),
+    reason="Server not running at http://127.0.0.1:5000 - start server first",
+)
 def test_health_check():
     """Test health check endpoint"""
     print("Testing health check...")
@@ -87,6 +104,11 @@ def test_health_check():
 def main():
     print("Newsletter Generator API Test")
     print("=" * 40)
+
+    if not is_server_running():
+        print("❌ Server is not running at http://127.0.0.1:5000")
+        print("💡 Start the server first: python -m web.app")
+        return
 
     # Test health check first
     if not test_health_check():

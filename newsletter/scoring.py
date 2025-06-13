@@ -15,6 +15,7 @@ from . import config
 from .chains import get_llm
 from .date_utils import parse_date_string
 from .utils.logger import get_logger
+from .utils.error_handling import handle_exception
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {
@@ -149,8 +150,9 @@ def _parse_llm_json(text: str) -> Dict[str, float]:
     if match:
         try:
             return json.loads(match.group(0))
-        except Exception:
-            pass
+        except Exception as e:
+            handle_exception(e, "점수 JSON 파싱", log_level=logging.INFO)
+            return {"relevance": 1, "impact": 1, "novelty": 1}
     return {"relevance": 1, "impact": 1, "novelty": 1}
 
 

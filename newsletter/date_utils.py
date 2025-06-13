@@ -108,7 +108,50 @@ def parse_date_string(date_str: Any) -> Optional[datetime]:
     except ValueError:
         pass
 
-    # 4. Try other common formats
+    # 4. F-14: Windows 한글 환경에서 영어 월 이름 파싱 문제 해결
+    # locale 설정과 무관하게 영어 월 이름을 처리
+    english_month_names = {
+        "jan": 1,
+        "january": 1,
+        "feb": 2,
+        "february": 2,
+        "mar": 3,
+        "march": 3,
+        "apr": 4,
+        "april": 4,
+        "may": 5,
+        "jun": 6,
+        "june": 6,
+        "jul": 7,
+        "july": 7,
+        "aug": 8,
+        "august": 8,
+        "sep": 9,
+        "september": 9,
+        "oct": 10,
+        "october": 10,
+        "nov": 11,
+        "november": 11,
+        "dec": 12,
+        "december": 12,
+    }
+
+    # 영어 월 이름 형식 수동 처리
+    for month_name, month_num in english_month_names.items():
+        if month_name in date_str.lower():
+            # "Oct 15, 2023" 형식 처리
+            pattern = rf"\b{month_name}\s+(\d{{1,2}}),?\s+(\d{{4}})\b"
+            match = re.search(pattern, date_str, re.IGNORECASE)
+            if match:
+                day = int(match.group(1))
+                year = int(match.group(2))
+                try:
+                    dt = datetime(year, month_num, day, tzinfo=timezone.utc)
+                    return dt
+                except ValueError:
+                    continue
+
+    # 5. Try other common formats
     common_formats = [
         "%Y-%m-%dT%H:%M:%S.%f%z",  # ISO with microseconds and timezone
         "%Y-%m-%dT%H:%M:%S%z",  # ISO with timezone
@@ -122,12 +165,7 @@ def parse_date_string(date_str: Any) -> Optional[datetime]:
         "%Y.%m.%d",  # Original
         "%Y-%m-%d",
         "%Y년 %m월 %d일",  # Korean format "YYYY년 MM월 DD일"
-        # English formats
-        "%b %d, %Y",  # e.g., Apr 16, 2025
-        "%B %d, %Y",  # e.g., April 16, 2025
         "%m/%d/%Y",  # e.g., 04/16/2025
-        "%d %b %Y",  # e.g., 16 Apr 2025
-        "%d %B %Y",  # e.g., 16 April 2025
     ]
 
     for fmt in common_formats:

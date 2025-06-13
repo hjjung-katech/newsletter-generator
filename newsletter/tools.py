@@ -23,6 +23,7 @@ from rich.console import Console
 
 from . import config
 from .utils.logger import get_logger, show_collection_brief
+from .utils.error_handling import handle_exception
 
 # 로거 초기화
 logger = get_logger()
@@ -257,6 +258,9 @@ def fetch_article_content(url: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        import logging
+
+        logging.warning(f"fetch_article_content 예외 발생: {e}")
         raise ToolException(f"Error fetching article content: {str(e)}")
 
 
@@ -321,9 +325,11 @@ def generate_keywords_with_gemini(
             try:
                 from .cost_tracking import get_tracking_callbacks
 
+                handle_exception(None, "비용 추적 콜백 추가", log_level=logging.INFO)
                 callbacks += get_tracking_callbacks()
-            except Exception:
-                pass
+            except Exception as e:
+                handle_exception(e, "비용 추적 콜백 추가", log_level=logging.INFO)
+                # 비용 추적 실패는 치명적이지 않음
 
         # LLM 팩토리를 사용하여 키워드 생성에 최적화된 모델 사용
         try:
@@ -507,8 +513,10 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
                     from .cost_tracking import get_tracking_callbacks
 
                     callbacks += get_tracking_callbacks()
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+
+                    logging.warning(f"get_tracking_callbacks 예외 발생: {e}")
 
             llm = get_llm_for_task("theme_extraction", callbacks, enable_fallback=False)
 
@@ -543,6 +551,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
 
         # Fallback using LangChain Google GenAI
         from langchain_core.messages import HumanMessage
+
         from .llm_factory import get_llm_for_task
 
         try:
@@ -741,6 +750,7 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
 
     # Fallback using LangChain Google GenAI
     from langchain_core.messages import HumanMessage
+
     from .llm_factory import get_llm_for_task
 
     try:

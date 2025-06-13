@@ -8,20 +8,61 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Final
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from rich.console import Console
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from . import config
 from .date_utils import parse_date_string, standardize_date
 from .utils.logger import get_logger, show_collection_brief
+from .utils.error_handling import handle_exception
 
 # 로거 초기화
 logger = get_logger()
 console = Console()
+
+# 상수 정의
+TIMEOUT_SECONDS: Final[int] = 30
+MAX_RETRIES: Final[int] = 3
+BACKOFF_FACTOR: Final[float] = 0.3
+
+
+def create_requests_session() -> requests.Session:
+    """재시도 로직이 포함된 requests 세션 생성"""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=MAX_RETRIES,
+        backoff_factor=BACKOFF_FACTOR,
+        status_forcelist=[500, 502, 503, 504],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+def fetch_url_content(
+    url: str, headers: dict = None, method: str = "GET", data: dict = None
+) -> str:
+    """URL에서 컨텐츠를 안전하게 가져옴"""
+    session = create_requests_session()
+    try:
+        if method.upper() == "POST":
+            response = session.post(
+                url, headers=headers, json=data, timeout=TIMEOUT_SECONDS
+            )
+        else:
+            response = session.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
+        response.raise_for_status()
+        return response.text
+    except requests.RequestException as e:
+        logger.error(f"URL 요청 실패: {url}, 메소드: {method}, 에러: {str(e)}")
+        raise
 
 
 class NewsSource:
@@ -80,80 +121,69 @@ class SerperAPISource(NewsSource):
     def fetch_news(
         self, keywords: List[str], num_results: int = 10
     ) -> List[Dict[str, Any]]:
-        """Serper.dev API를 통해 뉴스 기사를 검색"""
+        """Serper API를 통해 뉴스 기사를 검색"""
         if not self.api_key:
-            logger.error("SERPER_API_KEY를 찾을 수 없습니다. .env 파일에 설정해주세요.")
+            logger.warning(
+                "Serper API 키를 찾을 수 없습니다. Serper 소스를 건너뜁니다."
+            )
             return []
 
         all_articles = []
         keyword_article_counts = {}
 
-        url = "https://google.serper.dev/news"
-
         for keyword in keywords:
             logger.info(
-                f"Serper.dev를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다"
-            )
-            payload = json.dumps(
-                {"q": keyword, "gl": "kr", "num": num_results}  # 한국 지역 결과
+                f"Serper API를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다"
             )
 
+            url = "https://google.serper.dev/news"
             headers = {
                 "X-API-KEY": self.api_key,
                 "Content-Type": "application/json",
             }
+            payload = {
+                "q": keyword,
+                "num": num_results,
+                "gl": "kr",  # 대한민국 검색 결과
+                "hl": "ko",  # 한국어 인터페이스
+            }
 
             try:
-                response = requests.request("POST", url, headers=headers, data=payload)
-                response.raise_for_status()
-
-                results = response.json()
+                content = fetch_url_content(
+                    url, headers=headers, method="POST", data=payload
+                )
+                results = json.loads(content)
                 articles_for_keyword = []
 
-                # 여러 가능한 결과 컨테이너를 확인하여 데이터 추출
-                containers = []
-
-                # 1. 'news' 키 확인 (뉴스 엔드포인트의 주요 응답 형식)
                 if "news" in results:
-                    containers.extend(results["news"])
-
-                # 2. 'topStories' 키도 확인 (일부 응답에 존재할 수 있음)
-                if "topStories" in results:
-                    containers.extend(results["topStories"])
-
-                # 3. 'organic' 키 확인 (fallback - 일반 검색 결과)
-                if "organic" in results and not containers:
-                    containers.extend(results["organic"])
-
-                # 각 아이템 처리
-                for item in containers[: min(num_results, len(containers))]:
-                    article = {
-                        "title": item.get("title", "제목 없음"),
-                        "url": item.get("link", ""),
-                        "link": item.get("link", ""),
-                        "snippet": item.get("snippet")
-                        or item.get("description", "내용 없음"),
-                        "source": item.get("source", "출처 없음"),
-                        "date": item.get("date")
-                        or item.get("publishedAt")
-                        or "날짜 없음",
-                    }
-                    articles_for_keyword.append(self._standardize_article(article))
+                    for item in results["news"]:
+                        article = {
+                            "title": item.get("title", "제목 없음"),
+                            "url": item.get("link", ""),
+                            "link": item.get("link", ""),
+                            "snippet": item.get("snippet")
+                            or item.get("description", "내용 없음"),
+                            "source": item.get("source", "출처 없음"),
+                            "date": item.get("date")
+                            or item.get("publishedAt")
+                            or "날짜 없음",
+                        }
+                        articles_for_keyword.append(self._standardize_article(article))
 
                 num_found = len(articles_for_keyword)
                 keyword_article_counts[keyword] = num_found
                 logger.info(
-                    f"Serper.dev를 통해 키워드 '{keyword}'에 대해 {num_found}개의 기사를 찾았습니다"
+                    f"Serper API를 통해 키워드 '{keyword}'에 대해 {num_found}개의 기사를 찾았습니다"
                 )
                 all_articles.extend(articles_for_keyword)
 
             except requests.exceptions.RequestException as e:
                 logger.error(
-                    f"Serper.dev를 통해 키워드 '{keyword}'에 대한 기사를 가져오는 중 오류가 발생했습니다: {e}"
+                    f"Serper API를 통해 키워드 '{keyword}'에 대한 기사를 가져오는 중 오류가 발생했습니다: {e}"
                 )
             except json.JSONDecodeError:
                 logger.error(
-                    f"Serper.dev를 통해 키워드 '{keyword}'에 대한 JSON 응답을 디코딩하는 중 오류가 발생했습니다."
+                    f"Serper API를 통해 키워드 '{keyword}'에 대한 JSON 응답을 디코딩하는 중 오류가 발생했습니다."
                 )
 
         # 키워드별 수집 결과 저장 (소스별 집계용)
@@ -162,7 +192,7 @@ class SerperAPISource(NewsSource):
 
 
 class RSSFeedSource(NewsSource):
-    """RSS 피드를 사용하여 뉴스 기사를 수집하는 소스"""
+    """RSS 피드에서 뉴스 기사를 가져오는 소스"""
 
     def __init__(self, name: str, feed_urls: List[str]):
         super().__init__(name)
@@ -171,19 +201,17 @@ class RSSFeedSource(NewsSource):
     def fetch_news(
         self, keywords: List[str], num_results: int = 10
     ) -> List[Dict[str, Any]]:
-        """RSS 피드에서 뉴스 기사를 수집하고 키워드로 필터링"""
+        """RSS 피드에서 뉴스 기사를 가져옴"""
         all_articles = []
-        keyword_article_counts = {keyword: 0 for keyword in keywords}
+        keyword_article_counts = {}
 
         for feed_url in self.feed_urls:
             try:
-                logger.info(f"RSS 피드를 가져오는 중: {feed_url}")
-                feed = feedparser.parse(feed_url)
+                content = fetch_url_content(feed_url)
+                feed = feedparser.parse(content)
 
-                if getattr(feed, "status", 200) != 200:
-                    logger.warning(
-                        f"RSS 피드 {feed_url}를 가져오는 데 실패했습니다, 상태: {getattr(feed, 'status', 'unknown')}"
-                    )
+                if not feed.entries:
+                    logger.warning(f"피드 {feed_url}에서 기사를 찾을 수 없습니다")
                     continue
 
                 logger.info(
@@ -299,8 +327,9 @@ class RSSFeedSource(NewsSource):
                 try:
                     dt = datetime(*date_field[:6])
                     return dt.strftime("%Y-%m-%d")
-                except Exception:
-                    pass
+                except Exception as e:
+                    handle_exception(e, "날짜 형식 변환", log_level=logging.DEBUG)
+                    # 날짜 변환 실패시 다음 필드 시도
             for field in ["published", "updated", "created"]:
                 if field in entry and entry[field]:
                     return entry[field]
@@ -313,8 +342,9 @@ class RSSFeedSource(NewsSource):
                 try:
                     dt = datetime(*date_field[:6])
                     return dt.strftime("%Y-%m-%d")
-                except Exception:
-                    pass
+                except Exception as e:
+                    handle_exception(e, "날짜 형식 변환", log_level=logging.DEBUG)
+                    # 날짜 변환 실패시 다음 필드 시도
             for field in ["published", "updated", "created"]:
                 if hasattr(entry, field) and getattr(entry, field):
                     return getattr(entry, field)
@@ -354,10 +384,8 @@ class NaverNewsAPISource(NewsSource):
             }
 
             try:
-                response = requests.get(url, headers=headers)
-                response.raise_for_status()
-
-                results = response.json()
+                content = fetch_url_content(url, headers=headers)
+                results = json.loads(content)
                 articles_for_keyword = []
 
                 if "items" in results and results["items"]:
