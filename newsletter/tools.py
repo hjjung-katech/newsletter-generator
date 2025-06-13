@@ -258,6 +258,9 @@ def fetch_article_content(url: str) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        import logging
+
+        logging.warning(f"fetch_article_content 예외 발생: {e}")
         raise ToolException(f"Error fetching article content: {str(e)}")
 
 

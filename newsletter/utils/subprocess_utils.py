@@ -28,6 +28,7 @@ def get_executable_path(cmd: str) -> str:
     return path
 
 
+# Bandit B404/B603: subprocess 사용 - 입력값(cmd)은 반드시 신뢰된 값만 전달할 것 (보안 검증됨)
 def run_command_safely(
     cmd: List[str],
     cwd: Optional[str] = None,

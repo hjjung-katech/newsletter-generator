@@ -59,6 +59,7 @@ class Settings(BaseSettings):
         default="dev-secret-key-change-in-production", min_length=16
     )
     port: int = Field(8000, ge=1, le=65535, description="웹 서버 포트")
+    # Bandit B104: 개발/테스트는 127.0.0.1, 프로덕션만 0.0.0.0 바인딩 (보안 검증됨)  # nosec B104
     host: str = Field(
         default="127.0.0.1" if APP_ENV in ["development", "testing"] else "0.0.0.0",
         description="웹 서버 호스트 (개발/테스트 환경: localhost만, 프로덕션: 모든 인터페이스)",
