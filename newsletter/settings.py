@@ -20,6 +20,7 @@ from typing import Literal
 
 from pydantic import BaseSettings, Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
+from .utils.error_handling import handle_exception
 
 # ────────────────────────────────
 # 1) .env 로드 (dev 전용·안전하게)
@@ -58,7 +59,10 @@ class Settings(BaseSettings):
         default="dev-secret-key-change-in-production", min_length=16
     )
     port: int = Field(8000, ge=1, le=65535, description="웹 서버 포트")
-    host: str = Field("0.0.0.0", description="웹 서버 호스트")
+    host: str = Field(
+        default="127.0.0.1" if APP_ENV in ["development", "testing"] else "0.0.0.0",
+        description="웹 서버 호스트 (개발/테스트 환경: localhost만, 프로덕션: 모든 인터페이스)",
+    )
     app_env: Literal["development", "testing", "production"] = APP_ENV
 
     # ── 선택(디폴트) ─────────────────────────────────────
@@ -242,9 +246,9 @@ class _SecretFilter(logging.Filter):
                     msg = msg.replace(secret_value, masked)
 
             record.msg = msg
-        except Exception:
+        except Exception as e:
+            handle_exception(e, "로그 메시지 설정", log_level=logging.DEBUG)
             # 필터 자체가 실패해도 로그는 출력되어야 함
-            pass
 
         return True
 

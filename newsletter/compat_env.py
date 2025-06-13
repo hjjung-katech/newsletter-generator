@@ -14,7 +14,10 @@ Legacy Compatibility Shim for Environment Variables
 
 import logging
 import os
-from typing import Any
+from typing import Any, List, Optional
+
+from .utils.subprocess_utils import run_command_safely
+from .utils.error_handling import handle_exception
 
 logger = logging.getLogger(__name__)
 
@@ -111,45 +114,53 @@ def getenv_compat(key: str, default: Any = None) -> Any:
     return os.getenv(key, default)
 
 
+def find_env_usage() -> List[str]:
+    """
+    프로젝트에서 os.getenv 사용을 찾아 반환
+    """
+    try:
+        # ripgrep 시도
+        result = run_command_safely(
+            ["rg", "-n", r"os\.getenv", "--type", "py", "."],
+            capture_output=True,
+            text=True,
+            cwd=".",
+        )
+        if result.returncode == 0:
+            return result.stdout.splitlines()
+    except Exception as e:
+        handle_exception(
+            e, "ripgrep으로 환경 변수 사용 검색", log_level=logging.WARNING
+        )
+
+        # grep으로 대체 시도
+        try:
+            result = run_command_safely(
+                ["grep", "-rn", "os.getenv", "--include=*.py", "."],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                return result.stdout.splitlines()
+        except Exception as e:
+            handle_exception(e, "grep으로 환경 변수 사용 검색", log_level=logging.ERROR)
+
+    return []
+
+
 def migrate_getenv_calls():
     """
     모든 os.getenv 호출을 찾아서 마이그레이션이 필요한 곳을 보고하는 유틸리티
 
     개발자가 수동으로 실행하여 마이그레이션 진행도를 확인할 수 있습니다.
     """
-    import subprocess
-    import sys
-
-    try:
-        # ripgrep으로 os.getenv 호출 찾기
-        result = subprocess.run(
-            ["rg", "-n", r"os\.getenv", "--type", "py", "."],
-            capture_output=True,
-            text=True,
-            cwd=".",
-        )
-
-        if result.returncode == 0:
-            print("🔍 Found os.getenv calls that need migration:")
-            print(result.stdout)
-        else:
-            print("✅ No os.getenv calls found!")
-
-    except FileNotFoundError:
-        print("⚠️ ripgrep not found, using grep fallback")
-        try:
-            result = subprocess.run(
-                ["grep", "-rn", "os.getenv", "--include=*.py", "."],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode == 0:
-                print("🔍 Found os.getenv calls that need migration:")
-                print(result.stdout)
-            else:
-                print("✅ No os.getenv calls found!")
-        except Exception as e:
-            print(f"❌ Could not search for os.getenv calls: {e}")
+    found_usages = find_env_usage()
+    if found_usages:
+        print("🔍 Found os.getenv calls that need migration:")
+        for usage in found_usages:
+            print(usage)
+    else:
+        print("✅ No os.getenv calls found!")
 
 
 if __name__ == "__main__":

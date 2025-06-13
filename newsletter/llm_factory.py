@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
 from .utils.logger import get_logger
+from .utils.error_handling import handle_exception
 
 # 중앙화된 설정 import 추가 (F-14)
 try:
@@ -345,8 +346,11 @@ class LLMWithFallback(Runnable):
                         try:
                             cost_callback = get_cost_callback_for_provider("gemini")
                             fallback_callbacks.append(cost_callback)
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            handle_exception(
+                                e, "비용 추적 콜백 추가", log_level=logging.INFO
+                            )
+                            # 비용 추적 실패는 치명적이지 않음
 
                         provider = self.factory.providers.get("gemini")
                         if provider and provider.is_available():
@@ -398,9 +402,12 @@ class LLMWithFallback(Runnable):
                     cost_callback = get_cost_callback_for_provider(provider_name)
                     fallback_callbacks.append(cost_callback)
                 except Exception as e:
-                    logger.warning(
-                        f"비용 추적 추가에 실패했습니다 ({provider_name}): {e}"
+                    handle_exception(
+                        e,
+                        f"비용 추적 콜백 추가 ({provider_name})",
+                        log_level=logging.INFO,
                     )
+                    # 비용 추적 실패는 치명적이지 않음
 
                 return provider.create_model(fallback_config, fallback_callbacks)
 
@@ -657,8 +664,10 @@ class LLMFactory:
             cost_callback = get_cost_callback_for_provider(provider_name)
             final_callbacks.append(cost_callback)
         except Exception as e:
-            logger.warning(
-                f"Warning: Failed to add cost tracking for {provider_name}: {e}"
+            handle_exception(
+                e,
+                f"Warning: Failed to add cost tracking for {provider_name}",
+                log_level=logging.INFO,
             )
 
         if not provider.is_available():
@@ -678,9 +687,12 @@ class LLMFactory:
                         cost_callback = get_cost_callback_for_provider(fallback_name)
                         final_callbacks.append(cost_callback)
                     except Exception as e:
-                        logger.warning(
-                            f"비용 추적 추가에 실패했습니다 ({fallback_name}): {e}"
+                        handle_exception(
+                            e,
+                            f"비용 추적 추가 ({fallback_name})",
+                            log_level=logging.INFO,
                         )
+                        # 비용 추적 실패는 치명적이지 않음
 
                     llm = fallback_provider.create_model(model_config, final_callbacks)
 

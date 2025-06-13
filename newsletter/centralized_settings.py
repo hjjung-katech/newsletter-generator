@@ -20,6 +20,7 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+from .utils.error_handling import handle_exception
 
 # 테스트 모드 플래그
 _test_mode = "pytest" in sys.modules or os.getenv("TESTING") == "1"
@@ -364,8 +365,9 @@ class _SecretFilter(logging.Filter):
                         msg = msg.replace(secret_value, masked)
 
             record.msg = msg
-        except Exception:
-            pass  # 에러가 나도 로그는 남겨야 함
+        except Exception as e:
+            handle_exception(e, "로그 메시지 설정", log_level=logging.DEBUG)
+            # 에러가 나도 로그는 남겨야 함
 
         return True
 

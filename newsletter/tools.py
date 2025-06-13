@@ -23,6 +23,7 @@ from rich.console import Console
 
 from . import config
 from .utils.logger import get_logger, show_collection_brief
+from .utils.error_handling import handle_exception
 
 # 로거 초기화
 logger = get_logger()
@@ -321,9 +322,11 @@ def generate_keywords_with_gemini(
             try:
                 from .cost_tracking import get_tracking_callbacks
 
+                handle_exception(None, "비용 추적 콜백 추가", log_level=logging.INFO)
                 callbacks += get_tracking_callbacks()
-            except Exception:
-                pass
+            except Exception as e:
+                handle_exception(e, "비용 추적 콜백 추가", log_level=logging.INFO)
+                # 비용 추적 실패는 치명적이지 않음
 
         # LLM 팩토리를 사용하여 키워드 생성에 최적화된 모델 사용
         try:
