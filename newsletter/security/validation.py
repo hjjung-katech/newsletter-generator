@@ -26,6 +26,42 @@ class FileValidationError(InputValidationError):
     pass
 
 
+def sanitize_input(value: str) -> str:
+    """입력값 살균 처리 (간단한 인터페이스)
+
+    Args:
+        value: 살균할 문자열
+
+    Returns:
+        살균된 문자열
+    """
+    return InputSanitizer.sanitize_string(value)
+
+
+def detect_sql_injection(value: str) -> bool:
+    """SQL 인젝션 패턴 검사 (간단한 인터페이스)
+
+    Args:
+        value: 검사할 문자열
+
+    Returns:
+        SQL 인젝션 패턴이 발견된 경우 True
+    """
+    return InputSanitizer.is_sql_injection(value)
+
+
+def validate_file_upload(filename: str) -> bool:
+    """파일 업로드 검증 (간단한 인터페이스)
+
+    Args:
+        filename: 검증할 파일명
+
+    Returns:
+        유효한 파일인 경우 True
+    """
+    return validate_file_extension(filename)
+
+
 def validate_file_extension(
     filename: str, allowed_extensions: Optional[List[str]] = None
 ) -> bool:
@@ -116,6 +152,16 @@ class InputSanitizer:
         if not isinstance(value, str):
             value = str(value)
 
+        # XSS 패턴 먼저 제거
+        for pattern in cls.XSS_PATTERNS:
+            value = pattern.sub("", value)
+
+        # 위험 함수명(alert 등) 추가 제거
+        value = re.sub(r"alert\s*\(.*?\)", "", value, flags=re.I)
+        value = re.sub(r"confirm\s*\(.*?\)", "", value, flags=re.I)
+        value = re.sub(r"prompt\s*\(.*?\)", "", value, flags=re.I)
+        value = re.sub(r"eval\s*\(.*?\)", "", value, flags=re.I)
+
         # HTML 이스케이프
         value = (
             value.replace("&", "&amp;")
@@ -124,10 +170,6 @@ class InputSanitizer:
             .replace('"', "&quot;")
             .replace("'", "&#x27;")
         )
-
-        # XSS 패턴 제거
-        for pattern in cls.XSS_PATTERNS:
-            value = pattern.sub("", value)
 
         return value.strip()
 

@@ -122,6 +122,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 headers={"Retry-After": str(security_config.RATE_LIMIT_WINDOW)},
             )
 
+        # 현재 시간을 요청 목록에 추가
         self.requests[identifier].append(time.time())
 
         # 캐시 저장
