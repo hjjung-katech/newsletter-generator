@@ -1,81 +1,73 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "newsletter-generator"
-version = "0.5.0"
-description = "내부 연구원을 위한 뉴스레터 생성 CLI 도구 - LangChain 및 LangGraph 사용"
+version = "0.6.0"
+description = "AI Newsletter Generator"
 readme = "README.md"
 authors = [
     {name = "Newsletter Generator Team", email = "example@corp.com"},
 ]
 requires-python = ">=3.10"
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Topic :: Communications :: Email",
-    "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: News/Diary",
+    "Programming Language :: Python :: 3.12",
 ]
 
 # Core runtime dependencies
 dependencies = [
-    "typer>=0.9.0",
-    "rich>=13.0.0",
-    "python-dotenv>=1.0.0",
-    "PyYAML>=6.0",
-    "requests>=2.28.0",
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "jinja2>=3.1.2",
+    "python-multipart>=0.0.6",
+    "httpx>=0.25.0",
     "beautifulsoup4>=4.12.0",
-    "markdownify>=0.11.0",
-    "jinja2>=3.1.0",
+    "python-dateutil>=2.8.2",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "feedparser>=6.0.10",
+    "requests>=2.31.0",
+    "redis>=5.0.0",
+    "rq>=1.15.0",
+    "sentry-sdk[fastapi]>=1.38.0",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.0.5",
+    "langchain-anthropic>=0.1.0",
+    "langchain-google-genai>=1.0.0",
+    "postmarker>=0.21.3",
 ]
 
 [project.optional-dependencies]
-# Full AI/ML dependencies for production
-full = [
-    "langchain>=0.3.0",
-    "langchain-core>=0.3.59",
-    "langchain-google-genai>=2.1.0",
-    "google-genai>=1.10.0",
-    "langgraph>=0.4.0",
-    "faiss-cpu>=1.7.4",
-    "chromadb>=0.4.22,<0.5.0",
-    "google-api-python-client>=2.100.0",
-    "google-auth>=2.15.0",
-    "google-auth-httplib2>=0.1.0",
-    "google-auth-oauthlib>=1.0.0",
-    "grpcio>=1.60.0",
-    "protobuf>=3.20.0,<7.0.0",
-]
-
-# Development and testing dependencies
 dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-mock>=3.10.0",
-    "black>=23.3.0",
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.0",
+    "black>=23.7.0",
     "isort>=5.12.0",
     "flake8>=6.0.0",
-    "mypy>=1.0.0",
+    "mypy>=1.5.0",
+    "pre-commit>=3.4.0",
+    "detect-secrets>=1.4.0",
     "responses>=0.23.0",
-    "unittest-xml-reporting>=3.2.0",
 ]
-
-# Minimal dependencies for CI testing
-test = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest-mock>=3.10.0",
-    "black>=23.3.0",
+security = [
+    "detect-secrets>=1.4.0",
+    "bandit>=1.7.0",
+    "safety>=2.3.0",
 ]
 
 [project.scripts]
-newsletter = "newsletter.cli:app"
+newsletter = "newsletter.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/hjjung-katech/newsletter-generator"
@@ -91,7 +83,7 @@ newsletter = ["templates/*.html", "templates/*.txt"]
 
 [tool.black]
 line-length = 88
-target-version = ['py310']
+target-version = ["py310"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -110,8 +102,11 @@ extend-exclude = '''
 [tool.isort]
 profile = "black"
 multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
 line_length = 88
-known_first_party = ["newsletter"]
 
 [tool.flake8]
 max-line-length = 88
@@ -129,46 +124,32 @@ exclude = [
 python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
 no_implicit_optional = true
-strict_optional = false
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
 
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = [
-    "-ra",
-    "--strict-markers",
-    "--strict-config",
-    "--tb=short",
-    "-m", "not manual",
+[[tool.mypy.overrides]]
+module = [
+    "feedparser.*",
+    "postmarker.*",
+    "rq.*",
+    "redis.*",
 ]
-testpaths = [
-    "tests",
-]
-markers = [
-    "real_api: tests that require real API calls and network connectivity",
-    "mock_api: tests that use mocked API responses",
-    "integration: integration tests that require full system setup",
-    "manual: manual tests that require specific setup or user interaction",
-    "asyncio: async tests that require asyncio event loop",
-    "unit: unit tests that test individual functions in isolation",
-    "api: tests that involve web API endpoints",
-    "email: tests that involve email functionality",
-    "e2e: end-to-end tests that test complete workflows",
-    "deployment: tests related to deployment and infrastructure",
-]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["newsletter"]
 omit = [
-    "*/tests/*",
-    "*/test_*",
+    "tests/*",
+    "newsletter/__main__.py",
     "*/__init__.py",
-    "setup.py",
 ]
 
 [tool.coverage.report]
@@ -183,4 +164,70 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
+]
+
+[tool.detect-secrets]
+baseline = ".secrets.baseline"
+filters_used = [
+    { path = "detect_secrets.filters.allowlist.is_line_allowlisted" },
+    { path = "detect_secrets.filters.common.is_baseline_file" },
+    { path = "detect_secrets.filters.common.is_ignored_due_to_verification_policies", min_level = 2 },
+    { path = "detect_secrets.filters.heuristic.is_indirect_reference" },
+    { path = "detect_secrets.filters.heuristic.is_likely_id_string" },
+    { path = "detect_secrets.filters.heuristic.is_lock_file" },
+    { path = "detect_secrets.filters.heuristic.is_not_alphanumeric_string" },
+    { path = "detect_secrets.filters.heuristic.is_potential_uuid" },
+    { path = "detect_secrets.filters.heuristic.is_prefixed_with_dollar_sign" },
+    { path = "detect_secrets.filters.heuristic.is_sequential_string" },
+    { path = "detect_secrets.filters.heuristic.is_swagger_file" },
+    { path = "detect_secrets.filters.heuristic.is_templated_secret" },
+]
+
+exclude_files = [
+    ".secrets.baseline",
+    ".*\\.lock$",
+    ".*\\.log$",
+    ".*\\.pyc$",
+    ".*/__pycache__/.*",
+    ".git/.*",
+    ".pytest_cache/.*",
+    ".venv/.*",
+    "htmlcov/.*",
+    "node_modules/.*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+minversion = "6.0"
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=newsletter",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+    "--tb=short",
+]
+markers = [
+    "real_api: tests that require real API calls",
+    "e2e: end-to-end tests",
+    "deployment: deployment tests",
+    "slow: slow running tests",
+    "integration: integration tests",
+    "mock_api: tests that use mocked API responses",
+    "email: tests that involve email functionality",
+    "api: tests for API endpoints",
+    "unit: unit tests",
+    "manual: manual tests that require specific setup",
+]
+# 경고 필터링
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore:.*PytestReturnNotNoneWarning.*",
+    "ignore:.*request_timeout.*:UserWarning",
 ]

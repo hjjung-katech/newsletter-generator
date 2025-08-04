@@ -8,6 +8,8 @@ HTML 형식의 뉴스레터를 자동으로 생성하는 기능을 제공합니�
 import os
 from datetime import datetime
 
+from .config_manager import config_manager
+
 # Set the generation date environment variable with current date and time
 os.environ["GENERATION_DATE"] = datetime.now().strftime("%Y-%m-%d")
 os.environ["GENERATION_TIMESTAMP"] = datetime.now().strftime("%H:%M:%S")

@@ -26,6 +26,7 @@
 - 📊 **Health Check**: 시스템 상태 및 의존성 모니터링
 - 🚨 **통합 모니터링**: Sentry를 통한 에러 추적 및 성능 모니터링
 - 📝 **구조화 로깅**: JSON 포맷 로깅으로 운영 환경 모니터링 최적화
+- ⚙️ **중앙집중식 설정**: Pydantic 기반 타입 안전 설정 관리, 환경별 분기, 시크릿 마스킹
 
 ## 🚀 Railway 클라우드 배포
 
@@ -114,32 +115,53 @@ python setup_env.py
 ```
 
 **수동 설정:**
-1. `.env` 파일을 루트 디렉토리에 생성
+1. `env.example` 파일을 참조하여 `.env` 파일 생성
 2. 필수 환경변수 설정:
 
 ```env
-# 필수 API 키
-SERPER_API_KEY=your_serper_api_key_here
-OPENAI_API_KEY=your_openai_api_key_here
+# ==========================================
+# [Required] 필수 환경변수 - 앱 시작에 필요
+# ==========================================
 
-# 이메일 발송 (필수 - 이메일 기능 사용시)
+# News Search API (필수)
+SERPER_API_KEY=your_serper_api_key_here
+
+# Email Service (필수)
 POSTMARK_SERVER_TOKEN=your_postmark_server_token_here
 EMAIL_SENDER=your_verified_email@yourdomain.com
 
-# 웹 애플리케이션
+# LLM API Keys (하나 이상 필요)
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# ==========================================
+# [Optional] 선택적 환경변수 - 기본값 있음
+# ==========================================
+
+# Application Environment (기본값: production)
+APP_ENV=development  # development, testing, production
+
+# Web Server Configuration
+PORT=8000
+HOST=0.0.0.0
 SECRET_KEY=your-secret-key-here
 
-# 선택사항 - 추가 기능
-GEMINI_API_KEY=your_gemini_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# Logging Configuration
+LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_FORMAT=json  # json, text
 
-# 모니터링 (선택사항)
+# Application Modes
+MOCK_MODE=false  # 개발시에는 true
+DEBUG=false
+
+# Monitoring & Error Tracking (선택사항)
 SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
-LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR
-
-# 개발/테스트 모드
-MOCK_MODE=false  # 운영환경에서는 false, 개발시에는 true
+SENTRY_TRACES_SAMPLE_RATE=0.1
+SENTRY_PROFILES_SAMPLE_RATE=0.1
 ```
+
+> **📝 참고**: 전체 환경변수 목록과 설명은 [`env.example`](env.example) 파일을 참조하세요.
 
 ### 2. API 키 발급 방법
 
@@ -198,6 +220,104 @@ python -m newsletter test-email --to your@email.com
 
 **참고사항:**
 - 발송자 이메일은 반드시 Postmark에서 인증되어야 합니다
+
+## ⚙️ Settings (F-14 중앙집중식 설정 관리)
+
+본 프로젝트는 **F-14 Centralized Settings Layer**를 통해 타입 안전하고 검증된 설정 관리를 제공합니다.
+
+### 주요 특징
+
+- **📋 타입 안전성**: Pydantic 기반 자동 타입 검증 및 변환
+- **🔒 보안 강화**: SecretStr 타입으로 시크릿 값 마스킹, 로그 노출 방지
+- **⚡ Fail-Fast**: 앱 시작 시점에 필수 설정 누락/오류 즉시 감지
+- **🌍 환경별 분기**: development/testing/production 환경별 자동 설정
+- **🔄 호환성 유지**: 기존 코드 중단 없이 점진적 마이그레이션
+
+### 환경변수 우선순위
+
+```
+1. OS 환경변수 (최우선)
+2. .env 파일 (development 환경에서만)
+3. 기본값 (설정에서 정의된 경우)
+```
+
+### 사용 방법
+
+**새로운 방식 (권장):**
+```python
+from newsletter.centralized_settings import get_settings
+
+# 싱글톤 설정 인스턴스 가져오기
+settings = get_settings()
+
+# 타입 안전 접근
+api_key = settings.serper_api_key.get_secret_value()  # SecretStr
+port = settings.port  # int (검증됨)
+debug_mode = settings.debug  # bool
+```
+
+**레거시 호환 방식:**
+```python
+from newsletter.compat_env import getenv_compat
+
+# 기존 os.getenv() 호출을 점진적으로 교체
+api_key = getenv_compat("SERPER_API_KEY")  # 자동으로 centralized settings에서 조회
+```
+
+### 환경별 설정
+
+```bash
+# Development
+APP_ENV=development  # .env 파일 자동 로드
+DEBUG=true
+LOG_LEVEL=DEBUG
+
+# Testing  
+APP_ENV=testing     # GitHub Actions에서 설정
+MOCK_MODE=true
+
+# Production
+APP_ENV=production  # .env 파일 무시, OS 환경변수만 사용
+DEBUG=false
+LOG_LEVEL=INFO
+```
+
+### 설정 검증
+
+앱 시작 시 다음 항목들이 자동 검증됩니다:
+
+- **필수 API 키**: SERPER_API_KEY, POSTMARK_SERVER_TOKEN, EMAIL_SENDER
+- **LLM 키**: OpenAI, Anthropic, Gemini 중 최소 1개 필요
+- **키 길이**: API 키는 최소 16자 이상
+- **포트 범위**: 1-65535 범위
+- **디렉토리**: 필요한 디렉토리 자동 생성
+
+### 시크릿 마스킹
+
+로그와 디버그 출력에서 시크릿 값이 자동으로 마스킹됩니다:
+
+```python
+# 입력: "API call failed with key: sk-1234567890abcdef"
+# 출력: "API call failed with key: •••••••••••• (OPENAI_KEY, len: 51)"
+```
+
+### 마이그레이션 가이드
+
+기존 `os.getenv()` 호출을 점진적으로 교체:
+
+```python
+# 기존
+api_key = os.getenv("SERPER_API_KEY")
+
+# 임시 (호환성)
+from newsletter.compat_env import getenv_compat
+api_key = getenv_compat("SERPER_API_KEY")
+
+# 최종 (권장)
+from newsletter.centralized_settings import get_settings
+settings = get_settings()
+api_key = settings.serper_api_key.get_secret_value()
+```
 - 무료 플랜은 월 100개 이메일까지 발송 가능합니다
 
 ## 💡 키워드 제안 기능
