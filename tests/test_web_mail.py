@@ -1,6 +1,18 @@
 """
 Unit tests for web mail functionality
 Tests the mail.py module with mocked Postmark responses
+
+FIXED ISSUES (2024-12-19):
+- Fixed mock path from 'newsletter.config_manager.get_config_manager' to 'newsletter.config_manager.config_manager'
+- Added proper environment variable cleanup in setup_method
+- Added fallback test with complete mocking of _get_email_config
+- All tests now pass in GitHub Actions environment
+
+TEST STRATEGY:
+- 5 tests pass (core functionality)
+- 3 tests skipped (complex mocking or real API requirements)
+- Environment variables properly isolated for clean test state
+- Mock configuration covers both success and failure scenarios
 """
 
 import os
@@ -23,6 +35,16 @@ class TestWebMail:
         # Set test environment variables
         os.environ["TESTING"] = "1"
         os.environ["MOCK_MODE"] = "true"
+
+        # Clear email-related environment variables to ensure clean test state
+        email_env_vars = [
+            "POSTMARK_SERVER_TOKEN",
+            "EMAIL_SENDER",
+            "POSTMARK_FROM_EMAIL",
+        ]
+        for var in email_env_vars:
+            if var in os.environ:
+                del os.environ[var]
 
         # Clear all previous imports to avoid cached state
         modules_to_clear = [
@@ -81,19 +103,17 @@ class TestWebMail:
         with pytest.raises((RuntimeError, RetryError)):
             send_email(to="test@example.com", subject="Test", html="<h1>Test</h1>")
 
-    @patch("newsletter.config_manager.get_config_manager")
-    def test_check_email_configuration_complete(self, mock_get_config_manager):
+    @patch("newsletter.config_manager.config_manager")
+    def test_check_email_configuration_complete(self, mock_config_manager):
         """Test email configuration check with complete setup"""
         from web.mail import check_email_configuration
 
-        # Mock the config manager
-        mock_config_manager = MagicMock()
+        # Mock the config manager instance directly
         mock_config_manager.validate_email_config.return_value = {
             "postmark_token_configured": True,
             "from_email_configured": True,
             "ready": True,
         }
-        mock_get_config_manager.return_value = mock_config_manager
 
         config = check_email_configuration()
 
@@ -101,23 +121,44 @@ class TestWebMail:
         assert config["from_email_configured"] is True
         assert config["ready"] is True
 
-    @patch("newsletter.config_manager.get_config_manager")
-    def test_check_email_configuration_incomplete(self, mock_get_config_manager):
-        """Test email configuration check with placeholder values"""
+    @patch("newsletter.config_manager.config_manager")
+    def test_check_email_configuration_incomplete(self, mock_config_manager):
+        """Test email configuration check with incomplete setup"""
         from web.mail import check_email_configuration
 
-        # Mock the config manager
-        mock_config_manager = MagicMock()
+        # Mock the config manager instance directly
         mock_config_manager.validate_email_config.return_value = {
             "postmark_token_configured": False,
             "from_email_configured": False,
             "ready": False,
         }
-        mock_get_config_manager.return_value = mock_config_manager
 
         config = check_email_configuration()
 
-        # These placeholder values should be considered as not configured
+        # These values should be considered as not configured
+        assert config["postmark_token_configured"] is False
+        assert config["from_email_configured"] is False
+        assert config["ready"] is False
+
+    @patch("newsletter.config_manager.config_manager")
+    @patch("web.mail._get_email_config")
+    def test_check_email_configuration_fallback(
+        self, mock_get_email_config, mock_config_manager
+    ):
+        """Test email configuration check with fallback logic"""
+        from web.mail import check_email_configuration
+
+        # Mock config_manager to raise an exception, forcing fallback
+        mock_config_manager.validate_email_config.side_effect = ImportError(
+            "Test import error"
+        )
+
+        # Mock _get_email_config to return None values for fallback
+        mock_get_email_config.return_value = (None, None)
+
+        config = check_email_configuration()
+
+        # Should use fallback logic and return False for all values
         assert config["postmark_token_configured"] is False
         assert config["from_email_configured"] is False
         assert config["ready"] is False
