@@ -141,8 +141,10 @@ class CentralizedSettings(BaseSettings):
 
     # 필수 설정 (F-14: SERPER_API_KEY를 Optional로 변경)
     serper_api_key: SecretStr | None = None
-    postmark_server_token: SecretStr = Field(..., description="Postmark 서버 토큰")
-    email_sender: str = Field(..., description="발송자 이메일")
+    postmark_server_token: SecretStr | None = Field(
+        None, description="Postmark 서버 토큰"
+    )
+    email_sender: str | None = Field(None, description="발송자 이메일")
 
     # LLM API 키 (하나 이상 필수)
     openai_api_key: SecretStr | None = None
@@ -253,7 +255,10 @@ class CentralizedSettings(BaseSettings):
     # 검증
     @field_validator("postmark_server_token")
     @classmethod
-    def validate_api_keys(cls, v: SecretStr) -> SecretStr:
+    def validate_api_keys(cls, v: SecretStr | None) -> SecretStr | None:
+        # None인 경우는 허용
+        if v is None:
+            return v
         # 테스트 모드에서는 검증 우회
         if _test_mode:
             return v

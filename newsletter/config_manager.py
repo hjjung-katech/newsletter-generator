@@ -48,7 +48,11 @@ class ConfigManager:
             settings = get_settings()
 
             # API 키들 (SecretStr에서 값 추출)
-            self.SERPER_API_KEY = settings.serper_api_key.get_secret_value()
+            self.SERPER_API_KEY = (
+                settings.serper_api_key.get_secret_value()
+                if settings.serper_api_key
+                else None
+            )
             self.GEMINI_API_KEY = (
                 settings.gemini_api_key.get_secret_value()
                 if settings.gemini_api_key
@@ -88,6 +92,8 @@ class ConfigManager:
             self.EMAIL_SENDER = settings.email_sender
             self.POSTMARK_SERVER_TOKEN = (
                 settings.postmark_server_token.get_secret_value()
+                if settings.postmark_server_token
+                else None
             )
 
             # 기타 설정
@@ -389,5 +395,17 @@ class ConfigManager:
             print(f"[WARNING] {message}")
 
 
-# 싱글톤 인스턴스
-config_manager = ConfigManager()
+# 싱글톤 인스턴스 (지연 초기화)
+_config_manager_instance = None
+
+
+def get_config_manager() -> ConfigManager:
+    """설정 관리자 싱글톤 인스턴스 반환 (지연 초기화)"""
+    global _config_manager_instance
+    if _config_manager_instance is None:
+        _config_manager_instance = ConfigManager()
+    return _config_manager_instance
+
+
+# 하위 호환성을 위한 별칭
+config_manager = get_config_manager()

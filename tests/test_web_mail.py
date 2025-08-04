@@ -20,8 +20,17 @@ class TestWebMail:
 
     def setup_method(self):
         """Setup test environment"""
+        # Set test environment variables
+        os.environ["TESTING"] = "1"
+        os.environ["MOCK_MODE"] = "true"
+
         # Clear all previous imports to avoid cached state
-        modules_to_clear = ["web.mail", "mail"]
+        modules_to_clear = [
+            "web.mail",
+            "mail",
+            "newsletter.config_manager",
+            "newsletter.centralized_settings",
+        ]
         for module in modules_to_clear:
             if module in sys.modules:
                 del sys.modules[module]
@@ -72,17 +81,19 @@ class TestWebMail:
         with pytest.raises((RuntimeError, RetryError)):
             send_email(to="test@example.com", subject="Test", html="<h1>Test</h1>")
 
-    @patch("newsletter.config_manager.config_manager.validate_email_config")
-    def test_check_email_configuration_complete(self, mock_validate_config):
+    @patch("newsletter.config_manager.get_config_manager")
+    def test_check_email_configuration_complete(self, mock_get_config_manager):
         """Test email configuration check with complete setup"""
         from web.mail import check_email_configuration
 
-        # Mock the config_manager.validate_email_config to return valid config
-        mock_validate_config.return_value = {
+        # Mock the config manager
+        mock_config_manager = MagicMock()
+        mock_config_manager.validate_email_config.return_value = {
             "postmark_token_configured": True,
             "from_email_configured": True,
             "ready": True,
         }
+        mock_get_config_manager.return_value = mock_config_manager
 
         config = check_email_configuration()
 
@@ -90,17 +101,19 @@ class TestWebMail:
         assert config["from_email_configured"] is True
         assert config["ready"] is True
 
-    @patch("newsletter.config_manager.config_manager")
-    def test_check_email_configuration_incomplete(self, mock_config_manager):
+    @patch("newsletter.config_manager.get_config_manager")
+    def test_check_email_configuration_incomplete(self, mock_get_config_manager):
         """Test email configuration check with placeholder values"""
         from web.mail import check_email_configuration
 
-        # Mock config_manager.validate_email_config to return placeholder result
+        # Mock the config manager
+        mock_config_manager = MagicMock()
         mock_config_manager.validate_email_config.return_value = {
             "postmark_token_configured": False,
             "from_email_configured": False,
             "ready": False,
         }
+        mock_get_config_manager.return_value = mock_config_manager
 
         config = check_email_configuration()
 
