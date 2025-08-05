@@ -18,6 +18,12 @@ import json
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
+# Helper to get correct paths when bundled with PyInstaller
+def resource_path(relative_path: str) -> str:
+    """Return absolute path to resource for dev and for PyInstaller bundles."""
+    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
+
 # Import web types module - will be loaded later to avoid conflicts
 
 
@@ -683,7 +689,11 @@ except Exception as e:
     newsletter_cli = MockNewsletterCLI()
     print("⚠️  Falling back to MockNewsletterCLI")
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=resource_path("templates"),
+    static_folder=resource_path("static"),
+)
 CORS(app)  # Enable CORS for frontend-backend communication
 
 # Enable detailed logging
@@ -722,7 +732,12 @@ except Exception as e:
 in_memory_tasks = {}
 
 # Database initialization
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
+if getattr(sys, "frozen", False):
+    # When bundled by PyInstaller, store DB next to executable for persistence
+    data_dir = os.path.dirname(sys.executable)
+else:
+    data_dir = os.path.dirname(os.path.abspath(__file__))
+DATABASE_PATH = os.path.join(data_dir, "storage.db")
 
 
 def init_db():
