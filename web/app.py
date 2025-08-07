@@ -5,6 +5,8 @@ Flask application that provides web interface for the CLI newsletter generator
 
 import os
 import sys
+import logging
+import subprocess
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import redis
@@ -18,11 +20,13 @@ import json
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
+
 # Helper to get correct paths when bundled with PyInstaller
 def resource_path(relative_path: str) -> str:
     """Return absolute path to resource for dev and for PyInstaller bundles."""
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base_path, relative_path)
+
 
 # Import web types module - will be loaded later to avoid conflicts
 
@@ -69,7 +73,7 @@ try:
                     event if event.get("level") != "info" else None
                 ),
             )
-            print("✅ Sentry initialized successfully")
+            print("[SUCCESS] Sentry initialized successfully")
 
             # 실제 Sentry 함수들로 재정의
             def set_sentry_user_context(user_id=None, email=None, **kwargs):
@@ -82,15 +86,17 @@ try:
                     sentry_sdk.set_tag(key, value)
 
         except ImportError:
-            print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+            print("[WARNING] Sentry SDK not installed, skipping Sentry integration")
         except Exception as e:
-            print(f"⚠️  Sentry initialization failed: {e}")
+            print(f"[WARNING] Sentry initialization failed: {e}")
     else:
-        print("ℹ️  Sentry DSN not configured, skipping Sentry integration")
+        print("[INFO] Sentry DSN not configured, skipping Sentry integration")
 
 except Exception as e:
     # Centralized settings 실패 시 legacy fallback
-    print(f"⚠️  Centralized settings unavailable, checking legacy SENTRY_DSN: {e}")
+    print(
+        f"[WARNING] Centralized settings unavailable, checking legacy SENTRY_DSN: {e}"
+    )
     if os.getenv("SENTRY_DSN"):
         try:
             import sentry_sdk
@@ -118,7 +124,7 @@ except Exception as e:
                     event if event.get("level") != "info" else None
                 ),
             )
-            print("✅ Sentry initialized successfully (legacy mode)")
+            print("[SUCCESS] Sentry initialized successfully (legacy mode)")
 
             # 실제 Sentry 함수들로 재정의
             def set_sentry_user_context(user_id=None, email=None, **kwargs):
@@ -131,11 +137,11 @@ except Exception as e:
                     sentry_sdk.set_tag(key, value)
 
         except ImportError:
-            print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+            print("[WARNING] Sentry SDK not installed, skipping Sentry integration")
         except Exception as e:
-            print(f"⚠️  Sentry initialization failed: {e}")
+            print(f"[WARNING] Sentry initialization failed: {e}")
     else:
-        print("ℹ️  Legacy SENTRY_DSN not configured, skipping Sentry integration")
+        print("[INFO] Legacy SENTRY_DSN not configured, skipping Sentry integration")
 
 
 # Import task function for RQ
@@ -160,10 +166,15 @@ sys.path.insert(0, project_root)
 
 class RealNewsletterCLI:
     def __init__(self):
-        # CLI 경로 설정 - 프로젝트 루트에서 실행
-        self.project_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..")
-        )
+        # CLI 경로 설정 - PyInstaller 환경 대응
+        if getattr(sys, "frozen", False):
+            # PyInstaller로 빌드된 경우 - exe와 동일한 폴더를 프로젝트 루트로 설정
+            self.project_root = os.path.dirname(sys.executable)
+        else:
+            # 일반 Python 환경
+            self.project_root = os.path.abspath(
+                os.path.join(os.path.dirname(__file__), "..")
+            )
         self.timeout = 900  # 15분 타임아웃으로 증가
 
         # 환경 확인
@@ -171,20 +182,32 @@ class RealNewsletterCLI:
 
     def _check_environment(self):
         """환경 설정 확인"""
+        # PyInstaller 실행 파일에서 실행 중인지 확인
+        if getattr(sys, "frozen", False):
+            # PyInstaller 실행 파일에서 실행 중
+            base_path = sys._MEIPASS
+            newsletter_path = os.path.join(base_path, "newsletter")
+            env_file = os.path.join(base_path, ".env")
+        else:
+            # 일반 Python 스크립트로 실행 중
+            newsletter_path = os.path.join(self.project_root, "newsletter")
+            env_file = os.path.join(self.project_root, ".env")
+
         # 프로젝트 루트 확인
-        if not os.path.exists(os.path.join(self.project_root, "newsletter")):
-            raise Exception(f"Newsletter module not found in {self.project_root}")
+        if not os.path.exists(newsletter_path):
+            raise Exception(f"Newsletter module not found in {newsletter_path}")
 
         # .env 파일 확인
-        env_file = os.path.join(self.project_root, ".env")
         if not os.path.exists(env_file):
-            print(f"⚠️  Warning: .env file not found at {env_file}")
-            print(f"⚠️  This may cause longer processing times or fallback to mock mode")
+            print(f"[WARNING] Warning: .env file not found at {env_file}")
+            print(
+                f"[WARNING] This may cause longer processing times or fallback to mock mode"
+            )
 
         # API 키 확인
         api_keys_status = self._check_api_keys()
 
-        print(f"✅ Environment check passed")
+        print("[SUCCESS] Environment check passed")
         print(f"   Project root: {self.project_root}")
         print(
             f"   Newsletter module exists: {os.path.exists(os.path.join(self.project_root, 'newsletter'))}"
@@ -193,27 +216,323 @@ class RealNewsletterCLI:
         print(f"   API keys configured: {api_keys_status}")
 
     def _check_api_keys(self):
-        """API 키 설정 상태 확인"""
-        required_keys = {
-            "GEMINI_API_KEY": "Gemini (primary LLM)",
-            "OPENAI_API_KEY": "OpenAI (fallback LLM)",
-            "POSTMARK_TOKEN": "Email service",
-        }
+        """API 키 설정 상태 확인 - 개선된 검사"""
+        try:
+            # newsletter 모듈의 API 키 검사 함수 사용
+            from newsletter.llm_factory import validate_api_keys
 
-        configured = []
-        missing = []
+            available_providers = validate_api_keys()
 
-        for key, description in required_keys.items():
-            if os.getenv(key):
-                configured.append(f"{description} ✅")
+            # 결과 정리
+            llm_providers = [
+                p for p in available_providers if p in ["gemini", "openai", "anthropic"]
+            ]
+            has_serper = "serper" in available_providers
+
+            status = {
+                "llm_providers": llm_providers,
+                "has_serper": has_serper,
+                "total_available": len(available_providers),
+                "status": "success" if llm_providers else "error",
+            }
+
+            print(f"✅ API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능")
+            if llm_providers:
+                print(f"   사용 가능한 LLM: {', '.join(llm_providers)}")
+            if has_serper:
+                print("   ✅ Serper API (뉴스 검색) 사용 가능")
             else:
-                missing.append(f"{description} ❌")
+                print("   ⚠️ Serper API (뉴스 검색) 없음")
 
-        if missing:
-            print(f"⚠️  Missing API keys: {', '.join(missing)}")
-            print(f"   This may cause slower performance or feature limitations")
+            return status
 
-        return f"{len(configured)}/{len(required_keys)} configured"
+        except Exception as e:
+            print(f"❌ API 키 검사 실패: {e}")
+            return {
+                "llm_providers": [],
+                "has_serper": False,
+                "total_available": 0,
+                "status": "error",
+                "error": str(e),
+            }
+
+    def _generate_direct(
+        self,
+        keywords=None,
+        domain=None,
+        template_style="compact",
+        email_compatible=False,
+        period=14,
+    ):
+        """웹 서비스 모드에서 직접 뉴스레터 생성"""
+        try:
+            # 환경 변수 완전 초기화
+            import os
+            import sys
+
+            # 프로젝트 루트를 Python 경로에 추가
+            if self.project_root not in sys.path:
+                sys.path.insert(0, self.project_root)
+
+            # 환경 변수 강제 설정 (PyInstaller 환경 대응)
+            self._ensure_environment_variables()
+
+            # newsletter 모듈 직접 import
+            from newsletter import collect, compose, summarize
+
+            # 키워드 처리
+            if keywords:
+                keyword_list = keywords if isinstance(keywords, list) else [keywords]
+                keyword_str = ",".join(keyword_list)
+                input_description = f"keywords: {keyword_str}"
+            elif domain:
+                input_description = f"domain: {domain}"
+                # 도메인에서 키워드 생성 (간단한 구현)
+                keyword_list = [domain]
+                keyword_str = domain
+            else:
+                raise ValueError("Either keywords or domain must be provided")
+
+            logging.info(f"Direct generation for: {input_description}")
+
+            # 뉴스 수집
+            articles = collect.collect_articles(
+                keywords=keyword_str,
+                num_results=10,
+                max_per_source=3,
+                filter_duplicates=True,
+                group_by_keywords=True,
+                use_major_sources_filter=True,  # 올바른 매개변수명 사용
+            )
+
+            # 기사가 없으면 빈 결과 반환
+            if not articles:
+                return {
+                    "content": "수집된 기사가 없습니다.",
+                    "title": f"{keyword_str} 관련 뉴스레터",
+                    "status": "success",
+                }
+
+            # 템플릿 기반 생성 방식 선택
+            # 환경 변수나 설정을 통해 제어 가능
+            from newsletter.config_manager import (
+                should_use_template_system,
+                get_template_name,
+            )
+
+            use_template_system = should_use_template_system()
+
+            if use_template_system:
+                # 기존 Jinja2 템플릿 시스템 사용
+                logging.info("Using Jinja2 template system for newsletter generation")
+
+                # 템플릿 디렉토리 설정 - PyInstaller 환경 대응
+                if getattr(sys, "frozen", False):
+                    # PyInstaller로 빌드된 경우 - 임시 디렉토리에서 템플릿 찾기
+                    template_dir = os.path.join(sys._MEIPASS, "templates")
+                    logging.info(f"PyInstaller 환경: 템플릿 디렉토리 = {template_dir}")
+                else:
+                    # 일반 Python 환경
+                    template_dir = os.path.join(self.project_root, "templates")
+
+                # 템플릿 디렉토리 존재 확인
+                if not os.path.exists(template_dir):
+                    logging.error(
+                        f"템플릿 디렉토리가 존재하지 않습니다: {template_dir}"
+                    )
+                    # 대안 경로들 시도
+                    alternative_paths = [
+                        os.path.join(os.path.dirname(__file__), "..", "templates"),
+                        os.path.join(os.getcwd(), "templates"),
+                    ]
+                    for alt_path in alternative_paths:
+                        if os.path.exists(alt_path):
+                            template_dir = alt_path
+                            logging.info(f"대안 템플릿 디렉토리 사용: {template_dir}")
+                            break
+                    else:
+                        raise FileNotFoundError(
+                            f"템플릿 디렉토리를 찾을 수 없습니다. 시도한 경로들: {[template_dir] + alternative_paths}"
+                        )
+                else:
+                    logging.info(f"템플릿 디렉토리 확인됨: {template_dir}")
+
+                # 설정 파일에서 템플릿 이름 가져오기
+                template_name = get_template_name(template_style, email_compatible)
+
+                # 기사 데이터를 템플릿 시스템에 맞게 변환
+                if isinstance(articles, dict):
+                    # 딕셔너리 형태를 리스트로 변환 (템플릿 시스템 호환성)
+                    all_articles = []
+                    for keyword, article_list in articles.items():
+                        all_articles.extend(article_list)
+                    articles_for_template = all_articles
+                else:
+                    articles_for_template = articles
+
+                # Jinja2 템플릿을 사용하여 HTML 생성
+                html_content = compose.compose_newsletter_html(
+                    articles_for_template, template_dir, template_name
+                )
+
+                logging.info(f"Generated HTML using Jinja2 template: {template_name}")
+
+            else:
+                # LLM 직접 생성 방식 (기존 방식)
+                logging.info("Using LLM direct generation for newsletter")
+                html_content = summarize.summarize_articles(keyword_list, articles)
+
+            # 제목 생성
+            title = f"Newsletter: {keyword_str}"
+
+            # 성공 통계 - articles가 딕셔너리인 경우를 처리
+            if isinstance(articles, dict):
+                # 딕셔너리인 경우: 각 키워드별 기사 수를 합산
+                total_articles = sum(
+                    len(article_list) for article_list in articles.values()
+                )
+                # 모든 기사의 소스를 수집
+                all_sources = set()
+                for article_list in articles.values():
+                    for article in article_list:
+                        if isinstance(article, dict):
+                            all_sources.add(article.get("source", ""))
+                sources_count = len(all_sources)
+            else:
+                # 리스트인 경우: 기존 로직 사용
+                total_articles = len(articles)
+                sources_count = len(
+                    set(article.get("source", "") for article in articles)
+                )
+
+            stats = {
+                "articles_count": total_articles,
+                "sources_count": sources_count,
+                "generation_time": (
+                    "template_mode" if use_template_system else "direct_mode"
+                ),
+                "template_used": template_name if use_template_system else "LLM_direct",
+            }
+
+            logging.info(f"Direct newsletter generation successful: {title}")
+            logging.info(f"Generated HTML size: {len(html_content)} characters")
+
+            response = {
+                "content": html_content,
+                "title": title,
+                "status": "success",
+                "cli_output": f"Template-based generation mode - {len(articles)} articles processed",
+                "generation_stats": stats,
+                "input_params": {
+                    "keywords": keywords,
+                    "domain": domain,
+                    "template_style": template_style,
+                    "email_compatible": email_compatible,
+                    "period": period,
+                    "generation_method": (
+                        "template" if use_template_system else "llm_direct"
+                    ),
+                },
+            }
+
+            return response
+
+        except Exception as e:
+            error_msg = f"Direct generation failed: {str(e)}"
+            logging.error(error_msg, exc_info=True)
+            return self._fallback_response(keywords or domain, error_msg)
+
+    def _ensure_environment_variables(self):
+        """환경 변수를 확실히 설정합니다 (PyInstaller 환경 대응)"""
+        import os
+
+        print("[DEBUG] Attempting to load environment variables...")
+
+        # List of .env files to check, in order of precedence
+        env_files_to_check = []
+
+        # 1. .env file in the project root (dist directory in PyInstaller)
+        env_files_to_check.append(os.path.join(self.project_root, ".env"))
+
+        # 2. .env file in the current working directory (if different)
+        current_cwd_env_file = os.path.join(os.getcwd(), ".env")
+        if current_cwd_env_file not in env_files_to_check:
+            env_files_to_check.append(current_cwd_env_file)
+
+        # Keys we are interested in
+        target_keys = [
+            "POSTMARK_SERVER_TOKEN",
+            "EMAIL_SENDER",
+            "SERPER_API_KEY",
+            "OPENAI_API_KEY",
+            "NAVER_CLIENT_ID",
+            "NAVER_CLIENT_SECRET",
+        ]
+
+        # Load environment variables from files
+        for env_file in env_files_to_check:
+            if os.path.exists(env_file):
+                print(f"[DEBUG] Loading from: {env_file}")
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip()
+
+                            # Remove quotes
+                            if value.startswith('"') and value.endswith('"'):
+                                value = value[1:-1]
+                            elif value.startswith("'") and value.endswith("'"):
+                                value = value[1:-1]
+
+                            # Set environment variable if it's one of our target keys
+                            if key in target_keys:
+                                os.environ[key] = value
+                                print(
+                                    f"[DEBUG] Set {key} = {value[:10]}... from {os.path.basename(env_file)}"
+                                )
+
+        # Final check and logging
+        postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
+        email_sender = os.getenv("EMAIL_SENDER")
+        serper_key = os.getenv("SERPER_API_KEY")
+        naver_client_id = os.getenv("NAVER_CLIENT_ID")
+        naver_client_secret = os.getenv("NAVER_CLIENT_SECRET")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        print(
+            f"[DEBUG] Final check - POSTMARK_SERVER_TOKEN: {'Set' if postmark_token and 'your-' not in postmark_token else 'Not set or placeholder'}"
+        )
+        print(
+            f"[DEBUG] Final check - EMAIL_SENDER: {'Set' if email_sender and 'yourdomain.com' not in email_sender else 'Not set or placeholder'}"
+        )
+        print(
+            f"[DEBUG] Final check - SERPER_API_KEY: {'Set' if serper_key and 'your-' not in serper_key else 'Not set or placeholder'}"
+        )
+        print(
+            f"[DEBUG] Final check - NAVER_CLIENT_ID: {'Set' if naver_client_id and 'your-' not in naver_client_id else 'Not set or placeholder'}"
+        )
+        print(
+            f"[DEBUG] Final check - NAVER_CLIENT_SECRET: {'Set' if naver_client_secret and 'your-' not in naver_client_secret else 'Not set or placeholder'}"
+        )
+        print(
+            f"[DEBUG] Final check - OPENAI_API_KEY: {'Set' if openai_key and 'your-' not in openai_key else 'Not set or placeholder'}"
+        )
+
+        if (
+            (postmark_token and "your-" not in postmark_token)
+            and (email_sender and "yourdomain.com" not in email_sender)
+            and (serper_key and "your-" not in serper_key)
+        ):  # Add other critical keys here
+            print(
+                "[DEBUG] All critical environment variables appear to be set correctly."
+            )
+        else:
+            print(
+                "[WARNING] Some critical environment variables are still missing or are placeholders."
+            )
 
     def generate_newsletter(
         self,
@@ -225,148 +544,14 @@ class RealNewsletterCLI:
     ):
         """실제 CLI를 사용하여 뉴스레터 생성"""
         try:
-            # CLI 명령어 구성 - --output 옵션 제거
-            cmd = [
-                sys.executable,
-                "-m",
-                "newsletter.cli",
-                "run",
-                "--output-format",
-                "html",
-                "--template-style",
-                template_style,
-                "--period",
-                str(period),
-                "--log-level",
-                "INFO",  # 웹서비스에서는 INFO 레벨로 설정
-            ]
-
-            # 키워드 또는 도메인 추가
-            if keywords:
-                # 키워드가 문자열인 경우 그대로, 리스트인 경우 조인
-                keyword_str = (
-                    keywords if isinstance(keywords, str) else ",".join(keywords)
-                )
-                cmd.extend(["--keywords", keyword_str])
-                input_description = f"keywords: {keyword_str}"
-            elif domain:
-                cmd.extend(["--domain", domain])
-                input_description = f"domain: {domain}"
-            else:
-                raise ValueError("Either keywords or domain must be provided")
-
-            # 이메일 호환성 옵션 추가
-            if email_compatible:
-                cmd.append("--email-compatible")
-
-            # CLI 실행 환경 설정 - 한국어 인코딩 문제 해결
-            env = dict(os.environ)
-            env["PYTHONPATH"] = self.project_root
-            # UTF-8 인코딩 강제 설정
-            env["PYTHONIOENCODING"] = "utf-8"
-            env["PYTHONUTF8"] = "1"
-            # Windows CMD 인코딩 설정
-            env["CHCP"] = "65001"
-
-            # CLI 실행
-            logging.info(f"Executing CLI command: {' '.join(cmd)}")
-            logging.info(f"Working directory: {self.project_root}")
-            logging.info(f"Input: {input_description}")
-
-            # 바이트 모드로 실행하여 인코딩 문제 방지
-            result = subprocess.run(
-                cmd,
-                cwd=self.project_root,
-                capture_output=True,
-                text=False,  # 바이트 모드 사용
-                timeout=self.timeout,
-                env=env,
+            # 웹 서비스 모드에서는 항상 직접 모듈 호출 사용
+            return self._generate_direct(
+                keywords=keywords,
+                domain=domain,
+                template_style=template_style,
+                email_compatible=email_compatible,
+                period=period,
             )
-
-            # 안전한 디코딩
-            stdout_text = ""
-            stderr_text = ""
-
-            if result.stdout:
-                try:
-                    stdout_text = result.stdout.decode("utf-8")
-                except UnicodeDecodeError:
-                    try:
-                        stdout_text = result.stdout.decode("cp949")
-                    except UnicodeDecodeError:
-                        stdout_text = result.stdout.decode("latin1")
-
-            if result.stderr:
-                try:
-                    stderr_text = result.stderr.decode("utf-8")
-                except UnicodeDecodeError:
-                    try:
-                        stderr_text = result.stderr.decode("cp949")
-                    except UnicodeDecodeError:
-                        stderr_text = result.stderr.decode("latin1")
-
-            # 결과 객체에 디코딩된 텍스트 할당
-            result.stdout = stdout_text
-            result.stderr = stderr_text
-
-            logging.info(
-                f"CLI execution completed with return code: {result.returncode}"
-            )
-
-            # 결과 처리
-            if result.returncode != 0:
-                error_msg = (
-                    f"CLI execution failed (code {result.returncode}): {result.stderr}"
-                )
-                logging.error(error_msg)
-                logging.error(f"CLI stdout: {result.stdout}")
-                return self._fallback_response(keywords or domain, error_msg)
-
-            # CLI가 자동으로 생성한 HTML 파일 찾기
-            default_output_dir = os.path.join(self.project_root, "output")
-            html_content = self._find_latest_html_file(default_output_dir, keywords)
-
-            if html_content:
-                # 제목 추출
-                title = (
-                    self._extract_title_from_html(html_content)
-                    or f"Newsletter: {keywords or domain}"
-                )
-
-                # 성공 통계 정보 추출
-                stats = self._extract_generation_stats(result.stdout)
-
-                logging.info(f"Newsletter generated successfully: {title}")
-                logging.info(f"Generated HTML size: {len(html_content)} characters")
-
-                response = {
-                    "content": html_content,
-                    "title": title,
-                    "status": "success",
-                    "cli_output": result.stdout,
-                    "generation_stats": stats,
-                    "input_params": {
-                        "keywords": keywords,
-                        "domain": domain,
-                        "template_style": template_style,
-                        "email_compatible": email_compatible,
-                        "period": period,
-                    },
-                }
-
-                return response
-            else:
-                error_msg = f"No HTML output file found in {default_output_dir}"
-                logging.error(error_msg)
-                return self._fallback_response(keywords or domain, error_msg)
-
-        except subprocess.TimeoutExpired:
-            error_msg = f"뉴스레터 생성이 {self.timeout}초 후 타임아웃되었습니다. API 키 설정을 확인해주세요."
-            logging.error(f"CLI execution timed out after {self.timeout} seconds")
-            logging.error(
-                "타임아웃 원인: API 키 누락으로 인한 Mock 데이터 사용 또는 외부 API 응답 지연"
-            )
-            return self._fallback_response(keywords or domain, error_msg)
 
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
@@ -572,7 +757,7 @@ class MockNewsletterCLI:
 </head>
 <body>
     <div class="mock-notice">
-        <strong>⚠️ Mock Mode:</strong> This is a test newsletter generated using mock data. 
+        <strong>[WARNING] Mock Mode:</strong> This is a test newsletter generated using mock data. 
         Template Style: {template_style} | Email Compatible: {email_compatible} | Period: {period} days
     </div>
     <div class="header">
@@ -628,7 +813,7 @@ class MockNewsletterCLI:
 </head>
 <body>
     <div class="mock-notice">
-        <strong>⚠️ Mock Mode:</strong> This is a test newsletter generated using mock data. 
+        <strong>[WARNING] Mock Mode:</strong> This is a test newsletter generated using mock data. 
         Template Style: {template_style} | Email Compatible: {email_compatible} | Period: {period} days
     </div>
     <div class="header">
@@ -678,16 +863,16 @@ class MockNewsletterCLI:
 # Try to use real CLI first, fallback to mock if it fails
 try:
     newsletter_cli = RealNewsletterCLI()
-    print("✅ Using RealNewsletterCLI for actual newsletter generation")
+    print("[SUCCESS] Using RealNewsletterCLI for actual newsletter generation")
     print(f"   Project root: {newsletter_cli.project_root}")
     print(f"   Timeout: {newsletter_cli.timeout} seconds")
 except Exception as e:
-    print(f"❌ Failed to initialize RealNewsletterCLI: {e}")
+    print(f"[WARNING] Failed to initialize RealNewsletterCLI: {e}")
     import traceback
 
     traceback.print_exc()
     newsletter_cli = MockNewsletterCLI()
-    print("⚠️  Falling back to MockNewsletterCLI")
+    print("[WARNING] Falling back to MockNewsletterCLI")
 
 app = Flask(
     __name__,
@@ -700,7 +885,7 @@ CORS(app)  # Enable CORS for frontend-backend communication
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-print("🔧 Flask app initialized with detailed logging")
+print("[INFO] Flask app initialized with detailed logging")
 
 # Configuration
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
@@ -715,16 +900,16 @@ try:
 
     # Windows에서는 RQ Worker가 제대로 작동하지 않으므로 직접 처리 사용
     if platform.system() == "Windows":
-        print("Windows detected: Using direct processing instead of Redis Queue")
+        print("[INFO] Windows detected: Using direct processing instead of Redis Queue")
         redis_conn = None
         task_queue = None
     else:
         redis_conn = redis.from_url(app.config["REDIS_URL"])
         redis_conn.ping()  # Test connection
         task_queue = Queue(QUEUE_NAME, connection=redis_conn)
-        print("Redis connected successfully")
+        print("[SUCCESS] Redis connected successfully")
 except Exception as e:
-    print(f"Redis connection failed: {e}. Using in-memory processing.")
+    print(f"[WARNING] Redis connection failed: {e}. Using in-memory processing.")
     redis_conn = None
     task_queue = None
 
@@ -798,43 +983,57 @@ def index():
 @app.route("/api/generate", methods=["POST"])
 def generate_newsletter():
     """Generate newsletter based on keywords or domain with optional email sending"""
-    print(f"📨 Newsletter generation request received")
+    print(f"[INFO] Newsletter generation request received")
 
     try:
         data = request.get_json()
         if not data:
-            print("❌ No data provided in request")
+            print("[WARNING] No data provided in request")
             return jsonify({"error": "No data provided"}), 400
 
         # Validate request using Pydantic
         try:
-            # Import here to avoid conflicts with Python's built-in types module
-            import importlib.util
-            import os
+            # Try to import web_types from sys.modules first (set up by runtime hook)
+            if "web.web_types" in sys.modules:
+                web_types = sys.modules["web.web_types"]
+            else:
+                # Fallback: Import here to avoid conflicts with Python's built-in types module
+                import importlib.util
+                import os
 
-            current_dir = os.path.dirname(os.path.abspath(__file__))
+                if getattr(sys, "frozen", False):
+                    # PyInstaller 실행 파일에서 실행 중
+                    base_path = sys._MEIPASS
+                    web_types_path = os.path.join(base_path, "web", "web_types.py")
+                else:
+                    # 일반 Python 스크립트로 실행 중
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    web_types_path = os.path.join(current_dir, "web_types.py")
 
-            spec = importlib.util.spec_from_file_location(
-                "web_types", os.path.join(current_dir, "types.py")
-            )
-            web_types = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(web_types)
+                if os.path.exists(web_types_path):
+                    spec = importlib.util.spec_from_file_location(
+                        "web_types", web_types_path
+                    )
+                    web_types = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(web_types)
+                else:
+                    raise ImportError(f"web_types.py not found at {web_types_path}")
 
             validated_data = web_types.GenerateNewsletterRequest(**data)
         except (ValueError, Exception) as e:
-            print(f"❌ Validation error: {e}")
+            print(f"[WARNING] Validation error: {e}")
             return jsonify({"error": f"Invalid request: {str(e)}"}), 400
 
         # Extract email for sending
         email = validated_data.email
         send_email = bool(email)
 
-        print(f"📋 Request data: {data}")
-        print(f"📧 Send email: {send_email} to {email}")
+        print(f"[INFO] Request data: {data}")
+        print(f"[INFO] Send email: {send_email} to {email}")
 
         # Create unique job ID
         job_id = str(uuid.uuid4())
-        print(f"🆔 Generated job ID: {job_id}")
+        print(f"[INFO] Generated job ID: {job_id}")
 
         # Store request in history
         conn = sqlite3.connect(DATABASE_PATH)
@@ -845,15 +1044,15 @@ def generate_newsletter():
         )
         conn.commit()
         conn.close()
-        print(f"💾 Stored request in database")
+        print(f"[INFO] Stored request in database")
 
         # If Redis is available, queue the task
         if task_queue:
-            print(f"📤 Queueing task with Redis")
+            print(f"[INFO] Queueing task with Redis")
             job = task_queue.enqueue(generate_newsletter_task, data, job_id, send_email)
             return jsonify({"job_id": job_id, "status": "queued"}), 202
         else:
-            print(f"🔄 Processing in-memory (Redis not available)")
+            print(f"[INFO] Processing in-memory (Redis not available)")
             # Fallback: process in background using in-memory tracking
             import threading
 
@@ -866,20 +1065,22 @@ def generate_newsletter():
             # Process in background thread
             def background_task():
                 try:
-                    print(f"⚙️  Starting background processing for job {job_id}")
-                    print(f"⚙️  Data: {data}")
-                    print(f"⚙️  Current time: {datetime.now().isoformat()}")
+                    print(f"[INFO] Starting background processing for job {job_id}")
+                    print(f"[INFO] Data: {data}")
+                    print(f"[INFO] Current time: {datetime.now().isoformat()}")
 
                     # 환경 체크
-                    print(f"⚙️  Using CLI type: {type(newsletter_cli).__name__}")
+                    print(f"[INFO] Using CLI type: {type(newsletter_cli).__name__}")
 
                     process_newsletter_in_memory(data, job_id)
 
                     # 메모리에서 결과 가져오기
                     if job_id in in_memory_tasks:
                         task_result = in_memory_tasks[job_id]
-                        print(f"💾 Updating database for job {job_id}")
-                        print(f"💾 Task status: {task_result.get('status', 'unknown')}")
+                        print(f"[INFO] Updating database for job {job_id}")
+                        print(
+                            f"[INFO] Task status: {task_result.get('status', 'unknown')}"
+                        )
 
                         # Update database with final result
                         conn = sqlite3.connect(DATABASE_PATH)
@@ -897,11 +1098,11 @@ def generate_newsletter():
                                     (result_json, "completed", job_id),
                                 )
                                 print(
-                                    f"💾 Successfully updated database for job {job_id}"
+                                    f"[INFO] Successfully updated database for job {job_id}"
                                 )
                             except (TypeError, ValueError) as json_error:
                                 print(
-                                    f"❌ JSON serialization error for job {job_id}: {json_error}"
+                                    f"[WARNING] JSON serialization error for job {job_id}: {json_error}"
                                 )
                                 # JSON 직렬화 실패 시 기본 응답 저장
                                 fallback_result = {
@@ -929,9 +1130,11 @@ def generate_newsletter():
 
                         conn.commit()
                         conn.close()
-                        print(f"✅ Completed background processing for job {job_id}")
+                        print(
+                            f"[SUCCESS] Completed background processing for job {job_id}"
+                        )
                     else:
-                        print(f"❌ Job {job_id} not found in in_memory_tasks")
+                        print(f"[WARNING] Job {job_id} not found in in_memory_tasks")
                         # 데이터베이스에 실패 상태 업데이트
                         conn = sqlite3.connect(DATABASE_PATH)
                         cursor = conn.cursor()
@@ -947,10 +1150,12 @@ def generate_newsletter():
                         conn.close()
 
                 except Exception as e:
-                    print(f"❌ Error in background processing for job {job_id}: {e}")
+                    print(
+                        f"[WARNING] Error in background processing for job {job_id}: {e}"
+                    )
                     import traceback
 
-                    print(f"❌ Traceback: {traceback.format_exc()}")
+                    print(f"[WARNING] Traceback: {traceback.format_exc()}")
 
                     # Update database with error
                     try:
@@ -964,7 +1169,7 @@ def generate_newsletter():
                         conn.close()
                     except Exception as db_error:
                         print(
-                            f"❌ Failed to update database with error for job {job_id}: {db_error}"
+                            f"[WARNING] Failed to update database with error for job {job_id}: {db_error}"
                         )
 
             thread = threading.Thread(target=background_task)
@@ -974,7 +1179,7 @@ def generate_newsletter():
             return jsonify({"job_id": job_id, "status": "processing"}), 202
 
     except Exception as e:
-        print(f"❌ Error in generate_newsletter endpoint: {e}")
+        print(f"[WARNING] Error in generate_newsletter endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1002,7 +1207,7 @@ def get_newsletter():
                 400,
             )
 
-        print(f"🔍 Newsletter request - Keywords: {keywords}, Period: {period}")
+        print(f"[INFO] Newsletter request - Keywords: {keywords}, Period: {period}")
 
         # 뉴스레터 생성
         result = newsletter_cli.generate_newsletter(
@@ -1026,15 +1231,15 @@ def get_newsletter():
             )
 
     except Exception as e:
-        print(f"❌ Error in newsletter endpoint: {e}")
+        print(f"[WARNING] Error in newsletter endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
 
 def process_newsletter_sync(data):
     """Process newsletter synchronously (fallback when Redis is not available)"""
     try:
-        print(f"🔄 Starting synchronous newsletter processing")
-        print(f"📊 Current newsletter_cli type: {type(newsletter_cli).__name__}")
+        print(f"[INFO] Starting synchronous newsletter processing")
+        print(f"[INFO] Current newsletter_cli type: {type(newsletter_cli).__name__}")
 
         # Extract parameters
         keywords = data.get("keywords", "")
@@ -1043,52 +1248,77 @@ def process_newsletter_sync(data):
         email_compatible = data.get("email_compatible", False)
         period = data.get("period", 14)
         email = data.get("email", "")  # 이메일 주소 추가
+        use_template_system = data.get(
+            "use_template_system", True
+        )  # 템플릿 시스템 사용 여부
 
-        print(f"📋 Processing parameters:")
+        print(f"[INFO] Processing parameters:")
         print(f"   Keywords: {keywords}")
         print(f"   Domain: {domain}")
         print(f"   Template style: {template_style}")
         print(f"   Email compatible: {email_compatible}")
         print(f"   Period: {period}")
         print(f"   Email: {email}")
+        print(f"   Use template system: {use_template_system}")
+
+        # 템플릿 시스템 설정을 환경 변수로 전달
+        if use_template_system is not None:
+            import os
+
+            os.environ["USE_TEMPLATE_SYSTEM"] = str(use_template_system).lower()
+            print(
+                f"[INFO] Set USE_TEMPLATE_SYSTEM environment variable to: {use_template_system}"
+            )
 
         # Use newsletter CLI with proper parameters
         try:
-            if keywords:
-                print(
-                    f"🔧 Generating newsletter with keywords using {type(newsletter_cli).__name__}"
-                )
-                result = newsletter_cli.generate_newsletter(
+            if isinstance(newsletter_cli, RealNewsletterCLI):
+                # RealNewsletterCLI의 경우 _generate_direct 메서드 직접 호출
+                print(f"[INFO] Using RealNewsletterCLI._generate_direct method")
+                result = newsletter_cli._generate_direct(
                     keywords=keywords,
-                    template_style=template_style,
-                    email_compatible=email_compatible,
-                    period=period,
-                )
-            elif domain:
-                print(
-                    f"🔧 Generating newsletter with domain using {type(newsletter_cli).__name__}"
-                )
-                result = newsletter_cli.generate_newsletter(
                     domain=domain,
                     template_style=template_style,
                     email_compatible=email_compatible,
                     period=period,
                 )
             else:
-                raise ValueError("Either keywords or domain must be provided")
+                # MockNewsletterCLI의 경우 기존 방식 사용
+                if keywords:
+                    print(
+                        f"[INFO] Generating newsletter with keywords using {type(newsletter_cli).__name__}"
+                    )
+                    result = newsletter_cli.generate_newsletter(
+                        keywords=keywords,
+                        template_style=template_style,
+                        email_compatible=email_compatible,
+                        period=period,
+                    )
+                elif domain:
+                    print(
+                        f"[INFO] Generating newsletter with domain using {type(newsletter_cli).__name__}"
+                    )
+                    result = newsletter_cli.generate_newsletter(
+                        domain=domain,
+                        template_style=template_style,
+                        email_compatible=email_compatible,
+                        period=period,
+                    )
+                else:
+                    raise ValueError("Either keywords or domain must be provided")
 
-            print(f"📊 CLI result status: {result['status']}")
-            print(f"📊 CLI result type: {type(result)}")
+            print(f"[INFO] CLI result status: {result['status']}")
+            print(f"[INFO] CLI result type: {type(result)}")
             print(
-                f"📊 CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+                f"[INFO] CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
             )
 
         except Exception as cli_error:
-            print(f"❌ CLI generation failed: {str(cli_error)}")
-            print(f"❌ CLI error type: {type(cli_error).__name__}")
+            print(f"[WARNING] CLI generation failed: {str(cli_error)}")
+            print(f"[WARNING] CLI error type: {type(cli_error).__name__}")
             import traceback
 
-            print(f"❌ CLI error traceback: {traceback.format_exc()}")
+            print(f"[WARNING] CLI error traceback: {traceback.format_exc()}")
             # Set result to error status for fallback logic
             result = {"status": "error", "error": str(cli_error)}
 
@@ -1096,7 +1326,7 @@ def process_newsletter_sync(data):
         if result["status"] == "error":
             # If CLI failed and returned error, try mock as fallback
             if isinstance(newsletter_cli, RealNewsletterCLI):
-                print("⚠️  Real CLI failed, trying mock fallback...")
+                print("[WARNING] Real CLI failed, trying mock fallback...")
                 mock_cli = MockNewsletterCLI()
                 if keywords:
                     result = mock_cli.generate_newsletter(
@@ -1112,13 +1342,18 @@ def process_newsletter_sync(data):
                         email_compatible=email_compatible,
                         period=period,
                     )
-                print(f"📊 Mock fallback result status: {result['status']}")
+                print(f"[INFO] Mock fallback result status: {result['status']}")
 
         # 이메일 발송 기능 추가
         email_sent = False
         if email and result.get("content") and not data.get("preview_only"):
             try:
-                print(f"📧 Attempting to send email to {email}")
+                print(f"[INFO] Attempting to send email to {email}")
+
+                # 이메일 발송 전 환경 변수 확인
+                if hasattr(newsletter_cli, "_ensure_environment_variables"):
+                    newsletter_cli._ensure_environment_variables()
+
                 # 이메일 발송 - try-except로 import 처리
                 try:
                     import mail
@@ -1149,9 +1384,9 @@ def process_newsletter_sync(data):
                 # 이메일 발송
                 send_email_func(to=email, subject=subject, html=result["content"])
                 email_sent = True
-                print(f"✅ Successfully sent email to {email}")
+                print(f"[SUCCESS] Successfully sent email to {email}")
             except Exception as e:
-                print(f"❌ Failed to send email to {email}: {str(e)}")
+                print(f"[WARNING] Failed to send email to {email}: {str(e)}")
                 # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
 
         response = {
@@ -1175,19 +1410,19 @@ def process_newsletter_sync(data):
             },
         }
 
-        print(f"✅ Processing completed successfully")
+        print(f"[SUCCESS] Processing completed successfully")
         return response
 
     except Exception as e:
         error_msg = f"Newsletter generation failed: {str(e)}"
-        print(f"❌ {error_msg}")
+        print(f"[WARNING] {error_msg}")
         raise Exception(error_msg)
 
 
 def process_newsletter_in_memory(data, job_id):
     """Process newsletter in memory and update task status"""
     try:
-        print(f"📊 Starting newsletter processing for job {job_id}")
+        print(f"[INFO] Starting newsletter processing for job {job_id}")
         result = process_newsletter_sync(data)
 
         # 메모리에 결과 저장
@@ -1197,15 +1432,15 @@ def process_newsletter_in_memory(data, job_id):
             "updated_at": datetime.now().isoformat(),
         }
 
-        print(f"📊 Newsletter processing completed for job {job_id}")
-        print(f"📊 Result status: {result.get('status', 'unknown')}")
+        print(f"[INFO] Newsletter processing completed for job {job_id}")
+        print(f"[INFO] Result status: {result.get('status', 'unknown')}")
         print(
-            f"📊 Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            f"[INFO] Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
         )
 
         return result
     except Exception as e:
-        print(f"❌ Error in process_newsletter_in_memory for job {job_id}: {e}")
+        print(f"[WARNING] Error in process_newsletter_in_memory for job {job_id}: {e}")
         in_memory_tasks[job_id] = {
             "status": "failed",
             "error": str(e),
@@ -1227,10 +1462,13 @@ def get_job_status(job_id):
         }
 
         if "result" in task:
-            response["result"] = task["result"]
-            # Extract sent status from result if available
-            if isinstance(task["result"], dict):
-                response["sent"] = task["result"].get("sent", False)
+            result = task["result"]
+            # 결과가 딕셔너리인 경우 직접 반환
+            if isinstance(result, dict):
+                response.update(result)  # result의 모든 키를 response에 추가
+                response["sent"] = result.get("sent", False)
+            else:
+                response["result"] = result
         if "error" in task:
             response["error"] = task["error"]
 
@@ -1256,10 +1494,12 @@ def get_job_status(job_id):
 
     if result:
         result_data = json.loads(result)
-        response["result"] = result_data
-        # Extract sent status from result
+        # 결과가 딕셔너리인 경우 직접 반환
         if isinstance(result_data, dict):
+            response.update(result_data)  # result_data의 모든 키를 response에 추가
             response["sent"] = result_data.get("sent", False)
+        else:
+            response["result"] = result_data
 
     return jsonify(response)
 
@@ -1267,7 +1507,7 @@ def get_job_status(job_id):
 @app.route("/api/history")
 def get_history():
     """Get recent newsletter generation history"""
-    print(f"📚 Fetching history from database")
+    print(f"[INFO] Fetching history from database")
 
     try:
         conn = sqlite3.connect(DATABASE_PATH)
@@ -1287,27 +1527,27 @@ def get_history():
         rows = cursor.fetchall()
         conn.close()
 
-        print(f"📚 Found {len(rows)} history records")
+        print(f"[INFO] Found {len(rows)} history records")
 
     except Exception as e:
-        print(f"❌ Database error in get_history: {e}")
+        print(f"[WARNING] Database error in get_history: {e}")
         return jsonify({"error": f"Database error: {str(e)}"}), 500
 
     history = []
     for row in rows:
         job_id, params, result, created_at, status = row
-        print(f"📚 Processing history record: {job_id} (status: {status})")
+        print(f"[INFO] Processing history record: {job_id} (status: {status})")
 
         try:
             parsed_params = json.loads(params) if params else None
         except json.JSONDecodeError as e:
-            print(f"❌ Failed to parse params for job {job_id}: {e}")
+            print(f"[WARNING] Failed to parse params for job {job_id}: {e}")
             parsed_params = None
 
         try:
             parsed_result = json.loads(result) if result else None
         except json.JSONDecodeError as e:
-            print(f"❌ Failed to parse result for job {job_id}: {e}")
+            print(f"[WARNING] Failed to parse result for job {job_id}: {e}")
             parsed_result = None
 
         history.append(
@@ -1320,7 +1560,7 @@ def get_history():
             }
         )
 
-    print(f"📚 Returning {len(history)} history records")
+    print(f"[INFO] Returning {len(history)} history records")
     return jsonify(history)
 
 
@@ -1925,8 +2165,34 @@ from suggest import bp as suggest_bp
 # Register blueprints
 app.register_blueprint(suggest_bp)
 
+
+# 애플리케이션 시작 시 API 키 검사
+def initialize_app():
+    """애플리케이션 초기화 - API 키 검사 포함"""
+    print("🚀 Newsletter Generator Web Service 초기화 중...")
+
+    try:
+        # API 키 검사
+        cli = RealNewsletterCLI()
+        api_status = cli._check_api_keys()
+
+        if api_status["status"] == "success":
+            print("✅ 애플리케이션 초기화 완료")
+        else:
+            print("⚠️ 애플리케이션 초기화 완료 (일부 기능 제한)")
+
+        return api_status
+
+    except Exception as e:
+        print(f"❌ 애플리케이션 초기화 실패: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+# 애플리케이션 초기화 실행
+app_initialization_status = initialize_app()
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
-    print(f"Starting Flask app on port {port}, debug={debug}")
+    print(f"[INFO] Starting Flask app on port {port}, debug={debug}")
     app.run(host="0.0.0.0", port=port, debug=True)

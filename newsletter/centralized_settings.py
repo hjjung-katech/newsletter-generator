@@ -79,8 +79,19 @@ def _load_dotenv_if_needed():
     if _should_load_dotenv() and not _test_mode:
         try:
             from dotenv import load_dotenv
+            import sys
+            import os
 
-            load_dotenv(".env", override=False)
+            # PyInstaller 환경에서의 경로 처리
+            if getattr(sys, "frozen", False):
+                # PyInstaller로 빌드된 경우
+                base_path = sys._MEIPASS
+                env_path = os.path.join(base_path, ".env")
+            else:
+                # 일반 Python 환경
+                env_path = ".env"
+
+            load_dotenv(env_path, override=False)
         except ImportError:
             pass
 
@@ -227,7 +238,7 @@ class CentralizedSettings(BaseSettings):
         env_file=".env" if _should_load_dotenv() else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="forbid",
+        extra="ignore",
     )
 
     @classmethod

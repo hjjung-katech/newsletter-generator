@@ -272,6 +272,12 @@ def summarize_articles(
             full_prompt = f"{system_prompt}\n\n{prompt}"
             response = llm.invoke([HumanMessage(content=full_prompt)])
             html_content = response.content
+
+            # 마크다운 코드 블록 래핑 제거
+            from .html_utils import clean_html_markers
+
+            html_content = clean_html_markers(html_content)
+
             return html_content
 
         except Exception as e:

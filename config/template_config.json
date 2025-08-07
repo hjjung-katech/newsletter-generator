@@ -1,4 +1,28 @@
 {
+  "newsletter_generation": {
+    "default_method": "template",
+    "available_methods": ["template", "llm_direct"],
+    "template_system": {
+      "enabled": true,
+      "default_template": "newsletter_template_compact.html",
+      "templates": {
+        "compact": "newsletter_template_compact.html",
+        "detailed": "newsletter_template.html",
+        "email_compatible": "newsletter_template_email_compatible.html"
+      }
+    },
+    "llm_direct_system": {
+      "enabled": true,
+      "description": "LLM이 직접 HTML을 생성하는 방식"
+    }
+  },
+  "api_settings": {
+    "use_template_system_default": true,
+    "allow_method_override": true
+  },
+  "environment_variables": {
+    "USE_TEMPLATE_SYSTEM": "true"
+  },
   "company": {
     "name": "산업통상자원 R&D 전략기획단",
     "copyright_year": "2025",

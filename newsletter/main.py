@@ -4,6 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import logging
 
+# 웹 서비스 모드 체크 - FastAPI 앱 중복 실행 방지
+if os.environ.get("WEB_SERVICE_MODE") == "1":
+    # 웹 서비스에서 호출된 경우 FastAPI 앱 시작 방지
+    os.environ["PORT"] = "0"  # 포트 0으로 설정하여 바인딩 방지
+
 from .security.middleware import setup_security_middleware
 from .security.logging import setup_secure_logging
 from .security.validation import InputValidationError, FileValidationError
