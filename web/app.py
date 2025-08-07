@@ -16,16 +16,41 @@ from datetime import datetime
 import uuid
 import json
 
-# Add current directory to path for local imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
+# Binary compatibility setup
+try:
+    from binary_compatibility import (
+        is_frozen, get_resource_path, get_external_resource_path,
+        run_comprehensive_diagnostics
+    )
+    
+    if is_frozen():
+        print("[INFO] Running in PyInstaller binary mode")
+        # 바이너리 환경에서 종합 진단 실행
+        diagnostics = run_comprehensive_diagnostics()
+        print(f"[INFO] Binary diagnostics status: {diagnostics['overall_status']}")
+    else:
+        print("[INFO] Running in development mode")
+        # 개발 환경에서는 기본 경로 설정
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        sys.path.insert(0, current_dir)
+        
+except ImportError:
+    print("[WARNING] Binary compatibility module not available, using fallback setup")
+    # Fallback: 기본 경로 설정
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    sys.path.insert(0, current_dir)
 
 
 # Helper to get correct paths when bundled with PyInstaller
 def resource_path(relative_path: str) -> str:
     """Return absolute path to resource for dev and for PyInstaller bundles."""
-    base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
+    try:
+        from binary_compatibility import get_resource_path
+        return get_resource_path(relative_path)
+    except ImportError:
+        # Fallback to original implementation
+        base_path = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+        return os.path.join(base_path, relative_path)
 
 
 # Import web types module - will be loaded later to avoid conflicts
@@ -236,18 +261,18 @@ class RealNewsletterCLI:
                 "status": "success" if llm_providers else "error",
             }
 
-            print(f"✅ API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능")
+            print(f"[완료] API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능")
             if llm_providers:
                 print(f"   사용 가능한 LLM: {', '.join(llm_providers)}")
             if has_serper:
-                print("   ✅ Serper API (뉴스 검색) 사용 가능")
+                print("   [확인] Serper API (뉴스 검색) 사용 가능")
             else:
-                print("   ⚠️ Serper API (뉴스 검색) 없음")
+                print("   [경고] Serper API (뉴스 검색) 없음")
 
             return status
 
         except Exception as e:
-            print(f"❌ API 키 검사 실패: {e}")
+            print(f"[오류] API 키 검사 실패: {e}")
             return {
                 "llm_providers": [],
                 "has_serper": False,
@@ -1082,10 +1107,21 @@ def generate_newsletter():
                             f"[INFO] Task status: {task_result.get('status', 'unknown')}"
                         )
 
-                        # Update database with final result
+                        # 중복 데이터베이스 업데이트 방지 - process_newsletter_in_memory에서 이미 처리됨
+                        print(f"[INFO] Database already updated by process_newsletter_in_memory for job {job_id}")
+                        
+                        # Update database with final result (fallback)
                         conn = sqlite3.connect(DATABASE_PATH)
                         cursor = conn.cursor()
-
+                        
+                        # 데이터베이스 상태 확인
+                        cursor.execute("SELECT status FROM history WHERE id = ?", (job_id,))
+                        current_status = cursor.fetchone()
+                        if current_status and current_status[0] == "completed":
+                            print(f"[INFO] Database already shows completed status for job {job_id}")
+                            conn.close()
+                            return
+                        
                         if (
                             task_result.get("status") == "completed"
                             and "result" in task_result
@@ -1098,7 +1134,7 @@ def generate_newsletter():
                                     (result_json, "completed", job_id),
                                 )
                                 print(
-                                    f"[INFO] Successfully updated database for job {job_id}"
+                                    f"[INFO] Successfully updated database for job {job_id} (fallback)"
                                 )
                             except (TypeError, ValueError) as json_error:
                                 print(
@@ -1431,6 +1467,21 @@ def process_newsletter_in_memory(data, job_id):
             "result": result,
             "updated_at": datetime.now().isoformat(),
         }
+        
+        # 데이터베이스에 직접 업데이트 (tasks.py import 문제 방지)
+        try:
+            conn = sqlite3.connect(DATABASE_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE history SET status = ?, result = ? WHERE id = ?",
+                ("completed", json.dumps(result), job_id),
+            )
+            conn.commit()
+            conn.close()
+            print(f"[SUCCESS] Updated database status to completed for job {job_id}")
+        except Exception as db_error:
+            print(f"[WARNING] Failed to update database for job {job_id}: {db_error}")
+            # 데이터베이스 업데이트 실패해도 메모리 결과는 유지
 
         print(f"[INFO] Newsletter processing completed for job {job_id}")
         print(f"[INFO] Result status: {result.get('status', 'unknown')}")
@@ -1446,13 +1497,58 @@ def process_newsletter_in_memory(data, job_id):
             "error": str(e),
             "updated_at": datetime.now().isoformat(),
         }
+        
+        # 데이터베이스에 직접 실패 상태 저장
+        try:
+            conn = sqlite3.connect(DATABASE_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE history SET status = ?, result = ? WHERE id = ?",
+                ("failed", json.dumps({"error": str(e)}), job_id),
+            )
+            conn.commit()
+            conn.close()
+            print(f"[INFO] Updated database status to failed for job {job_id}")
+        except Exception as db_error:
+            print(f"[WARNING] Failed to update database failure status for job {job_id}: {db_error}")
+        
         raise e
 
 
 @app.route("/api/status/<job_id>")
 def get_job_status(job_id):
     """Get status of a newsletter generation job"""
-    # Check in-memory tasks first (for non-Redis mode)
+    # Check database first for reliable status
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT params, result, status FROM history WHERE id = ?", (job_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        params, result, status = row
+        response = {
+            "job_id": job_id,
+            "status": status,
+            "params": json.loads(params) if params else None,
+            "sent": False,
+        }
+
+        if result:
+            result_data = json.loads(result)
+            # 결과가 딕셔너리인 경우 직접 반환
+            if isinstance(result_data, dict):
+                # 데이터베이스 상태를 보존하면서 결과 데이터 추가
+                db_status = response["status"]  # 데이터베이스 상태 보존
+                response.update(result_data)  # result_data의 모든 키를 response에 추가  
+                response["status"] = db_status  # 데이터베이스 상태로 복원 (중요!)
+                response["sent"] = result_data.get("sent", False)
+            else:
+                response["result"] = result_data
+        
+        return jsonify(response)
+
+    # Fallback to in-memory tasks (for jobs not yet in database)
     if job_id in in_memory_tasks:
         task = in_memory_tasks[job_id]
         response = {
@@ -1465,7 +1561,10 @@ def get_job_status(job_id):
             result = task["result"]
             # 결과가 딕셔너리인 경우 직접 반환
             if isinstance(result, dict):
+                # 메모리 상태를 보존하면서 결과 데이터 추가
+                memory_status = response["status"]  # 메모리 상태 보존
                 response.update(result)  # result의 모든 키를 response에 추가
+                response["status"] = memory_status  # 메모리 상태로 복원 (중요!)
                 response["sent"] = result.get("sent", False)
             else:
                 response["result"] = result
@@ -1474,34 +1573,8 @@ def get_job_status(job_id):
 
         return jsonify(response)
 
-    # Fallback to database
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT params, result, status FROM history WHERE id = ?", (job_id,))
-    row = cursor.fetchone()
-    conn.close()
-
-    if not row:
-        return jsonify({"error": "Job not found"}), 404
-
-    params, result, status = row
-    response = {
-        "job_id": job_id,
-        "status": status,
-        "params": json.loads(params) if params else None,
-        "sent": False,
-    }
-
-    if result:
-        result_data = json.loads(result)
-        # 결과가 딕셔너리인 경우 직접 반환
-        if isinstance(result_data, dict):
-            response.update(result_data)  # result_data의 모든 키를 response에 추가
-            response["sent"] = result_data.get("sent", False)
-        else:
-            response["result"] = result_data
-
-    return jsonify(response)
+    # Job not found anywhere
+    return jsonify({"error": "Job not found"}), 404
 
 
 @app.route("/api/history")
@@ -2169,7 +2242,7 @@ app.register_blueprint(suggest_bp)
 # 애플리케이션 시작 시 API 키 검사
 def initialize_app():
     """애플리케이션 초기화 - API 키 검사 포함"""
-    print("🚀 Newsletter Generator Web Service 초기화 중...")
+    print("[시작] Newsletter Generator Web Service 초기화 중...")
 
     try:
         # API 키 검사
@@ -2177,14 +2250,14 @@ def initialize_app():
         api_status = cli._check_api_keys()
 
         if api_status["status"] == "success":
-            print("✅ 애플리케이션 초기화 완료")
+            print("[완료] 애플리케이션 초기화 완료")
         else:
-            print("⚠️ 애플리케이션 초기화 완료 (일부 기능 제한)")
+            print("[경고] 애플리케이션 초기화 완료 (일부 기능 제한)")
 
         return api_status
 
     except Exception as e:
-        print(f"❌ 애플리케이션 초기화 실패: {e}")
+        print(f"[오류] 애플리케이션 초기화 실패: {e}")
         return {"status": "error", "error": str(e)}
 
 

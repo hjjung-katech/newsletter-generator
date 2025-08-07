@@ -52,37 +52,77 @@ class TemplateManager:
                 self._config = self._default_config()
 
     def _default_config(self):
-        """기본 설정 제공"""
-        return {
-            "company": {
-                "name": "산업통상자원 R&D 전략기획단",
-                "copyright_year": "2025",
-                "tagline": "최신 기술 동향을 한눈에",
-            },
-            "editor": {
-                "name": "Google Gemini",
-                "title": "편집자",
-                "email": "hjjung2@osp.re.kr",
-                "signature": "OSP 뉴스레터 편집팀 드림",
-            },
-            "footer": {
-                "disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
-                "contact_info": "문의사항: hjjung2@osp.re.kr",
-            },
-            "header": {
-                "title_prefix": "주간 산업 동향 뉴스 클리핑",
-                "greeting_prefix": "안녕하십니까, ",
-            },
-            "audience": {
-                "description": "전문위원 여러분",
-                "organization": "전략프로젝트팀",
-            },
-            "style": {
-                "primary_color": "#3498db",
-                "secondary_color": "#2c3e50",
-                "font_family": "Malgun Gothic, sans-serif",
-            },
-        }
+        """기본 설정 제공 - config.yml에서 설정을 가져와서 통합"""
+        try:
+            # config_manager를 통해 config.yml의 newsletter_settings 가져오기
+            from .config_manager import get_config_manager
+            config_manager = get_config_manager()
+            newsletter_settings = config_manager.get_newsletter_settings()
+            
+            # template_config.json 구조로 변환
+            return {
+                "company": {
+                    "name": newsletter_settings.get("company_name", "산업통상자원 R&D 전략기획단"),
+                    "copyright_year": "2025",
+                    "tagline": newsletter_settings.get("company_tagline", "최신 기술 동향을 한눈에"),
+                },
+                "editor": {
+                    "name": newsletter_settings.get("editor_name", "Google Gemini"),
+                    "title": newsletter_settings.get("editor_title", "편집자"),
+                    "email": newsletter_settings.get("editor_email", "hjjung2@osp.re.kr"),
+                    "signature": "OSP 뉴스레터 편집팀 드림",
+                },
+                "footer": {
+                    "disclaimer": newsletter_settings.get("footer_disclaimer", "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다."),
+                    "contact_info": newsletter_settings.get("footer_contact", "문의사항: hjjung2@osp.re.kr"),
+                },
+                "header": {
+                    "title_prefix": newsletter_settings.get("newsletter_title", "주간 산업 동향 뉴스 클리핑"),
+                    "greeting_prefix": "안녕하십니까, ",
+                },
+                "audience": {
+                    "description": "전문위원 여러분",
+                    "organization": "전략프로젝트팀",
+                },
+                "style": {
+                    "primary_color": "#3498db",
+                    "secondary_color": "#2c3e50",
+                    "font_family": "Malgun Gothic, sans-serif",
+                },
+            }
+        except Exception as e:
+            logger.warning(f"config.yml에서 설정을 가져오는 중 오류 발생, 기본값 사용: {e}")
+            # fallback to hardcoded defaults
+            return {
+                "company": {
+                    "name": "산업통상자원 R&D 전략기획단",
+                    "copyright_year": "2025",
+                    "tagline": "최신 기술 동향을 한눈에",
+                },
+                "editor": {
+                    "name": "Google Gemini",
+                    "title": "편집자",
+                    "email": "hjjung2@osp.re.kr",
+                    "signature": "OSP 뉴스레터 편집팀 드림",
+                },
+                "footer": {
+                    "disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+                    "contact_info": "문의사항: hjjung2@osp.re.kr",
+                },
+                "header": {
+                    "title_prefix": "주간 산업 동향 뉴스 클리핑",
+                    "greeting_prefix": "안녕하십니까, ",
+                },
+                "audience": {
+                    "description": "전문위원 여러분",
+                    "organization": "전략프로젝트팀",
+                },
+                "style": {
+                    "primary_color": "#3498db",
+                    "secondary_color": "#2c3e50",
+                    "font_family": "Malgun Gothic, sans-serif",
+                },
+            }
 
     def get(self, path, default=None):
         """경로로 설정값 가져오기 (점 표기법)"""

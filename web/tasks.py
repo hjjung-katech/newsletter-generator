@@ -270,8 +270,8 @@ def generate_newsletter_task(data, job_id, send_email=False):
         full_traceback = traceback.format_exc()
         error_msg = f"Newsletter generation failed: {str(e)}"
 
-        print(f"❌ Error in generate_newsletter_task: {error_msg}")
-        print(f"🔍 Full traceback:\n{full_traceback}")
+        print(f"[오류] Error in generate_newsletter_task: {error_msg}")
+        print(f"[추적] Full traceback:\n{full_traceback}")
 
         # sys 변수 상태 확인
         try:

@@ -32,7 +32,7 @@ def validate_api_keys():
     """
     시작 시 모든 필요한 API 키의 유효성을 검사합니다.
     """
-    logger.info("🔍 API 키 유효성 검사 시작...")
+    logger.info("[검사] API 키 유효성 검사 시작...")
 
     api_key_checks = {
         "gemini": ("GEMINI_API_KEY", "Gemini API"),
@@ -50,20 +50,20 @@ def validate_api_keys():
 
         if not api_key:
             missing_keys.append(f"{api_name} ({env_var})")
-            logger.warning(f"❌ {api_name} 키가 설정되지 않음: {env_var}")
+            logger.warning(f"[오류] {api_name} 키가 설정되지 않음: {env_var}")
         elif api_key.startswith("your-") or api_key == "your-openai-api-key":
             invalid_keys.append(f"{api_name} ({env_var}) - 플레이스홀더 값")
-            logger.error(f"❌ {api_name} 키가 플레이스홀더 값: {env_var}")
+            logger.error(f"[오류] {api_name} 키가 플레이스홀더 값: {env_var}")
         else:
             available_providers.append(provider)
-            logger.info(f"✅ {api_name} 키 확인됨: {env_var}")
+            logger.info(f"[확인] {api_name} 키 확인됨: {env_var}")
 
     # 최소 하나의 LLM 제공자가 필요
     llm_providers = [
         p for p in available_providers if p in ["gemini", "openai", "anthropic"]
     ]
     if not llm_providers:
-        logger.error("❌ 사용 가능한 LLM 제공자가 없습니다!")
+        logger.error("[오류] 사용 가능한 LLM 제공자가 없습니다!")
         logger.error("다음 중 하나 이상의 API 키를 설정해야 합니다:")
         for provider in ["gemini", "openai", "anthropic"]:
             env_var = api_key_checks[provider][0]
@@ -72,9 +72,9 @@ def validate_api_keys():
 
     # Serper API 키는 뉴스 검색에 필요
     if "serper" not in available_providers:
-        logger.warning("⚠️ Serper API 키가 없어 뉴스 검색 기능이 제한될 수 있습니다.")
+        logger.warning("[경고] Serper API 키가 없어 뉴스 검색 기능이 제한될 수 있습니다.")
 
-    logger.info(f"✅ API 키 검사 완료. 사용 가능한 LLM: {', '.join(llm_providers)}")
+    logger.info(f"[완료] API 키 검사 완료. 사용 가능한 LLM: {', '.join(llm_providers)}")
     return available_providers
 
 

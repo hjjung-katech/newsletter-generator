@@ -70,21 +70,27 @@ def filter_articles_by_major_sources(
     )
     console.print(f"[grey]- Other sources: {len(other_articles)} articles[/grey]")
 
-    # 티어에 따라 기사 선택 (티어1 우선, 그 다음 티어2, 마지막에 기타)
+    # 티어에 따라 기사 선택 (관대한 필터링으로 더 많은 기사 포함)
     filtered_articles = []
 
-    # 먼저 티어1 기사 추가
-    filtered_articles.extend(tier1_articles[:max_per_topic])
-
-    # 아직 공간이 남으면 티어2 기사 추가
+    # 각 티어에서 균형있게 선택 (더 많은 기사 포함)
+    tier1_count = min(len(tier1_articles), max(1, max_per_topic // 2))
+    tier2_count = min(len(tier2_articles), max(1, max_per_topic // 3))
+    other_count = max_per_topic - tier1_count - tier2_count
+    
+    # 각 티어에서 기사 추가
+    filtered_articles.extend(tier1_articles[:tier1_count])
+    filtered_articles.extend(tier2_articles[:tier2_count])
+    filtered_articles.extend(other_articles[:other_count])
+    
+    # 아직 공간이 남으면 추가 기사 포함
     remaining_slots = max_per_topic - len(filtered_articles)
     if remaining_slots > 0:
-        filtered_articles.extend(tier2_articles[:remaining_slots])
-
-    # 그래도 남으면 기타 기사 추가
-    remaining_slots = max_per_topic - len(filtered_articles)
-    if remaining_slots > 0:
-        filtered_articles.extend(other_articles[:remaining_slots])
+        # 남은 기사들도 추가
+        remaining_articles = (tier1_articles[tier1_count:] + 
+                            tier2_articles[tier2_count:] + 
+                            other_articles[other_count:])
+        filtered_articles.extend(remaining_articles[:remaining_slots])
 
     console.print(
         f"[cyan]Filtered articles by major sources: {len(filtered_articles)} selected from {len(articles)} total[/cyan]"

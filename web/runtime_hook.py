@@ -1,10 +1,50 @@
 """
-Runtime hook for PyInstaller to handle module conflicts.
-This hook ensures that the web_types module is properly loaded without conflicts.
+Enhanced Runtime hook for PyInstaller to handle all module conflicts and setup.
+This hook ensures comprehensive module loading and environment setup for binary execution.
 """
 
 import sys
 import os
+import logging
+
+
+def _setup_comprehensive_environment():
+    """Comprehensive environment setup for PyInstaller binary."""
+    try:
+        # Binary compatibility module 로드
+        if getattr(sys, "frozen", False):
+            base_path = sys._MEIPASS
+            
+            # binary_compatibility 모듈 경로 추가
+            web_path = os.path.join(base_path, "web")
+            if web_path not in sys.path:
+                sys.path.insert(0, web_path)
+            
+            # binary_compatibility 모듈 import 및 실행
+            try:
+                import binary_compatibility
+                diagnostics = binary_compatibility.run_comprehensive_diagnostics()
+                print(f"[SUCCESS] Binary compatibility diagnostics completed: {diagnostics['overall_status']}")
+            except ImportError as e:
+                print(f"[WARNING] Could not import binary_compatibility: {e}")
+                # Fallback to basic setup
+                _fallback_basic_setup()
+                
+        else:
+            print("[INFO] Running in development mode - skipping binary compatibility setup")
+            
+    except Exception as e:
+        print(f"[ERROR] Error in comprehensive environment setup: {e}")
+        # Fallback to basic setup
+        _fallback_basic_setup()
+
+
+def _fallback_basic_setup():
+    """Fallback basic setup when comprehensive setup fails."""
+    print("[INFO] Running fallback basic setup...")
+    _setup_newsletter_module()
+    _setup_web_types()
+    _setup_basic_paths()
 
 
 def _setup_web_types():
@@ -95,6 +135,80 @@ def _setup_newsletter_module():
         print(f"[ERROR] Error setting up newsletter module: {e}")
 
 
-# 모듈 설정 실행
-_setup_newsletter_module()
-_setup_web_types()
+def _setup_basic_paths():
+    """Setup basic paths for PyInstaller environment."""
+    try:
+        if getattr(sys, "frozen", False):
+            base_path = sys._MEIPASS
+            
+            # 중요한 경로들을 sys.path에 추가
+            important_paths = [
+                base_path,
+                os.path.join(base_path, "newsletter"),
+                os.path.join(base_path, "web"),
+                os.path.join(base_path, "templates"),
+            ]
+            
+            for path in important_paths:
+                if os.path.exists(path) and path not in sys.path:
+                    sys.path.insert(0, path)
+                    print(f"[SUCCESS] Added to sys.path: {path}")
+                    
+    except Exception as e:
+        print(f"[ERROR] Error setting up basic paths: {e}")
+
+
+def _setup_environment_variables():
+    """Setup environment variables for binary execution."""
+    try:
+        # Google Cloud 인증 비활성화 (binary에서 문제 발생 방지)
+        os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
+        os.environ.pop("GOOGLE_CLOUD_PROJECT", None)
+        os.environ.pop("CLOUDSDK_CONFIG", None)
+        
+        # UTF-8 인코딩 강제 설정 (Windows 환경)
+        if sys.platform.startswith("win"):
+            os.environ["PYTHONIOENCODING"] = "utf-8"
+            os.environ["PYTHONUTF8"] = "1"
+        
+        print("[SUCCESS] Environment variables configured for binary execution")
+        
+    except Exception as e:
+        print(f"[ERROR] Error setting up environment variables: {e}")
+
+
+def _setup_logging_early():
+    """Early logging setup for runtime hook debugging."""
+    try:
+        # 기본 로깅 설정 (파일이 아직 준비되지 않았을 수 있으므로 콘솔만)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='[RUNTIME-HOOK] %(asctime)s - %(levelname)s - %(message)s',
+            stream=sys.stdout
+        )
+        print("[SUCCESS] Early logging setup completed")
+        
+    except Exception as e:
+        print(f"[ERROR] Error setting up early logging: {e}")
+
+
+# === RUNTIME HOOK EXECUTION ===
+print("[INFO] ===== PyInstaller Runtime Hook Started =====")
+
+# 1. 기본 로깅 설정
+_setup_logging_early()
+
+# 2. 환경 변수 설정
+_setup_environment_variables()
+
+# 3. 종합 환경 설정 (또는 fallback 기본 설정)
+_setup_comprehensive_environment()
+
+print("[INFO] ===== PyInstaller Runtime Hook Completed =====")
+
+# 최종 환경 확인
+print(f"[INFO] Python executable: {sys.executable}")
+print(f"[INFO] Frozen: {getattr(sys, 'frozen', False)}")
+if hasattr(sys, '_MEIPASS'):
+    print(f"[INFO] MEIPASS: {sys._MEIPASS}")
+print(f"[INFO] sys.path entries: {len(sys.path)}")

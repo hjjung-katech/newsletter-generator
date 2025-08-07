@@ -78,9 +78,10 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
         # 리스트 형태로 제공된 경우 구조화된 데이터로 변환
         newsletter_data = {
             "newsletter_topic": "주간 산업 동향",
+            "top_articles": [],  # 상위 기사용
             "sections": [
                 {
-                    "title": "주요 기술 동향",
+                    "title": "주요 기술 동향", 
                     "summary_paragraphs": [
                         "다음은 지난 한 주간의 주요 기술 동향 요약입니다."
                     ],
@@ -89,25 +90,41 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
             ],
         }
 
-        for article in data:
+        # 상위 3개 기사를 top_articles로 설정
+        top_count = min(3, len(data))
+        for i, article in enumerate(data[:top_count]):
+            article_content = article.get("content") or article.get("snippet", "")
+            top_article = {
+                "title": article.get("title", "제목 없음"),
+                "url": article.get("url", "#"),
+                "snippet": article_content[:200] + "..." if len(article_content) > 200 else article_content,
+                "summary_text": article_content,
+                "source_and_date": f"{article.get('source', '출처 미상')}, {article.get('date', '날짜 미상')}",
+            }
+            newsletter_data["top_articles"].append(top_article)
+
+        # 나머지 기사들을 sections에 추가
+        for article in data[top_count:]:
             article_title = article.get("title", "제목 없음")
             article_url = article.get("url", "#")
             article_source = article.get("source", "출처 미상")
             article_date = article.get("date", "날짜 미상")
+            article_content = article.get("content") or article.get("snippet", "")
 
-            # 링크 정보 추가
+            # 링크 정보 추가 (content 필드를 snippet으로 매핑)
             link_info = {
                 "title": article_title,
                 "url": article_url,
+                "snippet": article_content,
+                "summary_text": article_content,
                 "source_and_date": f"{article_source}, {article_date}",
             }
             newsletter_data["sections"][0]["news_links"].append(link_info)
 
             # 첫 번째 기사 내용을 요약 본문으로 사용
             if len(newsletter_data["sections"][0]["summary_paragraphs"]) == 1:
-                summary = article.get("summary_text") or article.get("content", "")
                 # 간단한 문단 나누기 (실제로는 더 정교한 처리가 필요할 수 있음)
-                paragraphs = summary.split("\n\n")
+                paragraphs = article_content.split("\n\n") if article_content else [""]
                 newsletter_data["sections"][0]["summary_paragraphs"] = paragraphs[
                     :3
                 ]  # 최대 3개 문단
@@ -565,6 +582,56 @@ def render_newsletter_template(
 # 기존 함수들을 새로운 통합 함수로 래핑
 def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     """기존 detailed 뉴스레터 생성 함수 (호환성 유지)"""
+    # 데이터 형태 확인 및 변환
+    if isinstance(data, list):
+        # 리스트인 경우 딕셔너리로 변환 (템플릿이 기대하는 구조로)
+        top_articles = []
+        sections = [{
+            "title": "주요 기술 동향",
+            "summary_paragraphs": ["다음은 지난 한 주간의 주요 기술 동향 요약입니다."],
+            "news_links": []
+        }]
+        
+        # 상위 3개 기사를 top_articles로 설정
+        top_count = min(3, len(data))
+        for article in data[:top_count]:
+            article_content = article.get("content") or article.get("snippet", "")
+            top_article = {
+                "title": article.get("title", "제목 없음"),
+                "url": article.get("url", "#"),
+                "snippet": article_content[:200] + "..." if len(article_content) > 200 else article_content,
+                "summary_text": article_content,
+                "source_and_date": f"{article.get('source', '출처 미상')}, {article.get('date', '날짜 미상')}",
+            }
+            top_articles.append(top_article)
+        
+        # 나머지 기사들을 sections에 추가
+        for article in data[top_count:]:
+            article_content = article.get("content") or article.get("snippet", "")
+            link_info = {
+                "title": article.get("title", "제목 없음"),
+                "url": article.get("url", "#"),
+                "snippet": article_content,
+                "summary_text": article_content,
+                "source_and_date": f"{article.get('source', '출처 미상')}, {article.get('date', '날짜 미상')}",
+            }
+            sections[0]["news_links"].append(link_info)
+        
+        data = {
+            "top_articles": top_articles,
+            "sections": sections,
+            "newsletter_topic": "주간 산업 동향",
+            "newsletter_title": "주간 산업 동향 뉴스 클리핑"
+        }
+    elif not isinstance(data, dict):
+        # 딕셔너리도 리스트도 아닌 경우 기본값으로 설정
+        data = {
+            "top_articles": [],
+            "sections": [],
+            "newsletter_topic": "주간 산업 동향",
+            "newsletter_title": "주간 산업 동향 뉴스 클리핑"
+        }
+    
     # 템플릿 이름이 지정된 경우 사용, 아닌 경우 기본값 사용
     if template_name and template_name != "newsletter_template.html":
         # 사용자 정의 템플릿 처리

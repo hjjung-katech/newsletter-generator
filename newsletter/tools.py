@@ -30,7 +30,7 @@ logger = get_logger()
 console = Console()
 
 
-@tool
+@tool(description="Search for news articles using the Serper.dev API for each keyword.")
 def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     """
     Search for news articles using the Serper.dev API for each keyword.
@@ -155,14 +155,14 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     if keyword_article_counts and total_collected > 0:
         show_collection_brief(keyword_article_counts)
     elif total_collected > 0:
-        logger.info(f"📰 총 {total_collected}개 기사 수집 완료")
+        logger.info(f"[뉴스] 총 {total_collected}개 기사 수집 완료")
     else:
-        logger.warning("⚠️  수집된 기사가 없습니다")
+        logger.warning("[경고] 수집된 기사가 없습니다")
 
     return all_collected_articles
 
 
-@tool
+@tool(description="Fetch the full content of an article from its URL.")
 def fetch_article_content(url: str) -> Dict[str, Any]:
     """
     Fetch the full content of an article from its URL.
@@ -264,7 +264,7 @@ def fetch_article_content(url: str) -> Dict[str, Any]:
         raise ToolException(f"Error fetching article content: {str(e)}")
 
 
-@tool
+@tool(description="Save newsletter content locally as HTML or Markdown.")
 def save_newsletter_locally(
     html_content: str, filename_base: str, output_format: str = "html"
 ) -> str:
