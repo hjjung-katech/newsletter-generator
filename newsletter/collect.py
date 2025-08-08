@@ -6,8 +6,10 @@ from rich.console import Console
 
 from . import article_filter, config
 from .sources import NewsSourceManager, configure_default_sources
+from .utils.logger import get_structured_logger as get_logger
 
 console = Console()
+logger = get_logger("newsletter.collect")
 
 
 def collect_articles(
@@ -129,12 +131,12 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
         # 이미 리스트로 제공된 경우
         keywords_list = keywords
 
-    print(f"Collecting articles for: {keywords_list} using Serper.dev")
+    logger.info(f"Collecting articles for: {keywords_list} using Serper.dev")
     # 키워드별 기사 수를 저장할 딕셔너리
     keyword_article_counts = {}
 
     if not config.SERPER_API_KEY:
-        print("Error: SERPER_API_KEY not found. Please set it in the .env file.")
+        logger.error("SERPER_API_KEY not found. Please set it in the .env file.")
         return []  # 뉴스 전용 엔드포인트로 변경
     url = "https://google.serper.dev/news"
 
@@ -142,7 +144,7 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
     all_articles = []
 
     for keyword in keywords_list:
-        print(f"Searching for keyword: {keyword}")
+        logger.debug(f"Searching for keyword: {keyword}")
         payload = json.dumps(
             {
                 "q": keyword,
@@ -167,17 +169,17 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
 
             # 1. 주요 'news' 컨테이너 확인
             if "news" in search_results:
-                print(f"Processing news results for keyword '{keyword}'")
+                logger.debug(f"Processing news results for keyword '{keyword}'")
                 articles_container.extend(search_results["news"])
 
             # 2. 'topStories' 컨테이너도 확인 (일부 응답에서 사용)
             if "topStories" in search_results and not articles_container:
-                print(f"Processing topStories results for keyword '{keyword}'")
+                logger.debug(f"Processing topStories results for keyword '{keyword}'")
                 articles_container.extend(search_results["topStories"])
 
             # 3. 'organic' 컨테이너 확인 (fallback)
             if "organic" in search_results and not articles_container:
-                print(f"Processing organic results for keyword '{keyword}'")
+                logger.debug(f"Processing organic results for keyword '{keyword}'")
                 articles_container.extend(search_results["organic"])
 
             # 결과 처리
@@ -198,32 +200,32 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
                         }
                     )
             else:
-                print(
+                logger.info(
                     f"No results found for keyword '{keyword}'. Available keys: {list(search_results.keys())}"
                 )
 
             # 키워드별 기사 수 저장 및 출력
             num_articles_found = len(articles_for_keyword)
             keyword_article_counts[keyword] = num_articles_found
-            print(f"Found {num_articles_found} articles for keyword: '{keyword}'")
+            logger.info(f"Found {num_articles_found} articles for keyword: '{keyword}'")
 
             all_articles.extend(articles_for_keyword)
 
         except requests.exceptions.RequestException as e:
-            print(
+            logger.error(
                 f"Error fetching articles for keyword '{keyword}' from Serper.dev: {e}"
             )
         except json.JSONDecodeError:
-            print(
+            logger.error(
                 f"Error decoding JSON response for keyword '{keyword}' from Serper.dev. Response: {response.text}"
             )
 
     # 전체 수집된 기사 수 출력
-    print(f"\nTotal collected articles: {len(all_articles)}")
+    logger.info(f"Total collected articles: {len(all_articles)}")
     # 키워드별 수집된 기사 수 요약 출력
-    print("Summary of articles collected per keyword:")
+    logger.info("Summary of articles collected per keyword:")
     for kw, count in keyword_article_counts.items():
-        print(f"- '{kw}': {count} articles")
+        logger.info(f"- '{kw}': {count} articles")
 
     return all_articles
 

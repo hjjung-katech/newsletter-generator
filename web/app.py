@@ -16,13 +16,50 @@ from datetime import datetime
 import uuid
 import json
 
+# Structured logger setup
+try:
+    from newsletter.utils.logger import get_structured_logger as get_logger
+
+    logger = get_logger(name="web")
+except Exception:
+    logging.basicConfig(
+        level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO)
+    )
+    logger = logging.getLogger("web")
+
+# Redirect print() to structured logger with level inference
+try:
+    import builtins
+
+    def _print_to_logger(*args, **kwargs):
+        message = " ".join(str(a) for a in args)
+        lowered = message.lower()
+        if any(tag in message for tag in ["[ERROR]", "❌"]) or "오류" in message:
+            logger.error(message)
+        elif any(tag in message for tag in ["[WARNING]", "⚠️"]) or "경고" in message:
+            logger.warning(message)
+        elif (
+            any(tag in message for tag in ["[DEBUG]", "🔧", "[완료] debug"])
+            or "debug" in lowered
+        ):
+            logger.debug(message)
+        else:
+            logger.info(message)
+
+    builtins.print = _print_to_logger
+except Exception:
+    # If redirection fails, continue without raising
+    pass
+
 # Binary compatibility setup
 try:
     from binary_compatibility import (
-        is_frozen, get_resource_path, get_external_resource_path,
-        run_comprehensive_diagnostics
+        is_frozen,
+        get_resource_path,
+        get_external_resource_path,
+        run_comprehensive_diagnostics,
     )
-    
+
     if is_frozen():
         print("[INFO] Running in PyInstaller binary mode")
         # 바이너리 환경에서 종합 진단 실행
@@ -33,7 +70,7 @@ try:
         # 개발 환경에서는 기본 경로 설정
         current_dir = os.path.dirname(os.path.abspath(__file__))
         sys.path.insert(0, current_dir)
-        
+
 except ImportError:
     print("[WARNING] Binary compatibility module not available, using fallback setup")
     # Fallback: 기본 경로 설정
@@ -46,6 +83,7 @@ def resource_path(relative_path: str) -> str:
     """Return absolute path to resource for dev and for PyInstaller bundles."""
     try:
         from binary_compatibility import get_resource_path
+
         return get_resource_path(relative_path)
     except ImportError:
         # Fallback to original implementation
@@ -263,7 +301,9 @@ class RealNewsletterCLI:
                 "status": "success" if llm_providers else "error",
             }
 
-            print(f"[완료] API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능")
+            print(
+                f"[완료] API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능"
+            )
             if llm_providers:
                 print(f"   사용 가능한 LLM: {', '.join(llm_providers)}")
             if has_serper:
@@ -312,25 +352,25 @@ class RealNewsletterCLI:
                 keyword_list = keywords if isinstance(keywords, list) else [keywords]
                 keyword_str = keyword_list  # 리스트 형태로 전달
                 input_description = f"keywords: {','.join(keyword_list)}"
-                
+
                 # graph.py의 generate_newsletter 함수 호출
                 html_content, status = generate_newsletter(
                     keywords=keyword_str,
                     news_period_days=period,
                     template_style=template_style,
-                    email_compatible=email_compatible
+                    email_compatible=email_compatible,
                 )
-                
+
             elif domain:
                 input_description = f"domain: {domain}"
-                
+
                 # graph.py의 generate_newsletter 함수 호출 (키워드를 도메인으로 설정)
                 html_content, status = generate_newsletter(
                     keywords=[domain],  # 도메인을 키워드로 사용
                     news_period_days=period,
                     domain=domain,
                     template_style=template_style,
-                    email_compatible=email_compatible
+                    email_compatible=email_compatible,
                 )
             else:
                 raise ValueError("Either keywords or domain must be provided")
@@ -338,12 +378,18 @@ class RealNewsletterCLI:
             logging.info(f"LangGraph generation for: {input_description}")
 
             # HTML 생성 성공 확인
-            print(f"[DEBUG] LangGraph result - html_content length: {len(html_content) if html_content else 0}")
+            print(
+                f"[DEBUG] LangGraph result - html_content length: {len(html_content) if html_content else 0}"
+            )
             print(f"[DEBUG] LangGraph result - status: {status}")
-            print(f"[DEBUG] LangGraph result - html_content preview: {html_content[:200] if html_content else 'None'}...")
-            
+            print(
+                f"[DEBUG] LangGraph result - html_content preview: {html_content[:200] if html_content else 'None'}..."
+            )
+
             if not html_content or status != "success":
-                print(f"[ERROR] LangGraph failed - html_content: {bool(html_content)}, status: {status}")
+                print(
+                    f"[ERROR] LangGraph failed - html_content: {bool(html_content)}, status: {status}"
+                )
                 raise ValueError(f"Failed to generate newsletter HTML: {status}")
 
             # 제목과 통계 생성
@@ -351,11 +397,11 @@ class RealNewsletterCLI:
                 title = f"Newsletter: {','.join(keyword_list)}"
             else:
                 title = f"Newsletter: {domain}"
-            
+
             # 통계 정보 (실제 값은 LangGraph에서 로그로 출력됨)
             stats = {
                 "articles_count": 0,  # LangGraph 내부에서 처리
-                "sources_count": 0,   # LangGraph 내부에서 처리
+                "sources_count": 0,  # LangGraph 내부에서 처리
                 "generation_time": "langgraph_mode",
                 "template_style": template_style,
                 "email_compatible": email_compatible,
@@ -363,7 +409,9 @@ class RealNewsletterCLI:
 
             logging.info(f"Direct newsletter generation successful: {title}")
             logging.info(f"Generated HTML size: {len(html_content)} characters")
-            print(f"[SUCCESS] _generate_direct completed - HTML size: {len(html_content)} chars")
+            print(
+                f"[SUCCESS] _generate_direct completed - HTML size: {len(html_content)} chars"
+            )
 
             response = {
                 "content": html_content,
@@ -382,7 +430,9 @@ class RealNewsletterCLI:
             }
 
             print(f"[DEBUG] _generate_direct response keys: {list(response.keys())}")
-            print(f"[DEBUG] _generate_direct response.content length: {len(response.get('content', ''))}")
+            print(
+                f"[DEBUG] _generate_direct response.content length: {len(response.get('content', ''))}"
+            )
             print(f"[DEBUG] _generate_direct response.status: {response.get('status')}")
             print(f"[DEBUG] _generate_direct response.title: {response.get('title')}")
             print(f"[SUCCESS] _generate_direct returning complete response")
@@ -1035,20 +1085,26 @@ def generate_newsletter():
                         )
 
                         # 중복 데이터베이스 업데이트 방지 - process_newsletter_in_memory에서 이미 처리됨
-                        print(f"[INFO] Database already updated by process_newsletter_in_memory for job {job_id}")
-                        
+                        print(
+                            f"[INFO] Database already updated by process_newsletter_in_memory for job {job_id}"
+                        )
+
                         # Update database with final result (fallback)
                         conn = sqlite3.connect(DATABASE_PATH)
                         cursor = conn.cursor()
-                        
+
                         # 데이터베이스 상태 확인
-                        cursor.execute("SELECT status FROM history WHERE id = ?", (job_id,))
+                        cursor.execute(
+                            "SELECT status FROM history WHERE id = ?", (job_id,)
+                        )
                         current_status = cursor.fetchone()
                         if current_status and current_status[0] == "completed":
-                            print(f"[INFO] Database already shows completed status for job {job_id}")
+                            print(
+                                f"[INFO] Database already shows completed status for job {job_id}"
+                            )
                             conn.close()
                             return
-                        
+
                         if (
                             task_result.get("status") == "completed"
                             and "result" in task_result
@@ -1174,11 +1230,15 @@ def get_newsletter():
         # Smart email_compatible logic for GET endpoint
         if email and email.strip():
             email_compatible = True
-            print(f"[INFO] Auto-enabled email_compatible for GET request because email recipient is provided: {email}")
+            print(
+                f"[INFO] Auto-enabled email_compatible for GET request because email recipient is provided: {email}"
+            )
         else:
             email_compatible = False
 
-        print(f"[INFO] Newsletter request - Keywords: {keywords}, Period: {period}, Email: {email}, Email compatible: {email_compatible}")
+        print(
+            f"[INFO] Newsletter request - Keywords: {keywords}, Period: {period}, Email: {email}, Email compatible: {email_compatible}"
+        )
 
         # 뉴스레터 생성
         result = newsletter_cli.generate_newsletter(
@@ -1221,7 +1281,7 @@ def process_newsletter_sync(data):
         use_template_system = data.get(
             "use_template_system", True
         )  # 템플릿 시스템 사용 여부
-        
+
         # Smart email_compatible logic: 이메일이 있으면 자동으로 email_compatible=True
         # 단, 사용자가 명시적으로 False로 설정한 경우에는 그 값을 존중
         user_email_compatible = data.get("email_compatible", None)
@@ -1231,7 +1291,9 @@ def process_newsletter_sync(data):
         elif email and email.strip():
             # 이메일이 있으면 자동으로 email_compatible=True
             email_compatible = True
-            print(f"[INFO] Auto-enabled email_compatible because email recipient is provided: {email}")
+            print(
+                f"[INFO] Auto-enabled email_compatible because email recipient is provided: {email}"
+            )
         else:
             # 이메일이 없으면 기본값 False
             email_compatible = False
@@ -1293,19 +1355,27 @@ def process_newsletter_sync(data):
 
             print(f"[DEBUG] CLI result status: {result['status']}")
             print(f"[DEBUG] CLI result type: {type(result)}")
-            print(f"[DEBUG] CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
-            
+            print(
+                f"[DEBUG] CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            )
+
             # 핵심 필드들 상세 로깅
             if isinstance(result, dict):
-                print(f"[DEBUG] CLI result.content exists: {bool(result.get('content'))}")
-                print(f"[DEBUG] CLI result.content length: {len(result.get('content', ''))}")
+                print(
+                    f"[DEBUG] CLI result.content exists: {bool(result.get('content'))}"
+                )
+                print(
+                    f"[DEBUG] CLI result.content length: {len(result.get('content', ''))}"
+                )
                 print(f"[DEBUG] CLI result.title: {result.get('title', 'None')}")
                 print(f"[DEBUG] CLI result.status: {result.get('status', 'None')}")
-                if result.get('content'):
-                    print(f"[DEBUG] CLI result.content preview: {result['content'][:200]}...")
+                if result.get("content"):
+                    print(
+                        f"[DEBUG] CLI result.content preview: {result['content'][:200]}..."
+                    )
             else:
                 print(f"[ERROR] CLI result is not a dictionary: {result}")
-            
+
             print(f"[DEBUG] About to create final response...")
 
         except Exception as cli_error:
@@ -1407,16 +1477,22 @@ def process_newsletter_sync(data):
 
         print(f"[DEBUG] Final response created:")
         print(f"[DEBUG] Final response keys: {list(response.keys())}")
-        print(f"[DEBUG] Final response.html_content exists: {bool(response.get('html_content'))}")
-        print(f"[DEBUG] Final response.html_content length: {len(response.get('html_content', ''))}")
+        print(
+            f"[DEBUG] Final response.html_content exists: {bool(response.get('html_content'))}"
+        )
+        print(
+            f"[DEBUG] Final response.html_content length: {len(response.get('html_content', ''))}"
+        )
         print(f"[DEBUG] Final response.status: {response.get('status')}")
         print(f"[DEBUG] Final response.html_size: {response.get('html_size')}")
-        
-        if response.get('html_content'):
-            print(f"[DEBUG] Final response.html_content preview: {response['html_content'][:200]}...")
+
+        if response.get("html_content"):
+            print(
+                f"[DEBUG] Final response.html_content preview: {response['html_content'][:200]}..."
+            )
         else:
             print(f"[ERROR] Final response has no html_content!")
-        
+
         print(f"[SUCCESS] Processing completed successfully")
         return response
 
@@ -1438,18 +1514,24 @@ def process_newsletter_in_memory(data, job_id):
             "result": result,
             "updated_at": datetime.now().isoformat(),
         }
-        
+
         # 데이터베이스에 직접 업데이트 (tasks.py import 문제 방지)
         try:
             print(f"[DEBUG] About to save to database for job {job_id}")
-            print(f"[DEBUG] Result keys before JSON serialization: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
-            print(f"[DEBUG] Result.html_content exists before DB save: {bool(result.get('html_content'))}")
-            print(f"[DEBUG] Result.html_content length before DB save: {len(result.get('html_content', ''))}")
-            
+            print(
+                f"[DEBUG] Result keys before JSON serialization: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            )
+            print(
+                f"[DEBUG] Result.html_content exists before DB save: {bool(result.get('html_content'))}"
+            )
+            print(
+                f"[DEBUG] Result.html_content length before DB save: {len(result.get('html_content', ''))}"
+            )
+
             result_json = json.dumps(result)
             print(f"[DEBUG] Serialized JSON length: {len(result_json)}")
             print(f"[DEBUG] JSON preview: {result_json[:300]}...")
-            
+
             conn = sqlite3.connect(DATABASE_PATH)
             cursor = conn.cursor()
             cursor.execute(
@@ -1477,7 +1559,7 @@ def process_newsletter_in_memory(data, job_id):
             "error": str(e),
             "updated_at": datetime.now().isoformat(),
         }
-        
+
         # 데이터베이스에 직접 실패 상태 저장
         try:
             conn = sqlite3.connect(DATABASE_PATH)
@@ -1490,8 +1572,10 @@ def process_newsletter_in_memory(data, job_id):
             conn.close()
             print(f"[INFO] Updated database status to failed for job {job_id}")
         except Exception as db_error:
-            print(f"[WARNING] Failed to update database failure status for job {job_id}: {db_error}")
-        
+            print(
+                f"[WARNING] Failed to update database failure status for job {job_id}: {db_error}"
+            )
+
         raise e
 
 
@@ -1520,12 +1604,12 @@ def get_job_status(job_id):
             if isinstance(result_data, dict):
                 # 데이터베이스 상태를 보존하면서 결과 데이터 추가
                 db_status = response["status"]  # 데이터베이스 상태 보존
-                response.update(result_data)  # result_data의 모든 키를 response에 추가  
+                response.update(result_data)  # result_data의 모든 키를 response에 추가
                 response["status"] = db_status  # 데이터베이스 상태로 복원 (중요!)
                 response["sent"] = result_data.get("sent", False)
             else:
                 response["result"] = result_data
-        
+
         return jsonify(response)
 
     # Fallback to in-memory tasks (for jobs not yet in database)
@@ -2177,46 +2261,60 @@ def get_newsletter_html(job_id):
         print(f"[🔴 CRITICAL DEBUG] API ENDPOINT CALLED for job_id: {job_id}")
         print(f"[🔴 CRITICAL DEBUG] Current time: {datetime.now()}")
         print(f"[🔴 CRITICAL DEBUG] DATABASE_PATH: {DATABASE_PATH}")
-        
+
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
-        
+
         # 모든 레코드 확인
-        cursor.execute("SELECT id, status FROM history ORDER BY created_at DESC LIMIT 5")
+        cursor.execute(
+            "SELECT id, status FROM history ORDER BY created_at DESC LIMIT 5"
+        )
         all_rows = cursor.fetchall()
         print(f"[🔴 CRITICAL DEBUG] Recent 5 records: {all_rows}")
-        
+
         cursor.execute("SELECT status, result FROM history WHERE id = ?", (job_id,))
         row = cursor.fetchone()
         conn.close()
 
         if not row:
             print(f"[🔴 CRITICAL DEBUG] ❌ NO ROW FOUND for job_id: {job_id}")
-            return f"<html><body><h1>❌ JOB ID NOT FOUND: {job_id}</h1><p>Available IDs: {[r[0] for r in all_rows]}</p></body></html>", 404
+            return (
+                f"<html><body><h1>❌ JOB ID NOT FOUND: {job_id}</h1><p>Available IDs: {[r[0] for r in all_rows]}</p></body></html>",
+                404,
+            )
 
         status, result_json = row
         print(f"[🔴 CRITICAL DEBUG] ✅ Found row - status: {status}")
         print(f"[🔴 CRITICAL DEBUG] result_json length: {len(result_json or '')}")
-        
+
         if status != "completed":
             print(f"[🔴 CRITICAL DEBUG] ❌ Status not completed: {status}")
             return f"<html><body><h1>❌ STATUS: {status}</h1></body></html>", 400
 
         result = json.loads(result_json) if result_json else {}
-        print(f"[🔴 CRITICAL DEBUG] ✅ Parsed result keys: {list(result.keys()) if result else 'No result'}")
-        
+        print(
+            f"[🔴 CRITICAL DEBUG] ✅ Parsed result keys: {list(result.keys()) if result else 'No result'}"
+        )
+
         html_content = result.get("html_content", "")
         print(f"[🔴 CRITICAL DEBUG] HTML content exists: {bool(html_content)}")
-        print(f"[🔴 CRITICAL DEBUG] HTML content length: {len(html_content) if html_content else 0}")
-        
+        print(
+            f"[🔴 CRITICAL DEBUG] HTML content length: {len(html_content) if html_content else 0}"
+        )
+
         if html_content:
-            print(f"[🔴 CRITICAL DEBUG] ✅ HTML FOUND! Preview: {html_content[:200]}...")
+            print(
+                f"[🔴 CRITICAL DEBUG] ✅ HTML FOUND! Preview: {html_content[:200]}..."
+            )
             print(f"[🔴 CRITICAL DEBUG] ✅ RETURNING HTML CONTENT")
             return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
         else:
             print(f"[🔴 CRITICAL DEBUG] ❌ NO HTML CONTENT")
             print(f"[🔴 CRITICAL DEBUG] Full result debug: {str(result)[:500]}...")
-            return f"<html><body><h1>❌ NO HTML CONTENT</h1><p>Result keys: {list(result.keys())}</p><p>Full result preview: {str(result)[:500]}</p></body></html>", 404
+            return (
+                f"<html><body><h1>❌ NO HTML CONTENT</h1><p>Result keys: {list(result.keys())}</p><p>Full result preview: {str(result)[:500]}</p></body></html>",
+                404,
+            )
 
     except Exception as e:
         error_html = f"""
@@ -2237,7 +2335,7 @@ def get_newsletter_html(job_id):
 def test_iframe():
     """간단한 iframe 테스트용 엔드포인트"""
     print(f"[🔴 CRITICAL DEBUG] TEST IFRAME ENDPOINT CALLED at {datetime.now()}")
-    
+
     test_html = f"""
     <!DOCTYPE html>
     <html>
@@ -2264,7 +2362,7 @@ def test_iframe():
     </body>
     </html>
     """
-    
+
     return test_html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 

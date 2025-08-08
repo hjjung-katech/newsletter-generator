@@ -344,6 +344,16 @@ def get_logger(name: str = "newsletter", log_level: str = None) -> NewsletterLog
     return _global_logger
 
 
+def get_structured_logger(
+    name: str = "newsletter", log_level: str = None
+) -> NewsletterLogger:
+    """
+    프로젝트 전반에서 사용하는 구조화 로거를 반환합니다.
+    LOG_LEVEL 환경 변수(기본 INFO)에 따라 출력 수준을 제어할 수 있습니다.
+    """
+    return get_logger(name=name, log_level=log_level)
+
+
 def set_log_level(level: str):
     """로그 레벨 설정"""
     if _global_logger:
