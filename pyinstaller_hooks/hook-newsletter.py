@@ -121,6 +121,7 @@ newsletter_modules = [
     "newsletter.utils", "newsletter.utils.logger", "newsletter.utils.error_handling",
     "newsletter.utils.file_naming", "newsletter.utils.subprocess_utils",
     "newsletter.utils.test_mode", "newsletter.utils.convert_legacy_data",
+    "newsletter.utils.shutdown_manager",
     
     # Latest additional modules
     "newsletter.template_config", "newsletter.email_processing",
@@ -131,6 +132,7 @@ newsletter_modules = [
 web_modules = [
     "web", "web.app", "web.tasks", "web.mail", "web.suggest", 
     "web.worker", "web.schedule_runner", "web.web_types",
+    "web.graceful_shutdown",
     
     # Binary compatibility modules (important!)
     "web.binary_compatibility", "binary_compatibility",

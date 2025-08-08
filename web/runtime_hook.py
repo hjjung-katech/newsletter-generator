@@ -270,6 +270,39 @@ def _setup_logging_early():
         logger.error(f"Error setting up early logging: {e}")
 
 
+def _setup_graceful_shutdown():
+    """Setup graceful shutdown system for exe environment."""
+    try:
+        # Only setup in PyInstaller environment
+        if getattr(sys, "frozen", False):
+            # Import and initialize shutdown manager
+            from newsletter.utils.shutdown_manager import get_shutdown_manager
+            
+            shutdown_manager = get_shutdown_manager()
+            logger.info("Graceful shutdown manager initialized for exe environment")
+            
+            # Register runtime hook cleanup
+            def runtime_cleanup():
+                logger.info("Runtime hook cleanup called")
+            
+            from newsletter.utils.shutdown_manager import ShutdownPhase
+            
+            shutdown_manager.register_shutdown_task(
+                name="runtime_hook_cleanup",
+                callback=runtime_cleanup,
+                phase=ShutdownPhase.CLEANING_RESOURCES,
+                priority=100,
+                timeout=2.0
+            )
+            
+            logger.info("Runtime hook shutdown task registered")
+            
+    except ImportError:
+        logger.warning("Shutdown manager not available - graceful shutdown disabled")
+    except Exception as e:
+        logger.error(f"Error setting up graceful shutdown: {e}")
+
+
 # === RUNTIME HOOK EXECUTION ===
 logger.info("===== PyInstaller Runtime Hook Started =====")
 
@@ -281,6 +314,9 @@ _setup_environment_variables()
 
 # 3. 종합 환경 설정 (또는 fallback 기본 설정)
 _setup_comprehensive_environment()
+
+# 4. 정상 종료 시스템 설정
+_setup_graceful_shutdown()
 
 logger.info("===== PyInstaller Runtime Hook Completed =====")
 

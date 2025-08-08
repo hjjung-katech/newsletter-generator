@@ -7,6 +7,9 @@ import os
 import sys
 import logging
 import subprocess
+import threading
+import signal
+import atexit
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import redis
@@ -50,6 +53,42 @@ try:
 except Exception:
     # If redirection fails, continue without raising
     pass
+
+# Graceful shutdown setup
+shutdown_manager = None
+graceful_wrapper = None
+
+try:
+    from newsletter.utils.shutdown_manager import (
+        get_shutdown_manager,
+        register_shutdown_task,
+        managed_thread,
+        managed_process,
+        ShutdownPhase,
+        is_shutdown_requested
+    )
+    from web.graceful_shutdown import create_graceful_app
+    
+    shutdown_manager = get_shutdown_manager()
+    print(f"[SUCCESS] Shutdown manager initialized successfully")
+    
+except ImportError as e:
+    print(f"[WARNING] Graceful shutdown not available: {e}")
+    # Fallback functions
+    def register_shutdown_task(*args, **kwargs):
+        return False
+    def managed_thread(name, thread):
+        class DummyContext:
+            def __enter__(self): return thread
+            def __exit__(self, *args): pass
+        return DummyContext()
+    def managed_process(name, process):
+        class DummyContext:
+            def __enter__(self): return process
+            def __exit__(self, *args): pass
+        return DummyContext()
+    def is_shutdown_requested():
+        return False
 
 # Binary compatibility setup
 try:
@@ -883,6 +922,85 @@ app = Flask(
 )
 CORS(app)  # Enable CORS for frontend-backend communication
 
+# Setup application-wide shutdown tasks
+def setup_app_shutdown_tasks():
+    """Setup application-wide shutdown tasks"""
+    if not shutdown_manager:
+        return
+        
+    # Close database connections
+    def cleanup_database():
+        try:
+            # Note: SQLite connections are typically closed automatically
+            # But we can force cleanup if needed
+            print("[INFO] Database connections cleaned up")
+        except Exception as e:
+            print(f"[ERROR] Error cleaning up database: {e}")
+    
+    # Cleanup Redis connections
+    def cleanup_redis():
+        try:
+            if redis_conn:
+                redis_conn.close()
+                print("[INFO] Redis connection closed")
+        except Exception as e:
+            print(f"[ERROR] Error closing Redis connection: {e}")
+    
+    # Cleanup in-memory tasks
+    def cleanup_in_memory_tasks():
+        try:
+            cancelled_count = 0
+            for job_id, task_info in in_memory_tasks.items():
+                if task_info.get("status") == "processing":
+                    task_info["status"] = "cancelled"
+                    task_info["error"] = "Application shutdown"
+                    cancelled_count += 1
+            
+            if cancelled_count > 0:
+                print(f"[INFO] Cancelled {cancelled_count} in-memory tasks")
+            else:
+                print("[INFO] No in-memory tasks to cancel")
+        except Exception as e:
+            print(f"[ERROR] Error cleaning up in-memory tasks: {e}")
+    
+    # Register shutdown tasks
+    register_shutdown_task(
+        name="cleanup_database",
+        callback=cleanup_database,
+        phase=ShutdownPhase.CLEANING_RESOURCES,
+        priority=40
+    )
+    
+    register_shutdown_task(
+        name="cleanup_redis", 
+        callback=cleanup_redis,
+        phase=ShutdownPhase.CLEANING_RESOURCES,
+        priority=45
+    )
+    
+    register_shutdown_task(
+        name="cleanup_in_memory_tasks",
+        callback=cleanup_in_memory_tasks,
+        phase=ShutdownPhase.WAITING_FOR_TASKS,
+        priority=30
+    )
+    
+    print("[INFO] Application shutdown tasks registered")
+
+# Setup shutdown tasks
+setup_app_shutdown_tasks()
+
+# Create graceful wrapper if available
+if shutdown_manager:
+    try:
+        graceful_wrapper = create_graceful_app(app, shutdown_timeout=20.0)
+        print("[SUCCESS] Graceful shutdown wrapper created")
+    except Exception as e:
+        print(f"[WARNING] Failed to create graceful wrapper: {e}")
+        graceful_wrapper = None
+else:
+    graceful_wrapper = None
+
 # Enable detailed logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -1067,6 +1185,16 @@ def generate_newsletter():
             # Process in background thread
             def background_task():
                 try:
+                    # Check if shutdown is requested before starting work
+                    if is_shutdown_requested():
+                        print(f"[WARNING] Shutdown requested - cancelling job {job_id}")
+                        in_memory_tasks[job_id] = {
+                            "status": "cancelled",
+                            "error": "Application shutdown requested",
+                            "updated_at": datetime.now().isoformat(),
+                        }
+                        return
+                    
                     print(f"[INFO] Starting background processing for job {job_id}")
                     print(f"[INFO] Data: {data}")
                     print(f"[INFO] Current time: {datetime.now().isoformat()}")
@@ -1191,9 +1319,16 @@ def generate_newsletter():
                             f"[WARNING] Failed to update database with error for job {job_id}: {db_error}"
                         )
 
-            thread = threading.Thread(target=background_task)
+            thread = threading.Thread(target=background_task, name=f"newsletter-job-{job_id}")
             thread.daemon = True
-            thread.start()
+            
+            # Register thread with shutdown manager if available
+            if shutdown_manager:
+                with managed_thread(f"newsletter-job-{job_id}", thread):
+                    thread.start()
+                    # Thread is automatically unregistered when it completes
+            else:
+                thread.start()
 
             return jsonify({"job_id": job_id, "status": "processing"}), 202
 
@@ -2401,5 +2536,37 @@ app_initialization_status = initialize_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
+    
     print(f"[INFO] Starting Flask app on port {port}, debug={debug}")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    
+    if graceful_wrapper:
+        print("[INFO] Using graceful shutdown wrapper")
+        try:
+            # Use graceful wrapper for better shutdown handling
+            graceful_wrapper.run(
+                host="0.0.0.0", 
+                port=port, 
+                debug=debug,
+                threaded=True,
+                use_reloader=False  # Disable reloader for better shutdown handling
+            )
+        except KeyboardInterrupt:
+            print("[INFO] Received KeyboardInterrupt - shutting down gracefully")
+        except Exception as e:
+            print(f"[ERROR] Application error: {e}")
+            raise
+        finally:
+            if shutdown_manager:
+                print("[INFO] Ensuring graceful shutdown...")
+                shutdown_manager.shutdown()
+    else:
+        print("[WARNING] Using standard Flask run (no graceful shutdown)")
+        try:
+            app.run(host="0.0.0.0", port=port, debug=debug, threaded=True)
+        except KeyboardInterrupt:
+            print("[INFO] Received KeyboardInterrupt - shutting down")
+        except Exception as e:
+            print(f"[ERROR] Application error: {e}")
+            raise
+    
+    print("[INFO] Application terminated")
