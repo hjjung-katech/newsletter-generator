@@ -83,8 +83,11 @@ pip install -e .
 # Build wheel
 python -m build
 
-# Create PyInstaller executable (Windows)
-python build_web_exe.py
+# Create PyInstaller executable (Windows) - Enhanced with hooks
+python build_web_exe_enhanced.py
+
+# Note: The build process now uses PyInstaller hooks for better dependency management
+# All hidden imports and data files are managed centrally in pyinstaller_hooks/hook-newsletter.py
 ```
 
 ## High-Level Architecture
@@ -171,6 +174,22 @@ The system supports multiple LLM providers with automatic fallback:
 - Korean text processing optimized for news content
 - Proper encoding handling in file operations and API calls
 
+### PyInstaller Build System
+- Build system uses PyInstaller hooks for centralized dependency management
+- All hidden imports, data files, and binaries are defined in `pyinstaller_hooks/hook-newsletter.py`
+- This approach reduces maintenance burden by eliminating manual hidden-import lists in build scripts
+- Hook file automatically collects dependencies from key packages (LangChain, web modules, etc.)
+- Build script (`build_web_exe_enhanced.py`) is now much simpler and focuses on build configuration
+- To modify dependencies: edit `pyinstaller_hooks/hook-newsletter.py` instead of the main build script
+- Hook system provides better error handling and dependency discovery compared to manual lists
+
+### PyInstaller Logging Control
+- **Build-time debug mode**: Set `PYI_DEBUG=true` environment variable to enable `--debug imports` during build
+- **Runtime log level**: Built executables use `ERROR` log level by default to minimize PyiFrozenFinder output
+- **Runtime log control**: Set `PYINSTALLER_LOG_LEVEL=ERROR` when running the exe to suppress verbose import logs
+- **For debugging imports**: Use `PYI_DEBUG=true python build_web_exe_enhanced.py` to enable detailed import analysis
+- **Clean console output**: Default configuration eliminates console spam while preserving error messages
+
 ### Testing Strategy
 - Tests are categorized with pytest markers (`unit`, `integration`, `real_api`, `mock_api`)
 - Mock mode available for development (`MOCK_MODE=true`)
@@ -208,10 +227,22 @@ The system supports multiple LLM providers with automatic fallback:
 3. Test email compatibility with `tests/test_email_compatibility.py`
 4. Validate HTML output in various email clients
 
+### Managing PyInstaller Dependencies
+1. **Adding new dependencies**: Edit `pyinstaller_hooks/hook-newsletter.py` and add modules to appropriate category lists
+2. **Adding data files**: Update the `datas` list in the hook file with new template or config files
+3. **Adding binary dependencies**: Add to `binaries` list or use `collect_dynamic_libs()` for packages
+4. **Excluding unnecessary modules**: Add to `excludes` list to reduce bundle size
+5. **Testing build**: Run `python build_web_exe_enhanced.py` and check for missing dependencies
+6. **Debug mode**: Use `PYI_DEBUG=true python build_web_exe_enhanced.py` for detailed import analysis (generates verbose output)
+7. **Troubleshooting**: Check PyInstaller warnings and add missing modules to hook file
+
 ### Debugging Common Issues
 - **Email delivery issues**: Check `newsletter/deliver.py` and Postmark configuration
 - **LLM quota errors**: Verify fallback logic in `newsletter/llm_factory.py`
 - **Unicode/encoding issues**: Check Windows UTF-8 handling in `newsletter/cli.py`
 - **Web interface errors**: Debug Flask app in `web/app.py`
+- **PyInstaller build issues**: Check `pyinstaller_hooks/hook-newsletter.py` and add missing dependencies; review build warnings for "Hidden import not found" messages
+- **Excessive console output in exe**: PyInstaller logging is now minimized by default; use `PYINSTALLER_LOG_LEVEL=ERROR` if still experiencing verbose output
+- **Import debugging needed**: Enable build-time debug with `PYI_DEBUG=true` environment variable (expect verbose console output)
 
 Remember to run the full test suite and linting before making any changes, and ensure all environment variables are properly configured for development.

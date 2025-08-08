@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Enhanced Build script for standalone executable with comprehensive hidden imports.
+"""Enhanced Build script for standalone executable using PyInstaller hooks.
 
-This script addresses all the missing dependencies that cause the EXE to fail
-after news scraping, particularly LangChain and related AI modules.
+This script now uses centralized PyInstaller hooks for dependency management,
+making the build process cleaner and easier to maintain.
 """
 
 import os
@@ -13,146 +13,15 @@ import PyInstaller.__main__
 def build():
     project_root = os.path.abspath(os.path.dirname(__file__))
     os.chdir(project_root)
+    
+    # Debug mode control via environment variable
+    debug_enabled = os.getenv('PYI_DEBUG', '').lower() in ['true', '1', 'yes']
 
-    # PyInstaller 빌드에 포함할 내부 데이터 (exe 내부에 번들)
-    datas = [
-        f"{os.path.join(project_root, 'templates')}{os.pathsep}templates",
-        f"{os.path.join(project_root, 'web', 'templates')}{os.pathsep}templates",
-        f"{os.path.join(project_root, 'web', 'static')}{os.pathsep}static",
-        f"{os.path.join(project_root, 'web', 'web_types.py')}{os.pathsep}web",
-        f"{os.path.join(project_root, 'newsletter')}{os.pathsep}newsletter",  # newsletter 패키지 전체
-        f"{os.path.join(project_root, 'config.yml')}{os.pathsep}.",  # config 파일
-        f"{os.path.join(project_root, 'config')}{os.pathsep}config",  # config 디렉토리
-        f"{os.path.join(project_root, '.env')}{os.pathsep}.",  # 환경 설정 파일 (중요!)
-    ]
+    # Note: Data files are now managed by PyInstaller hooks
+    # See pyinstaller_hooks/hook-newsletter.py for all data file configurations
 
-    # 📋 COMPREHENSIVE HIDDEN IMPORTS
-    # 기본 필수 모듈들
-    basic_imports = [
-        # Web Framework
-        "flask", "flask_cors", "werkzeug", "jinja2", "jinja2.runtime", "jinja2.loaders", "jinja2.utils",
-        
-        # Database & Storage
-        "sqlite3", "redis", "rq", "rq.worker", "rq.job", "rq.queue",
-        
-        # Configuration & Environment
-        "pydantic", "pydantic_settings", "python_dotenv", "dotenv",
-        "yaml", "PyYAML",
-        
-        # HTTP & Web Scraping
-        "requests", "requests.adapters", "urllib3", "urllib3.util.retry",
-        "beautifulsoup4", "bs4", "feedparser",
-        
-        # Date & Time
-        "dateutil", "dateutil.rrule", "dateutil.parser", "dateutil.tz",
-        
-        # Utilities
-        "rich", "rich.console", "typer", "uuid", "json", "re", "time",
-        "threading", "multiprocessing", "concurrent.futures",
-    ]
-
-    # 🤖 AI/LLM Core Modules (가장 중요!)
-    ai_core_imports = [
-        # LangChain Core
-        "langchain", "langchain_core", "langchain_community",
-        "langchain.callbacks", "langchain.callbacks.base",
-        "langchain.prompts", "langchain.tools", "langchain.chains",
-        "langchain.llms", "langchain.chat_models",
-        "langchain_core.messages", "langchain_core.output_parsers", 
-        "langchain_core.runnables", "langchain_core.tools",
-        "langchain_core.outputs", "langchain_core.callbacks",
-        
-        # LangGraph
-        "langgraph", "langgraph.graph", "langgraph.prebuilt",
-        
-        # LangSmith (monitoring)
-        "langsmith", "langsmith.client",
-    ]
-
-    # 🌐 LLM Provider Specific Modules
-    llm_providers = [
-        # Google Gemini
-        "langchain_google_genai", 
-        "google", "google.generativeai", "google.ai", "google.ai.generativelanguage",
-        "google.api_core", "google.auth", "google.cloud",
-        "google.generativeai", "google.generativeai.client",
-        "google.generativeai.types", "google.generativeai.models",
-        
-        # OpenAI
-        "langchain_openai",
-        "openai", "openai.api_resources", "openai.error",
-        
-        # Anthropic
-        "langchain_anthropic",
-        "anthropic", "anthropic.client", "anthropic.types",
-        
-        # API clients common modules
-        "httpx", "httpx._client", "httpx._config", "httpx._models",
-        "aiohttp", "aiohttp.client", "aiohttp.connector",
-    ]
-
-    # 📧 Email & Communication
-    email_imports = [
-        "postmarker", "postmarker.core", "postmarker.models",
-        "premailer", "markdownify", "tenacity", "tenacity.stop", "tenacity.wait",
-    ]
-
-    # 🔍 Data Processing & Analysis
-    data_processing = [
-        "pandas", "numpy", 
-        "chromadb", "faiss", "faiss.swigfaiss",
-        "sentence_transformers",  # If used for embeddings
-    ]
-
-    # 🔒 Security & Monitoring
-    security_monitoring = [
-        "sentry_sdk", "sentry_sdk.integrations", "sentry_sdk.integrations.flask",
-        "sentry_sdk.integrations.logging",
-    ]
-
-    # 🔧 System & OS specific
-    system_imports = [
-        "platform", "subprocess", "pathlib", "tempfile", "shutil",
-        "signal", "atexit", "traceback", "logging", "logging.config",
-    ]
-
-    # ⚙️ Newsletter specific modules (업데이트됨 - 최신 기능 반영)
-    newsletter_modules = [
-        "newsletter", "newsletter.cli", "newsletter.main", "newsletter.settings",
-        "newsletter.collect", "newsletter.sources", "newsletter.article_filter",
-        "newsletter.compose", "newsletter.deliver", "newsletter.summarize",
-        "newsletter.chains", "newsletter.graph", "newsletter.tools",
-        "newsletter.llm_factory", "newsletter.cost_tracking", "newsletter.scoring",
-        "newsletter.config", "newsletter.config_manager", "newsletter.centralized_settings",
-        "newsletter.template_manager", "newsletter.date_utils", "newsletter.html_utils",
-        "newsletter.compat_env", "newsletter.logging_conf",
-        "newsletter.security", "newsletter.security.config", 
-        "newsletter.security.middleware", "newsletter.security.logging",
-        "newsletter.security.validation",
-        "newsletter.utils", "newsletter.utils.logger", "newsletter.utils.error_handling",
-        "newsletter.utils.file_naming", "newsletter.utils.subprocess_utils",
-        "newsletter.utils.test_mode", "newsletter.utils.convert_legacy_data",
-        
-        # 최신 추가 모듈들 (email_compatible 및 template 기능)
-        "newsletter.template_config", "newsletter.email_processing",
-        "newsletter.file_utils", "newsletter.validation",
-    ]
-
-    # 🌐 Web specific modules (업데이트됨 - 최신 웹 기능 반영)
-    web_modules = [
-        "web", "web.app", "web.tasks", "web.mail", "web.suggest", 
-        "web.worker", "web.schedule_runner", "web.web_types",
-        
-        # 바이너리 호환성 모듈 (중요!)
-        "web.binary_compatibility", "binary_compatibility",
-    ]
-
-    # 🔄 모든 hidden imports를 하나로 합치기
-    all_hidden_imports = (
-        basic_imports + ai_core_imports + llm_providers + email_imports +
-        data_processing + security_monitoring + system_imports +
-        newsletter_modules + web_modules
-    )
+    # Note: Hidden imports are now managed by PyInstaller hooks
+    # See pyinstaller_hooks/hook-newsletter.py for all hidden import configurations
 
     # PyInstaller 인수 구성
     args = [
@@ -161,38 +30,15 @@ def build():
         "--name", "newsletter_web",
         "--console",  # 디버깅을 위해 콘솔 창 표시
         
+        # Use PyInstaller hooks directory
+        "--additional-hooks-dir", "pyinstaller_hooks",
+        
         # Runtime hooks
         "--runtime-hook", "web/runtime_hook.py",
-        
-        # 모든 newsletter와 web 패키지 수집
-        "--collect-all", "newsletter",
-        "--collect-all", "web", 
-        "--collect-all", "langchain",
-        "--collect-all", "langchain_core",
-        "--collect-all", "langchain_google_genai",
-        "--collect-all", "langchain_openai",
-        "--collect-all", "langchain_anthropic",
-        "--collect-all", "langgraph",
-        
-        # Binary files
-        "--add-binary", f"{os.path.join(project_root, 'web', 'web_types.py')}{os.pathsep}web",
-        
-        # 추가 중요한 바이너리/데이터들
-        "--collect-binaries", "google",
-        "--collect-binaries", "grpc",
-        "--collect-binaries", "grpcio",
-        
-        # 바이너리 호환성 모듈 추가
-        "--add-binary", f"{os.path.join(project_root, 'web', 'binary_compatibility.py')}{os.pathsep}web",
     ]
 
-    # Hidden imports 추가
-    for module in all_hidden_imports:
-        args.extend(["--hidden-import", module])
-
-    # Data files 추가
-    for data in datas:
-        args.extend(["--add-data", data])
+    # Note: Hidden imports and data files are now handled by hooks
+    # This reduces the complexity of this build script significantly
 
     # 추가 옵션들
     additional_args = [
@@ -204,21 +50,27 @@ def build():
         # 메모리 및 성능 최적화
         "--optimize", "2",  # Python 최적화 레벨
         
-        # 디버깅을 위한 추가 정보 포함
-        "--debug", "imports",  # import 디버깅 활성화
+        # Debug options (controlled by PYI_DEBUG environment variable)
+        # Note: --debug imports can cause excessive console output during runtime
         
         # UPX 압축 비활성화 (안정성을 위해)
         "--noupx",
         
-        # 경고 억제 (너무 많은 경고 방지)
-        "--log-level", "WARN",
+        # Minimize console output (use ERROR to reduce PyiFrozenFinder logs)
+        "--log-level", "ERROR",
     ]
+    
+    # Add debug options conditionally
+    if debug_enabled:
+        additional_args.extend(["--debug", "imports"])
+        print("[DEBUG] PyInstaller debug mode enabled (imports)")
+    else:
+        print("[INFO] PyInstaller debug mode disabled (set PYI_DEBUG=true to enable)")
     
     args.extend(additional_args)
 
-    print("[INFO] Starting enhanced PyInstaller build...")
-    print(f"[INFO] Total hidden imports: {len(all_hidden_imports)}")
-    print(f"[INFO] Total data files: {len(datas)}")
+    print("[INFO] Starting PyInstaller build with hooks...")
+    print(f"[INFO] Using hooks directory: pyinstaller_hooks/")
     print(f"[INFO] Build arguments: {len(args)} total")
     
     # 빌드 실행

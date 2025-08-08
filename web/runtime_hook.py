@@ -173,16 +173,17 @@ def _setup_environment_variables():
         
         # 🔴 CRITICAL FIX: .env 파일 로딩
         if getattr(sys, "frozen", False):
-            base_path = sys._MEIPASS
-            env_file = os.path.join(base_path, ".env")
+            # PyInstaller로 빌드된 경우 - exe와 동일한 디렉토리에서 .env 파일 찾기
+            exe_dir = os.path.dirname(sys.executable)
+            env_file = os.path.join(exe_dir, ".env")
             
             if os.path.exists(env_file):
-                print(f"[🔴 CRITICAL] Loading .env file from: {env_file}")
+                print(f"[SUCCESS] Loading .env file from exe directory: {env_file}")
                 try:
                     # python-dotenv 사용하여 .env 파일 로딩
                     from dotenv import load_dotenv
                     load_dotenv(env_file)
-                    print("[🔴 SUCCESS] .env file loaded successfully")
+                    print("[SUCCESS] .env file loaded successfully via runtime hook")
                     
                     # 환경 변수 확인
                     critical_vars = ['SERPER_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY']

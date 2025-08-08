@@ -210,9 +210,11 @@ class RealNewsletterCLI:
         # PyInstaller 실행 파일에서 실행 중인지 확인
         if getattr(sys, "frozen", False):
             # PyInstaller 실행 파일에서 실행 중
-            base_path = sys._MEIPASS
+            base_path = sys._MEIPASS  # 번들된 파일들은 여기서
             newsletter_path = os.path.join(base_path, "newsletter")
-            env_file = os.path.join(base_path, ".env")
+            # .env 파일은 exe와 같은 디렉토리에서 찾기
+            exe_dir = os.path.dirname(sys.executable)
+            env_file = os.path.join(exe_dir, ".env")
         else:
             # 일반 Python 스크립트로 실행 중
             newsletter_path = os.path.join(self.project_root, "newsletter")

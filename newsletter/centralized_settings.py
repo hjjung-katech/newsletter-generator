@@ -84,9 +84,9 @@ def _load_dotenv_if_needed():
 
             # PyInstaller 환경에서의 경로 처리
             if getattr(sys, "frozen", False):
-                # PyInstaller로 빌드된 경우
-                base_path = sys._MEIPASS
-                env_path = os.path.join(base_path, ".env")
+                # PyInstaller로 빌드된 경우 - exe와 같은 디렉토리에서 .env 찾기
+                exe_dir = os.path.dirname(sys.executable)
+                env_path = os.path.join(exe_dir, ".env")
             else:
                 # 일반 Python 환경
                 env_path = ".env"
