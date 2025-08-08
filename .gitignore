@@ -296,3 +296,6 @@ debug_*.json
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Claude
+.claude
