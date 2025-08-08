@@ -23,6 +23,7 @@ def build():
         f"{os.path.join(project_root, 'newsletter')}{os.pathsep}newsletter",  # newsletter 패키지 전체
         f"{os.path.join(project_root, 'config.yml')}{os.pathsep}.",  # config 파일
         f"{os.path.join(project_root, 'config')}{os.pathsep}config",  # config 디렉토리
+        f"{os.path.join(project_root, '.env')}{os.pathsep}.",  # 환경 설정 파일 (중요!)
     ]
 
     # 📋 COMPREHENSIVE HIDDEN IMPORTS
@@ -115,7 +116,7 @@ def build():
         "signal", "atexit", "traceback", "logging", "logging.config",
     ]
 
-    # ⚙️ Newsletter specific modules
+    # ⚙️ Newsletter specific modules (업데이트됨 - 최신 기능 반영)
     newsletter_modules = [
         "newsletter", "newsletter.cli", "newsletter.main", "newsletter.settings",
         "newsletter.collect", "newsletter.sources", "newsletter.article_filter",
@@ -131,12 +132,19 @@ def build():
         "newsletter.utils", "newsletter.utils.logger", "newsletter.utils.error_handling",
         "newsletter.utils.file_naming", "newsletter.utils.subprocess_utils",
         "newsletter.utils.test_mode", "newsletter.utils.convert_legacy_data",
+        
+        # 최신 추가 모듈들 (email_compatible 및 template 기능)
+        "newsletter.template_config", "newsletter.email_processing",
+        "newsletter.file_utils", "newsletter.validation",
     ]
 
-    # 🌐 Web specific modules
+    # 🌐 Web specific modules (업데이트됨 - 최신 웹 기능 반영)
     web_modules = [
         "web", "web.app", "web.tasks", "web.mail", "web.suggest", 
         "web.worker", "web.schedule_runner", "web.web_types",
+        
+        # 바이너리 호환성 모듈 (중요!)
+        "web.binary_compatibility", "binary_compatibility",
     ]
 
     # 🔄 모든 hidden imports를 하나로 합치기
@@ -173,6 +181,9 @@ def build():
         "--collect-binaries", "google",
         "--collect-binaries", "grpc",
         "--collect-binaries", "grpcio",
+        
+        # 바이너리 호환성 모듈 추가
+        "--add-binary", f"{os.path.join(project_root, 'web', 'binary_compatibility.py')}{os.pathsep}web",
     ]
 
     # Hidden imports 추가

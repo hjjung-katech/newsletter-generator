@@ -495,7 +495,11 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
 
             # generate_unified_newsletter_filename이 이미 전체 경로를 반환함
             file_path = generate_unified_newsletter_filename(
-                domain_str, f"newsletter_{template_style}", keywords_str, "html"
+                topic=domain_str,
+                style=f"{template_style}_email_compatible" if state.get("email_compatible", False) else template_style,
+                timestamp=None,  # 현재 시간 사용
+                use_current_date=True,
+                generation_type="original"
             )
 
             # 디렉토리 존재 확인 (파일 경로에서 디렉토리 부분 추출)

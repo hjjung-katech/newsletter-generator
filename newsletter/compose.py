@@ -136,17 +136,11 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
         # 데이터에서 원래 template_style 확인 (graph.py에서 전달됨)
         original_template_style = data.get("template_style", "detailed")
 
-        # email_compatible 기본 설정을 가져옴
-        config = NewsletterConfig.get_config(style)
-
-        # 원래 template_style의 설정을 일부 적용
-        base_config = NewsletterConfig.get_config(original_template_style)
-
-        # 중요한 설정들을 원래 스타일에서 가져옴
-        config["max_articles"] = base_config["max_articles"]
-        config["max_groups"] = base_config["max_groups"]
-        config["max_definitions"] = base_config["max_definitions"]
-        config["summary_style"] = base_config["summary_style"]
+        # 원래 template_style의 설정을 가져옴 (CLI 기존 기능 유지)
+        config = NewsletterConfig.get_config(original_template_style)
+        
+        # email_compatible 템플릿 사용을 위해 template_name만 변경
+        config["template_name"] = "newsletter_template_email_compatible.html"
 
         print(
             f"Composing email-compatible newsletter with {original_template_style} content style..."

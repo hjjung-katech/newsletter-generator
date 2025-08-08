@@ -302,151 +302,72 @@ class RealNewsletterCLI:
             # 환경 변수 강제 설정 (PyInstaller 환경 대응)
             self._ensure_environment_variables()
 
-            # newsletter 모듈 직접 import
-            from newsletter import collect, compose, summarize
+            # LangGraph 워크플로우 사용하여 뉴스레터 생성 (template_style 정보 반영)
+            from newsletter.graph import generate_newsletter
 
             # 키워드 처리
             if keywords:
                 keyword_list = keywords if isinstance(keywords, list) else [keywords]
-                keyword_str = ",".join(keyword_list)
-                input_description = f"keywords: {keyword_str}"
+                keyword_str = keyword_list  # 리스트 형태로 전달
+                input_description = f"keywords: {','.join(keyword_list)}"
+                
+                # graph.py의 generate_newsletter 함수 호출
+                html_content, status = generate_newsletter(
+                    keywords=keyword_str,
+                    news_period_days=period,
+                    template_style=template_style,
+                    email_compatible=email_compatible
+                )
+                
             elif domain:
                 input_description = f"domain: {domain}"
-                # 도메인에서 키워드 생성 (간단한 구현)
-                keyword_list = [domain]
-                keyword_str = domain
+                
+                # graph.py의 generate_newsletter 함수 호출 (키워드를 도메인으로 설정)
+                html_content, status = generate_newsletter(
+                    keywords=[domain],  # 도메인을 키워드로 사용
+                    news_period_days=period,
+                    domain=domain,
+                    template_style=template_style,
+                    email_compatible=email_compatible
+                )
             else:
                 raise ValueError("Either keywords or domain must be provided")
 
-            logging.info(f"Direct generation for: {input_description}")
+            logging.info(f"LangGraph generation for: {input_description}")
 
-            # 뉴스 수집
-            articles = collect.collect_articles(
-                keywords=keyword_str,
-                num_results=10,
-                max_per_source=3,
-                filter_duplicates=True,
-                group_by_keywords=True,
-                use_major_sources_filter=True,  # 올바른 매개변수명 사용
-            )
+            # HTML 생성 성공 확인
+            print(f"[DEBUG] LangGraph result - html_content length: {len(html_content) if html_content else 0}")
+            print(f"[DEBUG] LangGraph result - status: {status}")
+            print(f"[DEBUG] LangGraph result - html_content preview: {html_content[:200] if html_content else 'None'}...")
+            
+            if not html_content or status != "success":
+                print(f"[ERROR] LangGraph failed - html_content: {bool(html_content)}, status: {status}")
+                raise ValueError(f"Failed to generate newsletter HTML: {status}")
 
-            # 기사가 없으면 빈 결과 반환
-            if not articles:
-                return {
-                    "content": "수집된 기사가 없습니다.",
-                    "title": f"{keyword_str} 관련 뉴스레터",
-                    "status": "success",
-                }
-
-            # 템플릿 기반 생성 방식 선택
-            # 환경 변수나 설정을 통해 제어 가능
-            from newsletter.config_manager import (
-                should_use_template_system,
-                get_template_name,
-            )
-
-            use_template_system = should_use_template_system()
-
-            if use_template_system:
-                # 기존 Jinja2 템플릿 시스템 사용
-                logging.info("Using Jinja2 template system for newsletter generation")
-
-                # 템플릿 디렉토리 설정 - PyInstaller 환경 대응
-                if getattr(sys, "frozen", False):
-                    # PyInstaller로 빌드된 경우 - 임시 디렉토리에서 템플릿 찾기
-                    template_dir = os.path.join(sys._MEIPASS, "templates")
-                    logging.info(f"PyInstaller 환경: 템플릿 디렉토리 = {template_dir}")
-                else:
-                    # 일반 Python 환경
-                    template_dir = os.path.join(self.project_root, "templates")
-
-                # 템플릿 디렉토리 존재 확인
-                if not os.path.exists(template_dir):
-                    logging.error(
-                        f"템플릿 디렉토리가 존재하지 않습니다: {template_dir}"
-                    )
-                    # 대안 경로들 시도
-                    alternative_paths = [
-                        os.path.join(os.path.dirname(__file__), "..", "templates"),
-                        os.path.join(os.getcwd(), "templates"),
-                    ]
-                    for alt_path in alternative_paths:
-                        if os.path.exists(alt_path):
-                            template_dir = alt_path
-                            logging.info(f"대안 템플릿 디렉토리 사용: {template_dir}")
-                            break
-                    else:
-                        raise FileNotFoundError(
-                            f"템플릿 디렉토리를 찾을 수 없습니다. 시도한 경로들: {[template_dir] + alternative_paths}"
-                        )
-                else:
-                    logging.info(f"템플릿 디렉토리 확인됨: {template_dir}")
-
-                # 설정 파일에서 템플릿 이름 가져오기
-                template_name = get_template_name(template_style, email_compatible)
-
-                # 기사 데이터를 템플릿 시스템에 맞게 변환
-                if isinstance(articles, dict):
-                    # 딕셔너리 형태를 리스트로 변환 (템플릿 시스템 호환성)
-                    all_articles = []
-                    for keyword, article_list in articles.items():
-                        all_articles.extend(article_list)
-                    articles_for_template = all_articles
-                else:
-                    articles_for_template = articles
-
-                # Jinja2 템플릿을 사용하여 HTML 생성
-                html_content = compose.compose_newsletter_html(
-                    articles_for_template, template_dir, template_name
-                )
-
-                logging.info(f"Generated HTML using Jinja2 template: {template_name}")
-
+            # 제목과 통계 생성
+            if keywords:
+                title = f"Newsletter: {','.join(keyword_list)}"
             else:
-                # LLM 직접 생성 방식 (기존 방식)
-                logging.info("Using LLM direct generation for newsletter")
-                html_content = summarize.summarize_articles(keyword_list, articles)
-
-            # 제목 생성
-            title = f"Newsletter: {keyword_str}"
-
-            # 성공 통계 - articles가 딕셔너리인 경우를 처리
-            if isinstance(articles, dict):
-                # 딕셔너리인 경우: 각 키워드별 기사 수를 합산
-                total_articles = sum(
-                    len(article_list) for article_list in articles.values()
-                )
-                # 모든 기사의 소스를 수집
-                all_sources = set()
-                for article_list in articles.values():
-                    for article in article_list:
-                        if isinstance(article, dict):
-                            all_sources.add(article.get("source", ""))
-                sources_count = len(all_sources)
-            else:
-                # 리스트인 경우: 기존 로직 사용
-                total_articles = len(articles)
-                sources_count = len(
-                    set(article.get("source", "") for article in articles)
-                )
-
+                title = f"Newsletter: {domain}"
+            
+            # 통계 정보 (실제 값은 LangGraph에서 로그로 출력됨)
             stats = {
-                "articles_count": total_articles,
-                "sources_count": sources_count,
-                "generation_time": (
-                    "template_mode" if use_template_system else "direct_mode"
-                ),
-                "template_used": template_name if use_template_system else "LLM_direct",
+                "articles_count": 0,  # LangGraph 내부에서 처리
+                "sources_count": 0,   # LangGraph 내부에서 처리
+                "generation_time": "langgraph_mode",
+                "template_style": template_style,
+                "email_compatible": email_compatible,
             }
 
             logging.info(f"Direct newsletter generation successful: {title}")
             logging.info(f"Generated HTML size: {len(html_content)} characters")
+            print(f"[SUCCESS] _generate_direct completed - HTML size: {len(html_content)} chars")
 
             response = {
                 "content": html_content,
                 "title": title,
                 "status": "success",
-                "cli_output": f"Template-based generation mode - {len(articles)} articles processed",
+                "cli_output": f"LangGraph workflow - {stats.get('articles_count', 0)} articles processed",
                 "generation_stats": stats,
                 "input_params": {
                     "keywords": keywords,
@@ -454,11 +375,15 @@ class RealNewsletterCLI:
                     "template_style": template_style,
                     "email_compatible": email_compatible,
                     "period": period,
-                    "generation_method": (
-                        "template" if use_template_system else "llm_direct"
-                    ),
+                    "generation_method": "langgraph_workflow",
                 },
             }
+
+            print(f"[DEBUG] _generate_direct response keys: {list(response.keys())}")
+            print(f"[DEBUG] _generate_direct response.content length: {len(response.get('content', ''))}")
+            print(f"[DEBUG] _generate_direct response.status: {response.get('status')}")
+            print(f"[DEBUG] _generate_direct response.title: {response.get('title')}")
+            print(f"[SUCCESS] _generate_direct returning complete response")
 
             return response
 
@@ -1228,6 +1153,7 @@ def get_newsletter():
         keywords = request.args.get("keywords", topic)  # topic을 keywords로도 받음
         period = request.args.get("period", 14, type=int)
         template_style = request.args.get("template_style", "compact")
+        email = request.args.get("email", "")
 
         # 기간 파라미터 검증
         if period not in [1, 7, 14, 30]:
@@ -1243,13 +1169,20 @@ def get_newsletter():
                 400,
             )
 
-        print(f"[INFO] Newsletter request - Keywords: {keywords}, Period: {period}")
+        # Smart email_compatible logic for GET endpoint
+        if email and email.strip():
+            email_compatible = True
+            print(f"[INFO] Auto-enabled email_compatible for GET request because email recipient is provided: {email}")
+        else:
+            email_compatible = False
+
+        print(f"[INFO] Newsletter request - Keywords: {keywords}, Period: {period}, Email: {email}, Email compatible: {email_compatible}")
 
         # 뉴스레터 생성
         result = newsletter_cli.generate_newsletter(
             keywords=keywords,
             template_style=template_style,
-            email_compatible=False,
+            email_compatible=email_compatible,
             period=period,
         )
 
@@ -1281,12 +1214,25 @@ def process_newsletter_sync(data):
         keywords = data.get("keywords", "")
         domain = data.get("domain", "")
         template_style = data.get("template_style", "compact")
-        email_compatible = data.get("email_compatible", False)
         period = data.get("period", 14)
         email = data.get("email", "")  # 이메일 주소 추가
         use_template_system = data.get(
             "use_template_system", True
         )  # 템플릿 시스템 사용 여부
+        
+        # Smart email_compatible logic: 이메일이 있으면 자동으로 email_compatible=True
+        # 단, 사용자가 명시적으로 False로 설정한 경우에는 그 값을 존중
+        user_email_compatible = data.get("email_compatible", None)
+        if user_email_compatible is not None:
+            # 사용자가 명시적으로 설정한 경우 그 값 사용
+            email_compatible = bool(user_email_compatible)
+        elif email and email.strip():
+            # 이메일이 있으면 자동으로 email_compatible=True
+            email_compatible = True
+            print(f"[INFO] Auto-enabled email_compatible because email recipient is provided: {email}")
+        else:
+            # 이메일이 없으면 기본값 False
+            email_compatible = False
 
         print(f"[INFO] Processing parameters:")
         print(f"   Keywords: {keywords}")
@@ -1343,11 +1289,22 @@ def process_newsletter_sync(data):
                 else:
                     raise ValueError("Either keywords or domain must be provided")
 
-            print(f"[INFO] CLI result status: {result['status']}")
-            print(f"[INFO] CLI result type: {type(result)}")
-            print(
-                f"[INFO] CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
-            )
+            print(f"[DEBUG] CLI result status: {result['status']}")
+            print(f"[DEBUG] CLI result type: {type(result)}")
+            print(f"[DEBUG] CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+            
+            # 핵심 필드들 상세 로깅
+            if isinstance(result, dict):
+                print(f"[DEBUG] CLI result.content exists: {bool(result.get('content'))}")
+                print(f"[DEBUG] CLI result.content length: {len(result.get('content', ''))}")
+                print(f"[DEBUG] CLI result.title: {result.get('title', 'None')}")
+                print(f"[DEBUG] CLI result.status: {result.get('status', 'None')}")
+                if result.get('content'):
+                    print(f"[DEBUG] CLI result.content preview: {result['content'][:200]}...")
+            else:
+                print(f"[ERROR] CLI result is not a dictionary: {result}")
+            
+            print(f"[DEBUG] About to create final response...")
 
         except Exception as cli_error:
             print(f"[WARNING] CLI generation failed: {str(cli_error)}")
@@ -1446,6 +1403,18 @@ def process_newsletter_sync(data):
             },
         }
 
+        print(f"[DEBUG] Final response created:")
+        print(f"[DEBUG] Final response keys: {list(response.keys())}")
+        print(f"[DEBUG] Final response.html_content exists: {bool(response.get('html_content'))}")
+        print(f"[DEBUG] Final response.html_content length: {len(response.get('html_content', ''))}")
+        print(f"[DEBUG] Final response.status: {response.get('status')}")
+        print(f"[DEBUG] Final response.html_size: {response.get('html_size')}")
+        
+        if response.get('html_content'):
+            print(f"[DEBUG] Final response.html_content preview: {response['html_content'][:200]}...")
+        else:
+            print(f"[ERROR] Final response has no html_content!")
+        
         print(f"[SUCCESS] Processing completed successfully")
         return response
 
@@ -1470,11 +1439,20 @@ def process_newsletter_in_memory(data, job_id):
         
         # 데이터베이스에 직접 업데이트 (tasks.py import 문제 방지)
         try:
+            print(f"[DEBUG] About to save to database for job {job_id}")
+            print(f"[DEBUG] Result keys before JSON serialization: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+            print(f"[DEBUG] Result.html_content exists before DB save: {bool(result.get('html_content'))}")
+            print(f"[DEBUG] Result.html_content length before DB save: {len(result.get('html_content', ''))}")
+            
+            result_json = json.dumps(result)
+            print(f"[DEBUG] Serialized JSON length: {len(result_json)}")
+            print(f"[DEBUG] JSON preview: {result_json[:300]}...")
+            
             conn = sqlite3.connect(DATABASE_PATH)
             cursor = conn.cursor()
             cursor.execute(
                 "UPDATE history SET status = ?, result = ? WHERE id = ?",
-                ("completed", json.dumps(result), job_id),
+                ("completed", result_json, job_id),
             )
             conn.commit()
             conn.close()
@@ -2194,42 +2172,98 @@ def send_test_email_api():
 def get_newsletter_html(job_id):
     """작업 ID에 해당하는 뉴스레터 HTML을 직접 반환"""
     try:
+        print(f"[🔴 CRITICAL DEBUG] API ENDPOINT CALLED for job_id: {job_id}")
+        print(f"[🔴 CRITICAL DEBUG] Current time: {datetime.now()}")
+        print(f"[🔴 CRITICAL DEBUG] DATABASE_PATH: {DATABASE_PATH}")
+        
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
+        
+        # 모든 레코드 확인
+        cursor.execute("SELECT id, status FROM history ORDER BY created_at DESC LIMIT 5")
+        all_rows = cursor.fetchall()
+        print(f"[🔴 CRITICAL DEBUG] Recent 5 records: {all_rows}")
+        
         cursor.execute("SELECT status, result FROM history WHERE id = ?", (job_id,))
         row = cursor.fetchone()
         conn.close()
 
         if not row:
-            return "<html><body><h1>뉴스레터를 찾을 수 없습니다</h1></body></html>", 404
+            print(f"[🔴 CRITICAL DEBUG] ❌ NO ROW FOUND for job_id: {job_id}")
+            return f"<html><body><h1>❌ JOB ID NOT FOUND: {job_id}</h1><p>Available IDs: {[r[0] for r in all_rows]}</p></body></html>", 404
 
         status, result_json = row
+        print(f"[🔴 CRITICAL DEBUG] ✅ Found row - status: {status}")
+        print(f"[🔴 CRITICAL DEBUG] result_json length: {len(result_json or '')}")
+        
         if status != "completed":
-            return (
-                "<html><body><h1>뉴스레터 생성이 완료되지 않았습니다</h1></body></html>",
-                400,
-            )
+            print(f"[🔴 CRITICAL DEBUG] ❌ Status not completed: {status}")
+            return f"<html><body><h1>❌ STATUS: {status}</h1></body></html>", 400
 
         result = json.loads(result_json) if result_json else {}
+        print(f"[🔴 CRITICAL DEBUG] ✅ Parsed result keys: {list(result.keys()) if result else 'No result'}")
+        
         html_content = result.get("html_content", "")
-
-        if not html_content:
-            return "<html><body><h1>뉴스레터 콘텐츠가 없습니다</h1></body></html>", 404
-
-        # HTML 콘텐츠를 직접 반환 (UTF-8 인코딩 명시)
-        return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
+        print(f"[🔴 CRITICAL DEBUG] HTML content exists: {bool(html_content)}")
+        print(f"[🔴 CRITICAL DEBUG] HTML content length: {len(html_content) if html_content else 0}")
+        
+        if html_content:
+            print(f"[🔴 CRITICAL DEBUG] ✅ HTML FOUND! Preview: {html_content[:200]}...")
+            print(f"[🔴 CRITICAL DEBUG] ✅ RETURNING HTML CONTENT")
+            return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
+        else:
+            print(f"[🔴 CRITICAL DEBUG] ❌ NO HTML CONTENT")
+            print(f"[🔴 CRITICAL DEBUG] Full result debug: {str(result)[:500]}...")
+            return f"<html><body><h1>❌ NO HTML CONTENT</h1><p>Result keys: {list(result.keys())}</p><p>Full result preview: {str(result)[:500]}</p></body></html>", 404
 
     except Exception as e:
         error_html = f"""
         <html>
         <head><meta charset="utf-8"></head>
         <body>
-            <h1>오류 발생</h1>
-            <p>뉴스레터를 불러오는 중 오류가 발생했습니다: {str(e)}</p>
+            <h1>🔴 API ERROR</h1>
+            <p>Error: {str(e)}</p>
+            <p>Time: {datetime.now()}</p>
         </body>
         </html>
         """
+        print(f"[🔴 CRITICAL DEBUG] ❌ EXCEPTION in get_newsletter_html: {e}")
         return error_html, 500, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@app.route("/api/test-iframe")
+def test_iframe():
+    """간단한 iframe 테스트용 엔드포인트"""
+    print(f"[🔴 CRITICAL DEBUG] TEST IFRAME ENDPOINT CALLED at {datetime.now()}")
+    
+    test_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>🔴 IFRAME TEST</title>
+        <style>
+            body {{ 
+                background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+                color: white;
+                font-family: Arial, sans-serif;
+                padding: 20px;
+                text-align: center;
+            }}
+            h1 {{ font-size: 2em; margin-bottom: 20px; }}
+            p {{ font-size: 1.2em; }}
+        </style>
+    </head>
+    <body>
+        <h1>🔴 IFRAME TEST SUCCESSFUL!</h1>
+        <p>If you can see this, iframe loading works!</p>
+        <p>Current time: {datetime.now()}</p>
+        <p>This proves the API endpoint and iframe mechanism are functional.</p>
+    </body>
+    </html>
+    """
+    
+    return test_html, 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
 # Blueprint imports

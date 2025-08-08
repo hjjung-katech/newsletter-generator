@@ -171,10 +171,64 @@ def _setup_environment_variables():
             os.environ["PYTHONIOENCODING"] = "utf-8"
             os.environ["PYTHONUTF8"] = "1"
         
+        # 🔴 CRITICAL FIX: .env 파일 로딩
+        if getattr(sys, "frozen", False):
+            base_path = sys._MEIPASS
+            env_file = os.path.join(base_path, ".env")
+            
+            if os.path.exists(env_file):
+                print(f"[🔴 CRITICAL] Loading .env file from: {env_file}")
+                try:
+                    # python-dotenv 사용하여 .env 파일 로딩
+                    from dotenv import load_dotenv
+                    load_dotenv(env_file)
+                    print("[🔴 SUCCESS] .env file loaded successfully")
+                    
+                    # 환경 변수 확인
+                    critical_vars = ['SERPER_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY']
+                    for var in critical_vars:
+                        value = os.environ.get(var)
+                        if value and value not in ['SERPER_API_KEY', 'GEMINI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY']:
+                            print(f"[🔴 LOADED] {var}: {'*' * 10}...{value[-5:] if len(value) > 5 else 'SHORT'}")
+                        else:
+                            print(f"[🔴 WARNING] {var}: NOT SET OR PLACEHOLDER")
+                            
+                except ImportError:
+                    print("[🔴 ERROR] python-dotenv not available, manual .env parsing")
+                    # Manual .env parsing as fallback
+                    _manual_env_parsing(env_file)
+                except Exception as e:
+                    print(f"[🔴 ERROR] Error loading .env file: {e}")
+                    _manual_env_parsing(env_file)
+            else:
+                print(f"[🔴 ERROR] .env file not found at: {env_file}")
+        
         print("[SUCCESS] Environment variables configured for binary execution")
         
     except Exception as e:
         print(f"[ERROR] Error setting up environment variables: {e}")
+
+
+def _manual_env_parsing(env_file):
+    """Manual .env file parsing as fallback."""
+    try:
+        print(f"[🔴 FALLBACK] Manual parsing of .env file: {env_file}")
+        with open(env_file, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")  # Remove quotes
+                    
+                    if key and value:
+                        os.environ[key] = value
+                        if key.endswith('_API_KEY'):
+                            print(f"[🔴 MANUAL] {key}: {'*' * 10}...{value[-5:] if len(value) > 5 else 'SHORT'}")
+                        
+        print("[🔴 SUCCESS] Manual .env parsing completed")
+    except Exception as e:
+        print(f"[🔴 ERROR] Manual .env parsing failed: {e}")
 
 
 def _setup_logging_early():

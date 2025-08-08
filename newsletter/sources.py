@@ -95,15 +95,19 @@ class NewsSource:
         # 날짜 형식 표준화 (YYYY-MM-DD)
         standardized_date = standardize_date(raw_date)
 
-        # 반환할 기사 정보
+        # 기사 요약 내용 추출 (snippet 우선, 없으면 description, 없으면 content)
+        snippet_content = article.get(
+            "snippet",
+            article.get("description", article.get("content", "내용 없음")),
+        )
+        
+        # 반환할 기사 정보 (snippet과 content 모두 포함)
         return {
             "title": article.get("title", "제목 없음"),
             "url": article.get("url", article.get("link", "#")),
             "link": article.get("link", article.get("url", "#")),
-            "content": article.get(
-                "snippet",
-                article.get("description", article.get("content", "내용 없음")),
-            ),
+            "snippet": snippet_content,  # 템플릿에서 사용하는 필드
+            "content": snippet_content,   # 호환성을 위해 content도 유지
             "source": article.get("source", self.name),
             "date": standardized_date,  # 표준화된 날짜 사용
             "original_date": original_date,  # 원래 날짜 형식 보존
