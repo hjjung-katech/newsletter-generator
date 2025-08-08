@@ -329,11 +329,11 @@ redis-server
 
 ### 웹 서버 포트 충돌
 ```bash
-# 다른 포트로 실행
+# 다른 포트로 실행 (예: 6000)
 cd web
-PORT=8000 python app.py
+PORT=6000 python app.py
 # 또는
-python app.py --port 8000
+python app.py --port 6000
 ```
 
 ## 추가 팁

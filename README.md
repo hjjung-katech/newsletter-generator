@@ -67,7 +67,8 @@
    # 웹 애플리케이션
    SECRET_KEY=your-secret-key-here
    FLASK_ENV=production
-   PORT=8080
+   # Railway는 자동으로 PORT를 주입합니다. 로컬 개발 기본값은 5000입니다.
+   PORT=5000
    
    # 선택사항 - 모니터링
    SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
@@ -143,7 +144,8 @@ GEMINI_API_KEY=your_gemini_api_key_here
 APP_ENV=development  # development, testing, production
 
 # Web Server Configuration
-PORT=8000
+# 로컬 개발 기본 포트는 5000입니다. (플랫폼 배포 시에는 플랫폼이 PORT를 설정합니다)
+PORT=5000
 HOST=0.0.0.0
 SECRET_KEY=your-secret-key-here
 
