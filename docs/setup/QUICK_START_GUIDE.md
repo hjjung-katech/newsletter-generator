@@ -134,9 +134,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 #### 3. 포트 5000이 사용 중인 경우
 ```bash
-# 해결방법: 다른 포트 사용
-PORT=8000 python app.py
-# 브라우저에서 http://localhost:8000 접속
+# 해결방법: 다른 포트 사용 (예: 6000)
+PORT=6000 python app.py
+# 브라우저에서 http://localhost:6000 접속
 ```
 
 #### 4. API 키 관련 오류

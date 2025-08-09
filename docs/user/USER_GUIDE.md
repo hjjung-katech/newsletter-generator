@@ -159,6 +159,19 @@ LangSmith를 통해 AI 사용 비용을 추적할 수 있습니다:
 newsletter run --keywords "AI" --track-cost --output-format html
 ```
 
+### 로깅과 디버깅
+
+애플리케이션은 구조화 로거를 사용하여 일관된 로그를 출력합니다. 모든 모듈은 `newsletter/utils/logger.py`의 `get_structured_logger`를 사용하며, 출력 수준은 `LOG_LEVEL` 환경 변수로 제어합니다.
+
+```python
+from newsletter.utils.logger import get_structured_logger as get_logger
+logger = get_logger(__name__)
+logger.info("작업 시작")
+```
+
+- LOG_LEVEL 기본값은 `INFO`입니다. 지원값: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+- 예시: `LOG_LEVEL=DEBUG python -m newsletter run --keywords "AI,자동화"`
+
 ## 템플릿 스타일
 
 Newsletter Generator는 두 가지 템플릿 스타일을 지원합니다:

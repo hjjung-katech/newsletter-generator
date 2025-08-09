@@ -26,6 +26,9 @@ class GenerateNewsletterRequest(BaseModel):
     email_compatible: bool = False
     period: int = Field(default=14)
     email: Optional[str] = None  # 즉시 발송용 이메일 주소
+    use_template_system: bool = Field(
+        default=True, description="기존 Jinja2 템플릿 시스템 사용 여부"
+    )
 
     @field_validator("keywords")
     @classmethod

@@ -27,6 +27,57 @@ except ImportError:
 # 로거 초기화
 logger = get_logger()
 
+
+def validate_api_keys():
+    """
+    시작 시 모든 필요한 API 키의 유효성을 검사합니다.
+    """
+    logger.info("[검사] API 키 유효성 검사 시작...")
+
+    api_key_checks = {
+        "gemini": ("GEMINI_API_KEY", "Gemini API"),
+        "openai": ("OPENAI_API_KEY", "OpenAI API"),
+        "anthropic": ("ANTHROPIC_API_KEY", "Anthropic API"),
+        "serper": ("SERPER_API_KEY", "Serper API"),
+    }
+
+    available_providers = []
+    missing_keys = []
+    invalid_keys = []
+
+    for provider, (env_var, api_name) in api_key_checks.items():
+        api_key = os.getenv(env_var)
+
+        if not api_key:
+            missing_keys.append(f"{api_name} ({env_var})")
+            logger.warning(f"[오류] {api_name} 키가 설정되지 않음: {env_var}")
+        elif api_key.startswith("your-") or api_key == "your-openai-api-key":
+            invalid_keys.append(f"{api_name} ({env_var}) - 플레이스홀더 값")
+            logger.error(f"[오류] {api_name} 키가 플레이스홀더 값: {env_var}")
+        else:
+            available_providers.append(provider)
+            logger.info(f"[확인] {api_name} 키 확인됨: {env_var}")
+
+    # 최소 하나의 LLM 제공자가 필요
+    llm_providers = [
+        p for p in available_providers if p in ["gemini", "openai", "anthropic"]
+    ]
+    if not llm_providers:
+        logger.error("[오류] 사용 가능한 LLM 제공자가 없습니다!")
+        logger.error("다음 중 하나 이상의 API 키를 설정해야 합니다:")
+        for provider in ["gemini", "openai", "anthropic"]:
+            env_var = api_key_checks[provider][0]
+            logger.error(f"  - {env_var}")
+        raise ValueError("사용 가능한 LLM 제공자가 없습니다. API 키를 확인하세요.")
+
+    # Serper API 키는 뉴스 검색에 필요
+    if "serper" not in available_providers:
+        logger.warning("[경고] Serper API 키가 없어 뉴스 검색 기능이 제한될 수 있습니다.")
+
+    logger.info(f"[완료] API 키 검사 완료. 사용 가능한 LLM: {', '.join(llm_providers)}")
+    return available_providers
+
+
 # Google Cloud 인증 문제 해결
 # 시스템에 잘못된 GOOGLE_APPLICATION_CREDENTIALS가 설정되어 있는 경우 처리
 google_creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -467,9 +518,10 @@ class GeminiProvider(LLMProvider):
         if not ChatGoogleGenerativeAI:
             raise ImportError("langchain_google_genai 패키지가 설치되지 않았습니다")
 
-        api_key = os.getenv("GOOGLE_API_KEY")
+        # GEMINI_API_KEY 환경변수 사용 (GOOGLE_API_KEY에서 변경)
+        api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY 환경변수가 설정되지 않았습니다")
+            raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다")
 
         # F-14: 중앙화된 설정에서 파라미터 가져오기
         model_params = model_config.copy()
@@ -506,7 +558,8 @@ class GeminiProvider(LLMProvider):
         )
 
     def is_available(self) -> bool:
-        return ChatGoogleGenerativeAI is not None and bool(os.getenv("GOOGLE_API_KEY"))
+        # GEMINI_API_KEY 환경변수 사용 (GOOGLE_API_KEY에서 변경)
+        return ChatGoogleGenerativeAI is not None and bool(os.getenv("GEMINI_API_KEY"))
 
 
 class OpenAIProvider(LLMProvider):
@@ -615,9 +668,16 @@ class AnthropicProvider(LLMProvider):
 
 
 class LLMFactory:
-    """LLM 팩토리 클래스"""
+    """LLM 팩토리 클래스 - 다양한 LLM 제공자를 통합 관리"""
 
     def __init__(self):
+        # 시작 시 API 키 유효성 검사
+        try:
+            validate_api_keys()
+        except Exception as e:
+            logger.error(f"API 키 검사 실패: {e}")
+            # 검사 실패해도 팩토리는 생성하되, 사용 시 오류 발생
+
         self.providers = {
             "gemini": GeminiProvider(),
             "openai": OpenAIProvider(),
@@ -672,39 +732,65 @@ class LLMFactory:
 
         if not provider.is_available():
             # Fallback to available provider
-            for fallback_name, fallback_provider in self.providers.items():
-                if fallback_provider.is_available():
-                    logger.warning(
-                        f"{provider_name}을 사용할 수 없어 {fallback_name}으로 대체합니다"
-                    )
-                    model_config = model_config.copy()
-                    model_config["provider"] = fallback_name
-                    model_config["model"] = self._get_default_model(fallback_name)
-
-                    # Fallback 제공자에 대한 비용 추적 콜백 업데이트
-                    final_callbacks = list(callbacks) if callbacks else []
-                    try:
-                        cost_callback = get_cost_callback_for_provider(fallback_name)
-                        final_callbacks.append(cost_callback)
-                    except Exception as e:
-                        handle_exception(
-                            e,
-                            f"비용 추적 추가 ({fallback_name})",
-                            log_level=logging.INFO,
-                        )
-                        # 비용 추적 실패는 치명적이지 않음
-
-                    llm = fallback_provider.create_model(model_config, final_callbacks)
-
-                    # Fallback 래퍼 적용
-                    if enable_fallback:
-                        return LLMWithFallback(llm, self, task, final_callbacks)
-                    else:
-                        return llm
-
-            raise ValueError(
-                f"No LLM providers are available. Please check your API keys."
+            logger.warning(
+                f"⚠️ {provider_name}을 사용할 수 없어 다른 제공자로 대체합니다"
             )
+
+            # 사용 가능한 제공자 찾기 (우선순위: gemini > openai > anthropic)
+            fallback_priority = ["gemini", "openai", "anthropic"]
+            fallback_provider = None
+            fallback_name = None
+
+            for fallback_candidate in fallback_priority:
+                if (
+                    fallback_candidate in self.providers
+                    and self.providers[fallback_candidate].is_available()
+                ):
+                    fallback_provider = self.providers[fallback_candidate]
+                    fallback_name = fallback_candidate
+                    break
+
+            if fallback_provider:
+                logger.info(f"✅ {provider_name} 대신 {fallback_name}을 사용합니다")
+                model_config = model_config.copy()
+                model_config["provider"] = fallback_name
+                model_config["model"] = self._get_default_model(fallback_name)
+
+                # Fallback 제공자에 대한 비용 추적 콜백 업데이트
+                final_callbacks = list(callbacks) if callbacks else []
+                try:
+                    cost_callback = get_cost_callback_for_provider(fallback_name)
+                    final_callbacks.append(cost_callback)
+                except Exception as e:
+                    handle_exception(
+                        e,
+                        f"비용 추적 추가 ({fallback_name})",
+                        log_level=logging.INFO,
+                    )
+                    # 비용 추적 실패는 치명적이지 않음
+
+                llm = fallback_provider.create_model(model_config, final_callbacks)
+
+                # Fallback 래퍼 적용
+                if enable_fallback:
+                    return LLMWithFallback(llm, self, task, final_callbacks)
+                else:
+                    return llm
+            else:
+                # 사용 가능한 제공자가 없는 경우
+                available_providers = []
+                for name, prov in self.providers.items():
+                    if prov.is_available():
+                        available_providers.append(name)
+
+                error_msg = f"❌ 사용 가능한 LLM 제공자가 없습니다!"
+                if available_providers:
+                    error_msg += f" (사용 가능: {', '.join(available_providers)})"
+                else:
+                    error_msg += " 다음 API 키 중 하나를 설정하세요: GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY"
+
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
         llm = provider.create_model(model_config, final_callbacks)
 
@@ -762,14 +848,24 @@ def get_llm_for_task(
     Returns:
         LLM 모델 인스턴스
     """
-    return llm_factory.get_llm_for_task(task, callbacks, enable_fallback)
+    # 싱글톤 패턴으로 LLMFactory 인스턴스 관리
+    if not hasattr(get_llm_for_task, "_factory"):
+        get_llm_for_task._factory = LLMFactory()
+
+    return get_llm_for_task._factory.get_llm_for_task(task, callbacks, enable_fallback)
 
 
 def get_available_providers() -> List[str]:
     """편의 함수: 사용 가능한 LLM 제공자 목록을 반환합니다."""
-    return llm_factory.get_available_providers()
+    # API 키 검사 실행
+    try:
+        return validate_api_keys()
+    except Exception as e:
+        logger.error(f"API 키 검사 실패: {e}")
+        return []
 
 
 def get_provider_info() -> Dict[str, Dict[str, Any]]:
     """편의 함수: 제공자 정보를 반환합니다."""
-    return llm_factory.get_provider_info()
+    factory = LLMFactory()
+    return factory.get_provider_info()

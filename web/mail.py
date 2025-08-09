@@ -13,24 +13,90 @@ if str(project_root) not in sys.path:
 
 
 def _get_email_config():
-    """이메일 설정을 동적으로 가져옵니다 (테스트 호환성 고려)"""
+    """이메일 설정을 동적으로 가져옵니다 (PyInstaller 환경 대응)"""
+    import os
+    import sys
+
+    # 1차 시도: 환경 변수 직접 확인
+    postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
+    email_sender = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
+
+    if postmark_token and email_sender:
+        return postmark_token, email_sender
+
+    # 2차 시도: Centralized Settings
     try:
-        # 1차 시도: Centralized Settings
         from newsletter.centralized_settings import get_settings
 
         settings = get_settings()
-        return settings.postmark_server_token.get_secret_value(), settings.email_sender
+        token = settings.postmark_server_token.get_secret_value()
+        sender = settings.email_sender
+        if token and sender:
+            return token, sender
     except Exception:
-        try:
-            # 2차 시도: Config Manager
-            from newsletter.config_manager import config_manager
+        pass
 
-            return config_manager.POSTMARK_SERVER_TOKEN, config_manager.EMAIL_SENDER
-        except (ImportError, AttributeError):
-            # 3차 시도: Direct env access (레거시)
-            postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
-            email_sender = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
-            return postmark_token, email_sender
+    # 3차 시도: Config Manager
+    try:
+        from newsletter.config_manager import config_manager
+
+        token = config_manager.POSTMARK_SERVER_TOKEN
+        sender = config_manager.EMAIL_SENDER
+        if token and sender:
+            return token, sender
+    except (ImportError, AttributeError):
+        pass
+
+    # 4차 시도: .env 파일 직접 읽기 (PyInstaller 환경 대응)
+    env_paths = []
+
+    # 현재 작업 디렉토리
+    env_paths.append(os.path.join(os.getcwd(), ".env"))
+
+    # 프로젝트 루트
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env_paths.append(os.path.join(project_root, ".env"))
+
+    # PyInstaller 환경
+    if getattr(sys, "frozen", False):
+        base_path = sys._MEIPASS
+        env_paths.append(os.path.join(base_path, ".env"))
+
+        # 실행 파일 위치
+        exe_dir = os.path.dirname(sys.executable)
+        env_paths.append(os.path.join(exe_dir, ".env"))
+
+    # .env 파일에서 이메일 설정 읽기
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            key, value = line.split("=", 1)
+                            key = key.strip()
+                            value = value.strip()
+
+                            # 주석 제거
+                            if "#" in value:
+                                value = value.split("#")[0].strip()
+
+                            # 이메일 관련 설정만 처리
+                            if key == "POSTMARK_SERVER_TOKEN" and not postmark_token:
+                                postmark_token = value
+                            elif key == "EMAIL_SENDER" and not email_sender:
+                                email_sender = value
+
+                # 필요한 설정이 모두 있으면 반환
+                if postmark_token and email_sender:
+                    return postmark_token, email_sender
+
+            except Exception as e:
+                print(f"Error reading {env_path}: {e}")
+                continue
+
+    return postmark_token, email_sender
 
 
 @retry(stop=stop_after_attempt(3))

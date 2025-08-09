@@ -68,9 +68,19 @@ def load_scoring_weights_from_config(
 
     try:
         import yaml
+        import sys
 
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as f:
+        # PyInstaller 환경에서의 경로 처리
+        if getattr(sys, "frozen", False):
+            # PyInstaller로 빌드된 경우
+            base_path = sys._MEIPASS
+            config_path = os.path.join(base_path, config_file)
+        else:
+            # 일반 Python 환경
+            config_path = config_file
+
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             scoring_config = config_data.get("scoring", {})

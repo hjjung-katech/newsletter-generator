@@ -7,6 +7,12 @@ class NewsletterApp {
     constructor() {
         this.currentJobId = null;
         this.pollInterval = null;
+        // 상태 플래그 초기화
+        this.isPolling = false;
+        this.isGenerating = false;
+        this.lastLoadedJobId = null;
+        this.pollCount = 0;
+        this.debug = window.location.hostname === 'localhost'; // 로컬에서만 디버깅
         this.init();
     }
 
@@ -121,12 +127,34 @@ class NewsletterApp {
     }
 
     async generateNewsletter() {
+        console.log('🔴 CRITICAL DEBUG: generateNewsletter() called');
+        
+        // 🔴 CRITICAL FIX: 중복 실행 방지
+        if (this.isGenerating) {
+            console.log('🔴 WARNING: 이미 뉴스레터 생성 중입니다. 요청을 무시합니다.');
+            return;
+        }
+        
+        // 기존 폴링 중단
+        if (this.isPolling) {
+            console.log('🔴 WARNING: 기존 폴링을 중단하고 새 작업을 시작합니다.');
+            this.stopPolling();
+        }
+        
+        this.isGenerating = true; // 생성 중 플래그 설정
+        
         const data = this.collectFormData();
-        if (!data) return;
+        if (!data) {
+            console.log('🔴 CRITICAL DEBUG: collectFormData failed in generateNewsletter');
+            this.isGenerating = false; // 플래그 리셋
+            return;
+        }
 
+        console.log('🔴 CRITICAL DEBUG: Data to send:', data);
         this.showProgress();
         
         try {
+            console.log('🔴 CRITICAL DEBUG: Making POST request to /api/generate');
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: {
@@ -135,32 +163,49 @@ class NewsletterApp {
                 body: JSON.stringify(data)
             });
 
+            console.log('🔴 CRITICAL DEBUG: Response status:', response.status);
             const result = await response.json();
+            console.log('🔴 CRITICAL DEBUG: Response data:', result);
             
             if (response.ok) {
                 this.currentJobId = result.job_id;
                 if (result.status === 'completed') {
-                    this.showResults(result.result);
+                    console.log('🔴 CRITICAL DEBUG: Job completed immediately, showing results');
+                    console.log('🔴 CRITICAL DEBUG: Passing entire result object to showResults');
+                    this.showResults(result);
                 } else {
+                    console.log('🔴 CRITICAL DEBUG: Job pending, starting polling for job_id:', result.job_id);
                     this.startPolling(result.job_id);
                 }
             } else {
+                console.log('🔴 CRITICAL DEBUG: API error:', result.error);
+                this.isGenerating = false; // 에러 시 플래그 리셋
                 this.showError(result.error || 'Generation failed');
             }
         } catch (error) {
+            console.log('🔴 CRITICAL DEBUG: Network error:', error);
+            this.isGenerating = false; // 에러 시 플래그 리셋
             this.showError('Network error: ' + error.message);
         }
     }
 
     async previewNewsletter() {
+        console.log('🔴 CRITICAL DEBUG: previewNewsletter() called');
+        
         // Similar to generate but without email sending
         const data = this.collectFormData();
-        if (!data) return;
+        if (!data) {
+            console.log('🔴 CRITICAL DEBUG: collectFormData failed');
+            return;
+        }
+
+        console.log('🔴 CRITICAL DEBUG: Form data collected:', data);
 
         // Remove email from preview
         delete data.email;
         data.preview_only = true;
 
+        console.log('🔴 CRITICAL DEBUG: Calling generateNewsletter with preview_only');
         this.generateNewsletter();
     }
 
@@ -188,6 +233,21 @@ class NewsletterApp {
         if (email) {
             data.email = email;
         }
+
+        // Template style selection
+        const templateStyle = document.querySelector('input[name="templateStyle"]:checked');
+        data.template_style = templateStyle ? templateStyle.value : 'compact';
+
+        // Period selection
+        const period = document.querySelector('input[name="period"]:checked');
+        data.period = period ? parseInt(period.value) : 14;
+
+        // Email compatibility option
+        const emailCompatible = document.getElementById('emailCompatible');
+        if (emailCompatible && emailCompatible.checked) {
+            data.email_compatible = true;
+        }
+        // Note: If not explicitly checked, server will auto-enable if email is provided
 
         // Schedule data
         const enableSchedule = document.getElementById('enableSchedule').checked;
@@ -251,9 +311,18 @@ class NewsletterApp {
     }
 
     startPolling(jobId) {
+        // 🔴 CRITICAL FIX: 중복 폴링 방지
+        if (this.pollInterval) {
+            console.log('🔴 WARNING: 이미 폴링 중입니다. 기존 폴링을 중단합니다.');
+            this.stopPolling();
+        }
+        
         this.currentJobId = jobId; // Store current job ID
         this.pollCount = 0; // 폴링 횟수 카운터 추가
         this.maxPollCount = 900; // 최대 15분 (900초)
+        this.isPolling = true; // 폴링 상태 플래그 추가
+        
+        console.log('🔴 STARTING POLLING for job:', jobId);
         
         this.pollInterval = setInterval(async () => {
             try {
@@ -281,20 +350,18 @@ class NewsletterApp {
                     this.stopPolling();
                     console.log(`✅ 폴링 완료: ${this.pollCount}초 후 작업 완료`);
                     // Add job_id to result for iframe src
-                    if (result.result) {
-                        result.result.job_id = jobId;
-                        result.result.sent = result.sent;
-                    }
-                    this.showResults(result.result);
+                    result.job_id = jobId;
+                    console.log('🔴 CRITICAL DEBUG: Polling completed, passing entire result object to showResults');
+                    this.showResults(result);
                     
                     // Show email success message
                     if (result.sent) {
-                        this.showEmailSuccess(result.result?.email_to);
+                        this.showEmailSuccess(result.email_to || result.email);
                     }
                 } else if (result.status === 'failed') {
                     this.stopPolling();
                     console.log(`❌ 폴링 중단: ${this.pollCount}초 후 작업 실패`);
-                    this.showError(result.result?.error || 'Generation failed');
+                    this.showError(result.error || 'Generation failed');
                 }
             } catch (error) {
                 console.error('Polling error:', error);
@@ -308,14 +375,31 @@ class NewsletterApp {
     }
 
     stopPolling() {
+        console.log('🔴 STOPPING POLLING - Current state:', {
+            hasInterval: !!this.pollInterval,
+            isPolling: this.isPolling,
+            pollCount: this.pollCount
+        });
+        
         if (this.pollInterval) {
             clearInterval(this.pollInterval);
             this.pollInterval = null;
-            this.pollCount = 0; // 카운터 리셋
         }
+        
+        this.isPolling = false; // 폴링 상태 플래그 리셋
+        this.pollCount = 0; // 카운터 리셋
+        
+        console.log('🔴 ✅ POLLING STOPPED');
     }
 
     showResults(result) {
+        console.log('🔴 CRITICAL DEBUG: showResults called with:', result);
+        console.log('🔴 CRITICAL DEBUG: result keys:', Object.keys(result || {}));
+        console.log('🔴 CRITICAL DEBUG: generation_stats:', result.generation_stats);
+        
+        // 🔴 CRITICAL FIX: 작업 완료 시 플래그 리셋
+        this.isGenerating = false;
+        
         document.getElementById('progressSection').classList.add('hidden');
         document.getElementById('resultsSection').classList.remove('hidden');
 
@@ -327,9 +411,11 @@ class NewsletterApp {
         // Create detailed results display
         let detailsHtml = '';
         
-        // Generation Statistics
-        if (result.generation_stats) {
-            const stats = result.generation_stats;
+        // Generation Statistics (handle both possible locations)
+        const stats = result.generation_stats || result.result?.generation_stats || {};
+        console.log('🔴 CRITICAL DEBUG: Using stats:', stats);
+        
+        if (stats && Object.keys(stats).length > 0) {
             detailsHtml += `
                 <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <h4 class="text-lg font-semibold text-blue-800 mb-3">
@@ -431,17 +517,12 @@ class NewsletterApp {
                     <i class="fas fa-newspaper mr-2"></i>Newsletter Content
                 </h4>
                 <div class="border rounded bg-gray-50">
-                    ${result.html_content ? 
-                        (result.job_id ? 
-                            `<iframe id="newsletterFrame" 
-                                     style="width: 100%; height: 600px; border: none;" 
-                                     src="/api/newsletter-html/${result.job_id}"
-                                     sandbox="allow-same-origin allow-scripts">
-                             </iframe>` :
-                            `<iframe id="newsletterFrame" 
-                                     style="width: 100%; height: 600px; border: none;" 
-                                     sandbox="allow-same-origin allow-scripts">
-                             </iframe>`) :
+                    ${result.html_content || result.content ? 
+                        `<iframe id="newsletterFrame" 
+                                 style="width: 100%; height: 600px; border: none;" 
+                                 sandbox="allow-same-origin allow-scripts">
+                                 <p>Loading newsletter...</p>
+                         </iframe>` :
                         '<p class="text-gray-500 p-4">Newsletter content could not be loaded.</p>'
                     }
                 </div>
@@ -450,21 +531,82 @@ class NewsletterApp {
 
         preview.innerHTML = detailsHtml;
 
-        // Load HTML content using blob URL if no job_id available
-        if (result.html_content && !result.job_id) {
+        // Load HTML content - handle both possible field names
+        const htmlContent = result.html_content || result.content;
+        console.log('🔴 CRITICAL DEBUG: HTML Content available:', {
+            hasHtmlContent: !!result.html_content,
+            hasContent: !!result.content,
+            usingContent: !!htmlContent,
+            contentLength: htmlContent?.length || 0
+        });
+        
+        if (htmlContent) {
+            console.log('🔴 CRITICAL FRONTEND DEBUG:', {
+                hasJobId: !!result.job_id,
+                contentLength: htmlContent.length,
+                jobId: result.job_id,
+                contentPreview: htmlContent.substring(0, 200)
+            });
+            
+            // 🔴 CRITICAL FIX: 중복 iframe 로딩 방지
+            if (this.lastLoadedJobId === result.job_id) {
+                console.log('🔴 WARNING: 동일한 job_id의 iframe이 이미 로딩되었습니다:', result.job_id);
+                return;
+            }
+            
+            const self = this; // Capture this for use in setTimeout
             setTimeout(() => {
                 const iframe = document.getElementById('newsletterFrame');
                 if (iframe) {
-                    const blob = new Blob([result.html_content], { type: 'text/html; charset=utf-8' });
-                    const blobUrl = URL.createObjectURL(blob);
-                    iframe.src = blobUrl;
+                    console.log('🔴 IFRAME FOUND, proceeding with content load');
                     
-                    // Clean up blob URL after iframe loads
-                    iframe.onload = () => {
-                        URL.revokeObjectURL(blobUrl);
-                    };
+                    // 로딩된 job_id 기록
+                    self.lastLoadedJobId = result.job_id;
+                    
+                    // Try API endpoint first if job_id is available
+                    if (result.job_id) {
+                        const apiUrl = `/api/newsletter-html/${result.job_id}`;
+                        console.log(`🔴 TRYING API ENDPOINT: ${apiUrl}`);
+                        
+                        // Test API endpoint directly first
+                        fetch(apiUrl)
+                            .then(response => {
+                                console.log('🔴 API RESPONSE STATUS:', response.status);
+                                console.log('🔴 API RESPONSE HEADERS:', response.headers);
+                                return response.text();
+                            })
+                            .then(html => {
+                                console.log('🔴 API RESPONSE HTML LENGTH:', html.length);
+                                console.log('🔴 API RESPONSE PREVIEW:', html.substring(0, 300));
+                                
+                                // Now set iframe src
+                                iframe.src = apiUrl;
+                                
+                                iframe.onload = () => {
+                                    console.log('🔴 ✅ IFRAME LOADED SUCCESSFULLY via API');
+                                };
+                                
+                                iframe.onerror = () => {
+                                    console.log('🔴 ❌ IFRAME FAILED TO LOAD, trying blob URL');
+                                    self.loadContentWithBlobUrl(iframe, htmlContent);
+                                };
+                            })
+                            .catch(error => {
+                                console.log('🔴 ❌ API ENDPOINT FAILED:', error);
+                                console.log('🔴 Falling back to blob URL');
+                                self.loadContentWithBlobUrl(iframe, htmlContent);
+                            });
+                    } else {
+                        // Use blob URL directly
+                        console.log('🔴 NO JOB_ID, using blob URL directly');
+                        self.loadContentWithBlobUrl(iframe, htmlContent);
+                    }
+                } else {
+                    console.log('🔴 ❌ IFRAME NOT FOUND!');
                 }
             }, 100);
+        } else {
+            console.log('🔴 ❌ NO HTML CONTENT IN RESULT');
         }
 
         // Update button states
@@ -499,12 +641,60 @@ class NewsletterApp {
         `;
     }
     
+    loadContentWithBlobUrl(iframe, htmlContent) {
+        console.log('🔴 LOADING WITH BLOB URL, content length:', htmlContent.length);
+        console.log('🔴 HTML CONTENT PREVIEW:', htmlContent.substring(0, 200));
+        
+        try {
+            const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
+            const blobUrl = URL.createObjectURL(blob);
+            console.log('🔴 BLOB URL CREATED:', blobUrl);
+            
+            iframe.src = blobUrl;
+            
+            // Clean up blob URL after iframe loads
+            iframe.onload = () => {
+                console.log('🔴 ✅ BLOB URL LOADED SUCCESSFULLY');
+                URL.revokeObjectURL(blobUrl);
+            };
+            
+            // Handle blob load errors
+            iframe.onerror = () => {
+                console.error('🔴 ❌ BLOB URL FAILED, trying srcdoc');
+                iframe.srcdoc = htmlContent; // Final fallback using srcdoc
+                
+                // Test if srcdoc works
+                setTimeout(() => {
+                    if (iframe.contentDocument && iframe.contentDocument.body) {
+                        console.log('🔴 ✅ SRCDOC LOADED SUCCESSFULLY');
+                    } else {
+                        console.log('🔴 ❌ SRCDOC ALSO FAILED - COMPLETE FAILURE');
+                    }
+                }, 1000);
+            };
+        } catch (error) {
+            console.error('🔴 ❌ ERROR CREATING BLOB URL:', error);
+            console.log('🔴 TRYING SRCDOC AS FALLBACK');
+            // Ultimate fallback - use srcdoc
+            iframe.srcdoc = htmlContent;
+            
+            // Test if srcdoc works
+            setTimeout(() => {
+                if (iframe.contentDocument && iframe.contentDocument.body) {
+                    console.log('🔴 ✅ FALLBACK SRCDOC LOADED SUCCESSFULLY');
+                } else {
+                    console.log('🔴 ❌ EVEN FALLBACK SRCDOC FAILED - SOMETHING IS VERY WRONG');
+                }
+            }, 1000);
+        }
+    }
+
     updateResultButtons(result) {
         const downloadBtn = document.getElementById('downloadBtn');
         const sendEmailBtn = document.getElementById('sendEmailBtn');
         
         // Enable/disable buttons based on result status
-        if (result.status === 'success' && result.html_content) {
+        if (result.status === 'success' && (result.html_content || result.content)) {
             downloadBtn.disabled = false;
             downloadBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             sendEmailBtn.disabled = false;

@@ -79,8 +79,19 @@ def _load_dotenv_if_needed():
     if _should_load_dotenv() and not _test_mode:
         try:
             from dotenv import load_dotenv
+            import sys
+            import os
 
-            load_dotenv(".env", override=False)
+            # PyInstaller 환경에서의 경로 처리
+            if getattr(sys, "frozen", False):
+                # PyInstaller로 빌드된 경우 - exe와 같은 디렉토리에서 .env 찾기
+                exe_dir = os.path.dirname(sys.executable)
+                env_path = os.path.join(exe_dir, ".env")
+            else:
+                # 일반 Python 환경
+                env_path = ".env"
+
+            load_dotenv(env_path, override=False)
         except ImportError:
             pass
 
@@ -163,14 +174,14 @@ class CentralizedSettings(BaseSettings):
     concurrent_requests: int = Field(5, description="동시 요청 수")
 
     # F-14: 테스트 모드 설정
-    test_mode: bool = Field(True, description="테스트 모드 활성화")
-    mock_api_responses: bool = Field(True, description="API 응답 모킹 활성화")
-    skip_real_api_calls: bool = Field(True, description="실제 API 호출 건너뛰기")
-    test_api_key_override: bool = Field(True, description="테스트용 API 키 오버라이드")
+    test_mode: bool = Field(False, description="테스트 모드 활성화")
+    mock_api_responses: bool = Field(False, description="API 응답 모킹 활성화")
+    skip_real_api_calls: bool = Field(False, description="실제 API 호출 건너뛰기")
+    test_api_key_override: bool = Field(False, description="테스트용 API 키 오버라이드")
 
     # 공통 설정
     secret_key: str = Field("dev-secret-key-change-in-production", min_length=16)
-    port: int = Field(8000, ge=1, le=65535)
+    port: int = Field(5000, ge=1, le=65535)
     # Bandit B104: 프로덕션 환경에서만 0.0.0.0 바인딩 (보안 검증됨)  # nosec B104
     host: str = Field("0.0.0.0")  # nosec B104
     app_env: Literal["development", "testing", "production"] = Field("production")
@@ -227,7 +238,7 @@ class CentralizedSettings(BaseSettings):
         env_file=".env" if _should_load_dotenv() else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="forbid",
+        extra="ignore",
     )
 
     @classmethod
@@ -399,7 +410,7 @@ class F14PerformanceSettings:
     concurrent_requests: int = 5  # 동시 요청 수 제한
 
     # F-14: 테스트 모드 설정 추가
-    test_mode: bool = True  # 테스트 모드 (기본값: True)
-    mock_api_responses: bool = True  # API 응답 모킹 활성화
-    skip_real_api_calls: bool = True  # 실제 API 호출 건너뛰기
-    test_api_key_override: bool = True  # 테스트용 API 키 오버라이드 활성화
+    test_mode: bool = False  # 테스트 모드 (기본값: False)
+    mock_api_responses: bool = False  # API 응답 모킹 비활성화
+    skip_real_api_calls: bool = False  # 실제 API 호출 활성화
+    test_api_key_override: bool = False  # 테스트용 API 키 오버라이드 비활성화

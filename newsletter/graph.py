@@ -181,10 +181,15 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     cutoff_date = datetime.now(timezone.utc) - timedelta(
         days=state.get("news_period_days", 7)
     )
+    
+    logger.info(f"[DEBUG] Date filtering setup:")
+    logger.info(f"[DEBUG] - Current time: {datetime.now(timezone.utc)}")
+    logger.info(f"[DEBUG] - Period days: {state.get('news_period_days', 7)}")
+    logger.info(f"[DEBUG] - Cutoff date: {cutoff_date}")
 
     initial_count = len(collected_articles)
 
-    for article in collected_articles:
+    for i, article in enumerate(collected_articles):
         date_str = article.get("date")
         if not date_str or date_str == "날짜 없음":
             articles_with_missing_date.append(article)
@@ -194,11 +199,21 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         if parsed_date is None:
             articles_unparseable_date += 1
             articles_with_unparseable_date.append(article)
+            logger.warning(f"[DEBUG] Article {i+1}: Failed to parse date '{date_str}'")
             continue
 
         articles_with_date += 1
+        
+        # Debug logging for date filtering
+        time_diff = cutoff_date - parsed_date if parsed_date < cutoff_date else parsed_date - cutoff_date
+        days_diff = time_diff.total_seconds() / (24 * 3600)
+        
         if parsed_date >= cutoff_date:
             articles_within_date_range.append(article)
+            logger.debug(f"[DEBUG] Article {i+1}: PASSED filter - '{date_str}' -> {parsed_date} ({days_diff:.1f} days ago)")
+        else:
+            logger.warning(f"[DEBUG] Article {i+1}: FILTERED OUT - '{date_str}' -> {parsed_date} (too old: {days_diff:.1f} days)")
+            logger.warning(f"[DEBUG] Cutoff date: {cutoff_date}, Article date: {parsed_date}")
 
     # Combine kept articles (recent + missing + unparseable dates)
     filtered_articles = (
@@ -495,7 +510,11 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
 
             # generate_unified_newsletter_filename이 이미 전체 경로를 반환함
             file_path = generate_unified_newsletter_filename(
-                domain_str, f"newsletter_{template_style}", keywords_str, "html"
+                topic=domain_str,
+                style=f"{template_style}_email_compatible" if state.get("email_compatible", False) else template_style,
+                timestamp=None,  # 현재 시간 사용
+                use_current_date=True,
+                generation_type="original"
             )
 
             # 디렉토리 존재 확인 (파일 경로에서 디렉토리 부분 추출)

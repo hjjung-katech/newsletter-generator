@@ -6,7 +6,99 @@ import yaml
 from dotenv import load_dotenv
 
 # 환경 변수 로드
-load_dotenv()
+import sys
+import os
+
+# PyInstaller 환경에서의 경로 처리
+if getattr(sys, "frozen", False):
+    # PyInstaller로 빌드된 경우 - exe와 동일한 폴더에서 찾기
+    exe_dir = os.path.dirname(sys.executable)
+    env_path = os.path.join(exe_dir, ".env")
+else:
+    # 일반 Python 환경
+    env_path = ".env"
+
+load_dotenv(env_path)
+
+import json
+import os
+from typing import Dict, Any, Optional
+
+
+def load_template_config() -> Dict[str, Any]:
+    """템플릿 시스템 설정을 로드합니다."""
+    # PyInstaller 환경 대응
+    if getattr(sys, "frozen", False):
+        # PyInstaller로 빌드된 경우 - exe와 동일한 폴더에서 찾기
+        exe_dir = os.path.dirname(sys.executable)
+        config_path = os.path.join(exe_dir, "config", "template_config.json")
+    else:
+        # 일반 Python 환경
+        config_path = os.path.join(
+            os.path.dirname(__file__), "..", "config", "template_config.json"
+        )
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        return config
+    except FileNotFoundError:
+        # 기본 설정 반환
+        return {
+            "newsletter_generation": {
+                "default_method": "template",
+                "template_system": {"enabled": True},
+                "llm_direct_system": {"enabled": True},
+            },
+            "api_settings": {"use_template_system_default": True},
+        }
+    except Exception as e:
+        print(f"설정 파일 로드 오류: {e}")
+        return {"newsletter_generation": {"default_method": "template"}}
+
+
+def should_use_template_system() -> bool:
+    """환경 변수와 설정 파일을 기반으로 템플릿 시스템 사용 여부를 결정합니다."""
+    # 1. 환경 변수 확인
+    env_setting = os.getenv("USE_TEMPLATE_SYSTEM")
+    if env_setting is not None:
+        return env_setting.lower() == "true"
+
+    # 2. 설정 파일 확인
+    try:
+        config = load_template_config()
+        return config.get("api_settings", {}).get("use_template_system_default", True)
+    except Exception:
+        # 3. 기본값
+        return True
+
+
+def get_template_name(template_style: str, email_compatible: bool = False) -> str:
+    """템플릿 스타일에 따른 템플릿 파일명을 반환합니다."""
+    try:
+        config = load_template_config()
+        templates = (
+            config.get("newsletter_generation", {})
+            .get("template_system", {})
+            .get("templates", {})
+        )
+
+        if email_compatible:
+            return templates.get(
+                "email_compatible", "newsletter_template_email_compatible.html"
+            )
+        elif template_style == "compact":
+            return templates.get("compact", "newsletter_template_compact.html")
+        else:
+            return templates.get("detailed", "newsletter_template.html")
+    except Exception:
+        # 기본값 반환
+        if email_compatible:
+            return "newsletter_template_email_compatible.html"
+        elif template_style == "compact":
+            return "newsletter_template_compact.html"
+        else:
+            return "newsletter_template.html"
 
 
 class ConfigManager:
@@ -138,7 +230,17 @@ class ConfigManager:
             return self._config_cache[config_file]
 
         try:
-            config_path = Path(config_file)
+            # PyInstaller 환경에서의 경로 처리
+            import sys
+
+            if getattr(sys, "frozen", False):
+                # PyInstaller로 빌드된 경우
+                base_path = sys._MEIPASS
+                config_path = Path(base_path) / config_file
+            else:
+                # 일반 Python 환경
+                config_path = Path(config_file)
+
             if not config_path.exists():
                 self._log_warning(f"설정 파일을 찾을 수 없습니다: {config_file}")
                 return {}
