@@ -1337,6 +1337,76 @@ def generate_newsletter():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/suggest", methods=["POST"])
+def suggest_keywords():
+    """Generate keyword suggestions for a given domain using AI"""
+    print(f"[INFO] Keyword suggestion request received")
+
+    try:
+        data = request.get_json()
+        if not data:
+            print("[WARNING] No data provided in keyword suggestion request")
+            return jsonify({"error": "No data provided"}), 400
+
+        domain = data.get("domain", "").strip()
+        count = data.get("count", 10)
+
+        if not domain:
+            print("[WARNING] No domain provided in keyword suggestion request")
+            return jsonify({"error": "Domain is required"}), 400
+
+        print(f"[INFO] Generating keywords for domain: '{domain}', count: {count}")
+
+        # Use the CLI's suggest_keywords function
+        try:
+            # Import the suggest_keywords function from CLI
+            from newsletter.cli import suggest_keywords as cli_suggest_keywords
+            
+            # Generate keywords using the existing CLI functionality
+            suggested_keywords = cli_suggest_keywords(domain, count)
+            
+            if suggested_keywords and len(suggested_keywords) > 0:
+                print(f"[INFO] Successfully generated {len(suggested_keywords)} keywords")
+                return jsonify({
+                    "success": True,
+                    "keywords": suggested_keywords,
+                    "domain": domain,
+                    "count": len(suggested_keywords)
+                }), 200
+            else:
+                print(f"[WARNING] No keywords generated for domain: '{domain}'")
+                return jsonify({
+                    "success": False,
+                    "error": "No keywords could be generated for the given domain",
+                    "keywords": []
+                }), 200
+
+        except Exception as cli_error:
+            print(f"[ERROR] CLI keyword generation failed: {str(cli_error)}")
+            # Provide more specific error messages
+            error_msg = str(cli_error)
+            if "GEMINI_API_KEY" in error_msg:
+                error_msg = "Gemini API key not configured. Please set GEMINI_API_KEY in environment variables."
+            elif "quota" in error_msg.lower() or "429" in error_msg:
+                error_msg = "API quota exceeded. Please try again later or check your API limits."
+            elif "network" in error_msg.lower() or "connection" in error_msg.lower():
+                error_msg = "Network connection error. Please check your internet connection."
+            
+            return jsonify({
+                "success": False,
+                "error": error_msg,
+                "keywords": []
+            }), 500
+
+    except Exception as e:
+        print(f"[ERROR] Error in suggest_keywords endpoint: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Server error: {str(e)}",
+            "keywords": []
+        }), 500
+
+
 @app.route("/newsletter", methods=["GET"])
 def get_newsletter():
     """Generate newsletter directly with GET parameters"""

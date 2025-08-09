@@ -174,10 +174,10 @@ class CentralizedSettings(BaseSettings):
     concurrent_requests: int = Field(5, description="동시 요청 수")
 
     # F-14: 테스트 모드 설정
-    test_mode: bool = Field(True, description="테스트 모드 활성화")
-    mock_api_responses: bool = Field(True, description="API 응답 모킹 활성화")
-    skip_real_api_calls: bool = Field(True, description="실제 API 호출 건너뛰기")
-    test_api_key_override: bool = Field(True, description="테스트용 API 키 오버라이드")
+    test_mode: bool = Field(False, description="테스트 모드 활성화")
+    mock_api_responses: bool = Field(False, description="API 응답 모킹 활성화")
+    skip_real_api_calls: bool = Field(False, description="실제 API 호출 건너뛰기")
+    test_api_key_override: bool = Field(False, description="테스트용 API 키 오버라이드")
 
     # 공통 설정
     secret_key: str = Field("dev-secret-key-change-in-production", min_length=16)
@@ -410,7 +410,7 @@ class F14PerformanceSettings:
     concurrent_requests: int = 5  # 동시 요청 수 제한
 
     # F-14: 테스트 모드 설정 추가
-    test_mode: bool = True  # 테스트 모드 (기본값: True)
-    mock_api_responses: bool = True  # API 응답 모킹 활성화
-    skip_real_api_calls: bool = True  # 실제 API 호출 건너뛰기
-    test_api_key_override: bool = True  # 테스트용 API 키 오버라이드 활성화
+    test_mode: bool = False  # 테스트 모드 (기본값: False)
+    mock_api_responses: bool = False  # API 응답 모킹 비활성화
+    skip_real_api_calls: bool = False  # 실제 API 호출 활성화
+    test_api_key_override: bool = False  # 테스트용 API 키 오버라이드 비활성화
