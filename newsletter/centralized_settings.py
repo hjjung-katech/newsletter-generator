@@ -231,6 +231,10 @@ class CentralizedSettings(BaseSettings):
 
     @property
     def output_dir(self) -> Path:
+        # Check for web environment override first
+        web_output_dir = _get_env("NEWSLETTER_OUTPUT_DIR")
+        if web_output_dir:
+            return Path(web_output_dir)
         return self.base_dir / "output"
 
     # 모델 설정

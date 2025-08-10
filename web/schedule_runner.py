@@ -9,6 +9,7 @@ import sys
 import sqlite3
 import json
 import logging
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import redis
@@ -51,10 +52,27 @@ class ScheduleRunner:
     def get_pending_schedules(self) -> List[Dict]:
         """실행 대기 중인 스케줄 목록을 가져옵니다."""
         try:
+            logger.info(f"[DEBUG] Using database path: {self.db_path}")
+            logger.info(f"[DEBUG] Database file exists: {os.path.exists(self.db_path)}")
+            
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
             now = datetime.now()
+            logger.info(f"[DEBUG] Current time: {now}")
+            
+            # 모든 활성 스케줄 조회
+            cursor.execute(
+                "SELECT id, params, rrule, next_run, created_at FROM schedules WHERE enabled = 1"
+            )
+            all_schedules = cursor.fetchall()
+            logger.info(f"[DEBUG] Found {len(all_schedules)} total active schedules")
+            
+            for schedule in all_schedules:
+                logger.info(f"[DEBUG] Schedule {schedule[0]}: next_run={schedule[3]}, due={'yes' if schedule[3] <= now.isoformat() else 'no'}")
+            
+            # 실행 대기 중인 스케줄 조회 (ISO 문자열 비교를 위해 now를 ISO 형식으로 변환)
+            logger.info(f"[DEBUG] Querying with now.isoformat(): {now.isoformat()}")
             cursor.execute(
                 """
                 SELECT id, params, rrule, next_run, created_at
@@ -62,11 +80,14 @@ class ScheduleRunner:
                 WHERE enabled = 1 AND next_run <= ?
                 ORDER BY next_run ASC
             """,
-                (now,),
+                (now.isoformat(),),
             )
+            
+            pending_rows = cursor.fetchall()
+            logger.info(f"[DEBUG] SQL query returned {len(pending_rows)} rows")
 
             schedules = []
-            for row in cursor.fetchall():
+            for row in pending_rows:
                 schedules.append(
                     {
                         "id": row[0],
@@ -164,23 +185,38 @@ class ScheduleRunner:
             logger.info(f"Executing schedule {schedule_id}")
 
             # 뉴스레터 생성 작업을 큐에 추가
+            redis_success = False
             if self.queue:
-                # RQ를 사용한 백그라운드 작업
-                job = self.queue.enqueue(
-                    generate_newsletter_task,
-                    params,
-                    job_timeout="10m",
-                    result_ttl=86400,  # 24시간 동안 결과 보관
+                try:
+                    # RQ를 사용한 백그라운드 작업 시도
+                    job = self.queue.enqueue(
+                        generate_newsletter_task,
+                        params,
+                        f"schedule_{schedule_id}",  # job_id 매개변수 추가
+                        params.get("send_email", False),  # send_email 매개변수 추가
+                        job_timeout="10m",
+                        result_ttl=86400,  # 24시간 동안 결과 보관
+                    )
+                    logger.info(
+                        f"Enqueued newsletter generation job {job.id} for schedule {schedule_id}"
+                    )
+                    redis_success = True
+                except Exception as redis_error:
+                    # Redis 연결 실패 시 fallback으로 동기 실행
+                    logger.warning(f"Redis connection failed for schedule {schedule_id}: {redis_error}")
+                    logger.info(f"Falling back to synchronous execution for schedule {schedule_id}")
+                    
+            if not redis_success:
+                # Redis가 없거나 연결에 실패한 경우 동기 실행 (fallback)
+                logger.info(f"Executing schedule {schedule_id} synchronously")
+                fallback_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
+                result = generate_newsletter_task(
+                    params, 
+                    fallback_job_id, 
+                    params.get("send_email", False)
                 )
                 logger.info(
-                    f"Enqueued newsletter generation job {job.id} for schedule {schedule_id}"
-                )
-            else:
-                # Redis가 없는 경우 동기 실행 (fallback)
-                logger.warning("Redis not available, executing synchronously")
-                result = generate_newsletter_task(params)
-                logger.info(
-                    f"Synchronous execution result for schedule {schedule_id}: {result}"
+                    f"Synchronous execution completed for schedule {schedule_id}: {result.get('status', 'unknown') if result else 'no result'}"
                 )
 
             # 다음 실행 시간 계산 및 업데이트
@@ -200,6 +236,9 @@ class ScheduleRunner:
 
         except Exception as e:
             logger.error(f"Failed to execute schedule {schedule['id']}: {e}")
+            # 스택트레이스 포함한 상세 에러 로깅
+            import traceback
+            logger.error(f"Full traceback for schedule {schedule['id']}: {traceback.format_exc()}")
             return False
 
     def run_once(self) -> int:
@@ -208,10 +247,20 @@ class ScheduleRunner:
 
         schedules = self.get_pending_schedules()
         executed_count = 0
+        
+        logger.info(f"[DEBUG] Found {len(schedules)} pending schedules to execute")
 
-        for schedule in schedules:
-            if self.execute_schedule(schedule):
-                executed_count += 1
+        for i, schedule in enumerate(schedules):
+            schedule_id = schedule.get("id", "unknown")
+            logger.info(f"[DEBUG] Processing schedule {i+1}/{len(schedules)}: {schedule_id}")
+            try:
+                if self.execute_schedule(schedule):
+                    executed_count += 1
+                    logger.info(f"[DEBUG] Schedule {schedule_id} executed successfully")
+                else:
+                    logger.warning(f"[DEBUG] Schedule {schedule_id} execution failed")
+            except Exception as e:
+                logger.error(f"[DEBUG] Exception executing schedule {schedule_id}: {e}")
 
         logger.info(f"Executed {executed_count} schedules")
         return executed_count

@@ -10,6 +10,7 @@ import subprocess
 import threading
 import signal
 import atexit
+import time
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_cors import CORS
 import redis
@@ -116,6 +117,9 @@ except ImportError:
     current_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, current_dir)
 
+
+# Import path manager for unified path handling
+from path_manager import get_path_manager
 
 # Helper to get correct paths when bundled with PyInstaller
 def resource_path(relative_path: str) -> str:
@@ -1037,12 +1041,12 @@ except Exception as e:
 in_memory_tasks = {}
 
 # Database initialization
-if getattr(sys, "frozen", False):
-    # When bundled by PyInstaller, store DB next to executable for persistence
-    data_dir = os.path.dirname(sys.executable)
-else:
-    data_dir = os.path.dirname(os.path.abspath(__file__))
-DATABASE_PATH = os.path.join(data_dir, "storage.db")
+# Use PathManager for unified path handling across environments
+path_manager = get_path_manager()
+DATABASE_PATH = path_manager.get_database_path()
+
+print(f"[PATH] Using DATABASE_PATH: {DATABASE_PATH}")
+print(f"[PATH] Environment: {'PyInstaller exe' if path_manager.is_frozen else 'Development'}")
 
 
 def init_db():
@@ -1919,46 +1923,65 @@ def create_schedule():
         return jsonify({"error": "Either keywords or domain is required"}), 400
 
     try:
-        # RRULE 파싱 및 다음 실행 시간 계산
+        # 한국 시간 처리를 위한 timezone 설정
         from dateutil.rrule import rrulestr
-
+        from dateutil import tz
+        
+        # 서울 시간대 설정
+        seoul_tz = tz.gettz('Asia/Seoul')
+        now_seoul = datetime.now(seoul_tz)
+        
         rrule_str = data["rrule"]
-        rrule = rrulestr(rrule_str, dtstart=datetime.now())
-        next_run = rrule.after(datetime.now())
+        
+        # RRULE을 서울 시간 기준으로 파싱
+        rrule = rrulestr(rrule_str, dtstart=now_seoul.replace(tzinfo=None))
+        next_run = rrule.after(now_seoul.replace(tzinfo=None))
 
         if not next_run:
             return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
+            
+        # 다음 실행 시간을 서울 시간으로 변환
+        next_run_seoul = next_run.replace(tzinfo=seoul_tz)
 
     except Exception as e:
         return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
 
     schedule_id = str(uuid.uuid4())
 
-    # 스케줄 데이터 준비
+    # 스케줄 데이터 준비 (시간대 정보 포함)
     schedule_params = {
         "keywords": data.get("keywords"),
         "domain": data.get("domain"),
         "email": data["email"],
+        "send_email": bool(data.get("email")),  # 이메일 주소가 있으면 전송 활성화
         "template_style": data.get("template_style", "compact"),
         "email_compatible": data.get("email_compatible", True),
         "period": data.get("period", 14),
+        "timezone": "Asia/Seoul",  # 시간대 정보 저장
+        "created_timestamp": now_seoul.isoformat(),  # 생성 시점의 서울 시간
     }
 
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO schedules (id, params, rrule, next_run) VALUES (?, ?, ?, ?)",
-        (schedule_id, json.dumps(schedule_params), rrule_str, next_run.isoformat()),
+        (schedule_id, json.dumps(schedule_params), rrule_str, next_run_seoul.isoformat()),
     )
     conn.commit()
     conn.close()
 
+    # 클라이언트에게 시간 정보 상세히 제공
     return (
         jsonify(
             {
                 "status": "scheduled",
                 "schedule_id": schedule_id,
-                "next_run": next_run.isoformat(),
+                "next_run": next_run_seoul.isoformat(),
+                "next_run_kst": next_run_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
+                "current_time_kst": now_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
+                "timezone": "Asia/Seoul",
+                "rrule": rrule_str,
+                "created_at": now_seoul.isoformat()
             }
         ),
         201,
@@ -1967,7 +1990,14 @@ def create_schedule():
 
 @app.route("/api/schedules")
 def get_schedules():
-    """Get all active schedules"""
+    """Get all active schedules with timezone information"""
+    from dateutil import tz
+    from dateutil.parser import isoparse
+    
+    # 서울 시간대 설정
+    seoul_tz = tz.gettz('Asia/Seoul')
+    now_seoul = datetime.now(seoul_tz)
+    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
@@ -1979,18 +2009,75 @@ def get_schedules():
     schedules = []
     for row in rows:
         schedule_id, params, rrule, next_run, created_at, enabled = row
-        schedules.append(
-            {
-                "id": schedule_id,
-                "params": json.loads(params) if params else None,
-                "rrule": rrule,
-                "next_run": next_run,
-                "created_at": created_at,
-                "enabled": bool(enabled),
-            }
-        )
+        
+        # 시간 정보 처리
+        try:
+            next_run_dt = isoparse(next_run)
+            if next_run_dt.tzinfo is None:
+                next_run_dt = next_run_dt.replace(tzinfo=seoul_tz)
+                
+            # 다음 실행까지의 시간 계산
+            time_until_next = next_run_dt - now_seoul
+            time_until_text = ""
+            if time_until_next.total_seconds() > 0:
+                days = time_until_next.days
+                hours, remainder = divmod(time_until_next.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                
+                if days > 0:
+                    time_until_text = f"{days}일 {hours}시간 후"
+                elif hours > 0:
+                    time_until_text = f"{hours}시간 {minutes}분 후"
+                else:
+                    time_until_text = f"{minutes}분 후"
+            else:
+                time_until_text = "지연됨"
+            
+        except Exception as e:
+            next_run_dt = None
+            time_until_text = "시간 처리 오류"
+        
+        schedule_data = {
+            "id": schedule_id,
+            "params": json.loads(params) if params else None,
+            "rrule": rrule,
+            "next_run": next_run,
+            "next_run_kst": next_run_dt.strftime('%Y-%m-%d %H:%M:%S KST') if next_run_dt else "Unknown",
+            "time_until_next": time_until_text,
+            "created_at": created_at,
+            "enabled": bool(enabled),
+            "is_overdue": next_run_dt < now_seoul if next_run_dt else False
+        }
+        schedules.append(schedule_data)
 
-    return jsonify(schedules)
+    # 현재 시간 정보도 함께 반환
+    return jsonify({
+        "schedules": schedules,
+        "current_time_kst": now_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
+        "timezone": "Asia/Seoul",
+        "server_time": now_seoul.isoformat()
+    })
+
+
+@app.route("/api/time-sync")
+def get_server_time():
+    """Get server time for synchronization with client"""
+    from dateutil import tz
+    
+    # 서울 시간대 설정
+    seoul_tz = tz.gettz('Asia/Seoul')
+    now_seoul = datetime.now(seoul_tz)
+    
+    # UTC 시간도 제공
+    now_utc = datetime.utcnow()
+    
+    return jsonify({
+        "server_time_kst": now_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
+        "server_time_iso": now_seoul.isoformat(),
+        "server_time_utc": now_utc.isoformat() + 'Z',
+        "timezone": "Asia/Seoul",
+        "timestamp": int(now_seoul.timestamp())
+    })
 
 
 @app.route("/api/schedule/<schedule_id>", methods=["DELETE"])
@@ -2034,7 +2121,11 @@ def run_schedule_now(schedule_id):
         # 즉시 뉴스레터 생성 작업 큐에 추가
         if redis_conn and task_queue:
             job = task_queue.enqueue(
-                generate_newsletter_task, params, job_timeout="10m"
+                generate_newsletter_task, 
+                params, 
+                f"manual_{schedule_id}",  # job_id 매개변수 추가
+                params.get("send_email", False),  # send_email 매개변수 추가
+                job_timeout="10m"
             )
 
             return jsonify(
@@ -2046,7 +2137,13 @@ def run_schedule_now(schedule_id):
             )
         else:
             # Redis가 없는 경우 직접 실행
-            result = generate_newsletter_task(params)
+            import uuid
+            fallback_job_id = f"manual_{schedule_id}_{uuid.uuid4().hex[:8]}"
+            result = generate_newsletter_task(
+                params, 
+                fallback_job_id, 
+                params.get("send_email", False)
+            )
             return jsonify({"status": "completed", "result": result})
 
     except Exception as e:
@@ -2226,7 +2323,7 @@ def health_check():
 
     # 파일 시스템 체크
     try:
-        output_dir = os.path.join(os.path.dirname(__file__), "..", "output")
+        output_dir = path_manager.get_output_dir()
         os.makedirs(output_dir, exist_ok=True)
         test_file = os.path.join(output_dir, "health_check.txt")
         with open(test_file, "w") as f:
@@ -2578,15 +2675,75 @@ from suggest import bp as suggest_bp
 app.register_blueprint(suggest_bp)
 
 
+# 스케줄러 관련 함수들
+def start_schedule_runner():
+    """백그라운드에서 스케줄러를 시작합니다"""
+    try:
+        # 스케줄러 import
+        from schedule_runner import ScheduleRunner
+        
+        print("[INFO] Starting Newsletter Schedule Runner...")
+        
+        # 스케줄러 인스팴스 생성
+        runner = ScheduleRunner(
+            db_path=DATABASE_PATH,
+            redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+        )
+        
+        def scheduler_loop():
+            """스케줄러 루프 실행"""
+            print("[INFO] Schedule runner thread started")
+            try:
+                while not is_shutdown_requested():
+                    try:
+                        executed_count = runner.run_once()
+                        if executed_count > 0:
+                            print(f"[INFO] Executed {executed_count} scheduled newsletters")
+                        time.sleep(60)  # 1분 간격으로 체크
+                    except Exception as e:
+                        print(f"[ERROR] Schedule runner error: {e}")
+                        time.sleep(30)  # 에러 발생 시 30초 후 재시도
+                        
+                print("[INFO] Schedule runner thread stopping due to shutdown request")
+                        
+            except Exception as e:
+                print(f"[ERROR] Fatal schedule runner error: {e}")
+            finally:
+                print("[INFO] Schedule runner thread terminated")
+        
+        # 백그라운드 스레드로 스케줄러 시작
+        scheduler_thread = threading.Thread(
+            target=scheduler_loop,
+            name="newsletter-scheduler",
+            daemon=True
+        )
+        
+        # Graceful shutdown에 스레드 등록
+        if shutdown_manager:
+            with managed_thread("newsletter-scheduler", scheduler_thread):
+                scheduler_thread.start()
+                print("[INFO] Newsletter scheduler started with graceful shutdown support")
+        else:
+            scheduler_thread.start()
+            print("[INFO] Newsletter scheduler started (no graceful shutdown)")
+            
+    except Exception as e:
+        print(f"[ERROR] Failed to start schedule runner: {e}")
+        print("[WARNING] Newsletter scheduling will not work properly")
+
+
 # 애플리케이션 시작 시 API 키 검사
 def initialize_app():
-    """애플리케이션 초기화 - API 키 검사 포함"""
+    """애플리케이션 초기화 - API 키 검사 및 스케줄러 시작 포함"""
     print("[시작] Newsletter Generator Web Service 초기화 중...")
 
     try:
         # API 키 검사
         cli = RealNewsletterCLI()
         api_status = cli._check_api_keys()
+
+        # 스케줄러 시작
+        start_schedule_runner()
 
         if api_status["status"] == "success":
             print("[완료] 애플리케이션 초기화 완료")

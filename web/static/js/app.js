@@ -13,6 +13,12 @@ class NewsletterApp {
         this.lastLoadedJobId = null;
         this.pollCount = 0;
         this.debug = window.location.hostname === 'localhost'; // 로컬에서만 디버깅
+        
+        // 시간 동기화 관련
+        this.serverTimeOffset = 0; // 서버와 클라이언트 시간 차이 (ms)
+        this.timeSyncInterval = null;
+        this.lastTimeSyncTime = null;
+        
         this.init();
     }
 
@@ -20,6 +26,8 @@ class NewsletterApp {
         this.bindEvents();
         this.loadHistory();
         this.loadSchedules();
+        this.initTimeSync();
+        this.startTimeDisplay();
     }
 
     bindEvents() {
@@ -41,6 +49,19 @@ class NewsletterApp {
         // Frequency change
         document.getElementById('frequency').addEventListener('change', () => {
             this.updateScheduleOptions();
+            this.updateSchedulePreview();
+        });
+        
+        // Time change
+        document.getElementById('scheduleTime').addEventListener('change', () => {
+            this.updateSchedulePreview();
+        });
+        
+        // Weekday changes
+        document.querySelectorAll('.weekday').forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                this.updateSchedulePreview();
+            });
         });
 
         // Action buttons
@@ -108,10 +129,15 @@ class NewsletterApp {
 
     toggleScheduleSettings(enabled) {
         const scheduleSettings = document.getElementById('scheduleSettings');
+        const schedulePreview = document.getElementById('schedulePreview');
+        
         if (enabled) {
             scheduleSettings.classList.remove('hidden');
+            schedulePreview.classList.remove('hidden');
+            this.updateSchedulePreview();
         } else {
             scheduleSettings.classList.add('hidden');
+            schedulePreview.classList.add('hidden');
         }
     }
 
@@ -151,6 +177,14 @@ class NewsletterApp {
         }
 
         console.log('🔴 CRITICAL DEBUG: Data to send:', data);
+        
+        // 스케줄이 설정된 경우 스케줄 생성 API 호출
+        if (data.schedule) {
+            this.showProgress('스케줄을 생성하고 있습니다...');
+            await this.createSchedule(data);
+            return;
+        }
+        
         this.showProgress();
         
         try {
@@ -256,33 +290,18 @@ class NewsletterApp {
                 this.showError('예약 발송을 위해서는 이메일 주소가 필요합니다.');
                 return null;
             }
-
-            const frequency = document.getElementById('frequency').value;
-            const time = document.getElementById('scheduleTime').value;
-            
-            let rrule = `FREQ=${frequency}`;
-            
-            if (frequency === 'WEEKLY') {
-                const selectedDays = Array.from(document.querySelectorAll('.weekday:checked'))
-                    .map(cb => cb.value);
-                if (selectedDays.length === 0) {
-                    this.showError('주간 발송을 위해 요일을 선택해주세요.');
-                    return null;
-                }
-                rrule += `;BYDAY=${selectedDays.join(',')}`;
+            const scheduleSettings = this.getScheduleSettings();
+            if (scheduleSettings) {
+                data.schedule = scheduleSettings;
+            } else {
+                return null; // 스케줄 설정이 잘못된 경우
             }
-
-            const [hour, minute] = time.split(':');
-            rrule += `;BYHOUR=${hour};BYMINUTE=${minute}`;
-
-            data.rrule = rrule;
-            data.schedule = true;
         }
 
         return data;
     }
 
-    showProgress() {
+    showProgress(customMessage = null) {
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('resultsSection').classList.add('hidden');
         
@@ -290,7 +309,14 @@ class NewsletterApp {
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
         
-        // Simulate progress
+        // 사용자 정의 메시지가 있으면 고정 메시지 사용
+        if (customMessage) {
+            progressText.textContent = customMessage;
+            progressBar.style.width = '50%';
+            return;
+        }
+        
+        // Simulate progress for newsletter generation
         const interval = setInterval(() => {
             progress += Math.random() * 10;
             if (progress > 90) progress = 90;
@@ -308,6 +334,10 @@ class NewsletterApp {
 
         // Clear interval when polling starts
         setTimeout(() => clearInterval(interval), 5000);
+    }
+    
+    hideProgress() {
+        document.getElementById('progressSection').classList.add('hidden');
     }
 
     startPolling(jobId) {
@@ -782,34 +812,76 @@ class NewsletterApp {
     async loadSchedules() {
         try {
             const response = await fetch('/api/schedules');
-            const schedules = await response.json();
+            const data = await response.json();
 
             const schedulesList = document.getElementById('schedulesList');
-            if (schedules.length === 0) {
-                schedulesList.innerHTML = '<p class="text-gray-500">예약된 발송이 없습니다.</p>';
+            
+            // 기존 내용 초기화
+            schedulesList.innerHTML = '';
+            
+            // 현재 서버 시간 표시
+            if (data.current_time_kst) {
+                const currentTimeDisplay = document.createElement('div');
+                currentTimeDisplay.className = 'mb-4 p-3 bg-blue-50 rounded-lg';
+                currentTimeDisplay.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-sm font-medium text-blue-900">현재 서버 시간 (KST)</span>
+                            <div class="text-lg font-mono text-blue-700" id="currentServerTime">${data.current_time_kst}</div>
+                        </div>
+                        <div class="text-xs text-blue-600">
+                            <div>Timezone: ${data.timezone}</div>
+                            <div id="timeDiffInfo" class="text-blue-500"></div>
+                        </div>
+                    </div>
+                `;
+                
+                // 기존 시간 표시 제거 후 새로 추가
+                const existingTimeDisplay = schedulesList.querySelector('.bg-blue-50');
+                if (existingTimeDisplay) {
+                    existingTimeDisplay.remove();
+                }
+                schedulesList.appendChild(currentTimeDisplay);
+                
+                this.updateTimeDifference(data.server_time);
+            }
+            
+            const schedules = data.schedules || data;
+            
+            if (!Array.isArray(schedules) || schedules.length === 0) {
+                const noSchedulesDiv = document.createElement('div');
+                noSchedulesDiv.innerHTML = '<p class="text-gray-500 mt-4">예약된 발송이 없습니다.</p>';
+                schedulesList.appendChild(noSchedulesDiv);
                 return;
             }
 
-            schedulesList.innerHTML = schedules.map(schedule => `
+            const schedulesHtml = schedules.map(schedule => `
                 <div class="border-b border-gray-200 py-4">
                     <div class="flex justify-between items-start">
-                        <div>
-                            <h4 class="text-sm font-medium text-gray-900">
+                        <div class="flex-1">
+                            <h4 class="text-sm font-medium text-gray-900 mb-2">
                                 ${schedule.params?.keywords ? 
                                   `키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
                                   `도메인: ${schedule.params?.domain || 'Unknown'}`}
                             </h4>
-                            <p class="text-sm text-gray-500">
-                                이메일: ${schedule.params?.email || 'Unknown'}
-                            </p>
-                            <p class="text-sm text-gray-500">
-                                다음 실행: ${new Date(schedule.next_run).toLocaleString()}
-                            </p>
-                            <p class="text-sm text-gray-500">
-                                규칙: ${schedule.rrule}
-                            </p>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
+                                <div>
+                                    <span class="font-medium">이메일:</span> ${schedule.params?.email || 'Unknown'}
+                                </div>
+                                <div>
+                                    <span class="font-medium">템플릿:</span> ${schedule.params?.template_style || 'compact'}
+                                </div>
+                                <div class="col-span-full">
+                                    <span class="font-medium">다음 실행:</span> 
+                                    <span class="font-mono ${schedule.is_overdue ? 'text-red-600' : 'text-blue-600'}">${schedule.next_run_kst || new Date(schedule.next_run).toLocaleString()}</span>
+                                    ${schedule.time_until_next ? `<span class="ml-2 text-xs px-2 py-1 rounded-full ${schedule.is_overdue ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">${schedule.time_until_next}</span>` : ''}
+                                </div>
+                                <div class="col-span-full text-xs text-gray-500">
+                                    <span class="font-medium">RRULE:</span> ${schedule.rrule}
+                                </div>
+                            </div>
                         </div>
-                        <div class="space-x-2">
+                        <div class="ml-4 space-x-2">
                             <button onclick="app.runScheduleNow('${schedule.id}')" 
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                                 즉시 실행
@@ -822,8 +894,15 @@ class NewsletterApp {
                     </div>
                 </div>
             `).join('');
+            
+            const schedulesContainer = document.createElement('div');
+            schedulesContainer.innerHTML = schedulesHtml;
+            schedulesList.appendChild(schedulesContainer);
+            
         } catch (error) {
             console.error('Failed to load schedules:', error);
+            const schedulesList = document.getElementById('schedulesList');
+            schedulesList.innerHTML = '<p class="text-red-500">스케줄 로딩 실패: ' + error.message + '</p>';
         }
     }
 
@@ -847,8 +926,323 @@ class NewsletterApp {
     }
 
     async runScheduleNow(scheduleId) {
-        // This would trigger immediate execution of a scheduled newsletter
-        alert('즉시 실행 기능은 추후 구현됩니다.');
+        if (!confirm('이 스케줄을 지금 즉시 실행하시겠습니까?')) return;
+        
+        try {
+            const response = await fetch(`/api/schedule/${scheduleId}/run`, {
+                method: 'POST'
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                if (result.status === 'queued') {
+                    alert(`뉴스레터 생성이 시작되었습니다.\nJob ID: ${result.job_id}`);
+                } else if (result.status === 'completed') {
+                    alert('뉴스레터가 성공적으로 생성되고 발송되었습니다.');
+                }
+            } else {
+                alert('실행 실패: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Network error: ' + error.message);
+        }
+    }
+    
+    // ===== 시간 동기화 관련 메소드들 =====
+    
+    async initTimeSync() {
+        try {
+            await this.syncServerTime();
+            // 5분마다 시간 동기화
+            this.timeSyncInterval = setInterval(() => this.syncServerTime(), 5 * 60 * 1000);
+        } catch (error) {
+            console.error('Failed to initialize time sync:', error);
+        }
+    }
+    
+    async syncServerTime() {
+        try {
+            const startTime = Date.now();
+            const response = await fetch('/api/time-sync');
+            const data = await response.json();
+            const endTime = Date.now();
+            
+            // 네트워크 지연을 고려한 서버 시간 계산
+            const networkDelay = (endTime - startTime) / 2;
+            const serverTime = new Date(data.server_time_iso).getTime();
+            const adjustedServerTime = serverTime + networkDelay;
+            
+            this.serverTimeOffset = adjustedServerTime - endTime;
+            this.lastTimeSyncTime = endTime;
+            
+            console.log(`Time sync completed. Offset: ${this.serverTimeOffset}ms, Delay: ${networkDelay}ms`);
+            
+            // UI 업데이트
+            this.updateTimeDifference(data.server_time_iso);
+            
+        } catch (error) {
+            console.error('Time sync failed:', error);
+        }
+    }
+    
+    updateTimeDifference(serverTimeIso) {
+        try {
+            const serverTime = new Date(serverTimeIso);
+            const clientTime = new Date();
+            const diffMs = Math.abs(serverTime.getTime() - clientTime.getTime());
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
+            
+            const timeDiffInfo = document.getElementById('timeDiffInfo');
+            if (timeDiffInfo) {
+                if (diffMinutes === 0) {
+                    timeDiffInfo.textContent = '시간 동기화 완료';
+                    timeDiffInfo.className = 'text-green-600';
+                } else if (diffMinutes < 5) {
+                    timeDiffInfo.textContent = `클라이언트와 ${diffMinutes}분 차이`;
+                    timeDiffInfo.className = 'text-yellow-600';
+                } else {
+                    timeDiffInfo.textContent = `클라이언트와 ${diffMinutes}분 차이 (주의)`;
+                    timeDiffInfo.className = 'text-red-600';
+                }
+            }
+        } catch (error) {
+            console.error('Failed to update time difference:', error);
+        }
+    }
+    
+    getCurrentServerTime() {
+        if (!this.lastTimeSyncTime) return new Date();
+        
+        const now = Date.now();
+        const timeSinceSync = now - this.lastTimeSyncTime;
+        return new Date(now + this.serverTimeOffset);
+    }
+    
+    startTimeDisplay() {
+        // 현재 시간을 1초마다 업데이트
+        setInterval(() => {
+            const serverTime = this.getCurrentServerTime();
+            const currentServerTimeEl = document.getElementById('currentServerTime');
+            if (currentServerTimeEl) {
+                currentServerTimeEl.textContent = serverTime.toLocaleString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit', 
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZone: 'Asia/Seoul'
+                }) + ' KST';
+            }
+        }, 1000);
+    }
+    
+    // ===== 스케줄 설정 관련 메소드들 =====
+    
+    getScheduleSettings() {
+        try {
+            const frequency = document.getElementById('frequency').value;
+            const time = document.getElementById('scheduleTime').value;
+            
+            if (!time) {
+                this.showError('발송 시간을 설정해주세요.');
+                return null;
+            }
+            
+            // RRULE 생성
+            let rrule = `FREQ=${frequency}`;
+            
+            // 요일 설정 (주간 발송인 경우)
+            if (frequency === 'WEEKLY') {
+                const selectedDays = Array.from(document.querySelectorAll('.weekday:checked'))
+                    .map(cb => cb.value);
+                if (selectedDays.length === 0) {
+                    this.showError('주간 발송을 위해 요일을 선택해주세요.');
+                    return null;
+                }
+                rrule += `;BYDAY=${selectedDays.join(',')}`;
+            }
+            
+            // 시간 설정
+            const [hour, minute] = time.split(':');
+            rrule += `;BYHOUR=${hour};BYMINUTE=${minute}`;
+            
+            // 다음 실행 시간 미리보기 계산
+            const nextRun = this.calculateNextRun(rrule);
+            const nextRunText = nextRun ? nextRun.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone: 'Asia/Seoul'
+            }) + ' KST' : '계산 실패';
+            
+            return {
+                rrule: rrule,
+                frequency: frequency,
+                time: time,
+                next_run_preview: nextRunText
+            };
+        } catch (error) {
+            console.error('Failed to get schedule settings:', error);
+            this.showError('스케줄 설정 처리 중 오류가 발생했습니다.');
+            return null;
+        }
+    }
+    
+    calculateNextRun(rruleString) {
+        try {
+            // 간단한 RRULE 파싱 및 다음 실행 시간 계산
+            // 실제로는 서버에서 더 정확히 계산되지만, UI 미리보기용
+            
+            const now = this.getCurrentServerTime();
+            const parts = rruleString.split(';');
+            const freq = parts.find(p => p.startsWith('FREQ='))?.split('=')[1];
+            const hourPart = parts.find(p => p.startsWith('BYHOUR='))?.split('=')[1];
+            const minutePart = parts.find(p => p.startsWith('BYMINUTE='))?.split('=')[1];
+            const daysPart = parts.find(p => p.startsWith('BYDAY='))?.split('=')[1];
+            
+            if (!freq || !hourPart || !minutePart) return null;
+            
+            const hour = parseInt(hourPart);
+            const minute = parseInt(minutePart);
+            
+            let nextRun = new Date(now);
+            nextRun.setHours(hour, minute, 0, 0);
+            
+            // 이미 지난 시간이면 다음으로
+            if (nextRun <= now) {
+                if (freq === 'DAILY') {
+                    nextRun.setDate(nextRun.getDate() + 1);
+                } else if (freq === 'WEEKLY') {
+                    // 간단한 주간 처리 - 다음 주
+                    nextRun.setDate(nextRun.getDate() + 7);
+                } else if (freq === 'MONTHLY') {
+                    nextRun.setMonth(nextRun.getMonth() + 1);
+                }
+            }
+            
+            return nextRun;
+        } catch (error) {
+            console.error('Failed to calculate next run:', error);
+            return null;
+        }
+    }
+    
+    async createSchedule(data) {
+        try {
+            const scheduleData = {
+                keywords: data.keywords,
+                domain: data.domain,
+                email: data.email,
+                template_style: data.template_style,
+                email_compatible: data.email_compatible,
+                period: data.period,
+                rrule: data.schedule.rrule
+            };
+            
+            console.log('Creating schedule with data:', scheduleData);
+            
+            const response = await fetch('/api/schedule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(scheduleData)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                this.isGenerating = false;
+                this.hideProgress();
+                
+                // 성공 메시지 표시
+                const successHtml = `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-6">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <h3 class="text-sm font-medium text-green-800">스케줄이 성공적으로 생성되었습니다!</h3>
+                                <div class="mt-2 text-sm text-green-700">
+                                    <div class="space-y-1">
+                                        <div><strong>스케줄 ID:</strong> <code class="bg-green-100 px-1 rounded">${result.schedule_id}</code></div>
+                                        <div><strong>다음 실행 시간:</strong> <span class="font-mono">${result.next_run_kst}</span></div>
+                                        <div><strong>RRULE:</strong> <code class="bg-green-100 px-1 rounded text-xs">${result.rrule}</code></div>
+                                        <div><strong>현재 서버 시간:</strong> <span class="font-mono">${result.current_time_kst}</span></div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button onclick="app.switchTab('scheduleManageTab')" 
+                                            class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm">
+                                        스케줄 관리로 이동
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('resultsSection').classList.remove('hidden');
+                document.getElementById('newsletterPreview').innerHTML = successHtml;
+                
+                // 스케줄 목록 새로고침
+                this.loadSchedules();
+                
+            } else {
+                this.isGenerating = false;
+                this.hideProgress();
+                this.showError('스케줄 생성 실패: ' + (result.error || 'Unknown error'));
+            }
+            
+        } catch (error) {
+            console.error('Failed to create schedule:', error);
+            this.isGenerating = false;
+            this.hideProgress();
+            this.showError('스케줄 생성 중 오류 발생: ' + error.message);
+        }
+    }
+    
+    updateSchedulePreview() {
+        try {
+            const scheduleSettings = this.getScheduleSettings();
+            const previewElement = document.getElementById('nextRunPreview');
+            
+            if (!previewElement) return;
+            
+            if (scheduleSettings && scheduleSettings.next_run_preview) {
+                previewElement.innerHTML = `
+                    <div class="font-mono">${scheduleSettings.next_run_preview}</div>
+                    <div class="text-xs mt-1">
+                        <div>빈도: ${scheduleSettings.frequency === 'DAILY' ? '매일' : 
+                                      scheduleSettings.frequency === 'WEEKLY' ? '매주' : 
+                                      scheduleSettings.frequency === 'MONTHLY' ? '매월' : scheduleSettings.frequency}</div>
+                        <div>시간: ${scheduleSettings.time}</div>
+                        <div>RRULE: <code class="text-xs bg-blue-100 px-1 rounded">${scheduleSettings.rrule}</code></div>
+                    </div>
+                `;
+            } else {
+                previewElement.innerHTML = `
+                    <div class="text-orange-600">설정을 확인해주세요</div>
+                    <div class="text-xs mt-1">모든 필드를 올바르게 입력하면 미리보기가 표시됩니다.</div>
+                `;
+            }
+        } catch (error) {
+            console.error('Failed to update schedule preview:', error);
+            const previewElement = document.getElementById('nextRunPreview');
+            if (previewElement) {
+                previewElement.innerHTML = `
+                    <div class="text-red-600">미리보기 오류</div>
+                    <div class="text-xs mt-1">${error.message}</div>
+                `;
+            }
+        }
     }
 
     async viewHistoryItem(itemId) {
@@ -858,14 +1252,14 @@ class NewsletterApp {
             const result = await response.json();
             console.log('API response:', result);
 
-            if (result.result?.html_content) {
+            if (result.html_content) {
                 console.log('HTML content found, switching to generate tab');
                 // Add job_id to result for iframe src
-                result.result.job_id = itemId;
+                result.job_id = itemId;
                 this.currentJobId = itemId;
                 // Switch to generate tab and show the result
                 this.switchTab('generateTab');
-                this.showResults(result.result);
+                this.showResults(result);
                 console.log('Results displayed successfully');
             } else {
                 console.log('No HTML content found in result');
