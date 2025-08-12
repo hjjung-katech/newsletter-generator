@@ -13,7 +13,10 @@ from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple, TypedDi
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, StateGraph
-from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
+try:
+    from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
+except ImportError:
+    from pydantic import BaseModel, Field  # Fallback to Pydantic v2
 
 from . import collect as news_collect
 from . import config
@@ -338,6 +341,48 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
         }
 
     except Exception as e:
+        from .scoring import _is_nested_connection_error
+        
+        # Enhanced connection error detection using the same logic as scoring.py
+        is_connection_error = _is_nested_connection_error(e)
+        
+        if is_connection_error:
+            logger.warning(f"연결 오류로 인한 스코어링 실패, 기본 점수로 계속 진행: {e}")
+            
+            # Assign default scores to all articles and continue
+            try:
+                for article in processed_articles:
+                    article["priority_score"] = 50.0  # Default middle score
+                    article["scoring"] = {"relevance": 3, "impact": 3, "novelty": 3}
+                    article["source_tier_score"] = 0.5
+                    article["source_tier_name"] = "기본 (연결 오류)"
+                
+                # Sort by publication date as fallback ranking
+                try:
+                    from .date_utils import parse_date_string
+                    ranked_articles = sorted(
+                        processed_articles,
+                        key=lambda a: parse_date_string(a.get("date", "")) or datetime.min.replace(tzinfo=timezone.utc),
+                        reverse=True
+                    )
+                except Exception:
+                    ranked_articles = processed_articles
+                
+                logger.info(f"연결 오류 복구: {len(ranked_articles)}개 기사에 기본 점수 할당 완료")
+                
+                step_times = state.get("step_times", {})
+                step_times["score_articles"] = time.time() - start_time
+                
+                return {
+                    **state,
+                    "ranked_articles": ranked_articles,
+                    "status": "scoring_complete",
+                    "step_times": step_times,
+                }
+                
+            except Exception as fallback_error:
+                logger.error(f"기본 점수 할당 중 오류: {fallback_error}")
+                
         logger.error(f"Error during article scoring: {e}")
         step_times = state.get("step_times", {})
         step_times["score_articles"] = time.time() - start_time

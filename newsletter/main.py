@@ -94,8 +94,8 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
 
-    # 환경별 포트 설정 (기본값 5000으로 통일)
-    port = int(os.getenv("PORT", 5000))
+    # 환경별 포트 설정 (기본값 8000으로 통일)
+    port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
 
     uvicorn.run(

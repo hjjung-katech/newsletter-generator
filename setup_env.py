@@ -62,7 +62,7 @@ FLASK_ENV=development
 # 디버그 모드
 DEBUG=true
 # 포트 설정
-PORT=5000
+PORT=8000
 """
 
 

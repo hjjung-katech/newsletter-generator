@@ -18,7 +18,26 @@ else:
     # 일반 Python 환경
     env_path = ".env"
 
-load_dotenv(env_path)
+try:
+    load_dotenv(env_path, encoding='utf-8')
+except UnicodeDecodeError:
+    # Windows에서 BOM 또는 인코딩 문제가 있을 경우
+    try:
+        import chardet
+        with open(env_path, 'rb') as f:
+            raw_data = f.read()
+        detected_encoding = chardet.detect(raw_data)['encoding']
+        load_dotenv(env_path, encoding=detected_encoding)
+    except Exception:
+        # chardet이 없거나 다른 오류 발생 시 latin-1로 시도
+        try:
+            load_dotenv(env_path, encoding='latin-1')
+        except Exception:
+            # 마지막으로 인코딩 없이 시도
+            load_dotenv(env_path)
+except Exception as e:
+    print(f"Warning: .env 파일 로딩 실패: {e}")
+    # .env 파일 로딩 실패해도 계속 진행 (환경변수에서 직접 읽기)
 
 import json
 import os

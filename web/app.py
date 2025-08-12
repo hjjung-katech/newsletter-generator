@@ -301,9 +301,12 @@ class RealNewsletterCLI:
             newsletter_path = os.path.join(self.project_root, "newsletter")
             env_file = os.path.join(self.project_root, ".env")
 
-        # 프로젝트 루트 확인
-        if not os.path.exists(newsletter_path):
-            raise Exception(f"Newsletter module not found in {newsletter_path}")
+        # Newsletter 모듈 import 가능성 확인
+        try:
+            import newsletter
+            print(f"[SUCCESS] Newsletter module found and importable")
+        except ImportError as e:
+            raise Exception(f"Newsletter module not importable: {e}")
 
         # .env 파일 확인
         if not os.path.exists(env_file):
@@ -373,6 +376,7 @@ class RealNewsletterCLI:
         template_style="compact",
         email_compatible=False,
         period=14,
+        suggest_count=10,
     ):
         """웹 서비스 모드에서 직접 뉴스레터 생성"""
         try:
@@ -405,16 +409,48 @@ class RealNewsletterCLI:
                 )
 
             elif domain:
-                input_description = f"domain: {domain}"
-
-                # graph.py의 generate_newsletter 함수 호출 (키워드를 도메인으로 설정)
-                html_content, status = generate_newsletter(
-                    keywords=[domain],  # 도메인을 키워드로 사용
-                    news_period_days=period,
-                    domain=domain,
-                    template_style=template_style,
-                    email_compatible=email_compatible,
-                )
+                # CLI와 동일한 로직: 도메인에서 키워드 생성 후 뉴스레터 생성
+                print(f"[INFO] Generating keywords from domain: {domain}")
+                
+                # Step 1: Generate keywords from domain (CLI 로직과 동일)
+                from newsletter import tools
+                try:
+                    generated_keywords = tools.generate_keywords_with_gemini(domain, count=suggest_count)
+                    if generated_keywords and len(generated_keywords) > 0:
+                        keyword_list = generated_keywords
+                        print(f"[INFO] Generated {len(keyword_list)} keywords: {', '.join(keyword_list)}")
+                        input_description = f"domain: {domain} -> keywords: {','.join(keyword_list)}"
+                        
+                        # Step 2: Generate newsletter with generated keywords (CLI 로직과 동일)
+                        html_content, status = generate_newsletter(
+                            keywords=keyword_list,  # 생성된 키워드들 사용
+                            news_period_days=period,
+                            domain=domain,          # 도메인 정보도 전달
+                            template_style=template_style,
+                            email_compatible=email_compatible,
+                        )
+                    else:
+                        print(f"[WARNING] Failed to generate keywords from domain: {domain}")
+                        # 키워드 생성 실패 시 폴백 (기존 방식)
+                        input_description = f"domain: {domain} (fallback to direct domain use)"
+                        html_content, status = generate_newsletter(
+                            keywords=[domain],
+                            news_period_days=period,
+                            domain=domain,
+                            template_style=template_style,
+                            email_compatible=email_compatible,
+                        )
+                except Exception as e:
+                    print(f"[ERROR] Keyword generation failed: {e}")
+                    # 키워드 생성 실패 시 폴백 (기존 방식)
+                    input_description = f"domain: {domain} (error fallback)"
+                    html_content, status = generate_newsletter(
+                        keywords=[domain],
+                        news_period_days=period,
+                        domain=domain,
+                        template_style=template_style,
+                        email_compatible=email_compatible,
+                    )
             else:
                 raise ValueError("Either keywords or domain must be provided")
 
@@ -586,6 +622,7 @@ class RealNewsletterCLI:
         template_style="compact",
         email_compatible=False,
         period=14,
+        suggest_count=10,
     ):
         """실제 CLI를 사용하여 뉴스레터 생성"""
         try:
@@ -596,6 +633,7 @@ class RealNewsletterCLI:
                 template_style=template_style,
                 email_compatible=email_compatible,
                 period=period,
+                suggest_count=suggest_count,
             )
 
         except Exception as e:
@@ -774,6 +812,7 @@ class MockNewsletterCLI:
         template_style="compact",
         email_compatible=False,
         period=14,
+        suggest_count=10,
     ):
         """Mock newsletter generation with more realistic content"""
         if keywords:
@@ -1050,7 +1089,17 @@ print(f"[PATH] Environment: {'PyInstaller exe' if path_manager.is_frozen else 'D
 
 
 def init_db():
-    """Initialize SQLite database with required tables"""
+    """Initialize SQLite database with required tables.
+    
+    This function is called automatically on first run or when database doesn't exist.
+    """
+    print("[INIT] Initializing database...")
+    
+    # Check if this is first run
+    is_first_run = path_manager.is_first_run()
+    if is_first_run:
+        print("[INIT] First run detected - creating fresh database")
+    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
@@ -1080,9 +1129,22 @@ def init_db():
         )
     """
     )
+    
+    # Create indexes for better performance
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_status ON history(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_schedules_enabled ON schedules(enabled)")
 
     conn.commit()
     conn.close()
+    
+    if is_first_run:
+        print("[INIT] Fresh database created successfully")
+        # Try to copy .env template if needed
+        path_manager.copy_env_template_if_needed()
+    else:
+        print("[INIT] Database verified/updated")
 
 
 # Initialize database on startup
@@ -1181,9 +1243,13 @@ def generate_newsletter():
             import threading
 
             # Store initial task status
+            try:
+                from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
+            except ImportError:
+                from time_utils import get_utc_now, to_iso_utc      # Development
             in_memory_tasks[job_id] = {
                 "status": "processing",
-                "started_at": datetime.now().isoformat(),
+                "started_at": to_iso_utc(get_utc_now()),
             }
 
             # Process in background thread
@@ -1195,13 +1261,13 @@ def generate_newsletter():
                         in_memory_tasks[job_id] = {
                             "status": "cancelled",
                             "error": "Application shutdown requested",
-                            "updated_at": datetime.now().isoformat(),
+                            "updated_at": to_iso_utc(get_utc_now()),
                         }
                         return
                     
                     print(f"[INFO] Starting background processing for job {job_id}")
                     print(f"[INFO] Data: {data}")
-                    print(f"[INFO] Current time: {datetime.now().isoformat()}")
+                    print(f"[INFO] Current time: {to_iso_utc(get_utc_now())}")
 
                     # 환경 체크
                     print(f"[INFO] Using CLI type: {type(newsletter_cli).__name__}")
@@ -1343,7 +1409,7 @@ def generate_newsletter():
 
 @app.route("/api/suggest", methods=["POST"])
 def suggest_keywords():
-    """Generate keyword suggestions for a given domain using AI"""
+    """Generate keyword suggestions for a given topic using AI (supports legacy domain parameter)"""
     print(f"[INFO] Keyword suggestion request received")
 
     try:
@@ -1352,14 +1418,15 @@ def suggest_keywords():
             print("[WARNING] No data provided in keyword suggestion request")
             return jsonify({"error": "No data provided"}), 400
 
-        domain = data.get("domain", "").strip()
+        # Support both new 'topic' and legacy 'domain' parameters for backward compatibility
+        topic = data.get("topic", "").strip() or data.get("domain", "").strip()
         count = data.get("count", 10)
 
-        if not domain:
-            print("[WARNING] No domain provided in keyword suggestion request")
-            return jsonify({"error": "Domain is required"}), 400
+        if not topic:
+            print("[WARNING] No topic provided in keyword suggestion request")
+            return jsonify({"error": "Topic or domain is required"}), 400
 
-        print(f"[INFO] Generating keywords for domain: '{domain}', count: {count}")
+        print(f"[INFO] Generating keywords for topic: '{topic}', count: {count}")
 
         # Use the CLI's suggest_keywords function
         try:
@@ -1367,21 +1434,22 @@ def suggest_keywords():
             from newsletter.cli import suggest_keywords as cli_suggest_keywords
             
             # Generate keywords using the existing CLI functionality
-            suggested_keywords = cli_suggest_keywords(domain, count)
+            suggested_keywords = cli_suggest_keywords(topic, count)
             
             if suggested_keywords and len(suggested_keywords) > 0:
                 print(f"[INFO] Successfully generated {len(suggested_keywords)} keywords")
                 return jsonify({
                     "success": True,
                     "keywords": suggested_keywords,
-                    "domain": domain,
+                    "topic": topic,  # New field
+                    "domain": topic,  # Legacy field for backward compatibility
                     "count": len(suggested_keywords)
                 }), 200
             else:
-                print(f"[WARNING] No keywords generated for domain: '{domain}'")
+                print(f"[WARNING] No keywords generated for topic: '{topic}'")
                 return jsonify({
                     "success": False,
-                    "error": "No keywords could be generated for the given domain",
+                    "error": "No keywords could be generated for the given topic",
                     "keywords": []
                 }), 200
 
@@ -1452,9 +1520,11 @@ def get_newsletter():
         # 뉴스레터 생성
         result = newsletter_cli.generate_newsletter(
             keywords=keywords,
+            domain=validated_data.domain,
             template_style=template_style,
             email_compatible=email_compatible,
             period=period,
+            suggest_count=validated_data.suggest_count,
         )
 
         if result["status"] == "success":
@@ -1481,15 +1551,16 @@ def process_newsletter_sync(data):
         print(f"[INFO] Starting synchronous newsletter processing")
         print(f"[INFO] Current newsletter_cli type: {type(newsletter_cli).__name__}")
 
-        # Extract parameters
+        # Extract parameters (support both new 'topic' and legacy 'domain' for compatibility)
         keywords = data.get("keywords", "")
-        domain = data.get("domain", "")
+        topic = data.get("topic", "").strip() or data.get("domain", "").strip()  # Support legacy domain parameter
         template_style = data.get("template_style", "compact")
         period = data.get("period", 14)
         email = data.get("email", "")  # 이메일 주소 추가
         use_template_system = data.get(
             "use_template_system", True
         )  # 템플릿 시스템 사용 여부
+        suggest_count = data.get("suggest_count", 10)  # 도메인 키워드 생성 개수
 
         # Smart email_compatible logic: 이메일이 있으면 자동으로 email_compatible=True
         # 단, 사용자가 명시적으로 False로 설정한 경우에는 그 값을 존중
@@ -1509,7 +1580,7 @@ def process_newsletter_sync(data):
 
         print(f"[INFO] Processing parameters:")
         print(f"   Keywords: {keywords}")
-        print(f"   Domain: {domain}")
+        print(f"   Topic: {topic}")
         print(f"   Template style: {template_style}")
         print(f"   Email compatible: {email_compatible}")
         print(f"   Period: {period}")
@@ -1532,10 +1603,11 @@ def process_newsletter_sync(data):
                 print(f"[INFO] Using RealNewsletterCLI._generate_direct method")
                 result = newsletter_cli._generate_direct(
                     keywords=keywords,
-                    domain=domain,
+                    domain=topic,  # Pass topic as domain for internal compatibility
                     template_style=template_style,
                     email_compatible=email_compatible,
                     period=period,
+                    suggest_count=suggest_count,
                 )
             else:
                 # MockNewsletterCLI의 경우 기존 방식 사용
@@ -1548,19 +1620,21 @@ def process_newsletter_sync(data):
                         template_style=template_style,
                         email_compatible=email_compatible,
                         period=period,
+                        suggest_count=suggest_count,
                     )
-                elif domain:
+                elif topic:
                     print(
-                        f"[INFO] Generating newsletter with domain using {type(newsletter_cli).__name__}"
+                        f"[INFO] Generating newsletter with topic using {type(newsletter_cli).__name__}"
                     )
                     result = newsletter_cli.generate_newsletter(
-                        domain=domain,
+                        domain=topic,  # Pass topic as domain for internal compatibility
                         template_style=template_style,
                         email_compatible=email_compatible,
                         period=period,
+                        suggest_count=suggest_count,
                     )
                 else:
-                    raise ValueError("Either keywords or domain must be provided")
+                    raise ValueError("Either keywords or topic must be provided")
 
             print(f"[DEBUG] CLI result status: {result['status']}")
             print(f"[DEBUG] CLI result type: {type(result)}")
@@ -1611,7 +1685,7 @@ def process_newsletter_sync(data):
                     )
                 else:
                     result = mock_cli.generate_newsletter(
-                        domain=domain,
+                        domain=topic,  # Pass topic as domain for internal compatibility
                         template_style=template_style,
                         email_compatible=email_compatible,
                         period=period,
@@ -1652,8 +1726,8 @@ def process_newsletter_sync(data):
                 subject = result.get("title", "Newsletter")
                 if keywords:
                     subject = f"Newsletter: {keywords}"
-                elif domain:
-                    subject = f"Newsletter: {domain} Insights"
+                elif topic:
+                    subject = f"Newsletter: {topic} Insights"
 
                 # 이메일 발송
                 send_email_func(to=email, subject=subject, html=result["content"])
@@ -1714,6 +1788,11 @@ def process_newsletter_sync(data):
 def process_newsletter_in_memory(data, job_id):
     """Process newsletter in memory and update task status"""
     try:
+        from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
+    except ImportError:
+        from time_utils import get_utc_now, to_iso_utc      # Development
+        
+    try:
         print(f"[INFO] Starting newsletter processing for job {job_id}")
         result = process_newsletter_sync(data)
 
@@ -1721,7 +1800,7 @@ def process_newsletter_in_memory(data, job_id):
         in_memory_tasks[job_id] = {
             "status": "completed",
             "result": result,
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": to_iso_utc(get_utc_now()),
         }
 
         # 데이터베이스에 직접 업데이트 (tasks.py import 문제 방지)
@@ -1766,7 +1845,7 @@ def process_newsletter_in_memory(data, job_id):
         in_memory_tasks[job_id] = {
             "status": "failed",
             "error": str(e),
-            "updated_at": datetime.now().isoformat(),
+            "updated_at": to_iso_utc(get_utc_now()),
         }
 
         # 데이터베이스에 직접 실패 상태 저장
@@ -1852,7 +1931,12 @@ def get_job_status(job_id):
 
 @app.route("/api/history")
 def get_history():
-    """Get recent newsletter generation history"""
+    """Get recent newsletter generation history with unified time handling"""
+    try:
+        from web.time_utils import parse_sqlite_timestamp, format_display_time  # PyInstaller
+    except ImportError:
+        from time_utils import parse_sqlite_timestamp, format_display_time      # Development
+    
     print(f"[INFO] Fetching history from database")
 
     try:
@@ -1896,17 +1980,33 @@ def get_history():
             print(f"[WARNING] Failed to parse result for job {job_id}: {e}")
             parsed_result = None
 
+        # Parse SQLite timestamp and format for display
+        try:
+            created_dt = parse_sqlite_timestamp(created_at)
+            time_info = format_display_time(created_dt)
+        except Exception as e:
+            print(f"[WARNING] Failed to parse timestamp for job {job_id}: {e}")
+            # Fallback to original timestamp
+            time_info = {
+                'utc_iso': created_at,
+                'kst_display': created_at,
+                'timestamp': 0
+            }
+
         history.append(
             {
                 "id": job_id,
                 "params": parsed_params,
                 "result": parsed_result,
-                "created_at": created_at,
+                "created_at": time_info['utc_iso'],  # Always return UTC ISO format
+                "created_at_display": time_info['kst_display'],  # KST for display
+                "created_at_timestamp": time_info['timestamp'],  # Unix timestamp for JS
+                "time_info": time_info,  # Complete time information
                 "status": status,
             }
         )
 
-    print(f"[INFO] Returning {len(history)} history records")
+    print(f"[INFO] Returning {len(history)} history records with unified time format")
     return jsonify(history)
 
 
@@ -1918,70 +2018,101 @@ def create_schedule():
     if not data or not data.get("rrule") or not data.get("email"):
         return jsonify({"error": "Missing required fields: rrule, email"}), 400
 
-    # Keywords나 domain 중 하나는 필수
-    if not data.get("keywords") and not data.get("domain"):
-        return jsonify({"error": "Either keywords or domain is required"}), 400
+    # Keywords나 topic (or legacy domain) 중 하나는 필수  
+    if not data.get("keywords") and not data.get("topic") and not data.get("domain"):
+        return jsonify({"error": "Either keywords or topic is required"}), 400
 
     try:
-        # 한국 시간 처리를 위한 timezone 설정
+        try:
+            from web.time_utils import get_utc_now, get_kst_now, to_utc, to_iso_utc, format_display_time  # PyInstaller
+        except ImportError:
+            from time_utils import get_utc_now, get_kst_now, to_utc, to_iso_utc, format_display_time      # Development
         from dateutil.rrule import rrulestr
         from dateutil import tz
         
-        # 서울 시간대 설정
-        seoul_tz = tz.gettz('Asia/Seoul')
-        now_seoul = datetime.now(seoul_tz)
+        # 현재 시간을 UTC와 KST로 가져오기
+        now_utc = get_utc_now()
+        now_kst = get_kst_now()
         
         rrule_str = data["rrule"]
         
-        # RRULE을 서울 시간 기준으로 파싱
-        rrule = rrulestr(rrule_str, dtstart=now_seoul.replace(tzinfo=None))
-        next_run = rrule.after(now_seoul.replace(tzinfo=None))
+        # RRULE을 KST 기준으로 파싱하되, UTC로 저장
+        seoul_tz = tz.gettz('Asia/Seoul')
+        rrule = rrulestr(rrule_str, dtstart=now_kst.replace(tzinfo=None))
+        next_run_naive = rrule.after(now_kst.replace(tzinfo=None))
 
-        if not next_run:
+        if not next_run_naive:
             return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
             
-        # 다음 실행 시간을 서울 시간으로 변환
-        next_run_seoul = next_run.replace(tzinfo=seoul_tz)
+        # 다음 실행 시간을 KST로 해석한 후 UTC로 변환
+        next_run_kst = next_run_naive.replace(tzinfo=seoul_tz)
+        next_run_utc = to_utc(next_run_kst)
 
     except Exception as e:
         return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
 
     schedule_id = str(uuid.uuid4())
 
-    # 스케줄 데이터 준비 (시간대 정보 포함)
-    schedule_params = {
-        "keywords": data.get("keywords"),
-        "domain": data.get("domain"),
-        "email": data["email"],
-        "send_email": bool(data.get("email")),  # 이메일 주소가 있으면 전송 활성화
-        "template_style": data.get("template_style", "compact"),
-        "email_compatible": data.get("email_compatible", True),
-        "period": data.get("period", 14),
-        "timezone": "Asia/Seoul",  # 시간대 정보 저장
-        "created_timestamp": now_seoul.isoformat(),  # 생성 시점의 서울 시간
-    }
+    # 주제 기반 vs 키워드 기반 구분하여 스케줄 데이터 준비  
+    topic = data.get("topic") or data.get("domain")  # Support legacy domain parameter
+    if topic:
+        # 주제 기반 예약: 매번 새로운 키워드 생성
+        schedule_params = {
+            "source_type": "topic",  # Updated to reflect new terminology
+            "source_value": topic,
+            "suggest_count": data.get("suggest_count", 10),  # 키워드 생성 개수
+            "email": data["email"],
+            "send_email": bool(data.get("email")),
+            "template_style": data.get("template_style", "compact"),
+            "email_compatible": data.get("email_compatible", True),
+            "period": data.get("period", 14),
+            "timezone": "Asia/Seoul",
+            "created_timestamp": to_iso_utc(now_utc),
+        }
+    else:
+        # 키워드 기반 예약: 고정된 키워드 사용
+        schedule_params = {
+            "source_type": "keywords",
+            "source_value": data.get("keywords"),
+            "email": data["email"],
+            "send_email": bool(data.get("email")),
+            "template_style": data.get("template_style", "compact"),
+            "email_compatible": data.get("email_compatible", True),
+            "period": data.get("period", 14),
+            "timezone": "Asia/Seoul",
+            "created_timestamp": to_iso_utc(now_utc),
+        }
 
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO schedules (id, params, rrule, next_run) VALUES (?, ?, ?, ?)",
-        (schedule_id, json.dumps(schedule_params), rrule_str, next_run_seoul.isoformat()),
+        (schedule_id, json.dumps(schedule_params), rrule_str, next_run_utc.isoformat()),
     )
     conn.commit()
     conn.close()
 
-    # 클라이언트에게 시간 정보 상세히 제공
+    # 클라이언트에게 시간 정보 상세히 제공 (unified format)
+    next_run_time_info = format_display_time(next_run_utc)
+    current_time_info = format_display_time(now_utc)
+    
     return (
         jsonify(
             {
                 "status": "scheduled",
                 "schedule_id": schedule_id,
-                "next_run": next_run_seoul.isoformat(),
-                "next_run_kst": next_run_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
-                "current_time_kst": now_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
+                "next_run": next_run_time_info['utc_iso'],  # UTC ISO format
+                "next_run_display": next_run_time_info['kst_display'],  # KST display
+                "next_run_timestamp": next_run_time_info['timestamp'],  # Unix timestamp
+                "current_time": current_time_info['utc_iso'],  # UTC ISO format
+                "current_time_display": current_time_info['kst_display'],  # KST display
                 "timezone": "Asia/Seoul",
                 "rrule": rrule_str,
-                "created_at": now_seoul.isoformat()
+                "created_at": to_iso_utc(now_utc),  # UTC ISO format
+                "time_info": {
+                    "next_run": next_run_time_info,
+                    "current_time": current_time_info
+                }
             }
         ),
         201,
@@ -1990,13 +2121,15 @@ def create_schedule():
 
 @app.route("/api/schedules")
 def get_schedules():
-    """Get all active schedules with timezone information"""
-    from dateutil import tz
-    from dateutil.parser import isoparse
+    """Get all active schedules with unified timezone information"""
+    try:
+        from web.time_utils import get_utc_now, get_kst_now, to_utc, to_kst, format_display_time, parse_sqlite_timestamp  # PyInstaller
+    except ImportError:
+        from time_utils import get_utc_now, get_kst_now, to_utc, to_kst, format_display_time, parse_sqlite_timestamp      # Development
     
-    # 서울 시간대 설정
-    seoul_tz = tz.gettz('Asia/Seoul')
-    now_seoul = datetime.now(seoul_tz)
+    # 현재 시간을 UTC와 KST로 가져오기  
+    now_utc = get_utc_now()
+    now_kst = get_kst_now()
     
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
@@ -2010,18 +2143,18 @@ def get_schedules():
     for row in rows:
         schedule_id, params, rrule, next_run, created_at, enabled = row
         
-        # 시간 정보 처리
+        # 시간 정보 처리 (unified time handling)
         try:
-            next_run_dt = isoparse(next_run)
-            if next_run_dt.tzinfo is None:
-                next_run_dt = next_run_dt.replace(tzinfo=seoul_tz)
-                
+            # next_run을 UTC datetime으로 파싱
+            next_run_utc = to_utc(next_run)
+            next_run_kst = to_kst(next_run_utc)
+            
             # 다음 실행까지의 시간 계산
-            time_until_next = next_run_dt - now_seoul
+            time_until_next = next_run_kst - now_kst
             time_until_text = ""
             if time_until_next.total_seconds() > 0:
                 days = time_until_next.days
-                hours, remainder = divmod(time_until_next.seconds, 3600)
+                hours, remainder = divmod(int(time_until_next.total_seconds()), 3600)
                 minutes, _ = divmod(remainder, 60)
                 
                 if days > 0:
@@ -2032,52 +2165,80 @@ def get_schedules():
                     time_until_text = f"{minutes}분 후"
             else:
                 time_until_text = "지연됨"
+                
+            # 시간 정보 포맷팅
+            next_run_time_info = format_display_time(next_run_utc)
             
         except Exception as e:
-            next_run_dt = None
+            next_run_utc = None
             time_until_text = "시간 처리 오류"
+            next_run_time_info = {
+                'utc_iso': next_run,
+                'kst_display': 'Unknown',
+                'timestamp': 0
+            }
+        
+        # created_at 시간 정보 처리
+        try:
+            if created_at:
+                created_dt = parse_sqlite_timestamp(created_at)
+                created_time_info = format_display_time(created_dt)
+            else:
+                created_time_info = {
+                    'utc_iso': '',
+                    'kst_display': 'Unknown',
+                    'timestamp': 0
+                }
+        except Exception as e:
+            created_time_info = {
+                'utc_iso': created_at,
+                'kst_display': 'Unknown',
+                'timestamp': 0
+            }
         
         schedule_data = {
             "id": schedule_id,
             "params": json.loads(params) if params else None,
             "rrule": rrule,
-            "next_run": next_run,
-            "next_run_kst": next_run_dt.strftime('%Y-%m-%d %H:%M:%S KST') if next_run_dt else "Unknown",
+            "next_run": next_run_time_info['utc_iso'],  # UTC ISO format
+            "next_run_display": next_run_time_info['kst_display'],  # KST display
+            "next_run_timestamp": next_run_time_info['timestamp'],  # Unix timestamp for JS
             "time_until_next": time_until_text,
-            "created_at": created_at,
+            "created_at": created_time_info['utc_iso'],  # UTC ISO format
+            "created_at_display": created_time_info['kst_display'],  # KST display
             "enabled": bool(enabled),
-            "is_overdue": next_run_dt < now_seoul if next_run_dt else False
+            "is_overdue": next_run_utc < now_utc if next_run_utc else False,
+            "time_info": {
+                "next_run": next_run_time_info,
+                "created_at": created_time_info
+            }
         }
         schedules.append(schedule_data)
 
-    # 현재 시간 정보도 함께 반환
+    # 현재 시간 정보도 함께 반환 (unified format)
+    current_time_info = format_display_time(now_utc)
     return jsonify({
         "schedules": schedules,
-        "current_time_kst": now_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
+        "current_time": current_time_info['utc_iso'],  # UTC ISO format
+        "current_time_display": current_time_info['kst_display'],  # KST display 
+        "current_timestamp": current_time_info['timestamp'],  # Unix timestamp for JS
         "timezone": "Asia/Seoul",
-        "server_time": now_seoul.isoformat()
+        "time_info": current_time_info
     })
 
 
 @app.route("/api/time-sync")
 def get_server_time():
-    """Get server time for synchronization with client"""
-    from dateutil import tz
+    """Get server time for synchronization with client (unified time handling)"""
+    try:
+        from web.time_utils import get_timezone_info  # PyInstaller
+    except ImportError:
+        from time_utils import get_timezone_info      # Development
     
-    # 서울 시간대 설정
-    seoul_tz = tz.gettz('Asia/Seoul')
-    now_seoul = datetime.now(seoul_tz)
+    # 통합된 시간대 정보 가져오기
+    timezone_info = get_timezone_info()
     
-    # UTC 시간도 제공
-    now_utc = datetime.utcnow()
-    
-    return jsonify({
-        "server_time_kst": now_seoul.strftime('%Y-%m-%d %H:%M:%S KST'),
-        "server_time_iso": now_seoul.isoformat(),
-        "server_time_utc": now_utc.isoformat() + 'Z',
-        "timezone": "Asia/Seoul",
-        "timestamp": int(now_seoul.timestamp())
-    })
+    return jsonify(timezone_info)
 
 
 @app.route("/api/schedule/<schedule_id>", methods=["DELETE"])
@@ -2231,9 +2392,13 @@ def health_check():
     import os
 
     # 기본 상태
+    try:
+        from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
+    except ImportError:
+        from time_utils import get_utc_now, to_iso_utc      # Development
     health_status = {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": to_iso_utc(get_utc_now()),
         "service": "newsletter-generator",
         "version": "1.0.0",
     }
@@ -2348,6 +2513,99 @@ def health_check():
         status_code = 200  # 여전히 서비스 가능하므로 200
 
     return jsonify(health_status), status_code
+
+
+@app.route("/api/setup-status")
+def setup_status():
+    """Get current setup status and guidance for first-time users"""
+    try:
+        # Get setup status from PathManager
+        status = path_manager.get_setup_status()
+        
+        # Add additional API key validation
+        from newsletter.llm_factory import validate_api_keys
+        api_keys_available = validate_api_keys()
+        
+        # Enhance status with more details
+        enhanced_status = {
+            **status,
+            "api_keys_available": api_keys_available,
+            "has_serper": "serper" in api_keys_available,
+            "has_llm_provider": bool(set(api_keys_available) & {"gemini", "openai", "anthropic"}),
+            "docs": {
+                "user_guide_available": status["user_guide_available"],
+                "quick_start_available": status["quick_start_available"],
+            }
+        }
+        
+        # Determine next action recommendation
+        if status["stage"] == "initial_setup":
+            enhanced_status["recommendation"] = {
+                "action": "configure_env",
+                "message": "Please configure your API keys in the .env file",
+                "priority": "high"
+            }
+        elif status["stage"] == "api_key_setup":
+            enhanced_status["recommendation"] = {
+                "action": "add_api_keys", 
+                "message": "Add your Gemini and Serper API keys to get started",
+                "priority": "high"
+            }
+        else:
+            enhanced_status["recommendation"] = {
+                "action": "ready",
+                "message": "System is ready to generate newsletters",
+                "priority": "low"
+            }
+        
+        return jsonify(enhanced_status)
+        
+    except Exception as e:
+        print(f"[ERROR] Setup status check failed: {e}")
+        return jsonify({
+            "stage": "error",
+            "error": str(e),
+            "recommendation": {
+                "action": "check_logs",
+                "message": "Please check the logs for detailed error information",
+                "priority": "high"
+            }
+        }), 500
+
+
+@app.route("/api/docs/<doc_name>")
+def get_documentation(doc_name):
+    """Serve documentation files from the bundled docs directory"""
+    try:
+        if doc_name == "user-guide":
+            doc_path = path_manager.get_user_guide_path()
+        elif doc_name == "quick-start":
+            doc_path = path_manager.get_quick_start_path()
+        else:
+            return jsonify({"error": "Document not found"}), 404
+            
+        if not os.path.exists(doc_path):
+            return jsonify({
+                "error": "Document file not found",
+                "requested": doc_name,
+                "path": doc_path
+            }), 404
+            
+        with open(doc_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        return jsonify({
+            "name": doc_name,
+            "content": content,
+            "type": "markdown"
+        })
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to load documentation {doc_name}: {e}")
+        return jsonify({
+            "error": f"Failed to load documentation: {str(e)}",
+            "name": doc_name
+        }), 500
 
 
 @app.route("/test")
@@ -2761,7 +3019,7 @@ def initialize_app():
 app_initialization_status = initialize_app()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8000))
     debug = os.environ.get("FLASK_ENV") == "development"
     
     print(f"[INFO] Starting Flask app on port {port}, debug={debug}")

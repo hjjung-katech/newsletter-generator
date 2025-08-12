@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -166,9 +167,51 @@ def _parse_llm_json(text: str) -> Dict[str, float]:
     return {"relevance": 1, "impact": 1, "novelty": 1}
 
 
+def _is_nested_connection_error(exception) -> bool:
+    """
+    중첩된 예외 구조에서 연결 오류를 감지합니다.
+    예: ('Connection aborted.', ConnectionResetError(...))
+    """
+    import socket
+    
+    # Direct instance check
+    if isinstance(exception, (ConnectionResetError, ConnectionError, socket.error)):
+        return True
+    
+    # Check for nested tuple exceptions (like requests library wraps)
+    if isinstance(exception, tuple) and len(exception) > 1:
+        for item in exception:
+            if isinstance(item, (ConnectionResetError, ConnectionError, socket.error)):
+                return True
+    
+    # Check exception args for nested exceptions
+    if hasattr(exception, 'args') and exception.args:
+        for arg in exception.args:
+            if isinstance(arg, (ConnectionResetError, ConnectionError, socket.error)):
+                return True
+            # Check nested tuples in args
+            if isinstance(arg, tuple):
+                for nested_item in arg:
+                    if isinstance(nested_item, (ConnectionResetError, ConnectionError, socket.error)):
+                        return True
+    
+    # String-based detection as fallback
+    error_str = str(exception).lower()
+    connection_keywords = [
+        "연결", "강제", "끊", "reset", "connection", "timeout", "network", 
+        "10054", "10061", "10060", "connection aborted", "connection reset",
+        "현재 연결은", "원격 호스트", "강제로 끊"
+    ]
+    
+    return any(keyword in error_str for keyword in connection_keywords)
+
+
 def request_llm_scores(
     article: Dict[str, Any], domain: str, llm=None
 ) -> Dict[str, float]:
+    import time
+    import socket
+    
     if llm is None:
         llm = get_llm(temperature=0)
 
@@ -181,12 +224,40 @@ def request_llm_scores(
         summary=article.get("content") or article.get("snippet", ""),
     )
     message = HumanMessage(content=prompt)
-    result = llm.invoke([message])
-    if isinstance(result, AIMessage):
-        text = result.content
-    else:
-        text = str(result)
-    return _parse_llm_json(text)
+    
+    # Enhanced retry logic for connection errors during scoring
+    max_retries = 3
+    base_delay = 2
+    
+    for attempt in range(max_retries + 1):
+        try:
+            result = llm.invoke([message])
+            if isinstance(result, AIMessage):
+                text = result.content
+            else:
+                text = str(result)
+            return _parse_llm_json(text)
+            
+        except Exception as e:
+            # Enhanced connection error detection
+            is_connection_error = _is_nested_connection_error(e)
+            
+            if is_connection_error:
+                if attempt < max_retries:
+                    delay = base_delay * (2 ** attempt)  # Exponential backoff
+                    logger.warning(f"스코어링 연결 오류 (시도 {attempt + 1}/{max_retries + 1}), {delay}초 후 재시도: {e}")
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"스코어링 최종 실패, 기본 점수 사용: {e}")
+                    return {"relevance": 3, "impact": 3, "novelty": 3}  # Default scores
+            else:
+                # Non-connection errors - log and return defaults immediately
+                logger.error(f"스코어링 오류 (재시도 불가), 기본 점수 사용: {e}")
+                return {"relevance": 3, "impact": 3, "novelty": 3}
+    
+    # Should not reach here, but fallback
+    return {"relevance": 3, "impact": 3, "novelty": 3}
 
 
 def calculate_priority_score(

@@ -475,19 +475,27 @@ class LLMWithFallback(Runnable):
 
     def _is_retryable_error(self, e):
         error_str = str(e).lower()
-        return any(
-            keyword in error_str
-            for keyword in [
-                "529",
-                "429",
-                "quota",
-                "rate limit",
-                "too many requests",
-                "overloaded",
-                "timeout",
-                "connection",
-            ]
-        )
+        
+        # Check for specific exception types first
+        import socket
+        if isinstance(e, (ConnectionResetError, ConnectionError, socket.error)):
+            return True
+        
+        # Check for HTTP/network related errors
+        if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+            status_code = e.response.status_code
+            if status_code in [429, 500, 502, 503, 504, 520, 521, 522, 523, 524]:
+                return True
+        
+        # Check for error message keywords
+        retryable_keywords = [
+            "529", "429", "quota", "rate limit", "too many requests", "overloaded",
+            "timeout", "connection", "연결", "강제", "끊", "reset", "refused", 
+            "unreachable", "network", "socket", "ssl", "tls", "certificate",
+            "temporary", "서버", "응답", "없음", "실패", "10054", "10061", "10060"
+        ]
+        
+        return any(keyword in error_str for keyword in retryable_keywords)
 
 
 class LLMProvider(ABC):

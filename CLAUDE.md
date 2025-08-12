@@ -18,6 +18,15 @@ pip install -r requirements-dev.txt
 # Run CLI newsletter generation
 python -m newsletter run --keywords "AI,tech" --to user@example.com
 
+# Generate newsletter with domain-based keyword suggestion
+python -m newsletter run --domain "인공지능" --suggest-count 10
+
+# Interactive keyword review mode (NEW!)
+python -m newsletter run --domain "AI" --interactive
+
+# Generate keywords only (for review)
+python -m newsletter suggest --domain "블록체인" --count 8
+
 # Start web interface for development
 python test_server.py
 # Or from web directory
@@ -206,6 +215,73 @@ The system supports multiple LLM providers with automatic fallback:
 - Automatic retry mechanisms for transient failures
 - Graceful degradation when services are unavailable
 - Detailed logging for debugging and monitoring
+
+## Enhanced Domain and Keyword Features (2024-12)
+
+The system now provides improved domain-based keyword generation with interactive editing capabilities:
+
+### CLI Interactive Mode
+
+```bash
+# Interactive keyword review and editing
+newsletter run --domain "AI" --interactive
+
+# This allows you to:
+# - Review generated keywords before newsletter creation
+# - Edit individual keywords (e <number>)
+# - Add new keywords (a)
+# - Delete keywords (d <number>)
+# - Regenerate all keywords (r)
+# - Continue with current keywords (Enter)
+```
+
+### Web Interface Enhancements
+
+The web interface now supports:
+
+1. **Inline Keyword Editing**: Generated keywords are displayed as editable tags
+2. **Individual Keyword Management**: Click to edit, hover to delete
+3. **Add New Keywords**: Plus button to add custom keywords
+4. **Two Generation Modes**:
+   - **Review Mode**: Edit keywords before newsletter generation
+   - **Direct Mode**: Generate newsletter directly from domain (like CLI)
+
+### API Endpoints
+
+```bash
+# Keyword suggestion API
+POST /api/suggest
+{
+  "domain": "artificial intelligence",
+  "count": 10
+}
+
+# Newsletter generation with domain or keywords
+POST /api/generate
+{
+  "domain": "AI",           // Direct domain-based generation
+  "keywords": ["AI", "ML"], // Or use specific keywords
+  "template_style": "compact",
+  "email_compatible": false
+}
+```
+
+### Usage Patterns
+
+**For Quick Generation:**
+```bash
+newsletter run --domain "fintech"
+```
+
+**For Reviewed Generation:**
+```bash
+newsletter run --domain "fintech" --interactive
+```
+
+**For Keyword-Only Generation:**
+```bash
+newsletter suggest --domain "fintech" --count 15
+```
 
 ## Common Development Tasks
 

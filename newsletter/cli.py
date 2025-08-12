@@ -164,6 +164,12 @@ def run(
         "--log-level",
         help="Logging level: DEBUG, INFO, WARNING, ERROR",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Interactive mode: review and edit generated keywords before newsletter creation.",
+    ),
 ):
     """
     Generate and optionally send a newsletter based on keywords or domain.
@@ -378,6 +384,12 @@ def run(
                     keyword_list = generated_keywords
                     final_keywords_str = ",".join(keyword_list)
                     logger.success(f"Generated keywords: {final_keywords_str}")
+                    
+                    # Interactive mode: allow user to review and edit keywords
+                    if interactive:
+                        keyword_list = interactive_keyword_review(keyword_list, domain)
+                        final_keywords_str = ",".join(keyword_list)
+                        console.print(f"[green]최종 키워드:[/green] {final_keywords_str}")
                 else:
                     logger.warning(
                         f"Failed to generate keywords for domain '{domain}'."
@@ -1805,6 +1817,116 @@ def suggest_keywords(domain: str, count: int = 10) -> list[str]:
 
     # 기존 검증된 키워드 생성 함수 사용
     return tools.generate_keywords_with_gemini(domain, count=count)
+
+
+def interactive_keyword_review(keywords: List[str], domain: str) -> List[str]:
+    """
+    Interactive keyword review and editing function.
+    Allows users to add, edit, or remove keywords before newsletter generation.
+    """
+    console.print(f"\n[bold blue]🔍 키워드 검토 및 수정 모드[/bold blue]")
+    console.print(f"[cyan]도메인:[/cyan] {domain}")
+    console.print(f"[yellow]생성된 키워드를 검토하고 필요시 수정하세요.[/yellow]\n")
+    
+    current_keywords = keywords.copy()
+    
+    while True:
+        # Show current keywords
+        console.print("[bold]현재 키워드:[/bold]")
+        for i, keyword in enumerate(current_keywords, 1):
+            console.print(f"  {i}. {keyword}")
+        
+        console.print(f"\n[bold cyan]선택 옵션:[/bold cyan]")
+        console.print("  [green]Enter[/green] - 현재 키워드로 계속 진행")
+        console.print("  [yellow]e <번호>[/yellow] - 키워드 편집 (예: e 1)")
+        console.print("  [red]d <번호>[/red] - 키워드 삭제 (예: d 2)")
+        console.print("  [blue]a[/blue] - 새 키워드 추가")
+        console.print("  [magenta]r[/magenta] - 모든 키워드 재생성")
+        console.print("  [red]q[/red] - 종료")
+        
+        try:
+            user_input = input("\n명령을 입력하세요: ").strip()
+            
+            if not user_input or user_input.lower() == "":
+                # Continue with current keywords
+                break
+                
+            elif user_input.lower() == "q":
+                console.print("[red]사용자가 종료를 선택했습니다.[/red]")
+                raise typer.Exit(code=0)
+                
+            elif user_input.lower() == "a":
+                # Add new keyword
+                new_keyword = input("추가할 키워드를 입력하세요: ").strip()
+                if new_keyword:
+                    current_keywords.append(new_keyword)
+                    console.print(f"[green]'{new_keyword}' 키워드가 추가되었습니다.[/green]")
+                else:
+                    console.print("[yellow]키워드가 입력되지 않았습니다.[/yellow]")
+                    
+            elif user_input.lower() == "r":
+                # Regenerate all keywords
+                console.print("[cyan]키워드를 재생성하고 있습니다...[/cyan]")
+                try:
+                    regenerated = tools.generate_keywords_with_gemini(domain, count=len(current_keywords))
+                    if regenerated:
+                        current_keywords = regenerated
+                        console.print("[green]키워드가 재생성되었습니다.[/green]")
+                    else:
+                        console.print("[red]키워드 재생성에 실패했습니다.[/red]")
+                except Exception as e:
+                    console.print(f"[red]키워드 재생성 중 오류 발생: {e}[/red]")
+                    
+            elif user_input.lower().startswith("e "):
+                # Edit keyword
+                try:
+                    index_str = user_input[2:].strip()
+                    index = int(index_str) - 1
+                    if 0 <= index < len(current_keywords):
+                        old_keyword = current_keywords[index]
+                        console.print(f"현재 키워드: [yellow]{old_keyword}[/yellow]")
+                        new_keyword = input("새로운 키워드를 입력하세요: ").strip()
+                        if new_keyword:
+                            current_keywords[index] = new_keyword
+                            console.print(f"[green]키워드가 '{old_keyword}' → '{new_keyword}'로 변경되었습니다.[/green]")
+                        else:
+                            console.print("[yellow]변경이 취소되었습니다.[/yellow]")
+                    else:
+                        console.print(f"[red]잘못된 번호입니다. 1-{len(current_keywords)} 사이의 숫자를 입력하세요.[/red]")
+                except ValueError:
+                    console.print("[red]잘못된 형식입니다. 'e 1'과 같이 입력하세요.[/red]")
+                    
+            elif user_input.lower().startswith("d "):
+                # Delete keyword
+                try:
+                    index_str = user_input[2:].strip()
+                    index = int(index_str) - 1
+                    if 0 <= index < len(current_keywords):
+                        if len(current_keywords) <= 1:
+                            console.print("[red]최소 하나의 키워드는 필요합니다.[/red]")
+                        else:
+                            deleted_keyword = current_keywords.pop(index)
+                            console.print(f"[green]'{deleted_keyword}' 키워드가 삭제되었습니다.[/green]")
+                    else:
+                        console.print(f"[red]잘못된 번호입니다. 1-{len(current_keywords)} 사이의 숫자를 입력하세요.[/red]")
+                except ValueError:
+                    console.print("[red]잘못된 형식입니다. 'd 1'과 같이 입력하세요.[/red]")
+                    
+            else:
+                console.print("[red]알 수 없는 명령입니다.[/red]")
+                
+        except KeyboardInterrupt:
+            console.print("\n[red]사용자가 중단했습니다.[/red]")
+            raise typer.Exit(code=0)
+        except EOFError:
+            console.print("\n[yellow]입력이 종료되었습니다. 현재 키워드로 진행합니다.[/yellow]")
+            break
+    
+    if not current_keywords:
+        console.print("[red]키워드가 없습니다. 최소 하나의 키워드가 필요합니다.[/red]")
+        raise typer.Exit(code=1)
+    
+    return current_keywords
 
 
 if __name__ == "__main__":

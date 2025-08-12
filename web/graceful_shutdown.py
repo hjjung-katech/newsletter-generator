@@ -223,7 +223,7 @@ class GracefulShutdownWrapper:
         force_thread = threading.Thread(target=force_exit, daemon=True)
         force_thread.start()
     
-    def run(self, host: str = '0.0.0.0', port: int = 5000, debug: bool = False, **options):
+    def run(self, host: str = '0.0.0.0', port: int = 8000, debug: bool = False, **options):
         """
         Run the Flask application with graceful shutdown support.
         
@@ -377,7 +377,7 @@ def run_with_graceful_shutdown(app: Flask, **kwargs):
     
     Usage:
         from web.graceful_shutdown import run_with_graceful_shutdown
-        run_with_graceful_shutdown(app, host='0.0.0.0', port=5000)
+        run_with_graceful_shutdown(app, host='0.0.0.0', port=8000)
     """
     wrapper = create_graceful_app(app)
     wrapper.run(**kwargs)

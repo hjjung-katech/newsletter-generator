@@ -29,6 +29,9 @@ class GenerateNewsletterRequest(BaseModel):
     use_template_system: bool = Field(
         default=True, description="기존 Jinja2 템플릿 시스템 사용 여부"
     )
+    suggest_count: int = Field(
+        default=10, description="도메인에서 생성할 키워드 개수", ge=1, le=20
+    )
 
     @field_validator("keywords")
     @classmethod

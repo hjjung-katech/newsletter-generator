@@ -27,6 +27,73 @@ from .template_manager import TemplateManager
 from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
 
+
+def robust_json_parse(text, fallback_data, operation_name="JSON 파싱"):
+    """
+    연결 오류에 강한 JSON 파싱 함수
+    
+    Args:
+        text: 파싱할 텍스트
+        fallback_data: 파싱 실패 시 반환할 기본 데이터
+        operation_name: 오류 로그에 표시할 작업 이름
+    """
+    import re
+    import json
+    import socket
+    
+    try:
+        # 네트워크 연결 오류 감지
+        error_str = str(text).lower()
+        if any(keyword in error_str for keyword in [
+            "연결", "강제", "끊", "reset", "connection", "timeout", "network", "10054"
+        ]):
+            logger.warning(f"네트워크 오류로 인한 {operation_name} 실패, 기본 구조 사용")
+            return fallback_data
+
+        # 다양한 JSON 추출 시도
+        json_str = None
+        
+        # 1. 코드 블록 내 JSON
+        json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1).strip()
+        
+        # 2. 중괄호로 감싸진 JSON
+        if not json_str:
+            json_match = re.search(r"\{.*\}", text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group()
+        
+        # 3. 전체 텍스트 (마지막 시도)
+        if not json_str:
+            json_str = text.strip()
+
+        # JSON 파싱 시도 (다중 시도)
+        for attempt in range(3):
+            try:
+                result = json.loads(json_str)
+                logger.info(f"{operation_name} 성공")
+                return result
+            except json.JSONDecodeError as json_error:
+                # JSON 정리 시도
+                if attempt == 0:
+                    # 줄바꿈 문자 정리
+                    json_str = json_str.replace('\n', ' ').replace('\r', '')
+                elif attempt == 1:
+                    # 불완전한 JSON 완성 시도
+                    if not json_str.endswith('}'):
+                        json_str += '}'
+                    if not json_str.startswith('{'):
+                        json_str = '{' + json_str
+                else:
+                    raise json_error
+                        
+    except Exception as e:
+        logger.error(f"{operation_name} 오류: {e}")
+        logger.debug(f"원본 텍스트: {text[:500]}...")
+        
+    return fallback_data
+
 # 로거 초기화
 logger = get_logger(__name__)
 
@@ -433,47 +500,30 @@ def create_categorization_chain(is_compact=False):
 
     # JSON 파싱 함수
     def parse_json_response(text):
-        try:
-            # JSON 부분만 추출
-            import re
-
-            json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1).strip()
-            else:
-                # compact 버전에서는 중괄호로 감싸진 JSON도 찾기
-                if is_compact:
-                    json_match = re.search(r"\{.*\}", text, re.DOTALL)
-                    if json_match:
-                        json_str = json_match.group()
-                    else:
-                        json_str = text.strip()
-                else:
-                    json_str = text.strip()
-
-            # JSON 파싱
-            result = json.loads(json_str)
+        # 기본 구조 정의 (기사 개수 기본값 사용)
+        if is_compact:
+            fallback_data = {
+                "categories": [
+                    {"title": "주요 동향", "article_indices": list(range(1, 11))}  # 최대 10개 기사
+                ]
+            }
+        else:
+            fallback_data = {
+                "categories": [
+                    {"title": "기타", "article_indices": list(range(1, 6))}  # 최대 5개 기사
+                ]
+            }
+        
+        result = robust_json_parse(text, fallback_data, "카테고리 분류")
+        
+        # 결과 로그 (성공한 경우만)
+        if result != fallback_data:
             logger.info(
                 f"카테고리 분류 결과: "
                 f"{json.dumps(result, ensure_ascii=False, indent=2)}"
             )
-            return result
-        except Exception as e:
-            logger.error(f"JSON 파싱 오류: {e}")
-            logger.error(f"원본 텍스트: {text}")
-            # 기본 구조 반환
-            if is_compact:
-                return {
-                    "categories": [
-                        {"title": "주요 동향", "article_indices": list(range(1, 11))}
-                    ]
-                }
-            else:
-                return {
-                    "categories": [
-                        {"title": "기타", "article_indices": [1, 2, 3, 4, 5]}
-                    ]
-                }
+        
+        return result
 
     return chain | RunnableLambda(parse_json_response)
 
@@ -574,26 +624,38 @@ def create_summarization_chain(is_compact=False):
 
                 # JSON 파싱 시작
                 try:
-                    # JSON 추출
-                    import re
-
-                    json_match = re.search(
-                        r"```(?:json)?\s*(.*?)```", summary_text, re.DOTALL
-                    )
-                    if json_match:
-                        json_str = json_match.group(1).strip()
+                    # 기본 구조 정의
+                    category_title = category.get("title", "제목 없음")
+                    if is_compact:
+                        fallback_summary = {
+                            "title": category_title,
+                            "intro": f"{category_title}에 대한 주요 동향입니다.",
+                            "definitions": [
+                                {
+                                    "term": "기술동향",
+                                    "explanation": f"{category_title} 분야의 최신 기술 발전 동향입니다.",
+                                }
+                            ],
+                        }
                     else:
-                        # compact 버전에서는 중괄호로 감싸진 JSON도 찾기
-                        if is_compact:
-                            json_match = re.search(r"\{.*\}", summary_text, re.DOTALL)
-                            if json_match:
-                                json_str = json_match.group()
-                            else:
-                                json_str = summary_text.strip()
-                        else:
-                            json_str = summary_text.strip()
-
-                    summary_json = json.loads(json_str)
+                        fallback_summary = {
+                            "title": category_title,
+                            "summary_paragraphs": [
+                                f"{category_title} 분야의 주요 동향입니다."
+                            ],
+                            "definitions": [
+                                {
+                                    "term": "기술동향",
+                                    "explanation": f"{category_title} 분야의 최신 기술 발전 동향입니다.",
+                                }
+                            ],
+                        }
+                    
+                    summary_json = robust_json_parse(
+                        summary_text, 
+                        fallback_summary, 
+                        f"카테고리 '{category_title}' 요약"
+                    )
 
                     # 카테고리 제목 추가
                     summary_json["title"] = category.get("title", "제목 없음")
@@ -840,34 +902,21 @@ def create_composition_chain():
 
     # JSON 파싱 함수
     def parse_json_response(text):
-        try:
-            # JSON 부분만 추출
-            import re
-
-            json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1).strip()
-            else:
-                json_str = text.strip()
-
-            # JSON 파싱
-            return json.loads(json_str)
-        except Exception as e:
-            logger.error(f"종합 구성 JSON 파싱 오류: {e}")
-            logger.error(f"원본 텍스트: {text}")
-            # 기본 구조 반환
-            return {
-                "newsletter_topic": "최신 산업 동향",
-                "generation_date": datetime.date.today().strftime("%Y-%m-%d"),
-                "recipient_greeting": "안녕하세요, 독자 여러분",
-                "introduction_message": "이번 뉴스레터에서는 주요 산업 동향을 살펴봅니다.",
-                "food_for_thought": {
-                    "message": "산업의 변화에 어떻게 대응해 나갈지 생각해 보시기 바랍니다."
-                },
-                "closing_message": "다음 뉴스레터에서 다시 만나뵙겠습니다.",
-                "editor_signature": "편집자 드림",
-                "company_name": "Tech Insights",
-            }
+        # 기본 구조 정의
+        fallback_data = {
+            "newsletter_topic": "최신 산업 동향",
+            "generation_date": datetime.date.today().strftime("%Y-%m-%d"),
+            "recipient_greeting": "안녕하세요, 독자 여러분",
+            "introduction_message": "이번 뉴스레터에서는 주요 산업 동향을 살펴봅니다.",
+            "food_for_thought": {
+                "message": "산업의 변화에 어떻게 대응해 나갈지 생각해 보시기 바랍니다."
+            },
+            "closing_message": "다음 뉴스레터에서 다시 만나뵙겠습니다.",
+            "editor_signature": "편집자 드림",
+            "company_name": "Tech Insights",
+        }
+        
+        return robust_json_parse(text, fallback_data, "종합 구성")
 
     # 체인 구성
     chain = (

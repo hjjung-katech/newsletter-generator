@@ -181,7 +181,7 @@ class CentralizedSettings(BaseSettings):
 
     # 공통 설정
     secret_key: str = Field("dev-secret-key-change-in-production", min_length=16)
-    port: int = Field(5000, ge=1, le=65535)
+    port: int = Field(8000, ge=1, le=65535)
     # Bandit B104: 프로덕션 환경에서만 0.0.0.0 바인딩 (보안 검증됨)  # nosec B104
     host: str = Field("0.0.0.0")  # nosec B104
     app_env: Literal["development", "testing", "production"] = Field("production")

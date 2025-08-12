@@ -26,7 +26,7 @@ basic_imports = [
     
     # Configuration & Environment
     "pydantic", "pydantic_settings", "python_dotenv", "dotenv",
-    "yaml", "PyYAML",
+    "yaml", "PyYAML", "chardet",
     
     # HTTP & Web Scraping
     "requests", "requests.adapters", "urllib3", "urllib3.util.retry",
@@ -34,6 +34,7 @@ basic_imports = [
     
     # Date & Time
     "dateutil", "dateutil.rrule", "dateutil.parser", "dateutil.tz",
+    "pytz",
     
     # Utilities
     "rich", "rich.console", "typer", "uuid", "json", "re", "time",
@@ -132,7 +133,7 @@ newsletter_modules = [
 web_modules = [
     "web", "web.app", "web.tasks", "web.mail", "web.suggest", 
     "web.worker", "web.schedule_runner", "web.web_types",
-    "web.graceful_shutdown",
+    "web.graceful_shutdown", "web.time_utils",
     
     # Binary compatibility modules (important!)
     "web.binary_compatibility", "binary_compatibility",
@@ -151,15 +152,32 @@ hiddenimports = (
 
 # Define data files to be included in the bundle
 datas = [
+    # Essential templates and static files only
     (os.path.join(project_root, 'templates'), 'templates'),
     (os.path.join(project_root, 'web', 'templates'), 'templates'),
     (os.path.join(project_root, 'web', 'static'), 'static'),
-    (os.path.join(project_root, 'web', 'web_types.py'), 'web'),
-    (os.path.join(project_root, 'newsletter'), 'newsletter'),
+    
+    # Configuration files (templates only, not user data)
     (os.path.join(project_root, 'config.yml'), '.'),
     (os.path.join(project_root, 'config'), 'config'),
-    # Note: .env file is NOT included in bundle for security
-    # It should be placed next to the exe file by build script
+    
+    # Documentation files for user guidance
+    (os.path.join(project_root, 'web', 'docs'), 'docs'),
+    
+    # Environment template (not actual .env for security)
+    (os.path.join(project_root, '.env.example'), '.'),
+    
+    # Essential Python modules only (not development artifacts)
+    (os.path.join(project_root, 'web', 'web_types.py'), 'web'),
+    (os.path.join(project_root, 'web', 'path_manager.py'), 'web'),
+    (os.path.join(project_root, 'web', 'binary_compatibility.py'), 'web'),
+    (os.path.join(project_root, 'web', 'graceful_shutdown.py'), 'web'),
+    
+    # Note: User data files are excluded to ensure clean deployments:
+    # - .env (user configures their own)
+    # - storage.db (auto-created on first run)
+    # - output/ directory (auto-created, contains user newsletters)
+    # - logs/ directory (auto-created, contains runtime logs)
 ]
 
 # Filter out non-existent data files
@@ -184,8 +202,8 @@ binaries = [(src, dst) for src, dst in binaries if os.path.exists(src)]
 
 # Packages to collect entirely (this replaces --collect-all options)
 collect_all_packages = [
-    'newsletter',
-    'web', 
+    # Only include essential packages, not the entire newsletter module
+    # newsletter module is handled via hiddenimports for better control
     'langchain',
     'langchain_core',
     'langchain_google_genai',
@@ -238,6 +256,10 @@ excludes = [
     'tkinter', 'PyQt5', 'PyQt6', 'PySide2', 'PySide6',
     # Exclude matplotlib if not used
     'matplotlib',
+    # Exclude development/debug files
+    'pdb', 'debugpy', 'profiling',
+    # Exclude user data that should not be in bundle
+    'output', 'logs', 'storage.db', '.env',
 ]
 
 print(f"[HOOK] Newsletter hook loaded:")

@@ -37,10 +37,13 @@ def update_job_status(job_id, status, result=None):
     
     if not record_exists:
         # Create new record for scheduled jobs
-        from datetime import datetime
+        try:
+            from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
+        except ImportError:
+            from time_utils import get_utc_now, to_iso_utc      # Development
         cursor.execute(
             "INSERT INTO history (id, params, status, created_at) VALUES (?, ?, ?, ?)",
-            (job_id, json.dumps({"source": "scheduled"}), status, datetime.now().isoformat())
+            (job_id, json.dumps({"source": "scheduled"}), status, to_iso_utc(get_utc_now()))
         )
         print(f"[DEBUG] Created new history record for scheduled job: {job_id}")
     else:
@@ -68,13 +71,23 @@ def generate_newsletter_task(data, job_id, send_email=False):
     try:
         update_job_status(job_id, "processing")
 
-        # CLI 명령어 구성
-        keywords = data.get("keywords", "")
-        domain = data.get("domain", "")
+        # 새로운 source_type 기반 처리
+        source_type = data.get("source_type", "keywords")  # 기존 호환성을 위한 기본값
+        source_value = data.get("source_value", "")
+        suggest_count = data.get("suggest_count", 10)
         template_style = data.get("template_style", "compact")
         email_compatible = data.get("email_compatible", False)
         period = data.get("period", 14)
         email = data.get("email", "")
+
+        # 기존 format 호환성 처리 (legacy support)
+        if not source_type or source_type == "keywords":
+            if data.get("keywords"):
+                source_type = "keywords"
+                source_value = data.get("keywords")
+            elif data.get("domain"):
+                source_type = "domain"
+                source_value = data.get("domain")
 
         # Direct function call instead of subprocess for PyInstaller compatibility
         print(f"🚀 Starting direct newsletter generation")
@@ -88,25 +101,51 @@ def generate_newsletter_task(data, job_id, send_email=False):
             from newsletter import graph, tools
             from newsletter.utils.logger import get_logger
             
-            print(f"📊 Keywords: {keywords}")
-            print(f"📊 Domain: {domain}")
+            print(f"📊 Source type: {source_type}")
+            print(f"📊 Source value: {source_value}")
+            print(f"📊 Suggest count: {suggest_count}")
             print(f"📊 Template style: {template_style}")
             print(f"📊 Period: {period} days")
             print(f"📊 Email compatible: {email_compatible}")
             
-            # Prepare keywords list
-            if keywords:
-                keyword_str = keywords if isinstance(keywords, str) else ",".join(keywords)
-                keyword_list = [kw.strip() for kw in keyword_str.split(",") if kw.strip()]
-            elif domain:
-                # Generate keywords from domain
-                keyword_list = tools.extract_keywords_from_domain(
-                    domain, suggest_count=10
+            # 키워드 생성 로직 (동적 vs 정적)
+            if source_type == "domain":
+                # 도메인 기반: 매번 새로운 키워드 생성
+                print(f"🔄 Generating fresh keywords from domain: {source_value}")
+                keyword_list = tools.generate_keywords_with_gemini(
+                    source_value, count=suggest_count
                 )
                 if not keyword_list:
-                    raise ValueError(f"도메인 '{domain}'에서 키워드를 생성할 수 없습니다")
+                    raise ValueError(f"도메인 '{source_value}'에서 키워드를 생성할 수 없습니다")
+                
+                # 생성된 키워드를 로그에 출력
+                print(f"✅ Generated keywords: {', '.join(keyword_list)}")
+                
+                # 결과에 포함할 정보
+                generation_info = {
+                    "source_type": "domain",
+                    "domain": source_value,
+                    "generated_keywords": keyword_list,
+                    "suggest_count": suggest_count,
+                    "generation_time": to_iso_utc(get_utc_now())
+                }
             else:
-                raise ValueError("키워드 또는 도메인이 필요합니다")
+                # 키워드 기반: 고정된 키워드 사용
+                print(f"📝 Using fixed keywords: {source_value}")
+                keyword_str = source_value if isinstance(source_value, str) else ",".join(source_value)
+                keyword_list = [kw.strip() for kw in keyword_str.split(",") if kw.strip()]
+                
+                if not keyword_list:
+                    raise ValueError("키워드가 비어있습니다")
+                
+                # 결과에 포함할 정보
+                generation_info = {
+                    "source_type": "keywords",
+                    "fixed_keywords": keyword_list
+                }
+
+            if not keyword_list:
+                raise ValueError("키워드 목록이 비어있습니다")
             
             print(f"🔍 Using keywords: {keyword_list}")
             
@@ -118,10 +157,11 @@ def generate_newsletter_task(data, job_id, send_email=False):
             os.environ['NEWSLETTER_OUTPUT_DIR'] = output_dir
             
             # Call the core newsletter generation function
+            domain_param = source_value if source_type == "domain" else None
             html_content, status = graph.generate_newsletter(
                 keyword_list,
                 period,
-                domain=domain,
+                domain=domain_param,
                 template_style=template_style,
                 email_compatible=email_compatible,
             )
@@ -134,13 +174,14 @@ def generate_newsletter_task(data, job_id, send_email=False):
             
             # Create a result object that matches subprocess.run structure
             class DirectCallResult:
-                def __init__(self, html_content):
+                def __init__(self, html_content, generation_info):
                     self.returncode = 0
                     self.stdout = f"Newsletter generation completed successfully.\nContent length: {len(html_content)} characters"
                     self.stderr = ""
                     self.html_content = html_content
+                    self.generation_info = generation_info
                     
-            result = DirectCallResult(html_content)
+            result = DirectCallResult(html_content, generation_info)
             
         except Exception as e:
             print(f"❌ Direct function call failed: {str(e)}")
@@ -166,12 +207,12 @@ def generate_newsletter_task(data, job_id, send_email=False):
                     "INFO",
                 ]
 
-                # 키워드 또는 도메인 추가
-                if keywords:
-                    keyword_str = keywords if isinstance(keywords, str) else ",".join(keywords)
+                # 새로운 구조에 맞게 키워드 또는 도메인 추가
+                if source_type == "domain":
+                    cmd.extend(["--domain", source_value, "--suggest-count", str(suggest_count)])
+                else:
+                    keyword_str = source_value if isinstance(source_value, str) else ",".join(keyword_list)
                     cmd.extend(["--keywords", keyword_str])
-                elif domain:
-                    cmd.extend(["--domain", domain])
 
                 print(f"🔄 Falling back to CLI subprocess: {' '.join(cmd)}")
 
@@ -226,13 +267,13 @@ def generate_newsletter_task(data, job_id, send_email=False):
 
             # 키워드 기반으로 최신 파일 찾기
             search_terms = []
-            if keywords:
-                if isinstance(keywords, str):
-                    search_terms = [kw.strip().lower() for kw in keywords.split(",")]
+            if source_type == "domain":
+                search_terms = [source_value.lower()]
+            else:
+                if isinstance(source_value, str):
+                    search_terms = [kw.strip().lower() for kw in source_value.split(",")]
                 else:
-                    search_terms = [str(kw).strip().lower() for kw in keywords]
-            elif domain:
-                search_terms = [domain.lower()]
+                    search_terms = [str(kw).strip().lower() for kw in keyword_list]
 
             html_files = [f for f in os.listdir(output_dir) if f.endswith(".html")]
 
@@ -284,6 +325,11 @@ def generate_newsletter_task(data, job_id, send_email=False):
         if not html_content:
             raise RuntimeError("HTML 콘텐츠를 가져올 수 없습니다 (직접 호출 및 파일 읽기 모두 실패)")
 
+        # 결과에 generation_info 포함
+        result_generation_info = generation_info if 'generation_info' in locals() else {}
+        if hasattr(result, 'generation_info'):
+            result_generation_info = result.generation_info
+        
         # 결과 구성
         result_data = {
             "status": "success",
@@ -295,8 +341,12 @@ def generate_newsletter_task(data, job_id, send_email=False):
             "template_style": template_style,
             "email_compatible": email_compatible,
             "period": f"{period} days",
-            "keywords": keywords,
-            "domain": domain,
+            "source_type": source_type,
+            "source_value": source_value,
+            "generation_info": result_generation_info,
+            # 하위 호환성을 위한 레거시 필드들
+            "keywords": source_value if source_type == "keywords" else None,
+            "domain": source_value if source_type == "domain" else None,
         }
 
         # 이메일 발송 (옵션)
@@ -307,14 +357,29 @@ def generate_newsletter_task(data, job_id, send_email=False):
                 # 이메일 모듈 import
                 from mail import send_email as mail_send_email
 
-                # 제목 생성
-                if keywords:
-                    subject_keywords = (
-                        keywords if isinstance(keywords, str) else ", ".join(keywords)
-                    )
-                    subject = f"Newsletter: {subject_keywords}"
+                # 제목 생성 (CLI 로직과 일치)
+                if source_type == "domain":
+                    # 도메인 기반: "도메인명 주간 산업동향"
+                    subject = f"{source_value} 주간 산업동향"
+                    
+                    # 실제 사용된 키워드 정보 추가
+                    if result_generation_info.get("generated_keywords"):
+                        keyword_info = f" (키워드: {', '.join(result_generation_info['generated_keywords'])})"
+                        if len(subject + keyword_info) <= 100:  # 이메일 제목 길이 제한
+                            subject += keyword_info
                 else:
-                    subject = f"Newsletter: {domain}"
+                    # 키워드 기반: 키워드 개수에 따라 처리
+                    if isinstance(source_value, str):
+                        keywords_list = [kw.strip() for kw in source_value.split(",") if kw.strip()]
+                    else:
+                        keywords_list = keyword_list if 'keyword_list' in locals() else []
+                    
+                    if len(keywords_list) == 1:
+                        subject = f"{keywords_list[0]} 주간 산업동향"
+                    elif len(keywords_list) > 1:
+                        subject = f"{keywords_list[0]} 외 {len(keywords_list)-1}개 분야 주간 산업동향"
+                    else:
+                        subject = "주간 산업동향 뉴스레터"
 
                 mail_send_email(to=email, subject=subject, html=html_content)
                 result_data["email_sent"] = True

@@ -10,7 +10,7 @@ import sqlite3
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 import redis
 from rq import Queue
@@ -49,6 +49,14 @@ class ScheduleRunner:
             self.redis_conn = None
             self.queue = None
 
+    def _parse_iso_datetime(self, iso_string: str) -> datetime:
+        """Parse ISO datetime string, handling Z suffix properly"""
+        if iso_string.endswith('Z'):
+            # Remove Z and add UTC timezone
+            return datetime.fromisoformat(iso_string[:-1]).replace(tzinfo=timezone.utc)
+        else:
+            return datetime.fromisoformat(iso_string)
+
     def get_pending_schedules(self) -> List[Dict]:
         """실행 대기 중인 스케줄 목록을 가져옵니다."""
         try:
@@ -68,11 +76,17 @@ class ScheduleRunner:
             all_schedules = cursor.fetchall()
             logger.info(f"[DEBUG] Found {len(all_schedules)} total active schedules")
             
-            for schedule in all_schedules:
-                logger.info(f"[DEBUG] Schedule {schedule[0]}: next_run={schedule[3]}, due={'yes' if schedule[3] <= now.isoformat() else 'no'}")
+            try:
+                from web.time_utils import to_iso_utc  # PyInstaller
+            except ImportError:
+                from time_utils import to_iso_utc      # Development
+            now_iso = to_iso_utc(now)
             
-            # 실행 대기 중인 스케줄 조회 (ISO 문자열 비교를 위해 now를 ISO 형식으로 변환)
-            logger.info(f"[DEBUG] Querying with now.isoformat(): {now.isoformat()}")
+            for schedule in all_schedules:
+                logger.info(f"[DEBUG] Schedule {schedule[0]}: next_run={schedule[3]}, due={'yes' if schedule[3] <= now_iso else 'no'}")
+            
+            # 실행 대기 중인 스케줄 조회 (UTC ISO 문자연 비교)
+            logger.info(f"[DEBUG] Querying with now_iso: {now_iso}")
             cursor.execute(
                 """
                 SELECT id, params, rrule, next_run, created_at
@@ -80,7 +94,7 @@ class ScheduleRunner:
                 WHERE enabled = 1 AND next_run <= ?
                 ORDER BY next_run ASC
             """,
-                (now.isoformat(),),
+                (now_iso,),
             )
             
             pending_rows = cursor.fetchall()
@@ -93,8 +107,8 @@ class ScheduleRunner:
                         "id": row[0],
                         "params": json.loads(row[1]),
                         "rrule": row[2],
-                        "next_run": datetime.fromisoformat(row[3]),
-                        "created_at": datetime.fromisoformat(row[4]),
+                        "next_run": self._parse_iso_datetime(row[3]),
+                        "created_at": self._parse_iso_datetime(row[4]),
                     }
                 )
 
@@ -137,7 +151,7 @@ class ScheduleRunner:
                 SET next_run = ? 
                 WHERE id = ?
             """,
-                (next_run.isoformat(), schedule_id),
+                (to_iso_utc(next_run), schedule_id),
             )
 
             conn.commit()

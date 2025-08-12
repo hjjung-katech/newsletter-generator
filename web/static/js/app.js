@@ -257,10 +257,16 @@ class NewsletterApp {
         } else {
             const domain = document.getElementById('domain').value.trim();
             if (!domain) {
-                this.showError('도메인을 입력해주세요.');
+                this.showError('관심 주제를 입력해주세요.');
                 return null;
             }
             data.domain = domain;
+            
+            // Add suggest_count for domain method
+            const suggestCountSelect = document.getElementById('suggest-count');
+            if (suggestCountSelect) {
+                data.suggest_count = parseInt(suggestCountSelect.value) || 10;
+            }
         }
 
         const email = document.getElementById('email').value.trim();
@@ -782,11 +788,13 @@ class NewsletterApp {
                     <div class="flex justify-between items-start">
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
-                                ${item.params?.keywords ? 
-                                  `키워드: ${Array.isArray(item.params.keywords) ? item.params.keywords.join(', ') : item.params.keywords}` : 
-                                  `도메인: ${item.params?.domain || 'Unknown'}`}
+                                ${this.formatHistoryKeywords(item)}
                             </h4>
-                            <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
+                            ${item.result?.generation_info?.generated_keywords ? 
+                              `<p class="text-xs text-blue-600 mt-1">🔄 생성된 키워드: ${item.result.generation_info.generated_keywords.join(', ')}</p>` : ''}
+                            ${item.result?.generation_info?.generation_time ? 
+                              `<p class="text-xs text-gray-400 mt-1">⏰ 키워드 생성 시간: ${new Date(item.result.generation_info.generation_time).toLocaleString()}</p>` : ''}
+                            <p class="text-sm text-gray-500">${item.created_at_display || new Date(item.created_at).toLocaleString()}</p>
                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                 item.status === 'completed' ? 'bg-green-100 text-green-800' :
                                 item.status === 'failed' ? 'bg-red-100 text-red-800' :
@@ -809,6 +817,47 @@ class NewsletterApp {
         }
     }
 
+    formatHistoryKeywords(item) {
+        // 새로운 데이터 구조 우선 처리 (source_type, source_value)
+        const sourceType = item.result?.source_type || item.params?.source_type;
+        const sourceValue = item.result?.source_value || item.params?.source_value;
+        
+        // 1. source_type이 정의된 경우 (최신 시스템)
+        if (sourceType && sourceValue) {
+            if (sourceType === 'domain' || sourceType === 'topic') {
+                return `🎯 주제: ${sourceValue}`;
+            } else if (sourceType === 'keywords') {
+                // source_value가 문자열이면 파싱, 배열이면 그대로 사용
+                const keywords = Array.isArray(sourceValue) ? sourceValue : 
+                               typeof sourceValue === 'string' ? sourceValue.split(',').map(k => k.trim()) : [sourceValue];
+                return `📝 키워드: ${keywords.join(', ')}`;
+            }
+        }
+        
+        // 2. 레거시 데이터 구조 fallback (keywords, domain)
+        if (item.params?.keywords) {
+            const keywords = Array.isArray(item.params.keywords) ? 
+                           item.params.keywords : 
+                           [item.params.keywords];
+            return `📝 키워드: ${keywords.join(', ')}`;
+        }
+        
+        if (item.params?.domain) {
+            return `🎯 도메인: ${item.params.domain}`;
+        }
+        
+        if (item.params?.topic) {
+            return `🎯 주제: ${item.params.topic}`;
+        }
+        
+        // 3. 최후 fallback
+        if (sourceValue) {
+            return `📝 정보: ${sourceValue}`;
+        }
+        
+        return `📝 키워드: 정보 없음`;
+    }
+
     async loadSchedules() {
         try {
             const response = await fetch('/api/schedules');
@@ -819,15 +868,15 @@ class NewsletterApp {
             // 기존 내용 초기화
             schedulesList.innerHTML = '';
             
-            // 현재 서버 시간 표시
-            if (data.current_time_kst) {
+            // 현재 서버 시간 표시 (unified format)
+            if (data.current_time_display || data.current_time_kst) {
                 const currentTimeDisplay = document.createElement('div');
                 currentTimeDisplay.className = 'mb-4 p-3 bg-blue-50 rounded-lg';
                 currentTimeDisplay.innerHTML = `
                     <div class="flex items-center justify-between">
                         <div>
                             <span class="text-sm font-medium text-blue-900">현재 서버 시간 (KST)</span>
-                            <div class="text-lg font-mono text-blue-700" id="currentServerTime">${data.current_time_kst}</div>
+                            <div class="text-lg font-mono text-blue-700" id="currentServerTime">${data.current_time_display || data.current_time_kst}</div>
                         </div>
                         <div class="text-xs text-blue-600">
                             <div>Timezone: ${data.timezone}</div>
@@ -843,7 +892,7 @@ class NewsletterApp {
                 }
                 schedulesList.appendChild(currentTimeDisplay);
                 
-                this.updateTimeDifference(data.server_time);
+                this.updateTimeDifference(data.current_time || data.server_time);
             }
             
             const schedules = data.schedules || data;
@@ -860,9 +909,11 @@ class NewsletterApp {
                     <div class="flex justify-between items-start">
                         <div class="flex-1">
                             <h4 class="text-sm font-medium text-gray-900 mb-2">
-                                ${schedule.params?.keywords ? 
-                                  `키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
-                                  `도메인: ${schedule.params?.domain || 'Unknown'}`}
+                                ${schedule.params?.source_type === 'domain' || schedule.params?.source_type === 'topic' ? 
+                                  `🎯 주제: ${schedule.params.source_value || schedule.params?.domain || schedule.params?.topic || 'Unknown'} (매번 새 키워드 생성)` :
+                                  schedule.params?.keywords ? 
+                                  `📝 키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
+                                  `📝 키워드: ${schedule.params?.source_value || 'Unknown'}`}
                             </h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
                                 <div>
@@ -873,7 +924,7 @@ class NewsletterApp {
                                 </div>
                                 <div class="col-span-full">
                                     <span class="font-medium">다음 실행:</span> 
-                                    <span class="font-mono ${schedule.is_overdue ? 'text-red-600' : 'text-blue-600'}">${schedule.next_run_kst || new Date(schedule.next_run).toLocaleString()}</span>
+                                    <span class="font-mono ${schedule.is_overdue ? 'text-red-600' : 'text-blue-600'}">${schedule.next_run_display || schedule.next_run_kst || new Date(schedule.next_run).toLocaleString()}</span>
                                     ${schedule.time_until_next ? `<span class="ml-2 text-xs px-2 py-1 rounded-full ${schedule.is_overdue ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">${schedule.time_until_next}</span>` : ''}
                                 </div>
                                 <div class="col-span-full text-xs text-gray-500">
@@ -968,9 +1019,9 @@ class NewsletterApp {
             const data = await response.json();
             const endTime = Date.now();
             
-            // 네트워크 지연을 고려한 서버 시간 계산
+            // 네트워크 지연을 고려한 서버 시간 계산 (unified format)
             const networkDelay = (endTime - startTime) / 2;
-            const serverTime = new Date(data.server_time_iso).getTime();
+            const serverTime = new Date(data.utc_time || data.server_time_iso).getTime();
             const adjustedServerTime = serverTime + networkDelay;
             
             this.serverTimeOffset = adjustedServerTime - endTime;
@@ -978,8 +1029,8 @@ class NewsletterApp {
             
             console.log(`Time sync completed. Offset: ${this.serverTimeOffset}ms, Delay: ${networkDelay}ms`);
             
-            // UI 업데이트
-            this.updateTimeDifference(data.server_time_iso);
+            // UI 업데이트 (unified format)
+            this.updateTimeDifference(data.utc_time || data.server_time_iso);
             
         } catch (error) {
             console.error('Time sync failed:', error);
@@ -1136,6 +1187,7 @@ class NewsletterApp {
             const scheduleData = {
                 keywords: data.keywords,
                 domain: data.domain,
+                suggest_count: data.suggest_count || 10,  // 도메인 기반 키워드 생성 개수
                 email: data.email,
                 template_style: data.template_style,
                 email_compatible: data.email_compatible,
@@ -1173,9 +1225,9 @@ class NewsletterApp {
                                 <div class="mt-2 text-sm text-green-700">
                                     <div class="space-y-1">
                                         <div><strong>스케줄 ID:</strong> <code class="bg-green-100 px-1 rounded">${result.schedule_id}</code></div>
-                                        <div><strong>다음 실행 시간:</strong> <span class="font-mono">${result.next_run_kst}</span></div>
+                                        <div><strong>다음 실행 시간:</strong> <span class="font-mono">${result.next_run_display || result.next_run_kst}</span></div>
                                         <div><strong>RRULE:</strong> <code class="bg-green-100 px-1 rounded text-xs">${result.rrule}</code></div>
-                                        <div><strong>현재 서버 시간:</strong> <span class="font-mono">${result.current_time_kst}</span></div>
+                                        <div><strong>현재 서버 시간:</strong> <span class="font-mono">${result.current_time_display || result.current_time_kst}</span></div>
                                     </div>
                                 </div>
                                 <div class="mt-3">
@@ -1440,18 +1492,20 @@ class NewsletterApp {
     async suggestKeywords() {
         const domainInput = document.getElementById('domain');
         const domain = domainInput.value.trim();
+        const suggestCountSelect = document.getElementById('suggest-count');
+        const suggestCount = parseInt(suggestCountSelect.value) || 10;
         const resultDiv = document.getElementById('keywords-result');
         const button = document.getElementById('btn-suggest');
 
         if (!domain) {
-            resultDiv.innerHTML = '<div class="text-red-600 text-sm">도메인을 입력해주세요.</div>';
+            resultDiv.innerHTML = '<div class="text-red-600 text-sm">관심 주제를 입력해주세요.</div>';
             return;
         }
 
         // Show loading state
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>추천 중...';
-        resultDiv.innerHTML = '<div class="text-blue-600 text-sm">키워드를 생성하고 있습니다...</div>';
+        resultDiv.innerHTML = `<div class="text-blue-600 text-sm">${suggestCount}개 키워드를 생성하고 있습니다...</div>`;
 
         try {
             const response = await fetch('/api/suggest', {
@@ -1459,25 +1513,21 @@ class NewsletterApp {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ domain: domain })
+                body: JSON.stringify({ 
+                    domain: domain,
+                    count: suggestCount 
+                })
             });
 
             const data = await response.json();
 
             if (response.ok && data.keywords && data.keywords.length > 0) {
-                // Display suggested keywords
-                const keywordsList = data.keywords.map(keyword => 
-                    `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2 mb-2 cursor-pointer hover:bg-blue-200" onclick="app.addKeywordToInput('${keyword}')">${keyword}</span>`
-                ).join('');
+                // Store suggested keywords for editing
+                this.suggestedKeywords = [...data.keywords];
+                this.currentDomain = domain;
                 
-                resultDiv.innerHTML = `
-                    <div class="text-sm text-gray-700 mb-2">추천 키워드 (클릭하여 추가):</div>
-                    <div class="flex flex-wrap">${keywordsList}</div>
-                    <button onclick="app.useAllKeywords(${JSON.stringify(data.keywords).replace(/"/g, '&quot;')})" 
-                            class="mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
-                        모든 키워드 사용
-                    </button>
-                `;
+                // Display editable keywords
+                this.renderEditableKeywords(data.keywords, domain);
             } else {
                 resultDiv.innerHTML = '<div class="text-yellow-600 text-sm">키워드를 생성할 수 없습니다. 다른 도메인을 시도해보세요.</div>';
             }
@@ -1512,6 +1562,123 @@ class NewsletterApp {
         // Switch to keywords method
         document.getElementById('keywordsMethod').checked = true;
         this.toggleInputMethod();
+    }
+
+    renderEditableKeywords(keywords, domain) {
+        const resultDiv = document.getElementById('keywords-result');
+        
+        // Create editable keywords HTML
+        const editableKeywords = keywords.map((keyword, index) => `
+            <div class="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-2 rounded-full mr-2 mb-2 group">
+                <input type="text" 
+                       value="${keyword}" 
+                       class="bg-transparent border-none outline-none text-sm min-w-0 flex-1"
+                       onchange="app.updateKeyword(${index}, this.value)"
+                       onkeypress="if(event.key==='Enter') this.blur()">
+                <button onclick="app.removeKeyword(${index})" 
+                        class="ml-2 text-blue-600 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </div>
+        `).join('');
+        
+        resultDiv.innerHTML = `
+            <div class="space-y-4">
+                <div>
+                    <div class="text-sm text-gray-700 mb-2">생성된 키워드 (클릭하여 편집):</div>
+                    <div class="flex flex-wrap" id="editable-keywords">
+                        ${editableKeywords}
+                        <button onclick="app.addNewKeyword()" 
+                                class="inline-flex items-center bg-gray-100 text-gray-600 text-sm px-3 py-2 rounded-full hover:bg-gray-200">
+                            <i class="fas fa-plus mr-1"></i>추가
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="app.useEditedKeywords()" 
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-md">
+                        <i class="fas fa-edit mr-1"></i>수정된 키워드로 뉴스레터 생성
+                    </button>
+                    
+                    <button onclick="app.generateDirectFromDomain('${domain}')" 
+                            class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-md">
+                        <i class="fas fa-rocket mr-1"></i>도메인에서 직접 생성
+                    </button>
+                    
+                    <button onclick="app.resetKeywords()" 
+                            class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded-md">
+                        <i class="fas fa-undo mr-1"></i>원래대로
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    updateKeyword(index, newValue) {
+        if (this.suggestedKeywords && index < this.suggestedKeywords.length) {
+            this.suggestedKeywords[index] = newValue.trim();
+        }
+    }
+
+    removeKeyword(index) {
+        if (this.suggestedKeywords && index < this.suggestedKeywords.length) {
+            this.suggestedKeywords.splice(index, 1);
+            this.renderEditableKeywords(this.suggestedKeywords, this.currentDomain);
+        }
+    }
+
+    addNewKeyword() {
+        const newKeyword = prompt('새 키워드를 입력하세요:');
+        if (newKeyword && newKeyword.trim()) {
+            this.suggestedKeywords.push(newKeyword.trim());
+            this.renderEditableKeywords(this.suggestedKeywords, this.currentDomain);
+        }
+    }
+
+    useEditedKeywords() {
+        const validKeywords = this.suggestedKeywords.filter(k => k && k.trim());
+        if (validKeywords.length === 0) {
+            alert('최소 하나 이상의 키워드가 필요합니다.');
+            return;
+        }
+        
+        const keywordsInput = document.getElementById('keywords');
+        keywordsInput.value = validKeywords.join(', ');
+        
+        // Switch to keywords method
+        document.getElementById('keywordsMethod').checked = true;
+        this.toggleInputMethod();
+        
+        // Show success message
+        const resultDiv = document.getElementById('keywords-result');
+        resultDiv.innerHTML = `<div class="text-green-600 text-sm">키워드가 설정되었습니다. 뉴스레터를 생성해보세요.</div>`;
+    }
+
+    async generateDirectFromDomain(domain) {
+        // Confirm with user
+        if (!confirm(`주제 "${domain}"에서 직접 뉴스레터를 생성하시겠습니까? (키워드 수정 없이 진행)`)) {
+            return;
+        }
+        
+        // Set domain method and generate directly
+        document.getElementById('domainMethod').checked = true;
+        document.getElementById('domain').value = domain;
+        this.toggleInputMethod();
+        
+        // Clear results and show generating message
+        const resultDiv = document.getElementById('keywords-result');
+        resultDiv.innerHTML = `<div class="text-blue-600 text-sm">도메인에서 직접 뉴스레터를 생성하고 있습니다...</div>`;
+        
+        // Generate newsletter
+        this.generateNewsletter();
+    }
+
+    resetKeywords() {
+        if (this.suggestedKeywords && this.currentDomain) {
+            // Reload original keywords from API
+            this.suggestKeywords();
+        }
     }
 }
 
