@@ -1205,13 +1205,52 @@ class NewsletterApp {
                 body: JSON.stringify(scheduleData)
             });
             
-            const result = await response.json();
+            let result;
+            const contentType = response.headers.get('content-type');
+            
+            if (contentType && contentType.includes('application/json')) {
+                result = await response.json();
+            } else {
+                // HTML 에러 응답 처리
+                const text = await response.text();
+                throw new Error(`Server returned non-JSON response (status: ${response.status}): ${text.substring(0, 100)}...`);
+            }
             
             if (response.ok) {
                 this.isGenerating = false;
                 this.hideProgress();
                 
                 // 성공 메시지 표시
+                // 테스트 모드 또는 경고 메시지 구성
+                let warningHtml = '';
+                if (result.is_test || result.test_mode) {
+                    warningHtml = `
+                        <div class="mt-3 p-3 bg-orange-100 border border-orange-300 rounded">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-exclamation-triangle text-orange-500"></i>
+                                </div>
+                                <div class="ml-2 text-sm text-orange-800">
+                                    <strong>테스트 모드:</strong> ${result.warning || `${result.time_until_execution_minutes || '10'}분 후 실행 예정 - 1시간 후 자동 비활성화됩니다.`}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (result.warning) {
+                    warningHtml = `
+                        <div class="mt-3 p-3 bg-yellow-100 border border-yellow-300 rounded">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <i class="fas fa-info-circle text-yellow-500"></i>
+                                </div>
+                                <div class="ml-2 text-sm text-yellow-800">
+                                    ${result.warning}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 const successHtml = `
                     <div class="bg-green-50 border border-green-200 rounded-lg p-6">
                         <div class="flex">
@@ -1230,6 +1269,7 @@ class NewsletterApp {
                                         <div><strong>현재 서버 시간:</strong> <span class="font-mono">${result.current_time_display || result.current_time_kst}</span></div>
                                     </div>
                                 </div>
+                                ${warningHtml}
                                 <div class="mt-3">
                                     <button onclick="app.switchTab('scheduleManageTab')" 
                                             class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm">
@@ -1265,6 +1305,7 @@ class NewsletterApp {
         try {
             const scheduleSettings = this.getScheduleSettings();
             const previewElement = document.getElementById('nextRunPreview');
+            const testModeWarning = document.getElementById('testModeWarning');
             
             if (!previewElement) return;
             
@@ -1279,11 +1320,37 @@ class NewsletterApp {
                         <div>RRULE: <code class="text-xs bg-blue-100 px-1 rounded">${scheduleSettings.rrule}</code></div>
                     </div>
                 `;
+                
+                // 테스트 모드 감지 (10분 이내 스케줄)
+                if (scheduleSettings.time_until_execution_minutes !== undefined) {
+                    const minutesUntil = scheduleSettings.time_until_execution_minutes;
+                    if (testModeWarning) {
+                        if (minutesUntil <= 10 && minutesUntil >= 1) {
+                            testModeWarning.classList.remove('hidden');
+                            testModeWarning.innerHTML = `
+                                <i class="fas fa-exclamation-triangle mr-1"></i>
+                                <strong>테스트 모드:</strong> ${minutesUntil.toFixed(1)}분 후 실행 예정 - 1시간 후 자동 비활성화됩니다.
+                            `;
+                        } else if (minutesUntil < 1) {
+                            testModeWarning.classList.remove('hidden');
+                            testModeWarning.innerHTML = `
+                                <i class="fas fa-times-circle mr-1"></i>
+                                <strong>오류:</strong> 최소 1분 이후 시간을 선택해주세요.
+                            `;
+                            testModeWarning.className = testModeWarning.className.replace('bg-orange-100 border-orange-300 text-orange-800', 'bg-red-100 border-red-300 text-red-800');
+                        } else {
+                            testModeWarning.classList.add('hidden');
+                        }
+                    }
+                }
             } else {
                 previewElement.innerHTML = `
                     <div class="text-orange-600">설정을 확인해주세요</div>
                     <div class="text-xs mt-1">모든 필드를 올바르게 입력하면 미리보기가 표시됩니다.</div>
                 `;
+                if (testModeWarning) {
+                    testModeWarning.classList.add('hidden');
+                }
             }
         } catch (error) {
             console.error('Failed to update schedule preview:', error);

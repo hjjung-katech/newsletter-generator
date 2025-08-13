@@ -245,11 +245,36 @@
                                 </div>
                             </div>
                             
+                            <!-- 스케줄링 가이드라인 및 경고 -->
+                            <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-info-circle text-yellow-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <h3 class="text-sm font-medium text-yellow-800">
+                                            스케줄링 가이드라인
+                                        </h3>
+                                        <div class="mt-2 text-sm text-yellow-700">
+                                            <ul class="list-disc space-y-1 pl-5">
+                                                <li><strong>정규 사용:</strong> 30분 이후 시간을 권장합니다</li>
+                                                <li><strong>테스트 목적:</strong> 1-10분 이내 설정 시 테스트 모드로 자동 전환됩니다</li>
+                                                <li><strong>테스트 모드:</strong> 스케줄은 1시간 후 자동 비활성화됩니다</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- 다음 실행 시간 미리보기 -->
                             <div id="schedulePreview" class="mt-4 p-3 bg-blue-50 rounded-md hidden">
                                 <h5 class="text-sm font-medium text-blue-900 mb-2">다음 실행 시간 (예상)</h5>
                                 <div class="text-sm text-blue-700" id="nextRunPreview">
                                     계산 중...
+                                </div>
+                                <div id="testModeWarning" class="mt-2 p-2 bg-orange-100 border border-orange-300 rounded text-sm text-orange-800 hidden">
+                                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                                    <strong>테스트 모드:</strong> 10분 이내 스케줄은 테스트용으로 간주되어 1시간 후 자동 비활성화됩니다.
                                 </div>
                                 <div class="text-xs text-blue-600 mt-1">
                                     * 정확한 시간은 스케줄 생성 후 서버에서 계산됩니다.

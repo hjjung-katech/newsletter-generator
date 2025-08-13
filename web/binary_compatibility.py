@@ -9,6 +9,9 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
+# Setup logger
+logger = logging.getLogger(__name__)
+
 
 def is_frozen() -> bool:
     """PyInstaller로 빌드된 바이너리에서 실행 중인지 확인"""
@@ -56,9 +59,9 @@ def setup_binary_environment() -> Dict[str, Any]:
     }
     
     if is_frozen():
-        print("[BINARY] PyInstaller 바이너리 환경 감지됨")
-        print(f"   Base path: {env_info['base_path']}")
-        print(f"   Executable: {env_info['executable_path']}")
+        logger.info("PyInstaller 바이너리 환경 감지됨")
+        logger.info(f"   Base path: {env_info['base_path']}")
+        logger.info(f"   Executable: {env_info['executable_path']}")
         
         # 바이너리 환경에서 필요한 경로들을 sys.path에 추가
         binary_paths = [
@@ -70,12 +73,12 @@ def setup_binary_environment() -> Dict[str, Any]:
         for path in binary_paths:
             if os.path.exists(path) and path not in sys.path:
                 sys.path.insert(0, path)
-                print(f"   Added to sys.path: {path}")
+                logger.debug(f"   Added to sys.path: {path}")
         
         env_info["paths_configured"] = True
     else:
-        print("[DEV] Python 개발 환경에서 실행 중")
-        print(f"   Working directory: {env_info['working_directory']}")
+        logger.info("Python 개발 환경에서 실행 중")
+        logger.info(f"   Working directory: {env_info['working_directory']}")
     
     return env_info
 
@@ -113,17 +116,17 @@ def load_environment_variables(env_files: Optional[List[str]] = None) -> Dict[st
                                     os.environ[key] = value
                                 
                             except ValueError as e:
-                                print(f"   [WARNING] Invalid line {line_num} in {env_file}: {e}")
+                                logger.warning(f"   Invalid line {line_num} in {env_file}: {e}")
                 
                 loaded_files[env_file] = True
-                print(f"[SUCCESS] Loaded environment file: {env_path}")
+                logger.info(f"Loaded environment file: {env_path}")
                 
             except Exception as e:
                 loaded_files[env_file] = False
-                print(f"[ERROR] Failed to load {env_path}: {e}")
+                logger.error(f"Failed to load {env_path}: {e}")
         else:
             loaded_files[env_file] = False
-            print(f"[WARNING] Environment file not found: {env_path}")
+            logger.warning(f"Environment file not found: {env_path}")
     
     return loaded_files
 
@@ -157,7 +160,7 @@ def verify_critical_modules() -> Dict[str, bool]:
         'postmarker': False,
     }
     
-    print("[CHECK] 핵심 모듈 가용성 검증 중...")
+    logger.info("핵심 모듈 가용성 검증 중...")
     
     for module_name in critical_modules.keys():
         try:
@@ -166,27 +169,27 @@ def verify_critical_modules() -> Dict[str, bool]:
             else:
                 __import__(module_name)
             critical_modules[module_name] = True
-            print(f"   [OK] {module_name}")
+            logger.debug(f"   [OK] {module_name}")
         except ImportError as e:
             critical_modules[module_name] = False
-            print(f"   [ERROR] {module_name}: {e}")
+            logger.error(f"   {module_name}: {e}")
         except Exception as e:
             critical_modules[module_name] = False
-            print(f"   [WARNING] {module_name}: {e}")
+            logger.warning(f"   {module_name}: {e}")
     
     # 결과 요약
     available_count = sum(critical_modules.values())
     total_count = len(critical_modules)
     success_rate = (available_count / total_count) * 100
     
-    print(f"[STATS] 모듈 가용성: {available_count}/{total_count} ({success_rate:.1f}%)")
+    logger.info(f"모듈 가용성: {available_count}/{total_count} ({success_rate:.1f}%)")
     
     # 필수 모듈 체크
     essential_modules = ['flask', 'requests', 'newsletter']
     missing_essential = [m for m in essential_modules if not critical_modules.get(m)]
     
     if missing_essential:
-        print(f"[WARNING] 필수 모듈 누락: {missing_essential}")
+        logger.warning(f"필수 모듈 누락: {missing_essential}")
         return False
     
     return critical_modules
@@ -209,9 +212,9 @@ def create_necessary_directories() -> List[str]:
         try:
             os.makedirs(dir_path, exist_ok=True)
             created_dirs.append(dir_path)
-            print(f"[DIR] Directory ready: {dir_path}")
+            logger.debug(f"Directory ready: {dir_path}")
         except Exception as e:
-            print(f"[ERROR] Failed to create directory {dir_path}: {e}")
+            logger.error(f"Failed to create directory {dir_path}: {e}")
     
     return created_dirs
 
@@ -233,13 +236,13 @@ def setup_logging_for_binary():
         ]
     )
     
-    print(f"[LOG] Logging configured: {log_file}")
+    logger.info(f"Logging configured: {log_file}")
     return log_file
 
 
 def run_comprehensive_diagnostics() -> Dict[str, Any]:
     """종합 진단 실행"""
-    print("[DIAG] === 바이너리 호환성 종합 진단 시작 ===")
+    logger.info("=== 바이너리 호환성 종합 진단 시작 ===")
     
     # 1. 환경 설정
     env_info = setup_binary_environment()
@@ -267,8 +270,8 @@ def run_comprehensive_diagnostics() -> Dict[str, Any]:
         "overall_status": "ready" if env_info["paths_configured"] and any(env_loaded.values()) else "partial"
     }
     
-    print("[SUCCESS] === 바이너리 호환성 진단 완료 ===")
-    print(f"[STATUS] 전체 상태: {diagnostics_result['overall_status'].upper()}")
+    logger.info("=== 바이너리 호환성 진단 완료 ===")
+    logger.info(f"전체 상태: {diagnostics_result['overall_status'].upper()}")
     
     return diagnostics_result
 

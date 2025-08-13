@@ -16,9 +16,15 @@ from flask_cors import CORS
 import redis
 from rq import Queue
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 import json
+
+# Import database utilities with logging
+try:
+    from web.db_utils import execute_query, log_db_operation
+except ImportError:
+    from db_utils import execute_query, log_db_operation
 
 # Structured logger setup
 try:
@@ -71,10 +77,10 @@ try:
     from web.graceful_shutdown import create_graceful_app
     
     shutdown_manager = get_shutdown_manager()
-    print(f"[SUCCESS] Shutdown manager initialized successfully")
+    logger.info("Shutdown manager initialized successfully")
     
 except ImportError as e:
-    print(f"[WARNING] Graceful shutdown not available: {e}")
+    logger.warning(f"Graceful shutdown not available: {e}")
     # Fallback functions
     def register_shutdown_task(*args, **kwargs):
         return False
@@ -101,18 +107,18 @@ try:
     )
 
     if is_frozen():
-        print("[INFO] Running in PyInstaller binary mode")
+        logger.info("Running in PyInstaller binary mode")
         # 바이너리 환경에서 종합 진단 실행
         diagnostics = run_comprehensive_diagnostics()
-        print(f"[INFO] Binary diagnostics status: {diagnostics['overall_status']}")
+        logger.info(f"Binary diagnostics status: {diagnostics['overall_status']}")
     else:
-        print("[INFO] Running in development mode")
+        logger.info("Running in development mode")
         # 개발 환경에서는 기본 경로 설정
         current_dir = os.path.dirname(os.path.abspath(__file__))
         sys.path.insert(0, current_dir)
 
 except ImportError:
-    print("[WARNING] Binary compatibility module not available, using fallback setup")
+    logger.warning("Binary compatibility module not available, using fallback setup")
     # Fallback: 기본 경로 설정
     current_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, current_dir)
@@ -179,7 +185,7 @@ try:
                     event if event.get("level") != "info" else None
                 ),
             )
-            print("[SUCCESS] Sentry initialized successfully")
+            logger.info("Sentry initialized successfully")
 
             # 실제 Sentry 함수들로 재정의
             def set_sentry_user_context(user_id=None, email=None, **kwargs):
@@ -192,11 +198,11 @@ try:
                     sentry_sdk.set_tag(key, value)
 
         except ImportError:
-            print("[WARNING] Sentry SDK not installed, skipping Sentry integration")
+            logger.warning("Sentry SDK not installed, skipping Sentry integration")
         except Exception as e:
-            print(f"[WARNING] Sentry initialization failed: {e}")
+            logger.warning(f"Sentry initialization failed: {e}")
     else:
-        print("[INFO] Sentry DSN not configured, skipping Sentry integration")
+        logger.info("Sentry DSN not configured, skipping Sentry integration")
 
 except Exception as e:
     # Centralized settings 실패 시 legacy fallback
@@ -243,11 +249,11 @@ except Exception as e:
                     sentry_sdk.set_tag(key, value)
 
         except ImportError:
-            print("[WARNING] Sentry SDK not installed, skipping Sentry integration")
+            logger.warning("Sentry SDK not installed, skipping Sentry integration")
         except Exception as e:
-            print(f"[WARNING] Sentry initialization failed: {e}")
+            logger.warning(f"Sentry initialization failed: {e}")
     else:
-        print("[INFO] Legacy SENTRY_DSN not configured, skipping Sentry integration")
+        logger.info("Legacy SENTRY_DSN not configured, skipping Sentry integration")
 
 
 # Import task function for RQ
@@ -304,13 +310,13 @@ class RealNewsletterCLI:
         # Newsletter 모듈 import 가능성 확인
         try:
             import newsletter
-            print(f"[SUCCESS] Newsletter module found and importable")
+            logger.info("Newsletter module found and importable")
         except ImportError as e:
             raise Exception(f"Newsletter module not importable: {e}")
 
         # .env 파일 확인
         if not os.path.exists(env_file):
-            print(f"[WARNING] Warning: .env file not found at {env_file}")
+            logger.warning(f"Warning: .env file not found at {env_file}")
             print(
                 f"[WARNING] This may cause longer processing times or fallback to mock mode"
             )
@@ -318,13 +324,13 @@ class RealNewsletterCLI:
         # API 키 확인
         api_keys_status = self._check_api_keys()
 
-        print("[SUCCESS] Environment check passed")
-        print(f"   Project root: {self.project_root}")
-        print(
+        logger.info("Environment check passed")
+        logger.info(f"   Project root: {self.project_root}")
+        logger.info(
             f"   Newsletter module exists: {os.path.exists(os.path.join(self.project_root, 'newsletter'))}"
         )
-        print(f"   .env file exists: {os.path.exists(env_file)}")
-        print(f"   API keys configured: {api_keys_status}")
+        logger.info(f"   .env file exists: {os.path.exists(env_file)}")
+        logger.info(f"   API keys configured: {api_keys_status}")
 
     def _check_api_keys(self):
         """API 키 설정 상태 확인 - 개선된 검사"""
@@ -410,7 +416,7 @@ class RealNewsletterCLI:
 
             elif domain:
                 # CLI와 동일한 로직: 도메인에서 키워드 생성 후 뉴스레터 생성
-                print(f"[INFO] Generating keywords from domain: {domain}")
+                logger.info(f"Generating keywords from domain: {domain}")
                 
                 # Step 1: Generate keywords from domain (CLI 로직과 동일)
                 from newsletter import tools
@@ -418,7 +424,7 @@ class RealNewsletterCLI:
                     generated_keywords = tools.generate_keywords_with_gemini(domain, count=suggest_count)
                     if generated_keywords and len(generated_keywords) > 0:
                         keyword_list = generated_keywords
-                        print(f"[INFO] Generated {len(keyword_list)} keywords: {', '.join(keyword_list)}")
+                        logger.info(f"Generated {len(keyword_list)} keywords: {', '.join(keyword_list)}")
                         input_description = f"domain: {domain} -> keywords: {','.join(keyword_list)}"
                         
                         # Step 2: Generate newsletter with generated keywords (CLI 로직과 동일)
@@ -430,7 +436,7 @@ class RealNewsletterCLI:
                             email_compatible=email_compatible,
                         )
                     else:
-                        print(f"[WARNING] Failed to generate keywords from domain: {domain}")
+                        logger.warning(f"Failed to generate keywords from domain: {domain}")
                         # 키워드 생성 실패 시 폴백 (기존 방식)
                         input_description = f"domain: {domain} (fallback to direct domain use)"
                         html_content, status = generate_newsletter(
@@ -441,7 +447,7 @@ class RealNewsletterCLI:
                             email_compatible=email_compatible,
                         )
                 except Exception as e:
-                    print(f"[ERROR] Keyword generation failed: {e}")
+                    logger.error(f"Keyword generation failed: {e}")
                     # 키워드 생성 실패 시 폴백 (기존 방식)
                     input_description = f"domain: {domain} (error fallback)"
                     html_content, status = generate_newsletter(
@@ -460,7 +466,7 @@ class RealNewsletterCLI:
             print(
                 f"[DEBUG] LangGraph result - html_content length: {len(html_content) if html_content else 0}"
             )
-            print(f"[DEBUG] LangGraph result - status: {status}")
+            logger.debug(f"LangGraph result - status: {status}")
             print(
                 f"[DEBUG] LangGraph result - html_content preview: {html_content[:200] if html_content else 'None'}..."
             )
@@ -508,13 +514,13 @@ class RealNewsletterCLI:
                 },
             }
 
-            print(f"[DEBUG] _generate_direct response keys: {list(response.keys())}")
+            logger.debug(f"_generate_direct response keys: {list(response.keys())}")
             print(
                 f"[DEBUG] _generate_direct response.content length: {len(response.get('content', ''))}"
             )
-            print(f"[DEBUG] _generate_direct response.status: {response.get('status')}")
-            print(f"[DEBUG] _generate_direct response.title: {response.get('title')}")
-            print(f"[SUCCESS] _generate_direct returning complete response")
+            logger.debug(f"_generate_direct response.status: {response.get('status')}")
+            logger.debug(f"_generate_direct response.title: {response.get('title')}")
+            logger.info("_generate_direct returning complete response")
 
             return response
 
@@ -527,7 +533,7 @@ class RealNewsletterCLI:
         """환경 변수를 확실히 설정합니다 (PyInstaller 환경 대응)"""
         import os
 
-        print("[DEBUG] Attempting to load environment variables...")
+        logger.debug("Attempting to load environment variables...")
 
         # List of .env files to check, in order of precedence
         env_files_to_check = []
@@ -553,7 +559,7 @@ class RealNewsletterCLI:
         # Load environment variables from files
         for env_file in env_files_to_check:
             if os.path.exists(env_file):
-                print(f"[DEBUG] Loading from: {env_file}")
+                logger.debug(f"Loading from: {env_file}")
                 with open(env_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
@@ -947,16 +953,16 @@ class MockNewsletterCLI:
 # Try to use real CLI first, fallback to mock if it fails
 try:
     newsletter_cli = RealNewsletterCLI()
-    print("[SUCCESS] Using RealNewsletterCLI for actual newsletter generation")
+    logger.info("Using RealNewsletterCLI for actual newsletter generation")
     print(f"   Project root: {newsletter_cli.project_root}")
     print(f"   Timeout: {newsletter_cli.timeout} seconds")
 except Exception as e:
-    print(f"[WARNING] Failed to initialize RealNewsletterCLI: {e}")
+    logger.warning(f"Failed to initialize RealNewsletterCLI: {e}")
     import traceback
 
     traceback.print_exc()
     newsletter_cli = MockNewsletterCLI()
-    print("[WARNING] Falling back to MockNewsletterCLI")
+    logger.warning("Falling back to MockNewsletterCLI")
 
 app = Flask(
     __name__,
@@ -976,18 +982,18 @@ def setup_app_shutdown_tasks():
         try:
             # Note: SQLite connections are typically closed automatically
             # But we can force cleanup if needed
-            print("[INFO] Database connections cleaned up")
+            logger.info("Database connections cleaned up")
         except Exception as e:
-            print(f"[ERROR] Error cleaning up database: {e}")
+            logger.error(f"Error cleaning up database: {e}")
     
     # Cleanup Redis connections
     def cleanup_redis():
         try:
             if redis_conn:
                 redis_conn.close()
-                print("[INFO] Redis connection closed")
+                logger.info("Redis connection closed")
         except Exception as e:
-            print(f"[ERROR] Error closing Redis connection: {e}")
+            logger.error(f"Error closing Redis connection: {e}")
     
     # Cleanup in-memory tasks
     def cleanup_in_memory_tasks():
@@ -1000,11 +1006,11 @@ def setup_app_shutdown_tasks():
                     cancelled_count += 1
             
             if cancelled_count > 0:
-                print(f"[INFO] Cancelled {cancelled_count} in-memory tasks")
+                logger.info(f"Cancelled {cancelled_count} in-memory tasks")
             else:
-                print("[INFO] No in-memory tasks to cancel")
+                logger.info("No in-memory tasks to cancel")
         except Exception as e:
-            print(f"[ERROR] Error cleaning up in-memory tasks: {e}")
+            logger.error(f"Error cleaning up in-memory tasks: {e}")
     
     # Register shutdown tasks
     register_shutdown_task(
@@ -1028,7 +1034,7 @@ def setup_app_shutdown_tasks():
         priority=30
     )
     
-    print("[INFO] Application shutdown tasks registered")
+    logger.info("Application shutdown tasks registered")
 
 # Setup shutdown tasks
 setup_app_shutdown_tasks()
@@ -1037,9 +1043,9 @@ setup_app_shutdown_tasks()
 if shutdown_manager:
     try:
         graceful_wrapper = create_graceful_app(app, shutdown_timeout=20.0)
-        print("[SUCCESS] Graceful shutdown wrapper created")
+        logger.info("Graceful shutdown wrapper created")
     except Exception as e:
-        print(f"[WARNING] Failed to create graceful wrapper: {e}")
+        logger.warning(f"Failed to create graceful wrapper: {e}")
         graceful_wrapper = None
 else:
     graceful_wrapper = None
@@ -1048,7 +1054,7 @@ else:
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-print("[INFO] Flask app initialized with detailed logging")
+logger.info("Flask app initialized with detailed logging")
 
 # Configuration
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
@@ -1063,16 +1069,16 @@ try:
 
     # Windows에서는 RQ Worker가 제대로 작동하지 않으므로 직접 처리 사용
     if platform.system() == "Windows":
-        print("[INFO] Windows detected: Using direct processing instead of Redis Queue")
+        logger.info("Windows detected: Using direct processing instead of Redis Queue")
         redis_conn = None
         task_queue = None
     else:
         redis_conn = redis.from_url(app.config["REDIS_URL"])
         redis_conn.ping()  # Test connection
         task_queue = Queue(QUEUE_NAME, connection=redis_conn)
-        print("[SUCCESS] Redis connected successfully")
+        logger.info("Redis connected successfully")
 except Exception as e:
-    print(f"[WARNING] Redis connection failed: {e}. Using in-memory processing.")
+    logger.warning(f"Redis connection failed: {e}. Using in-memory processing.")
     redis_conn = None
     task_queue = None
 
@@ -1104,6 +1110,7 @@ def init_db():
     cursor = conn.cursor()
 
     # History table
+    logger.debug("Creating history table if not exists")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS history (
@@ -1117,6 +1124,7 @@ def init_db():
     )
 
     # Schedules table for recurring newsletters
+    logger.debug("Creating schedules table if not exists")
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS schedules (
@@ -1169,12 +1177,12 @@ def index():
 @app.route("/api/generate", methods=["POST"])
 def generate_newsletter():
     """Generate newsletter based on keywords or domain with optional email sending"""
-    print(f"[INFO] Newsletter generation request received")
+    logger.info("Newsletter generation request received")
 
     try:
         data = request.get_json()
         if not data:
-            print("[WARNING] No data provided in request")
+            logger.warning("No data provided in request")
             return jsonify({"error": "No data provided"}), 400
 
         # Validate request using Pydantic
@@ -1207,38 +1215,39 @@ def generate_newsletter():
 
             validated_data = web_types.GenerateNewsletterRequest(**data)
         except (ValueError, Exception) as e:
-            print(f"[WARNING] Validation error: {e}")
+            logger.warning(f"Validation error: {e}")
             return jsonify({"error": f"Invalid request: {str(e)}"}), 400
 
         # Extract email for sending
         email = validated_data.email
         send_email = bool(email)
 
-        print(f"[INFO] Request data: {data}")
-        print(f"[INFO] Send email: {send_email} to {email}")
+        logger.info(f"Request data: {data}")
+        logger.info(f"Send email: {send_email} to {email}")
 
         # Create unique job ID
         job_id = str(uuid.uuid4())
-        print(f"[INFO] Generated job ID: {job_id}")
+        logger.info(f"Generated job ID: {job_id}")
 
         # Store request in history
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
+        logger.debug(f"Inserting job {job_id} into history with status 'pending'")
         cursor.execute(
             "INSERT INTO history (id, params, status) VALUES (?, ?, ?)",
             (job_id, json.dumps(data), "pending"),
         )
         conn.commit()
         conn.close()
-        print(f"[INFO] Stored request in database")
+        logger.info("Stored request in database")
 
         # If Redis is available, queue the task
         if task_queue:
-            print(f"[INFO] Queueing task with Redis")
+            logger.info("Queueing task with Redis")
             job = task_queue.enqueue(generate_newsletter_task, data, job_id, send_email)
             return jsonify({"job_id": job_id, "status": "queued"}), 202
         else:
-            print(f"[INFO] Processing in-memory (Redis not available)")
+            logger.info("Processing in-memory (Redis not available)")
             # Fallback: process in background using in-memory tracking
             import threading
 
@@ -1257,7 +1266,7 @@ def generate_newsletter():
                 try:
                     # Check if shutdown is requested before starting work
                     if is_shutdown_requested():
-                        print(f"[WARNING] Shutdown requested - cancelling job {job_id}")
+                        logger.warning(f"Shutdown requested - cancelling job {job_id}")
                         in_memory_tasks[job_id] = {
                             "status": "cancelled",
                             "error": "Application shutdown requested",
@@ -1351,7 +1360,7 @@ def generate_newsletter():
                             f"[SUCCESS] Completed background processing for job {job_id}"
                         )
                     else:
-                        print(f"[WARNING] Job {job_id} not found in in_memory_tasks")
+                        logger.warning(f"Job {job_id} not found in in_memory_tasks")
                         # 데이터베이스에 실패 상태 업데이트
                         conn = sqlite3.connect(DATABASE_PATH)
                         cursor = conn.cursor()
@@ -1454,7 +1463,7 @@ def suggest_keywords():
                 }), 200
 
         except Exception as cli_error:
-            print(f"[ERROR] CLI keyword generation failed: {str(cli_error)}")
+            logger.error(f"CLI keyword generation failed: {str(cli_error)}")
             # Provide more specific error messages
             error_msg = str(cli_error)
             if "GEMINI_API_KEY" in error_msg:
@@ -1471,7 +1480,7 @@ def suggest_keywords():
             }), 500
 
     except Exception as e:
-        print(f"[ERROR] Error in suggest_keywords endpoint: {e}")
+        logger.error(f"Error in suggest_keywords endpoint: {e}")
         return jsonify({
             "success": False,
             "error": f"Server error: {str(e)}",
@@ -1636,8 +1645,8 @@ def process_newsletter_sync(data):
                 else:
                     raise ValueError("Either keywords or topic must be provided")
 
-            print(f"[DEBUG] CLI result status: {result['status']}")
-            print(f"[DEBUG] CLI result type: {type(result)}")
+            logger.debug(f"CLI result status: {result['status']}")
+            logger.debug(f"CLI result type: {type(result)}")
             print(
                 f"[DEBUG] CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
             )
@@ -1650,16 +1659,16 @@ def process_newsletter_sync(data):
                 print(
                     f"[DEBUG] CLI result.content length: {len(result.get('content', ''))}"
                 )
-                print(f"[DEBUG] CLI result.title: {result.get('title', 'None')}")
-                print(f"[DEBUG] CLI result.status: {result.get('status', 'None')}")
+                logger.debug(f"CLI result.title: {result.get('title', 'None')}")
+                logger.debug(f"CLI result.status: {result.get('status', 'None')}")
                 if result.get("content"):
                     print(
                         f"[DEBUG] CLI result.content preview: {result['content'][:200]}..."
                     )
             else:
-                print(f"[ERROR] CLI result is not a dictionary: {result}")
+                logger.error(f"CLI result is not a dictionary: {result}")
 
-            print(f"[DEBUG] About to create final response...")
+            logger.debug("About to create final response...")
 
         except Exception as cli_error:
             print(f"[WARNING] CLI generation failed: {str(cli_error)}")
@@ -1732,7 +1741,7 @@ def process_newsletter_sync(data):
                 # 이메일 발송
                 send_email_func(to=email, subject=subject, html=result["content"])
                 email_sent = True
-                print(f"[SUCCESS] Successfully sent email to {email}")
+                logger.info(f"Successfully sent email to {email}")
             except Exception as e:
                 print(f"[WARNING] Failed to send email to {email}: {str(e)}")
                 # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
@@ -1758,25 +1767,25 @@ def process_newsletter_sync(data):
             },
         }
 
-        print(f"[DEBUG] Final response created:")
-        print(f"[DEBUG] Final response keys: {list(response.keys())}")
+        logger.debug("Final response created:")
+        logger.debug(f"Final response keys: {list(response.keys())}")
         print(
             f"[DEBUG] Final response.html_content exists: {bool(response.get('html_content'))}"
         )
         print(
             f"[DEBUG] Final response.html_content length: {len(response.get('html_content', ''))}"
         )
-        print(f"[DEBUG] Final response.status: {response.get('status')}")
-        print(f"[DEBUG] Final response.html_size: {response.get('html_size')}")
+        logger.debug(f"Final response.status: {response.get('status')}")
+        logger.debug(f"Final response.html_size: {response.get('html_size')}")
 
         if response.get("html_content"):
             print(
                 f"[DEBUG] Final response.html_content preview: {response['html_content'][:200]}..."
             )
         else:
-            print(f"[ERROR] Final response has no html_content!")
+            logger.error("Final response has no html_content!")
 
-        print(f"[SUCCESS] Processing completed successfully")
+        logger.info("Processing completed successfully")
         return response
 
     except Exception as e:
@@ -1805,7 +1814,7 @@ def process_newsletter_in_memory(data, job_id):
 
         # 데이터베이스에 직접 업데이트 (tasks.py import 문제 방지)
         try:
-            print(f"[DEBUG] About to save to database for job {job_id}")
+            logger.debug(f"About to save to database for job {job_id}")
             print(
                 f"[DEBUG] Result keys before JSON serialization: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
             )
@@ -1817,8 +1826,8 @@ def process_newsletter_in_memory(data, job_id):
             )
 
             result_json = json.dumps(result)
-            print(f"[DEBUG] Serialized JSON length: {len(result_json)}")
-            print(f"[DEBUG] JSON preview: {result_json[:300]}...")
+            logger.debug(f"Serialized JSON length: {len(result_json)}")
+            logger.debug(f"JSON preview: {result_json[:300]}...")
 
             conn = sqlite3.connect(DATABASE_PATH)
             cursor = conn.cursor()
@@ -1828,7 +1837,7 @@ def process_newsletter_in_memory(data, job_id):
             )
             conn.commit()
             conn.close()
-            print(f"[SUCCESS] Updated database status to completed for job {job_id}")
+            logger.info(f"Updated database status to completed for job {job_id}")
         except Exception as db_error:
             print(f"[WARNING] Failed to update database for job {job_id}: {db_error}")
             # 데이터베이스 업데이트 실패해도 메모리 결과는 유지
@@ -2047,6 +2056,23 @@ def create_schedule():
         # 다음 실행 시간을 KST로 해석한 후 UTC로 변환
         next_run_kst = next_run_naive.replace(tzinfo=seoul_tz)
         next_run_utc = to_utc(next_run_kst)
+        
+        # 테스트 모드 검증: 10분 이내 스케줄인지 확인
+        time_until_execution = (next_run_utc - now_utc).total_seconds() / 60  # minutes
+        is_test_schedule = time_until_execution <= 10
+        
+        # 스케줄링 간격 검증
+        if time_until_execution < 1:
+            return jsonify({
+                "error": "스케줄 시간이 너무 가깝습니다", 
+                "details": "최소 1분 이후 시간을 선택해주세요."
+            }), 400
+        elif 1 <= time_until_execution <= 10:
+            # 테스트 모드 자동 활성화
+            logger.info(f"Test mode activated: schedule in {time_until_execution:.1f} minutes")
+        elif time_until_execution < 30:
+            # 경고 메시지 (허용하되 주의 안내)
+            logger.warning(f"Short-term schedule: {time_until_execution:.1f} minutes")
 
     except Exception as e:
         return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
@@ -2068,6 +2094,7 @@ def create_schedule():
             "period": data.get("period", 14),
             "timezone": "Asia/Seoul",
             "created_timestamp": to_iso_utc(now_utc),
+            "is_test": is_test_schedule,
         }
     else:
         # 키워드 기반 예약: 고정된 키워드 사용
@@ -2081,13 +2108,20 @@ def create_schedule():
             "period": data.get("period", 14),
             "timezone": "Asia/Seoul",
             "created_timestamp": to_iso_utc(now_utc),
+            "is_test": is_test_schedule,
         }
 
+    # 테스트 스케줄의 경우 만료 시간 설정 (1시간 후)
+    expires_at = None
+    if is_test_schedule:
+        expires_at = to_iso_utc(now_utc + timedelta(hours=1))
+    
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO schedules (id, params, rrule, next_run) VALUES (?, ?, ?, ?)",
-        (schedule_id, json.dumps(schedule_params), rrule_str, next_run_utc.isoformat()),
+        "INSERT INTO schedules (id, params, rrule, next_run, is_test, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (schedule_id, json.dumps(schedule_params), rrule_str, next_run_utc.isoformat(), 
+         1 if is_test_schedule else 0, expires_at),
     )
     conn.commit()
     conn.close()
@@ -2096,27 +2130,38 @@ def create_schedule():
     next_run_time_info = format_display_time(next_run_utc)
     current_time_info = format_display_time(now_utc)
     
-    return (
-        jsonify(
-            {
-                "status": "scheduled",
-                "schedule_id": schedule_id,
-                "next_run": next_run_time_info['utc_iso'],  # UTC ISO format
-                "next_run_display": next_run_time_info['kst_display'],  # KST display
-                "next_run_timestamp": next_run_time_info['timestamp'],  # Unix timestamp
-                "current_time": current_time_info['utc_iso'],  # UTC ISO format
-                "current_time_display": current_time_info['kst_display'],  # KST display
-                "timezone": "Asia/Seoul",
-                "rrule": rrule_str,
-                "created_at": to_iso_utc(now_utc),  # UTC ISO format
-                "time_info": {
-                    "next_run": next_run_time_info,
-                    "current_time": current_time_info
-                }
-            }
-        ),
-        201,
-    )
+    response_data = {
+        "status": "scheduled",
+        "schedule_id": schedule_id,
+        "next_run": next_run_time_info['utc_iso'],  # UTC ISO format
+        "next_run_display": next_run_time_info['kst_display'],  # KST display
+        "next_run_timestamp": next_run_time_info['timestamp'],  # Unix timestamp
+        "current_time": current_time_info['utc_iso'],  # UTC ISO format
+        "current_time_display": current_time_info['kst_display'],  # KST display
+        "timezone": "Asia/Seoul",
+        "rrule": rrule_str,
+        "created_at": to_iso_utc(now_utc),  # UTC ISO format
+        "time_info": {
+            "next_run": next_run_time_info,
+            "current_time": current_time_info
+        },
+        "is_test": is_test_schedule,
+    }
+    
+    # 테스트 모드 관련 추가 정보
+    if is_test_schedule:
+        response_data.update({
+            "test_mode": True,
+            "expires_at": expires_at,
+            "time_until_execution_minutes": round(time_until_execution, 1),
+            "warning": "테스트 모드: 이 스케줄은 1시간 후 자동 비활성화됩니다."
+        })
+    elif time_until_execution < 30:
+        response_data.update({
+            "warning": f"단기 스케줄: {round(time_until_execution, 1)}분 후 실행됩니다. 테스트 목적이 아니라면 30분 이후 시간을 권장합니다."
+        })
+
+    return jsonify(response_data), 201
 
 
 @app.route("/api/schedules")
@@ -2561,7 +2606,7 @@ def setup_status():
         return jsonify(enhanced_status)
         
     except Exception as e:
-        print(f"[ERROR] Setup status check failed: {e}")
+        logger.error(f"Setup status check failed: {e}")
         return jsonify({
             "stage": "error",
             "error": str(e),
@@ -2601,7 +2646,7 @@ def get_documentation(doc_name):
         })
         
     except Exception as e:
-        print(f"[ERROR] Failed to load documentation {doc_name}: {e}")
+        logger.error(f"Failed to load documentation {doc_name}: {e}")
         return jsonify({
             "error": f"Failed to load documentation: {str(e)}",
             "name": doc_name
@@ -2957,15 +3002,15 @@ def start_schedule_runner():
                         executed_count = runner.run_once()
                         if executed_count > 0:
                             print(f"[INFO] Executed {executed_count} scheduled newsletters")
-                        time.sleep(60)  # 1분 간격으로 체크
+                        time.sleep(300)  # 5분 간격으로 체크 (중복 실행 방지)
                     except Exception as e:
-                        print(f"[ERROR] Schedule runner error: {e}")
+                        logger.error(f"Schedule runner error: {e}")
                         time.sleep(30)  # 에러 발생 시 30초 후 재시도
                         
                 print("[INFO] Schedule runner thread stopping due to shutdown request")
                         
             except Exception as e:
-                print(f"[ERROR] Fatal schedule runner error: {e}")
+                logger.error(f"Fatal schedule runner error: {e}")
             finally:
                 print("[INFO] Schedule runner thread terminated")
         
@@ -2986,7 +3031,7 @@ def start_schedule_runner():
             print("[INFO] Newsletter scheduler started (no graceful shutdown)")
             
     except Exception as e:
-        print(f"[ERROR] Failed to start schedule runner: {e}")
+        logger.error(f"Failed to start schedule runner: {e}")
         print("[WARNING] Newsletter scheduling will not work properly")
 
 
@@ -3038,7 +3083,7 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("[INFO] Received KeyboardInterrupt - shutting down gracefully")
         except Exception as e:
-            print(f"[ERROR] Application error: {e}")
+            logger.error(f"Application error: {e}")
             raise
         finally:
             if shutdown_manager:
@@ -3051,7 +3096,7 @@ if __name__ == "__main__":
         except KeyboardInterrupt:
             print("[INFO] Received KeyboardInterrupt - shutting down")
         except Exception as e:
-            print(f"[ERROR] Application error: {e}")
+            logger.error(f"Application error: {e}")
             raise
     
     print("[INFO] Application terminated")
