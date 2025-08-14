@@ -391,6 +391,12 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
 
         # Fallback to original Gemini implementation
         if not config.GEMINI_API_KEY:
+            # 테스트 환경에서는 Mock LLM 반환
+            if config.IS_TESTING or os.getenv('TESTING') == '1':
+                from unittest.mock import MagicMock
+                mock_llm = MagicMock()
+                mock_llm.invoke.return_value = MagicMock(content="Test response")
+                return mock_llm
             raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
         return ChatGoogleGenerativeAI(

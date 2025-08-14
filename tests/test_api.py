@@ -133,9 +133,11 @@ class TestNewsletterAPI:
             # generate_newsletter가 올바른 period로 호출되었는지 확인
             mock_newsletter_generation.generate_newsletter.assert_called_with(
                 keywords="AI",
+                domain="AI",
                 template_style="compact",
                 email_compatible=False,
                 period=period,
+                suggest_count=10,
             )
 
     def test_newsletter_endpoint_keywords_parameter(
@@ -147,9 +149,11 @@ class TestNewsletterAPI:
         assert response.status_code == 200
         mock_newsletter_generation.generate_newsletter.assert_called_with(
             keywords="machine learning",
+            domain=None,
             template_style="compact",
             email_compatible=False,
             period=7,
+            suggest_count=10,
         )
 
 

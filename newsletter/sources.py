@@ -207,7 +207,7 @@ class RSSFeedSource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """RSS 피드에서 뉴스 기사를 가져옴"""
         all_articles = []
-        keyword_article_counts = {}
+        keyword_article_counts = {keyword: 0 for keyword in keywords}
 
         for feed_url in self.feed_urls:
             try:

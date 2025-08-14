@@ -41,9 +41,9 @@ class TestCentralizedSettings:
     def test_missing_required_field_raises_validation_error(self):
         """필수 필드 누락 시 ValidationError 발생"""
         incomplete_env = {
-            # POSTMARK_SERVER_TOKEN 누락 (여전히 필수)
+            # 모든 LLM API 키 누락 (적어도 하나는 필수)
             "EMAIL_SENDER": "test@example.com",
-            "OPENAI_API_KEY": "sk-test-openai-key-1234567890123456",
+            "F14_FORCE_VALIDATION": "1",  # 강제 검증 모드 활성화
         }
 
         # 테스트 모드를 사용하지 않고 직접 환경변수 패치

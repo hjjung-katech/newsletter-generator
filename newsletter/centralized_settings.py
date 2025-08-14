@@ -34,14 +34,8 @@ def is_running_in_pytest() -> bool:
 
 def clear_settings_cache():
     """F-14: 설정 캐시를 클리어하여 테스트 격리 지원"""
-    global _cached_settings
-    _cached_settings = None
-
-
-def disable_test_mode():
-    """F-14: 테스트 모드를 비활성화하여 실제 검증 수행"""
-    global _test_mode
-    _test_mode = False
+    if 'get_settings' in globals():
+        get_settings.cache_clear()
 
 
 def enable_test_mode(test_env_vars: dict = None):
@@ -344,10 +338,7 @@ class CentralizedSettings(BaseSettings):
         }
 
 
-# 테스트를 위한 캐시 클리어 함수
-def clear_settings_cache():
-    """테스트용으로 설정 캐시를 클리어합니다."""
-    get_settings.cache_clear()
+# Note: clear_settings_cache function is defined above to avoid duplicates
 
 
 @lru_cache

@@ -44,6 +44,8 @@ dependencies = [
     "langchain-anthropic>=0.1.0",
     "langchain-google-genai>=1.0.0",
     "postmarker>=0.21.3",
+    "rich>=14.0.0",
+    "typer>=0.15.0",
 ]
 
 [project.optional-dependencies]

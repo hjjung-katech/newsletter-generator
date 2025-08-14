@@ -52,8 +52,9 @@ class TestScheduleCompatibility:
             # 기존 설정 로드가 정상 작동하는지 확인
             settings = get_settings()
             
-            # 기본 설정들이 존재하는지 확인
-            assert hasattr(settings, 'llm_factory'), "LLM factory settings should exist"
+            # 기본 설정들이 존재하는지 확인 (CentralizedSettings 기반)
+            assert hasattr(settings, 'gemini_api_key'), "Gemini API key settings should exist"
+            assert hasattr(settings, 'llm_request_timeout'), "LLM timeout settings should exist"
             
             # 스케줄링 모듈 임포트 후에도 설정이 유지되는지 확인
             from web.schedule_runner import ScheduleRunner
@@ -130,7 +131,7 @@ class TestScheduleCompatibility:
         # Mock 설정으로 기존 뉴스레터 생성 테스트
         with patch('newsletter.main.collect_news') as mock_collect, \
              patch('newsletter.main.process_articles') as mock_process, \
-             patch('newsletter.main.compose_newsletter') as mock_compose:
+             patch('newsletter.main.generate_newsletter') as mock_generate:
             
             # Mock 반환값 설정
             mock_collect.return_value = [
@@ -139,7 +140,7 @@ class TestScheduleCompatibility:
             mock_process.return_value = [
                 {"title": "Test Article", "summary": "Test summary", "score": 0.8}
             ]
-            mock_compose.return_value = "<html>Test Newsletter</html>"
+            mock_generate.return_value = {"status": "success", "content": "<html>Test Newsletter</html>"}
             
             # 기존 뉴스레터 생성 함수 호출 시뮬레이션
             try:
@@ -154,7 +155,7 @@ class TestScheduleCompatibility:
                 # Mock들이 호출 가능한지 확인
                 assert mock_collect is not None, "collect_news should be mockable"
                 assert mock_process is not None, "process_articles should be mockable"
-                assert mock_compose is not None, "compose_newsletter should be mockable"
+                assert mock_generate is not None, "generate_newsletter should be mockable"
                 
             except Exception as e:
                 pytest.fail(f"Newsletter generation compatibility issue: {e}")
@@ -210,28 +211,25 @@ class TestScheduleCompatibility:
             os.environ.clear()
             os.environ.update(original_env)
     
-    def test_existing_test_fixtures_compatibility(self):
+    def test_existing_test_fixtures_compatibility(self, mock_google_ai, mock_serper_api):
         """기존 테스트 픽스처들과의 호환성 테스트"""
-        # conftest.py의 기존 픽스처들이 정상 작동하는지 확인
+        # 기존 픽스처들이 정상 작동하는지 확인 (파라미터로 전달된 것 사용)
         
         try:
-            # 기존 픽스처들 임포트 테스트
-            from tests.conftest import (
-                korean_keywords,
-                sample_articles,
-                mock_google_ai,
-                mock_serper_api
-            )
-            
-            # Mock 픽스처들이 정상적으로 생성되는지 확인
-            mock_ai = mock_google_ai()
-            mock_serper = mock_serper_api()
+            # Mock 픽스처들이 정상적으로 생성되는지 확인 (파라미터로 받은 것 사용)
+            mock_ai = mock_google_ai
+            mock_serper = mock_serper_api
             
             assert mock_ai is not None, "Google AI mock should be available"
             assert mock_serper is not None, "Serper API mock should be available"
             assert 'organic' in mock_serper, "Serper mock should have expected structure"
             
-        except ImportError as e:
+            # conftest.py에서 fixture 함수들이 정의되어 있는지 확인
+            import tests.conftest as conftest_module
+            assert hasattr(conftest_module, 'mock_google_ai'), "mock_google_ai fixture should be defined"
+            assert hasattr(conftest_module, 'mock_serper_api'), "mock_serper_api fixture should be defined"
+            
+        except Exception as e:
             pytest.fail(f"Test fixture compatibility issue: {e}")
 
 
@@ -370,15 +368,12 @@ class TestExistingTestsNotBroken:
                 # 다른 이유 (API 키 없음 등)는 경고만
                 pytest.skip(f"Existing test import issue (not related to scheduling): {module_name} - {e}")
     
-    def test_existing_fixtures_still_work(self):
+    def test_existing_fixtures_still_work(self, korean_keywords, sample_articles):
         """기존 픽스처들이 여전히 작동하는지 확인"""
         
-        # 주요 픽스처들 테스트
-        from tests.conftest import korean_keywords, sample_articles
-        
-        # 픽스처 함수들 직접 호출해서 정상 작동 확인
-        keywords = korean_keywords()
-        articles = sample_articles()
+        # 주요 픽스처들 테스트 (파라미터로 받은 것 사용)
+        keywords = korean_keywords
+        articles = sample_articles
         
         assert isinstance(keywords, list), "korean_keywords fixture should return list"
         assert len(keywords) > 0, "korean_keywords should not be empty"

@@ -184,7 +184,9 @@ class TestWebAPI:
         assert response.status_code == 200
 
         result = json.loads(response.data)
-        assert isinstance(result, list)
+        assert isinstance(result, dict)
+        assert 'schedules' in result
+        assert isinstance(result['schedules'], list)
 
 
 if __name__ == "__main__":

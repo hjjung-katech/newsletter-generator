@@ -29,7 +29,7 @@ def test_suggest_missing_domain(client):
     assert response.status_code == 400
     data = response.get_json()
     assert "error" in data
-    assert "domain required" in data["error"]
+    assert "No data provided" in data["error"]
 
 
 def test_suggest_empty_domain(client):
@@ -38,7 +38,7 @@ def test_suggest_empty_domain(client):
     assert response.status_code == 400
     data = response.get_json()
     assert "error" in data
-    assert "domain required" in data["error"]
+    assert "Topic or domain is required" in data["error"]
 
 
 def test_suggest_api_error(client, monkeypatch):

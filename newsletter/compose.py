@@ -597,7 +597,12 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
         # 상위 3개 기사를 top_articles로 설정
         top_count = min(3, len(data))
         for article in data[:top_count]:
-            article_content = article.get("content") or article.get("snippet", "")
+            # summary_text 필드를 우선으로 하고, 없으면 content나 snippet 사용
+            article_content = (
+                article.get("summary_text") or 
+                article.get("content") or 
+                article.get("snippet", "")
+            )
             top_article = {
                 "title": article.get("title", "제목 없음"),
                 "url": article.get("url", "#"),
@@ -613,7 +618,12 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
 
         # 나머지 기사들을 sections에 추가
         for article in data[top_count:]:
-            article_content = article.get("content") or article.get("snippet", "")
+            # summary_text 필드를 우선으로 하고, 없으면 content나 snippet 사용
+            article_content = (
+                article.get("summary_text") or 
+                article.get("content") or 
+                article.get("snippet", "")
+            )
             link_info = {
                 "title": article.get("title", "제목 없음"),
                 "url": article.get("url", "#"),
@@ -1039,39 +1049,38 @@ def load_newsletter_settings(config_file: str = "config.yml") -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: 뉴스레터 설정 딕셔너리
     """
+    from .centralized_settings import get_settings
+    
+    settings = get_settings()
+    
+    # 기본 설정 (CentralizedSettings 기반)
+    default_settings = {
+        "newsletter_title": "주간 산업 동향 뉴스 클리핑",
+        "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
+        "publisher_name": "Your Company",
+        "company_name": "Your Company",
+        "company_tagline": "",
+        "editor_name": "",
+        "editor_title": "편집자",
+        "editor_email": settings.email_sender or "",
+        "footer_disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+        "footer_contact": "",
+    }
+
     try:
-        from .config_manager import config_manager
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
 
-        return config_manager.get_newsletter_settings()
-    except ImportError:
-        # Fallback to original implementation
-        default_settings = {
-            "newsletter_title": "주간 산업 동향 뉴스 클리핑",
-            "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
-            "publisher_name": "Your Company",
-            "company_name": "Your Company",
-            "company_tagline": "",
-            "editor_name": "",
-            "editor_title": "편집자",
-            "editor_email": "",
-            "footer_disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
-            "footer_contact": "",
-        }
+            newsletter_settings = config_data.get("newsletter_settings", {})
+            # 기본 설정과 병합
+            default_settings.update(newsletter_settings)
+    except Exception as e:
+        logger.warning(
+            f"Could not load newsletter settings from {config_file}: {e}"
+        )
 
-        try:
-            if os.path.exists(config_file):
-                with open(config_file, "r", encoding="utf-8") as f:
-                    config_data = yaml.safe_load(f)
-
-                newsletter_settings = config_data.get("newsletter_settings", {})
-                # 기본 설정과 병합
-                default_settings.update(newsletter_settings)
-        except Exception as e:
-            logger.warning(
-                f"Could not load newsletter settings from {config_file}: {e}"
-            )
-
-        return default_settings
+    return default_settings
 
 
 # Example usage (for testing purposes):

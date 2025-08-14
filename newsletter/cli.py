@@ -1929,5 +1929,11 @@ def interactive_keyword_review(keywords: List[str], domain: str) -> List[str]:
     return current_keywords
 
 
+# Main function for backward compatibility with tests
+def main():
+    """Main entry point for the CLI application"""
+    app()
+
+
 if __name__ == "__main__":
     app()

@@ -16,21 +16,84 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from rich import box
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
-from rich.table import Table
-from rich.text import Text
+# Store original print function to avoid recursion issues with web/app.py print override
+import builtins
+_original_print = builtins.print
 
-# Rich console 인스턴스
-console = Console()
+try:
+    from rich import box
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+    from rich.table import Table
+    from rich.text import Text
+    RICH_AVAILABLE = True
+    # Rich console 인스턴스
+    console = Console()
+except ImportError as e:
+    _original_print(f"[WARNING] Rich library import failed: {e}")
+    _original_print("[WARNING] Falling back to basic logging without rich formatting")
+    RICH_AVAILABLE = False
+    
+    # Mock implementations to prevent AttributeError
+    class MockBox:
+        ROUNDED = "rounded"
+        DOUBLE = "double"
+    
+    class MockConsole:
+        def print(self, *args, **kwargs):
+            # Fallback to original print, stripping rich markup
+            message = str(args[0]) if args else ""
+            # Remove rich markup tags
+            import re
+            clean_message = re.sub(r'\[/?[^\]]*\]', '', message)
+            _original_print(clean_message)
+    
+    class MockTable:
+        def __init__(self, title=None, box=None):
+            self.title = title
+            self.rows = []
+            
+        def add_column(self, *args, **kwargs):
+            pass
+            
+        def add_row(self, *args, **kwargs):
+            self.rows.append(args)
+    
+    class MockPanel:
+        def __init__(self, text, title=None, box=None, padding=None):
+            self.text = text
+            self.title = title
+    
+    class MockProgress:
+        def __init__(self, *args, **kwargs):
+            pass
+            
+        def __enter__(self):
+            return self
+            
+        def __exit__(self, *args):
+            pass
+            
+        def add_task(self, *args, **kwargs):
+            return "mock_task"
+            
+        def update(self, *args, **kwargs):
+            pass
+    
+    box = MockBox()
+    console = MockConsole()
+    Panel = MockPanel
+    Table = MockTable
+    Progress = MockProgress
+    # Other classes as None since they're less critical
+    BarColumn = SpinnerColumn = TextColumn = TimeElapsedColumn = Text = None
 
 
 class NewsletterLogger:
@@ -48,6 +111,10 @@ class NewsletterLogger:
         self.step_start_times: Dict[str, float] = {}
         self.statistics: Dict[str, Any] = {}
 
+        # Test mode detection for safer logging
+        import sys
+        self.test_mode = "pytest" in sys.modules or os.getenv("TESTING") == "1"
+        
         # 표준 로거 설정
         self.logger = logging.getLogger(name)
         self.logger.setLevel(self.log_level)
@@ -64,28 +131,48 @@ class NewsletterLogger:
     def debug(self, message: str, **kwargs):
         """디버그 메시지 출력 (개발자용)"""
         if self.log_level <= logging.DEBUG:
-            console.print(f"[dim cyan][DEBUG][/dim cyan] {message}", **kwargs)
+            # In test mode, use simple output to avoid Rich recursion
+            if self.test_mode or not RICH_AVAILABLE:
+                _original_print(f"[DEBUG] {message}")
+            else:
+                console.print(f"[dim cyan][DEBUG][/dim cyan] {message}", **kwargs)
         self.logger.debug(message)
 
     def info(self, message: str, **kwargs):
         """일반 정보 메시지"""
         if self.log_level <= logging.INFO:
-            console.print(f"[blue][INFO][/blue] {message}", **kwargs)
+            # In test mode, use simple output to avoid Rich recursion
+            if self.test_mode or not RICH_AVAILABLE:
+                _original_print(f"[INFO] {message}")
+            else:
+                console.print(f"[blue][INFO][/blue] {message}", **kwargs)
         self.logger.info(message)
 
     def warning(self, message: str, **kwargs):
         """경고 메시지"""
-        console.print(f"[yellow][WARNING][/yellow] {message}", **kwargs)
+        # In test mode, use simple output to avoid Rich recursion
+        if self.test_mode or not RICH_AVAILABLE:
+            _original_print(f"[WARNING] {message}")
+        else:
+            console.print(f"[yellow][WARNING][/yellow] {message}", **kwargs)
         self.logger.warning(message)
 
     def error(self, message: str, **kwargs):
         """오류 메시지"""
-        console.print(f"[red][ERROR][/red] {message}", **kwargs)
+        # In test mode, use simple output to avoid Rich recursion
+        if self.test_mode or not RICH_AVAILABLE:
+            _original_print(f"[ERROR] {message}")
+        else:
+            console.print(f"[red][ERROR][/red] {message}", **kwargs)
         self.logger.error(message)
 
     def success(self, message: str, **kwargs):
         """성공 메시지"""
-        console.print(f"[green][SUCCESS][/green] {message}", **kwargs)
+        # In test mode, use simple output to avoid Rich recursion
+        if self.test_mode or not RICH_AVAILABLE:
+            _original_print(f"[SUCCESS] {message}")
+        else:
+            console.print(f"[green][SUCCESS][/green] {message}", **kwargs)
         self.logger.info(f"SUCCESS: {message}")
 
     def step(self, message: str, step_name: Optional[str] = None, **kwargs):

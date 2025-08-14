@@ -40,21 +40,30 @@ except Exception:
 # Redirect print() to structured logger with level inference
 try:
     import builtins
+    
+    # Store original print function to avoid recursion
+    _original_print = builtins.print
 
     def _print_to_logger(*args, **kwargs):
         message = " ".join(str(a) for a in args)
         lowered = message.lower()
-        if any(tag in message for tag in ["[ERROR]", "❌"]) or "오류" in message:
-            logger.error(message)
-        elif any(tag in message for tag in ["[WARNING]", "⚠️"]) or "경고" in message:
-            logger.warning(message)
-        elif (
-            any(tag in message for tag in ["[DEBUG]", "🔧", "[완료] debug"])
-            or "debug" in lowered
-        ):
-            logger.debug(message)
-        else:
-            logger.info(message)
+        
+        # Use original print to avoid recursion with Rich library
+        try:
+            if any(tag in message for tag in ["[ERROR]", "❌"]) or "오류" in message:
+                _original_print(f"[ERROR] {message}", file=sys.stderr)
+            elif any(tag in message for tag in ["[WARNING]", "⚠️"]) or "경고" in message:
+                _original_print(f"[WARNING] {message}", file=sys.stderr)
+            elif (
+                any(tag in message for tag in ["[DEBUG]", "🔧", "[완료] debug"])
+                or "debug" in lowered
+            ):
+                _original_print(f"[DEBUG] {message}")
+            else:
+                _original_print(f"[INFO] {message}")
+        except Exception:
+            # Fallback to original print if anything fails
+            _original_print(*args, **kwargs)
 
     builtins.print = _print_to_logger
 except Exception:
@@ -1529,11 +1538,11 @@ def get_newsletter():
         # 뉴스레터 생성
         result = newsletter_cli.generate_newsletter(
             keywords=keywords,
-            domain=validated_data.domain,
+            domain=topic if topic else None,  # GET endpoint uses topic parameter as domain
             template_style=template_style,
             email_compatible=email_compatible,
             period=period,
-            suggest_count=validated_data.suggest_count,
+            suggest_count=10,  # Default suggest_count for GET endpoint
         )
 
         if result["status"] == "success":
