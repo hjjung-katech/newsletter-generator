@@ -1,25 +1,16 @@
 name: 🔒 Security Scan
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - '**.py'
-      - 'Dockerfile'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - '.github/workflows/security-scan.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - '**.py'
-      - 'Dockerfile'
-      - 'requirements*.txt'
-      - 'pyproject.toml'
-      - '.github/workflows/security-scan.yml'
   schedule:
     # 매주 월요일 오전 2시 (UTC)에 정기 스캔
     - cron: '0 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      full_scan:
+        description: 'Run full security scan including Docker'
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   detect-secrets:
@@ -134,7 +125,7 @@ jobs:
   trivy-docker-scan:
     name: 🐳 Docker Image Security Scan
     runs-on: ubuntu-latest
-    if: contains(github.event.head_commit.modified, 'Dockerfile') || github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.full_scan == 'true')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
