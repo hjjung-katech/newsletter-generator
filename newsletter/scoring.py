@@ -347,13 +347,13 @@ def score_articles(
         tier_stats[tier_name]["count"] += 1
         tier_stats[tier_name]["scores"].append(article["priority_score"])
 
-    logger.info("📊 Source Tier 분포 및 점수 통계:")
+    logger.info("[통계] Source Tier 분포 및 점수 통계:")
     for tier_name, stats in tier_stats.items():
         avg_score = (
             sum(stats["scores"]) / len(stats["scores"]) if stats["scores"] else 0
         )
         logger.info(
-            f"  • {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}"
+            f"  - {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}"
         )
 
     if top_n is None:

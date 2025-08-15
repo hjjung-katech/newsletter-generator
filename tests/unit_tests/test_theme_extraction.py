@@ -1,86 +1,98 @@
-import os
-from datetime import datetime
-from pathlib import Path
+import unittest
+from unittest.mock import patch
 
 import pytest
 
-from newsletter import config
+from newsletter.llm_factory import get_llm_for_task
 from newsletter.tools import (
     extract_common_theme_fallback,
     extract_common_theme_from_keywords,
+    get_filename_safe_theme,
 )
 
 
-def test_extract_common_theme_fallback():
-    """키워드 공통 주제 추출 폴백 방식 테스트"""
+class TestThemeExtraction(unittest.TestCase):
 
-    # 테스트 케이스 1: 단일 키워드
-    keywords1 = ["인공지능"]
-    result1 = extract_common_theme_fallback(keywords1)
-    assert result1 == "인공지능"
+    def test_extract_common_theme_fallback_single_keyword(self):
+        """Test that fallback returns single keyword unchanged"""
+        result = extract_common_theme_fallback(["AI 기술"])
+        self.assertEqual(result, "AI 기술")
 
-    # 테스트 케이스 2: 2-3개 키워드
-    keywords2 = ["인공지능", "머신러닝", "딥러닝"]
-    result2 = extract_common_theme_fallback(keywords2)
-    assert result2 == "인공지능, 머신러닝, 딥러닝"
+    def test_extract_common_theme_fallback_empty_list(self):
+        """Test that fallback handles empty list"""
+        result = extract_common_theme_fallback([])
+        self.assertEqual(result, "")
 
-    # 테스트 케이스 3: 4개 이상 키워드
-    keywords3 = ["인공지능", "머신러닝", "딥러닝", "강화학습", "자연어처리"]
-    result3 = extract_common_theme_fallback(keywords3)
-    assert result3 == "인공지능 외 4개 분야"
+    def test_extract_common_theme_fallback_multiple_keywords(self):
+        """Test that fallback combines multiple keywords correctly"""
+        result = extract_common_theme_fallback(["AI", "머신러닝", "딥러닝"])
+        self.assertEqual(result, "AI, 머신러닝, 딥러닝")
 
-    # 테스트 케이스 4: 문자열로 된 키워드
-    keywords4 = "인공지능, 머신러닝, 딥러닝"
-    result4 = extract_common_theme_fallback(keywords4)
-    assert result4 == "인공지능, 머신러닝, 딥러닝"
+    def test_extract_common_theme_fallback_more_than_three_keywords(self):
+        """Test that fallback formats more than three keywords correctly"""
+        result = extract_common_theme_fallback(
+            ["AI", "머신러닝", "딥러닝", "자연어처리"]
+        )
+        self.assertEqual(result, "AI 외 3개 분야")
+
+    def test_extract_common_theme_from_string(self):
+        """Test that extract_common_theme handles comma-separated string"""
+        result = extract_common_theme_fallback("AI, 머신러닝, 딥러닝")
+        self.assertEqual(result, "AI, 머신러닝, 딥러닝")
+
+    @patch(
+        "newsletter.tools.extract_common_theme_from_keywords",
+        side_effect=lambda x, y=None: "인공지능 기술",
+    )
+    def test_get_filename_safe_theme_with_domain(self, mock_extract):
+        """Test get_filename_safe_theme with domain parameter"""
+        result = get_filename_safe_theme(["AI", "머신러닝"], domain="인공지능")
+        self.assertEqual(result, "인공지능")
+        # Ensure extract_common_theme was not called
+        mock_extract.assert_not_called()
+
+    @patch(
+        "newsletter.tools.extract_common_theme_from_keywords",
+        side_effect=lambda x, y=None: "인공지능 기술",
+    )
+    def test_get_filename_safe_theme_single_keyword(self, mock_extract):
+        """Test get_filename_safe_theme with single keyword"""
+        result = get_filename_safe_theme(["AI 기술"])
+        self.assertEqual(result, "AI_기술")
+        # Ensure extract_common_theme was not called
+        mock_extract.assert_not_called()
+
+    @patch(
+        "newsletter.tools.extract_common_theme_from_keywords",
+        side_effect=lambda x, y=None: "인공지능 기술",
+    )
+    def test_get_filename_safe_theme_with_string(self, mock_extract):
+        """Test get_filename_safe_theme with comma-separated string"""
+        result = get_filename_safe_theme("AI, 머신러닝, 딥러닝")
+        self.assertEqual(result, "인공지능_기술")
+        # Ensure extract_common_theme was called
+        mock_extract.assert_called_once()
 
 
-def test_extract_common_theme_with_mock():
-    """키워드 공통 주제 추출 메인 함수 테스트 (API 호출 없이)"""
+@patch("newsletter.llm_factory.get_llm_for_task")
+def test_extract_common_theme_with_mock(mock_get_llm):
+    """Test theme extraction with a mocked LLM"""
+    # Mock the LLM response
+    mock_llm = mock_get_llm.return_value
+    mock_llm.invoke.return_value.content = "기술"
 
-    # 테스트를 위해 모든 API 키를 비활성화
-    original_config_gemini_key = config.GEMINI_API_KEY
-    original_config_openai_key = getattr(config, "OPENAI_API_KEY", None)
-    original_config_anthropic_key = getattr(config, "ANTHROPIC_API_KEY", None)
+    # Test cases
+    result_single = extract_common_theme_from_keywords(["블록체인"])
+    result_multiple = extract_common_theme_from_keywords(["AI", "머신러닝"])
 
-    # config 모두 비활성화
-    config.GEMINI_API_KEY = None
-    config.OPENAI_API_KEY = None
-    config.ANTHROPIC_API_KEY = None
+    # Assertions
+    assert result_single == "기술"  # The mock will return '기술' regardless of input
+    assert result_multiple == "기술"
 
-    try:
-        # 테스트 케이스: 여러 키워드
-        keywords = ["인공지능", "머신러닝", "딥러닝"]
-        result = extract_common_theme_from_keywords(keywords)
-
-        # Mock 환경이거나 API 키가 없는 경우 fallback 결과 확인
-        # fallback은 3개 이하 키워드일 때 ", ".join(keywords) 반환
-        expected = "인공지능, 머신러닝, 딥러닝"
-        # 하지만 Mock LLM이 사용될 수도 있으므로 유연하게 처리
-        if result == "인공지능":  # Mock LLM이 첫 번째 키워드만 반환하는 경우
-            assert result == "인공지능"
-        else:
-            assert result == expected, f"Expected '{expected}', got '{result}'"
-
-        # 단일 키워드 테스트 (API 없이)
-        single_keyword = ["블록체인"]
-        result_single = extract_common_theme_from_keywords(single_keyword)
-        assert result_single == "블록체인"  # 단일 키워드는 그대로 반환
-
-        # 문자열 키워드 테스트 (API 없이)
-        keywords_str = "메타버스, NFT, 가상현실"
-        result_str = extract_common_theme_from_keywords(keywords_str)
-        expected_str = extract_common_theme_fallback(keywords_str)
-        assert result_str == expected_str
-
-    finally:
-        # config 복원
-        config.GEMINI_API_KEY = original_config_gemini_key
-        config.OPENAI_API_KEY = original_config_openai_key
-        config.ANTHROPIC_API_KEY = original_config_anthropic_key
+    # Verify that the mock was called
+    assert mock_get_llm.called
+    assert mock_llm.invoke.called
 
 
 if __name__ == "__main__":
-    test_extract_common_theme_fallback()
-    test_extract_common_theme_with_mock()
-    print("All unit tests passed!")
+    unittest.main()

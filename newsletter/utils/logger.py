@@ -11,6 +11,8 @@
 
 import logging
 import os
+import sys
+import io
 import time
 from contextlib import contextmanager
 from datetime import datetime
@@ -121,12 +123,23 @@ class NewsletterLogger:
 
         # 핸들러가 이미 있는지 확인하여 중복 방지
         if not self.logger.handlers:
-            handler = logging.StreamHandler()
+            # UTF-8 인코딩을 지원하는 스트림 핸들러 생성
+            handler = logging.StreamHandler(sys.stdout)
+            
+            # Windows에서 UTF-8 인코딩 설정
+            if sys.platform == 'win32':
+                import locale
+                if sys.stdout.encoding != 'utf-8':
+                    sys.stdout.reconfigure(encoding='utf-8')
+            
             formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt='%Y-%m-%d %H:%M:%S'
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
+            # 부모 로거로 전파 방지 (중복 로그 방지)
+            self.logger.propagate = False
 
     def debug(self, message: str, **kwargs):
         """디버그 메시지 출력 (개발자용)"""
@@ -221,9 +234,9 @@ class NewsletterLogger:
         """키워드별 수집 결과 간략 표시"""
         total_articles = sum(keyword_counts.values())
 
-        console.print(f"[cyan]📰 뉴스 수집 결과:[/cyan]")
+        console.print(f"[cyan][뉴스] 수집 결과:[/cyan]")
         for keyword, count in keyword_counts.items():
-            console.print(f"  • [white]{keyword}:[/white] [bold]{count}개[/bold]")
+            console.print(f"  - [white]{keyword}:[/white] [bold]{count}개[/bold]")
         console.print(f"[bold cyan]  총 {total_articles}개 수집[/bold cyan]")
 
         self.update_statistics("total_collected_articles", total_articles)
@@ -378,7 +391,7 @@ class NewsletterLogger:
             return
 
         summary_text = Text()
-        summary_text.append("📊 생성 완료 요약\n\n", style="bold green")
+        summary_text.append("[요약] 생성 완료 요약\n\n", style="bold green")
 
         # 기사 관련 통계
         if "total_collected_articles" in self.statistics:

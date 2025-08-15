@@ -207,7 +207,7 @@ class TestF14PerformanceSettings:
         enable_test_mode(env_vars)
         try:
             settings = get_settings()
-            assert settings.enable_fast_mode == True
+            assert settings.enable_fast_mode
             assert settings.llm_request_timeout == 150
         finally:
             disable_test_mode()

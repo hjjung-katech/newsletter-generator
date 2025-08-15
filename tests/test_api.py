@@ -217,10 +217,9 @@ class TestMockModeValidation:
         """Mock 모드가 비활성화되었는지 확인"""
         # 환경 변수를 다시 로드하기 위해 config 모듈 재임포트
         import importlib
+        import newsletter.config
 
-        from newsletter import config
-
-        importlib.reload(config)
+        importlib.reload(newsletter.config)
 
         response = client.get("/health")
         data = json.loads(response.data)

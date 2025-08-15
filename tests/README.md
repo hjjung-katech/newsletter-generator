@@ -1,238 +1,114 @@
 # Newsletter Generator 테스트 가이드
 
-## 📁 개선된 테스트 구조
+## 🧪 테스트 철학
+
+이 프로젝트의 테스트는 **신뢰성**과 **속도**를 핵심 가치로 삼습니다. CI/CD 파이프라인에서는 빠르고 안정적인 단위 테스트와 모킹(Mocking) 기반의 통합 테스트를 실행하여 변경사항을 신속하게 검증합니다. 실제 API를 호출하거나 웹 서버에 의존하는 E2E 테스트는 개발자가 로컬 환경이나 스테이징 환경에서 수동으로 실행하여 실제 사용 시나리오를 검증합니다.
+
+## 📂 테스트 구조
+
+테스트는 목적에 따라 명확하게 분류되어 관리됩니다.
 
 ```
 tests/
-├── unit_tests/           # 단위 테스트 (외부 의존성 없음)
-│   ├── web/             # 웹 관련 단위 테스트
-│   ├── test_config_manager.py
-│   └── test_scrape_dates.py
-├── integration/         # 통합 테스트 (시스템 컴포넌트 간 상호작용)
-│   ├── test_cli_integration.py
-│   ├── test_web_integration.py
-│   └── test_web_api.py
-├── e2e/                 # End-to-End 테스트 (웹 서버 필요)
-│   ├── test_railway_e2e.py     # ← 이동 필요
-│   └── test_deployment.py
-├── manual/              # 수동 테스트 (사용자 상호작용 필요)
-│   ├── test_api.py      # 웹 서버 필요
-│   └── test_api.ps1     # PowerShell 스크립트
-├── api_tests/           # 외부 API 테스트
-├── deployment/          # 배포 관련 테스트
-│   ├── smoke_test.py    # ← 이동 필요
-│   └── test_railway.py  # ← 이동 필요
-├── test_data/           # 테스트 데이터
-├── test_mail.py         # 메일 시스템 테스트
-├── run_essential_tests.py  # 필수 테스트 실행기
-└── README.md            # 이 파일
+├── test_data/              # 🧪 테스트 실행에 사용되는 데이터 파일
+├── test_api.py             # 🌐 웹 API 동작 검증 (웹 서버 의존)
+├── test_article_filter.py  # 🧹 기사 필터링 및 정제 로직 검증
+├── test_chains.py          # ⛓️ LangChain 및 LangGraph 체인 검증
+├── test_ci.py              # 🤖 CI 환경 특별 케이스 검증
+├── test_compose.py         # 📝 뉴스레터 콘텐츠 생성 및 템플릿 렌더링 통합 검증
+├── test_delivery.py        # 📧 이메일 및 로컬 파일 전송 기능 통합 검증
+├── test_minimal.py         # 📦 최소 설치 환경 동작 검증
+├── test_news_integration.py # 🔗 기사 수집부터 처리까지의 통합 흐름 검증
+├── test_scoring.py         # 💯 기사 점수 계산 로직 검증
+├── test_security.py        # 🛡️ 보안 관련 기능 검증
+├── test_suggest.py         # ✨ 키워드 추천 기능 검증
+├── test_tools.py           # 🛠️ 외부 API 연동 도구(검색, 키워드 생성 등) 검증
+└── README.md               # 📖 이 파일
 ```
 
-## 🧪 테스트 카테고리 및 실행 방법
+### 주요 테스트 파일 설명
 
-### 1. 단위 테스트 (Unit Tests) ⚡
-- **목적**: 개별 함수/클래스의 기능 검증
-- **특징**: 빠른 실행 (< 10초), 외부 의존성 없음
-- **실행**: `python -m pytest tests/unit_tests/ -v`
-- **CI/CD**: 항상 실행
+- **`test_compose.py`**: 상세(Detailed) 및 요약(Compact) 뉴스레터의 HTML 생성, 템플릿 데이터 처리, 테마 생성 등 전반적인 콘텐츠 구성(Composition) 과정을 통합적으로 테스트합니다.
+- **`test_delivery.py`**: Postmark API를 이용한 이메일 발송 및 로컬 파일 저장 기능을 통합적으로 테스트합니다.
+- **`test_news_integration.py`**: 사용자의 키워드 입력부터 기사 수집, 필터링, 점수 계산까지 이어지는 핵심 데이터 파이프라인을 검증하는 가장 중요한 통합 테스트 중 하나입니다.
+- **`test_tools.py`**: `Serper`, `Gemini` 등 외부 API를 호출하는 각 도구의 요청/응답 형식을 모킹하여 테스트합니다.
 
-### 2. 통합 테스트 (Integration Tests) 🔗
-- **목적**: 컴포넌트 간 상호작용 검증
-- **특징**: 시스템 전체 설정 필요, Mock API 사용
-- **실행**: `RUN_INTEGRATION_TESTS=1 python -m pytest tests/integration/ -v`
-- **CI/CD**: PR 시 실행
+## 🚀 테스트 실행 방법
 
-### 3. E2E 테스트 (End-to-End Tests) 🌐
-- **목적**: 전체 사용자 워크플로우 검증
-- **특징**: **웹 서버 실행 필수**, 실제 API 호출 가능
-- **실행**: 
-  ```bash
-  # 1. 웹 서버 실행 (별도 터미널)
-  cd web && python app.py
-  
-  # 2. E2E 테스트 실행
-  python -m pytest tests/e2e/ -v
-  ```
-- **CI/CD**: 수동 실행 또는 스테이징 환경
+### 1. 빠른 단위/통합 테스트 (개발 중 권장)
 
-### 4. 배포 테스트 (Deployment Tests) 🚀
-- **목적**: 배포 환경 검증
-- **특징**: 실제 배포된 서비스에 대한 검증
-- **실행**: 
-  ```bash
-  # Railway 배포 후
-  python tests/deployment/smoke_test.py --railway
-  python tests/deployment/test_railway.py --production
-  ```
+외부 API 호출 없이, 모킹된 데이터를 사용하여 빠르게 실행됩니다. CI 환경에서 기본으로 실행되는 테스트입니다.
 
-### 5. 수동 테스트 (Manual Tests) 👤
-- **목적**: 사용자 상호작용이나 특별한 환경 필요
-- **실행**: `python -m pytest tests/manual/ -v -m manual`
-
-## 🚀 권장 테스트 실행 방법
-
-### 개발 중 (일반적인 경우)
 ```bash
-# 1. 빠른 단위 테스트만
-python -m pytest tests/unit_tests/ -v
-
-# 2. 필수 기능 검증
-python tests/run_essential_tests.py
-
-# 3. Mock API 포함 전체 테스트 (E2E 제외)
-python run_tests.py dev
+pytest
 ```
 
-### 기능 완성 후 (통합 검증)
+### 2. 특정 기능 테스트
+
+특정 파일이나 디렉토리를 지정하여 테스트를 실행할 수 있습니다.
+
 ```bash
-# 1. 통합 테스트 포함
-RUN_INTEGRATION_TESTS=1 python run_tests.py dev
+# 컴포지션 관련 기능만 테스트
+pytest tests/test_compose.py
 
-# 2. 웹 서버 실행 후 E2E 테스트
-# Terminal 1: cd web && python app.py
-# Terminal 2: python -m pytest tests/e2e/ -v
+# 이메일 발송 기능만 테스트
+pytest tests/test_delivery.py
 ```
 
-### 배포 전 (전체 검증)
+### 3. 실제 API를 이용한 통합 테스트 (수동 실행)
+
+**주의: 이 테스트는 실제 API 크레딧을 사용합니다.**
+
+로컬 환경에서 `.env` 파일에 실제 API 키를 설정한 후, 아래 명령어로 실행할 수 있습니다.
+
 ```bash
-# 실제 API 사용 전체 테스트
-python run_tests.py full
+# POSTMARK_SERVER_TOKEN, TEST_EMAIL_RECIPIENT 환경변수 설정 필요
+pytest --run-integration
 ```
 
-### 배포 후 (운영 검증)
+## 🏷️ Pytest 마커
+
+테스트 실행 범위를 효과적으로 제어하기 위해 마커를 사용합니다.
+
+- `@pytest.mark.unit`: 외부 의존성이 없는 순수한 단위 테스트입니다.
+- `@pytest.mark.mock_api`: `requests`나 외부 라이브러리를 모킹하여 API 상호작용을 시뮬레이션하는 테스트입니다.
+- `@pytest.mark.integration`: 실제 API 키가 있을 경우, 외부 서비스와 실제로 통신하여 통합 동작을 검증하는 테스트입니다. (CI에서는 기본적으로 비활성화)
+
 ```bash
-# Railway 배포 검증
-python tests/deployment/smoke_test.py --railway
+# 단위 테스트만 실행
+pytest -m unit
+
+# 모킹된 API 테스트만 실행
+pytest -m mock_api
+
+# 통합 테스트만 실행 (API 키 필요)
+pytest -m integration
 ```
-
-## 🏷️ 테스트 마커 시스템
-
-프로젝트에서 사용하는 pytest 마커:
-
-- `@pytest.mark.unit`: 단위 테스트
-- `@pytest.mark.integration`: 통합 테스트  
-- `@pytest.mark.e2e`: E2E 테스트 (웹 서버 필요)
-- `@pytest.mark.real_api`: 실제 API 호출 필요
-- `@pytest.mark.mock_api`: Mock API 사용
-- `@pytest.mark.manual`: 수동 테스트
-- `@pytest.mark.deployment`: 배포 테스트
-
-## ⚙️ 환경 변수 가이드
-
-### 테스트 실행 제어
-- `RUN_REAL_API_TESTS=1`: 실제 API 테스트 활성화
-- `RUN_INTEGRATION_TESTS=1`: 통합 테스트 활성화
-- `TEST_EMAIL_RECIPIENT`: 테스트 이메일 수신자
-
-### E2E/배포 테스트
-- `TEST_BASE_URL`: E2E 테스트 대상 URL (기본: http://localhost:5000)
-- `RAILWAY_PRODUCTION_URL`: Railway 배포 URL
-- `DEPLOYED_URL`: 일반 배포 URL
-
-### API 키 (실제 API 테스트 시)
-- `GEMINI_API_KEY`: Google Gemini API
-- `POSTMARK_SERVER_TOKEN`: 이메일 발송
-- `SERPER_API_KEY`: 검색 API
 
 ## 🔧 테스트 환경 설정
 
-### 웹 서버 의존성 확인
-E2E 테스트 실행 전 웹 서버 상태 확인:
-```python
-def check_web_server(base_url="http://localhost:5000"):
-    try:
-        response = requests.get(f"{base_url}/health", timeout=5)
-        return response.status_code == 200
-    except:
-        return False
+### 의존성 설치
 
-# E2E 테스트에서 사용
-@pytest.fixture(autouse=True)
-def ensure_web_server():
-    if not check_web_server():
-        pytest.skip("웹 서버가 실행되지 않음. 먼저 'cd web && python app.py' 실행 필요")
+테스트 실행에 필요한 모든 의존성은 `requirements.txt`와 `requirements-dev.txt`에 정의되어 있습니다.
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
-### Mock 설정 개선
-ConfigManager 상태 격리:
-```python
-@pytest.fixture(autouse=True)
-def reset_config():
-    ConfigManager.reset_for_testing()
-    yield
-    ConfigManager.reset_for_testing()
+### 환경 변수
+
+실제 API를 사용하는 통합 테스트를 실행하려면, 프로젝트 루트에 `.env` 파일을 생성하고 아래와 같이 필요한 키를 설정해야 합니다.
+
+```dotenv
+# .env.example 파일을 복사하여 사용하세요.
+
+# 이메일 통합 테스트용
+POSTMARK_SERVER_TOKEN="your_postmark_token"
+EMAIL_SENDER="sender@example.com"
+TEST_EMAIL_RECIPIENT="recipient@example.com"
+
+# 뉴스 검색 및 LLM 기능 테스트용
+SERPER_API_KEY="your_serper_key"
+GEMINI_API_KEY="your_gemini_key"
 ```
-
-## 📊 테스트 품질 메트릭
-
-### 성능 기준
-- 단위 테스트: < 10초
-- 통합 테스트: < 30초  
-- E2E 테스트: < 2분
-- 전체 테스트: < 5분
-
-### 커버리지 목표
-- 단위 테스트: > 80%
-- 통합 테스트: > 60%
-- 전체 커버리지: > 70%
-
-## 🚨 문제 해결 가이드
-
-### E2E 테스트 연결 오류
-```
-httpx.ConnectError: [WinError 10061] 대상 컴퓨터에서 연결을 거부
-```
-**해결**: 웹 서버가 실행되지 않음. `cd web && python app.py` 먼저 실행
-
-### API 키 관련 오류
-```
-External API dependency failed: API key error
-```
-**해결**: `.env` 파일에 필요한 API 키 설정 또는 Mock 테스트로 전환
-
-### ConfigManager 상태 공유 문제
-```python
-# 테스트 시작 시 항상 초기화
-ConfigManager.reset_for_testing()
-```
-
-### 웹 서버 자동 시작 (선택사항)
-E2E 테스트용 웹 서버 자동 시작:
-```python
-@pytest.fixture(scope="session")
-def web_server():
-    # 웹 서버 프로세스 시작
-    import subprocess
-    process = subprocess.Popen([sys.executable, "web/app.py"])
-    time.sleep(3)  # 서버 시작 대기
-    yield
-    process.terminate()
-```
-
-## 📝 새로운 테스트 작성 가이드
-
-### 1. 적절한 카테고리 선택
-- 외부 의존성 없음 → `unit_tests/`
-- 컴포넌트 간 상호작용 → `integration/`  
-- 웹 UI/API 워크플로우 → `e2e/`
-- 배포 환경 검증 → `deployment/`
-
-### 2. 마커 및 환경 설정
-```python
-@pytest.mark.unit
-@pytest.mark.mock_api
-def test_my_function():
-    ConfigManager.reset_for_testing()
-    # 테스트 로직
-```
-
-### 3. 웹 서버 의존성 처리
-```python
-@pytest.mark.e2e
-def test_web_endpoint():
-    if not check_web_server():
-        pytest.skip("웹 서버 필요")
-    # E2E 테스트 로직
-```
-
-이 개선된 구조를 통해 안정적이고 유지보수 가능한 테스트 환경을 제공하며, 개발 단계별로 적절한 테스트를 실행할 수 있습니다.
