@@ -7,11 +7,7 @@ from typing import Any, Dict, List, Tuple
 import yaml
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .date_utils import (
-    extract_source_and_date,
-    format_date_for_display,
-    standardize_date,
-)
+from .date_utils import extract_source_and_date, format_date_for_display
 from .utils.logger import get_logger
 
 # 로거 초기화
@@ -82,9 +78,7 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
             "sections": [
                 {
                     "title": "주요 기술 동향",
-                    "summary_paragraphs": [
-                        "다음은 지난 한 주간의 주요 기술 동향 요약입니다."
-                    ],
+                    "summary_paragraphs": ["다음은 지난 한 주간의 주요 기술 동향 요약입니다."],
                     "news_links": [],
                 }
             ],
@@ -518,9 +512,7 @@ def render_newsletter_template(
             **common_context,
             "tagline": data.get(
                 "tagline",
-                newsletter_settings.get(
-                    "tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."
-                ),
+                newsletter_settings.get("tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."),
             ),
             "grouped_sections": grouped_sections,
         }
@@ -587,9 +579,7 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
         sections = [
             {
                 "title": "주요 기술 동향",
-                "summary_paragraphs": [
-                    "다음은 지난 한 주간의 주요 기술 동향 요약입니다."
-                ],
+                "summary_paragraphs": ["다음은 지난 한 주간의 주요 기술 동향 요약입니다."],
                 "news_links": [],
             }
         ]
@@ -599,9 +589,9 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
         for article in data[:top_count]:
             # summary_text 필드를 우선으로 하고, 없으면 content나 snippet 사용
             article_content = (
-                article.get("summary_text") or 
-                article.get("content") or 
-                article.get("snippet", "")
+                article.get("summary_text")
+                or article.get("content")
+                or article.get("snippet", "")
             )
             top_article = {
                 "title": article.get("title", "제목 없음"),
@@ -620,9 +610,9 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
         for article in data[top_count:]:
             # summary_text 필드를 우선으로 하고, 없으면 content나 snippet 사용
             article_content = (
-                article.get("summary_text") or 
-                article.get("content") or 
-                article.get("snippet", "")
+                article.get("summary_text")
+                or article.get("content")
+                or article.get("snippet", "")
             )
             link_info = {
                 "title": article.get("title", "제목 없음"),
@@ -655,9 +645,7 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
             loader=FileSystemLoader(template_dir),
             autoescape=select_autoescape(["html", "xml"]),
         )
-        template = env.get_template(
-            template_name
-        )  # 여기서 TemplateNotFound 예외 발생 가능
+        template = env.get_template(template_name)  # 여기서 TemplateNotFound 예외 발생 가능
 
         # 현재 날짜와 시간 가져오기
         current_date = datetime.now().strftime("%Y-%m-%d")
@@ -710,15 +698,11 @@ def compose_compact_newsletter_html(
             loader=FileSystemLoader(template_dir),
             autoescape=select_autoescape(["html", "xml"]),
         )
-        template = env.get_template(
-            template_name
-        )  # 여기서 TemplateNotFound 예외 발생 가능
+        template = env.get_template(template_name)  # 여기서 TemplateNotFound 예외 발생 가능
 
         # 간단한 컨텍스트로 렌더링
         context = {
-            "newsletter_title": data.get(
-                "newsletter_topic", "주간 산업 동향 뉴스 클리핑"
-            ),
+            "newsletter_title": data.get("newsletter_topic", "주간 산업 동향 뉴스 클리핑"),
             "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
             "generation_date": data.get(
                 "generation_date", datetime.now().strftime("%Y-%m-%d")
@@ -793,9 +777,7 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
     )
 
     compact_data = {
-        "newsletter_title": newsletter_data.get(
-            "newsletter_topic", "주간 산업 동향 브리프"
-        ),
+        "newsletter_title": newsletter_data.get("newsletter_topic", "주간 산업 동향 브리프"),
         "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
         "company_name": newsletter_data.get("company_name", "Your Company"),
         "generation_date": newsletter_data.get("generation_date"),
@@ -816,9 +798,7 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
 
     # Check if grouped_sections already exist in the input data
     if "grouped_sections" in newsletter_data:
-        logger.debug(
-            f"기존 그룹화된 섹션을 사용합니다: {len(newsletter_data['grouped_sections'])}개"
-        )
+        logger.debug(f"기존 그룹화된 섹션을 사용합니다: {len(newsletter_data['grouped_sections'])}개")
         compact_data["grouped_sections"] = newsletter_data["grouped_sections"]
     else:
         logger.debug("섹션에서 그룹화된 섹션을 생성합니다")
@@ -1050,9 +1030,9 @@ def load_newsletter_settings(config_file: str = "config.yml") -> Dict[str, Any]:
         Dict[str, Any]: 뉴스레터 설정 딕셔너리
     """
     from .centralized_settings import get_settings
-    
+
     settings = get_settings()
-    
+
     # 기본 설정 (CentralizedSettings 기반)
     default_settings = {
         "newsletter_title": "주간 산업 동향 뉴스 클리핑",
@@ -1076,9 +1056,7 @@ def load_newsletter_settings(config_file: str = "config.yml") -> Dict[str, Any]:
             # 기본 설정과 병합
             default_settings.update(newsletter_settings)
     except Exception as e:
-        logger.warning(
-            f"Could not load newsletter settings from {config_file}: {e}"
-        )
+        logger.warning(f"Could not load newsletter settings from {config_file}: {e}")
 
     return default_settings
 

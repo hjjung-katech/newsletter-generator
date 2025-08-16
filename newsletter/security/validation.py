@@ -3,11 +3,11 @@
 """
 
 import re
-from typing import Any, List, Optional, Pattern
 from pathlib import Path
+from typing import Any, List, Optional, Pattern
 
-from pydantic import BaseModel, validator
 from fastapi import UploadFile
+from pydantic import BaseModel, validator
 
 from .config import SecurityConfig
 
@@ -17,13 +17,9 @@ security_config = SecurityConfig()
 class InputValidationError(Exception):
     """입력 검증 오류"""
 
-    pass
-
 
 class FileValidationError(InputValidationError):
     """파일 검증 오류"""
-
-    pass
 
 
 def sanitize_input(value: str) -> str:

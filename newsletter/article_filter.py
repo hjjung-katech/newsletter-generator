@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 from rich.console import Console
 
 from . import config
+from .date_utils import parse_date_string
 from .utils.logger import get_logger
 
 # 로거 초기화
@@ -61,7 +62,7 @@ def filter_articles_by_major_sources(
         else:
             other_articles.append(article)
 
-    console.print(f"[cyan]News source distribution:[/cyan]")
+    console.print("[cyan]News source distribution:[/cyan]")
     console.print(
         f"[green]- Tier 1 (major sources): {len(tier1_articles)} articles[/green]"
     )
@@ -77,23 +78,26 @@ def filter_articles_by_major_sources(
     tier1_count = min(len(tier1_articles), max(1, max_per_topic // 2))
     tier2_count = min(len(tier2_articles), max(1, max_per_topic // 3))
     other_count = max_per_topic - tier1_count - tier2_count
-    
+
     # 각 티어에서 기사 추가
     filtered_articles.extend(tier1_articles[:tier1_count])
     filtered_articles.extend(tier2_articles[:tier2_count])
     filtered_articles.extend(other_articles[:other_count])
-    
+
     # 아직 공간이 남으면 추가 기사 포함
     remaining_slots = max_per_topic - len(filtered_articles)
     if remaining_slots > 0:
         # 남은 기사들도 추가
-        remaining_articles = (tier1_articles[tier1_count:] + 
-                            tier2_articles[tier2_count:] + 
-                            other_articles[other_count:])
+        remaining_articles = (
+            tier1_articles[tier1_count:]
+            + tier2_articles[tier2_count:]
+            + other_articles[other_count:]
+        )
         filtered_articles.extend(remaining_articles[:remaining_slots])
 
     console.print(
-        f"[cyan]Filtered articles by major sources: {len(filtered_articles)} selected from {len(articles)} total[/cyan]"
+        "[cyan]Filtered articles by major sources: "
+        f"{len(filtered_articles)} selected from {len(articles)} total[/cyan]"
     )
 
     return filtered_articles
@@ -111,7 +115,7 @@ def group_articles_by_keywords(
     grouped_articles = {keyword: [] for keyword in keywords}
 
     def _tokenize(text: str) -> List[str]:
-        return re.findall(r"[가-힣a-zA-Z0-9]+", text.lower())
+        return re.findall(r"[가 - 힣a - zA - Z0 - 9]+", text.lower())
 
     def _tokens_in_context(
         text_tokens: List[str], tokens: List[str], window: int = 5
@@ -134,7 +138,7 @@ def group_articles_by_keywords(
     for i, article in enumerate(articles):
         full_text = f"{article.get('title', '')} {article.get('content', '')}".lower()
         tokens = _tokenize(full_text)
-        logger.debug(f"Processing article {i+1}: {full_text[:50]}...")
+        logger.debug(f"Processing article {i + 1}: {full_text[:50]}...")
 
         for keyword in keywords:
             variations = SYNONYMS.get(keyword, [keyword])
@@ -151,15 +155,17 @@ def group_articles_by_keywords(
                 if matched:
                     grouped_articles[keyword].append(article)
                     logger.debug(
-                        f"Article {i+1} matched keyword '{keyword}' via variant '{variant}'"
+                        f"Article {i + 1} matched keyword '{keyword}' "
+                        "via variant '{variant}'"
                     )
                     break
             if not matched:
-                logger.debug(f"Article {i+1} did not match keyword '{keyword}'")
+                logger.debug(f"Article {i + 1} did not match keyword '{keyword}'")
 
     for keyword in grouped_articles:
         logger.info(
-            f"Grouped {len(grouped_articles[keyword])} articles for keyword: '{keyword}'"
+            f"Grouped {len(grouped_articles[keyword])} articles "
+            "for keyword: '{keyword}'"
         )
 
     return grouped_articles
@@ -196,7 +202,7 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
             # 정규화된 URL 생성 (쿼리 파라미터 제외)
             normalized = f"{domain}{path}"
             return normalized
-        except:
+        except Exception:
             return url.lower()
 
     def normalize_title(title: str) -> str:
@@ -206,7 +212,7 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
         # 특수문자 제거, 공백 정규화, 소문자 변환
         import re
 
-        normalized = re.sub(r"[^\w\s가-힣]", "", title)
+        normalized = re.sub(r"[^\w\s가 - 힣]", "", title)
         normalized = re.sub(r"\s+", " ", normalized).strip().lower()
         return normalized
 
@@ -280,7 +286,8 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
         unique_articles.append(article)
 
     console.print(
-        f"[cyan]Removed {len(articles) - len(unique_articles)} duplicate articles[/cyan]"
+        f"[cyan]Removed {len(articles) - len(unique_articles)} "
+        "duplicate articles[/cyan]"
     )
     return unique_articles
 
@@ -319,7 +326,7 @@ def filter_articles_by_domains(
             domain = urlparse(url).netloc
             # www. 제거
             domain = re.sub(r"^www\.", "", domain)
-        except:
+        except Exception:
             # URL 파싱 실패시 전체 URL 사용
             domain = url
 
@@ -345,7 +352,8 @@ def filter_articles_by_domains(
         filtered_articles.extend(domain_articles[:max_per_domain])
 
     console.print(
-        f"[cyan]Filtered by domains: {len(filtered_articles)} selected from {len(articles)} total[/cyan]"
+        f"[cyan]Filtered by domains: {len(filtered_articles)} "
+        f"selected from {len(articles)} total[/cyan]"
     )
 
     return filtered_articles
@@ -386,9 +394,6 @@ def remove_similar_articles(
         f"[cyan]Removed {len(articles) - len(unique_articles)} similar articles[/cyan]"
     )
     return unique_articles
-
-
-from .date_utils import parse_date_string
 
 
 def calculate_article_importance(article: Dict[str, Any]) -> float:

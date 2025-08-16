@@ -1,11 +1,11 @@
 # 이 파일은 debug_files 디렉토리를 Git에서 추적하기 위한 목적입니다.
-# 
+#
 # debug_files 디렉토리는 디버깅 목적으로 생성되는 파일들이 저장되는 곳으로,
 # 디렉토리 구조는 유지하되 내용물은 .gitignore로 제외됩니다.
-# 
+#
 # 자동 생성되는 파일들:
 # - template_debug_*.txt (템플릿 디버그 파일)
 # - debug_*.json (디버그 JSON 파일)
 # - trace_*.txt (트레이스 파일)
-# 
-# 정리 도구: cleanup_debug_files.py를 사용하여 주기적으로 정리할 수 있습니다. 
+#
+# 정리 도구: cleanup_debug_files.py를 사용하여 주기적으로 정리할 수 있습니다.

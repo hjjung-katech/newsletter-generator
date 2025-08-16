@@ -4,18 +4,19 @@ Schedule Runner for Newsletter Generator
 Handles RRULE-based periodic newsletter generation
 """
 
-import os
-import sys
-import sqlite3
 import json
 import logging
+import os
+import sqlite3
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 import redis
-from rq import Queue
-from dateutil.rrule import rrulestr
 from dateutil import tz
+from dateutil.rrule import rrulestr
+from rq import Queue
 
 # Add current directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +29,7 @@ from tasks import generate_newsletter_task
 try:
     from web.time_utils import to_iso_utc  # PyInstaller
 except ImportError:
-    from time_utils import to_iso_utc      # Development
+    from time_utils import to_iso_utc  # Development
 
 # Configure logging
 logging.basicConfig(
@@ -57,7 +58,7 @@ class ScheduleRunner:
 
     def _parse_iso_datetime(self, iso_string: str) -> datetime:
         """Parse ISO datetime string, handling Z suffix properly"""
-        if iso_string.endswith('Z'):
+        if iso_string.endswith("Z"):
             # Remove Z and add UTC timezone
             return datetime.fromisoformat(iso_string[:-1]).replace(tzinfo=timezone.utc)
         else:
@@ -68,114 +69,150 @@ class ScheduleRunner:
         try:
             logger.info(f"[DEBUG] Using database path: {self.db_path}")
             logger.info(f"[DEBUG] Database file exists: {os.path.exists(self.db_path)}")
-            
+
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
             now = datetime.now(timezone.utc)
             logger.info(f"[DEBUG] Current time (UTC): {now}")
-            
+
             # Import time utilities and convert current time
             try:
                 from web.time_utils import to_iso_utc  # PyInstaller
             except ImportError:
-                from time_utils import to_iso_utc      # Development
+                from time_utils import to_iso_utc  # Development
             now_iso = to_iso_utc(now)
-            
+
             # 만료된 테스트 스케줄 정리
             cursor.execute(
                 "UPDATE schedules SET enabled = 0 WHERE is_test = 1 AND expires_at IS NOT NULL AND expires_at <= ?",
-                (now_iso,)
+                (now_iso,),
             )
             expired_count = cursor.rowcount
             if expired_count > 0:
                 logger.info(f"[DEBUG] Disabled {expired_count} expired test schedules")
-            
+
             # 모든 활성 스케줄 조회
             cursor.execute(
                 "SELECT id, params, rrule, next_run, created_at, is_test FROM schedules WHERE enabled = 1"
             )
             all_schedules = cursor.fetchall()
             logger.info(f"[DEBUG] Found {len(all_schedules)} total active schedules")
-            
+
             # 스케줄 실행 대기열과 만료된 스케줄 분리 처리
             ready_for_execution = []
             expired_schedules = []
             updated_count = 0
-            
-            # 정규 스케줄: 30분 윈도우, 테스트 스케줄: 10분 윈도우 
+
+            # 정규 스케줄: 30분 윈도우, 테스트 스케줄: 10분 윈도우
             regular_window = timedelta(minutes=30)
             test_window = timedelta(minutes=10)
-            
+
             for schedule in all_schedules:
-                schedule_id, params, rrule_str, next_run_str, created_at, is_test = schedule
-                
+                (
+                    schedule_id,
+                    params,
+                    rrule_str,
+                    next_run_str,
+                    created_at,
+                    is_test,
+                ) = schedule
+
                 try:
                     # 스케줄의 다음 실행 시간 파싱
                     next_run = self._parse_iso_datetime(next_run_str)
                     time_diff = now - next_run
-                    
+
                     # 실행 창 설정 (테스트 vs 정규)
                     execution_window = test_window if is_test else regular_window
-                    
-                    logger.info(f"[DEBUG] Schedule {schedule_id}: next_run={next_run_str}, time_diff={time_diff.total_seconds():.1f}s, window={execution_window.total_seconds()}s")
-                    
+
+                    logger.info(
+                        f"[DEBUG] Schedule {schedule_id}: next_run={next_run_str}, time_diff={time_diff.total_seconds():.1f}s, window={execution_window.total_seconds()}s"
+                    )
+
                     # 실행 창 내에 있는 스케줄 (즉시 실행 대상)
                     if timedelta(0) <= time_diff <= execution_window:
-                        logger.info(f"[DEBUG] Schedule {schedule_id} is READY for execution (within {execution_window.total_seconds()/60:.1f}min window)")
+                        logger.info(
+                            f"[DEBUG] Schedule {schedule_id} is READY for execution (within {execution_window.total_seconds()/60:.1f}min window)"
+                        )
                         ready_for_execution.append(schedule)
-                    
+
                     # 실행 창을 넘어선 과거 스케줄 (다음 주기로 업데이트)
                     elif time_diff > execution_window:
-                        logger.info(f"[DEBUG] Schedule {schedule_id} is EXPIRED (missed {time_diff.total_seconds()/60:.1f}min window), calculating next occurrence")
-                        
+                        logger.info(
+                            f"[DEBUG] Schedule {schedule_id} is EXPIRED (missed {time_diff.total_seconds()/60:.1f}min window), calculating next occurrence"
+                        )
+
                         # 다음 실행 시간 계산
                         next_run_calculated = self.calculate_next_run(rrule_str, now)
-                        
+
                         if next_run_calculated:
                             cursor.execute(
                                 "UPDATE schedules SET next_run = ? WHERE id = ?",
-                                (to_iso_utc(next_run_calculated), schedule_id)
+                                (to_iso_utc(next_run_calculated), schedule_id),
                             )
                             updated_count += 1
-                            logger.info(f"[DEBUG] Updated EXPIRED schedule {schedule_id} from {next_run_str} to {to_iso_utc(next_run_calculated)}")
+                            logger.info(
+                                f"[DEBUG] Updated EXPIRED schedule {schedule_id} from {next_run_str} to {to_iso_utc(next_run_calculated)}"
+                            )
                         else:
                             cursor.execute(
                                 "UPDATE schedules SET enabled = 0 WHERE id = ?",
-                                (schedule_id,)
+                                (schedule_id,),
                             )
-                            logger.info(f"[DEBUG] Disabled schedule {schedule_id} - no more occurrences")
-                    
+                            logger.info(
+                                f"[DEBUG] Disabled schedule {schedule_id} - no more occurrences"
+                            )
+
                     # 미래 스케줄 (아직 실행 시간이 아님)
                     else:
-                        logger.info(f"[DEBUG] Schedule {schedule_id} is FUTURE (will run in {abs(time_diff.total_seconds())/60:.1f}min)")
-                        
+                        logger.info(
+                            f"[DEBUG] Schedule {schedule_id} is FUTURE (will run in {abs(time_diff.total_seconds())/60:.1f}min)"
+                        )
+
                 except Exception as parse_error:
-                    logger.error(f"[DEBUG] Failed to parse schedule {schedule_id}: {parse_error}")
+                    logger.error(
+                        f"[DEBUG] Failed to parse schedule {schedule_id}: {parse_error}"
+                    )
                     continue
-            
+
             if updated_count > 0:
                 conn.commit()
-                logger.info(f"[DEBUG] Updated {updated_count} expired schedules to next occurrence")
-            
+                logger.info(
+                    f"[DEBUG] Updated {updated_count} expired schedules to next occurrence"
+                )
+
             # 실행 준비 완료된 스케줄들을 반환 형식으로 변환
-            logger.info(f"[DEBUG] Found {len(ready_for_execution)} schedules ready for immediate execution")
-            
+            logger.info(
+                f"[DEBUG] Found {len(ready_for_execution)} schedules ready for immediate execution"
+            )
+
             schedules = []
             for schedule_data in ready_for_execution:
-                schedule_id, params, rrule_str, next_run_str, created_at, is_test = schedule_data
+                (
+                    schedule_id,
+                    params,
+                    rrule_str,
+                    next_run_str,
+                    created_at,
+                    is_test,
+                ) = schedule_data
                 is_test_bool = bool(is_test)
-                
-                logger.info(f"[DEBUG] Adding {'TEST' if is_test_bool else 'REGULAR'} schedule {schedule_id} to execution queue (next_run={next_run_str})")
-                
-                schedules.append({
-                    "id": schedule_id,
-                    "params": json.loads(params),
-                    "rrule": rrule_str,
-                    "next_run": self._parse_iso_datetime(next_run_str),
-                    "created_at": self._parse_iso_datetime(created_at),
-                    "is_test": is_test_bool,
-                })
+
+                logger.info(
+                    f"[DEBUG] Adding {'TEST' if is_test_bool else 'REGULAR'} schedule {schedule_id} to execution queue (next_run={next_run_str})"
+                )
+
+                schedules.append(
+                    {
+                        "id": schedule_id,
+                        "params": json.loads(params),
+                        "rrule": rrule_str,
+                        "next_run": self._parse_iso_datetime(next_run_str),
+                        "created_at": self._parse_iso_datetime(created_at),
+                        "is_test": is_test_bool,
+                    }
+                )
 
             conn.close()
             return schedules
@@ -191,7 +228,7 @@ class ScheduleRunner:
         try:
             if after is None:
                 after = datetime.now(timezone.utc)
-            
+
             # after가 timezone-aware인 경우 naive로 변환
             if after.tzinfo is not None:
                 after_naive = after.replace(tzinfo=None)
@@ -203,7 +240,7 @@ class ScheduleRunner:
 
             # 다음 실행 시간 찾기 (naive datetime 반환)
             next_occurrence_naive = rrule.after(after_naive)
-            
+
             # UTC timezone을 추가하여 aware datetime으로 변환
             if next_occurrence_naive:
                 next_occurrence = next_occurrence_naive.replace(tzinfo=timezone.utc)
@@ -223,8 +260,8 @@ class ScheduleRunner:
 
             cursor.execute(
                 """
-                UPDATE schedules 
-                SET next_run = ? 
+                UPDATE schedules
+                SET next_run = ?
                 WHERE id = ?
             """,
                 (to_iso_utc(next_run), schedule_id),
@@ -248,8 +285,8 @@ class ScheduleRunner:
 
             cursor.execute(
                 """
-                UPDATE schedules 
-                SET enabled = 0 
+                UPDATE schedules
+                SET enabled = 0
                 WHERE id = ?
             """,
                 (schedule_id,),
@@ -276,25 +313,35 @@ class ScheduleRunner:
             try:
                 now = datetime.now(timezone.utc)
                 next_run = self.calculate_next_run(rrule_str, now)
-                
+
                 if next_run:
                     # 다음 실행 시간을 먼저 업데이트하여 중복 실행 방지
                     if self.update_schedule_next_run(schedule_id, next_run):
-                        logger.info(f"[EXECUTE] Pre-updated next run for schedule {schedule_id} to {next_run} (preventing duplicates)")
+                        logger.info(
+                            f"[EXECUTE] Pre-updated next run for schedule {schedule_id} to {next_run} (preventing duplicates)"
+                        )
                     else:
-                        logger.error(f"[EXECUTE] Failed to pre-update next run for schedule {schedule_id}")
+                        logger.error(
+                            f"[EXECUTE] Failed to pre-update next run for schedule {schedule_id}"
+                        )
                         return False
                 else:
                     # 더 이상 실행할 일정이 없으면 비활성화
-                    logger.info(f"[EXECUTE] No more occurrences for schedule {schedule_id}, disabling")
+                    logger.info(
+                        f"[EXECUTE] No more occurrences for schedule {schedule_id}, disabling"
+                    )
                     self.disable_schedule(schedule_id)
                     return True
             except Exception as update_error:
-                logger.error(f"[EXECUTE] Failed to calculate next run for schedule {schedule_id}: {update_error}")
+                logger.error(
+                    f"[EXECUTE] Failed to calculate next run for schedule {schedule_id}: {update_error}"
+                )
                 # 업데이트 실패시 실행하지 않음 (중복 방지)
                 return False
 
-            logger.info(f"[EXECUTE] Starting execution for schedule {schedule_id} - {params.get('keywords', 'No keywords')}")
+            logger.info(
+                f"[EXECUTE] Starting execution for schedule {schedule_id} - {params.get('keywords', 'No keywords')}"
+            )
 
             # 뉴스레터 생성 작업을 큐에 추가
             redis_success = False
@@ -315,17 +362,19 @@ class ScheduleRunner:
                     redis_success = True
                 except Exception as redis_error:
                     # Redis 연결 실패 시 fallback으로 동기 실행
-                    logger.warning(f"Redis connection failed for schedule {schedule_id}: {redis_error}")
-                    logger.info(f"Falling back to synchronous execution for schedule {schedule_id}")
-                    
+                    logger.warning(
+                        f"Redis connection failed for schedule {schedule_id}: {redis_error}"
+                    )
+                    logger.info(
+                        f"Falling back to synchronous execution for schedule {schedule_id}"
+                    )
+
             if not redis_success:
                 # Redis가 없거나 연결에 실패한 경우 동기 실행 (fallback)
                 logger.info(f"Executing schedule {schedule_id} synchronously")
                 fallback_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
                 result = generate_newsletter_task(
-                    params, 
-                    fallback_job_id, 
-                    params.get("send_email", False)
+                    params, fallback_job_id, params.get("send_email", False)
                 )
                 logger.info(
                     f"Synchronous execution completed for schedule {schedule_id}: {result.get('status', 'unknown') if result else 'no result'}"
@@ -339,7 +388,10 @@ class ScheduleRunner:
             logger.error(f"Failed to execute schedule {schedule['id']}: {e}")
             # 스택트레이스 포함한 상세 에러 로깅
             import traceback
-            logger.error(f"Full traceback for schedule {schedule['id']}: {traceback.format_exc()}")
+
+            logger.error(
+                f"Full traceback for schedule {schedule['id']}: {traceback.format_exc()}"
+            )
             return False
 
     def run_once(self) -> int:
@@ -348,12 +400,14 @@ class ScheduleRunner:
 
         schedules = self.get_pending_schedules()
         executed_count = 0
-        
+
         logger.info(f"[DEBUG] Found {len(schedules)} pending schedules to execute")
 
         for i, schedule in enumerate(schedules):
             schedule_id = schedule.get("id", "unknown")
-            logger.info(f"[DEBUG] Processing schedule {i+1}/{len(schedules)}: {schedule_id}")
+            logger.info(
+                f"[DEBUG] Processing schedule {i+1}/{len(schedules)}: {schedule_id}"
+            )
             try:
                 if self.execute_schedule(schedule):
                     executed_count += 1

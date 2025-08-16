@@ -217,7 +217,7 @@ from typing import List, Dict, Optional, Union
 from pathlib import Path
 
 def collect_articles(
-    keywords: List[str], 
+    keywords: List[str],
     period_days: int = 14,
     max_per_source: Optional[int] = None
 ) -> Dict[str, List[Dict[str, str]]]:
@@ -233,20 +233,20 @@ Google 스타일 docstring을 사용합니다:
 
 ```python
 def compose_newsletter(
-    data: Dict[str, Any], 
-    template_dir: str, 
+    data: Dict[str, Any],
+    template_dir: str,
     style: str = "detailed"
 ) -> str:
     """뉴스레터를 생성하는 통합 함수.
-    
+
     Args:
         data: 뉴스레터 데이터
         template_dir: 템플릿 디렉토리 경로
         style: 뉴스레터 스타일 ("compact" 또는 "detailed")
-    
+
     Returns:
         str: 렌더링된 HTML 뉴스레터
-        
+
     Raises:
         ValueError: 잘못된 스타일이 제공된 경우
         FileNotFoundError: 템플릿 파일을 찾을 수 없는 경우
@@ -301,7 +301,7 @@ from newsletter.compose import compose_newsletter
 
 class TestComposeNewsletter:
     """뉴스레터 조합 함수 테스트."""
-    
+
     def test_compose_newsletter_detailed_style(self):
         """Detailed 스타일 뉴스레터 생성 테스트."""
         # Given
@@ -310,23 +310,23 @@ class TestComposeNewsletter:
             "keywords": ["AI"]
         }
         template_dir = "templates"
-        
+
         # When
         result = compose_newsletter(mock_data, template_dir, "detailed")
-        
+
         # Then
         assert isinstance(result, str)
         assert "Test" in result
-        
+
     @patch('newsletter.compose.render_template')
     def test_compose_newsletter_with_mock(self, mock_render):
         """Mock을 사용한 테스트."""
         # Given
         mock_render.return_value = "<html>Mock Newsletter</html>"
-        
+
         # When
         result = compose_newsletter({}, "templates", "compact")
-        
+
         # Then
         assert result == "<html>Mock Newsletter</html>"
         mock_render.assert_called_once()
@@ -341,7 +341,7 @@ from newsletter.collect import collect_from_serper
 
 class TestSerperAPI:
     """Serper API 테스트."""
-    
+
     @responses.activate
     def test_collect_from_serper_success(self):
         """Serper API 성공 응답 테스트."""
@@ -352,10 +352,10 @@ class TestSerperAPI:
             json={"organic": [{"title": "Test", "link": "http://test.com"}]},
             status=200
         )
-        
+
         # When
         result = collect_from_serper(["AI"], api_key="test_key")
-        
+
         # Then
         assert len(result) == 1
         assert result[0]["title"] == "Test"
@@ -456,15 +456,15 @@ def profile_function():
     """함수 성능 프로파일링."""
     profiler = cProfile.Profile()
     profiler.enable()
-    
+
     # 프로파일링할 코드
     result = expensive_function()
-    
+
     profiler.disable()
     stats = pstats.Stats(profiler)
     stats.sort_stats('cumulative')
     stats.print_stats(10)  # 상위 10개 함수
-    
+
     return result
 ```
 
@@ -620,4 +620,4 @@ pip install -r requirements-dev.txt --upgrade
 - [코드 품질 가이드](CODE_QUALITY.md) - 품질 관리 도구
 - [테스트 가이드](TESTING_GUIDE.md) - 테스트 작성 및 실행
 - [아키텍처 문서](../ARCHITECTURE.md) - 시스템 설계
-- [API 참조](../API_REFERENCE.md) - 함수 및 클래스 참조 
+- [API 참조](../API_REFERENCE.md) - 함수 및 클래스 참조

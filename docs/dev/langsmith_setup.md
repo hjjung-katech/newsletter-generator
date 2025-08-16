@@ -135,4 +135,4 @@ ChatGoogleGenerativeAI(
 
 1.  `--track-cost` 옵션이 명령줄에 포함되어 있거나, `.env` 파일에 `ENABLE_COST_TRACKING="true"`가 설정되어 있는지 확인하세요.
 2.  `GoogleGenAICostCB` 콜백이 LLM 초기화에 포함되어 있는지 확인하세요.
-3.  `.env` 파일에 `DEBUG_COST_TRACKING="1"` 환경 변수를 설정하여 상세 로그를 확인할 수 있습니다. 
+3.  `.env` 파일에 `DEBUG_COST_TRACKING="1"` 환경 변수를 설정하여 상세 로그를 확인할 수 있습니다.

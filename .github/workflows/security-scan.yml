@@ -193,8 +193,8 @@ jobs:
           echo "- ✅ Environment variable validation" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ .env file exclusion from Docker images" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [ -f security-reports/bandit-report.json ]; then
             echo "## Bandit Issues Found:" >> $GITHUB_STEP_SUMMARY
             jq -r '.results[] | "- **\(.issue_severity)**: \(.issue_text) (\(.filename):\(.line_number))"' security-reports/bandit-report.json >> $GITHUB_STEP_SUMMARY || true
-          fi 
+          fi

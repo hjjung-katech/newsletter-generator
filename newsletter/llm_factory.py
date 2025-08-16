@@ -12,8 +12,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 # 중앙화된 설정 import 추가 (F-14)
 try:
@@ -132,8 +132,6 @@ from .cost_tracking import get_cost_callback_for_provider
 class QuotaExceededError(Exception):
     """API 할당량 초과 에러"""
 
-    pass
-
 
 class LLMWithFallback(Runnable):
     """
@@ -224,13 +222,9 @@ class LLMWithFallback(Runnable):
             elif "번역" in input_data or "translate" in input_data.lower():
                 mock_content = "안녕하세요, 세계!"
             else:
-                mock_content = (
-                    f"F-14 테스트 응답: {input_data[:50]}에 대한 모킹된 결과입니다."
-                )
+                mock_content = f"F-14 테스트 응답: {input_data[:50]}에 대한 모킹된 결과입니다."
         else:
-            mock_content = (
-                "F-14 테스트 응답: 중앙화된 설정을 사용한 모킹된 LLM 응답입니다."
-            )
+            mock_content = "F-14 테스트 응답: 중앙화된 설정을 사용한 모킹된 LLM 응답입니다."
 
         # LangChain AIMessage 형태로 반환
         try:
@@ -368,9 +362,7 @@ class LLMWithFallback(Runnable):
         primary_provider = type(self.primary_llm).__name__
         primary_model = getattr(self.primary_llm, "model", "unknown")
 
-        logger.info(
-            f"{primary_provider} ({primary_model})에 대한 대체 모델을 찾는 중입니다"
-        )
+        logger.info(f"{primary_provider} ({primary_model})에 대한 대체 모델을 찾는 중입니다")
 
         # 1. 같은 제공자 내에서 안정적인 모델로 fallback 시도
         if "gemini" in primary_provider.lower():
@@ -379,9 +371,7 @@ class LLMWithFallback(Runnable):
             for stable_model in stable_models:
                 if stable_model != primary_model:  # 동일한 모델이 아닌 경우만
                     try:
-                        logger.info(
-                            f"안정적인 Gemini 모델을 시도합니다: {stable_model}"
-                        )
+                        logger.info(f"안정적인 Gemini 모델을 시도합니다: {stable_model}")
                         fallback_config = {
                             "provider": "gemini",
                             "model": stable_model,
@@ -398,9 +388,7 @@ class LLMWithFallback(Runnable):
                             cost_callback = get_cost_callback_for_provider("gemini")
                             fallback_callbacks.append(cost_callback)
                         except Exception as e:
-                            handle_exception(
-                                e, "비용 추적 콜백 추가", log_level=logging.INFO
-                            )
+                            handle_exception(e, "비용 추적 콜백 추가", log_level=logging.INFO)
                             # 비용 추적 실패는 치명적이지 않음
 
                         provider = self.factory.providers.get("gemini")
@@ -409,9 +397,7 @@ class LLMWithFallback(Runnable):
                                 fallback_config, fallback_callbacks
                             )
                     except Exception as e:
-                        logger.warning(
-                            f"안정적인 Gemini 모델 {stable_model} 생성에 실패했습니다: {e}"
-                        )
+                        logger.warning(f"안정적인 Gemini 모델 {stable_model} 생성에 실패했습니다: {e}")
                         continue
 
         # 2. 다른 제공자로 fallback 시도
@@ -435,9 +421,7 @@ class LLMWithFallback(Runnable):
                     provider_name, self.factory._get_default_model(provider_name)
                 )
 
-                logger.info(
-                    f"다른 제공자를 시도합니다: {provider_name} (모델: {fallback_model})"
-                )
+                logger.info(f"다른 제공자를 시도합니다: {provider_name} (모델: {fallback_model})")
 
                 fallback_config = {
                     "provider": provider_name,
@@ -475,26 +459,50 @@ class LLMWithFallback(Runnable):
 
     def _is_retryable_error(self, e):
         error_str = str(e).lower()
-        
+
         # Check for specific exception types first
         import socket
+
         if isinstance(e, (ConnectionResetError, ConnectionError, socket.error)):
             return True
-        
+
         # Check for HTTP/network related errors
-        if hasattr(e, 'response') and hasattr(e.response, 'status_code'):
+        if hasattr(e, "response") and hasattr(e.response, "status_code"):
             status_code = e.response.status_code
             if status_code in [429, 500, 502, 503, 504, 520, 521, 522, 523, 524]:
                 return True
-        
+
         # Check for error message keywords
         retryable_keywords = [
-            "529", "429", "quota", "rate limit", "too many requests", "overloaded",
-            "timeout", "connection", "연결", "강제", "끊", "reset", "refused", 
-            "unreachable", "network", "socket", "ssl", "tls", "certificate",
-            "temporary", "서버", "응답", "없음", "실패", "10054", "10061", "10060"
+            "529",
+            "429",
+            "quota",
+            "rate limit",
+            "too many requests",
+            "overloaded",
+            "timeout",
+            "connection",
+            "연결",
+            "강제",
+            "끊",
+            "reset",
+            "refused",
+            "unreachable",
+            "network",
+            "socket",
+            "ssl",
+            "tls",
+            "certificate",
+            "temporary",
+            "서버",
+            "응답",
+            "없음",
+            "실패",
+            "10054",
+            "10061",
+            "10060",
         ]
-        
+
         return any(keyword in error_str for keyword in retryable_keywords)
 
 
@@ -506,12 +514,10 @@ class LLMProvider(ABC):
         self, model_config: Dict[str, Any], callbacks: Optional[List] = None
     ):
         """LLM 모델 인스턴스를 생성합니다."""
-        pass
 
     @abstractmethod
     def is_available(self) -> bool:
         """제공자가 사용 가능한지 확인합니다."""
-        pass
 
 
 class GeminiProvider(LLMProvider):
@@ -740,9 +746,7 @@ class LLMFactory:
 
         if not provider.is_available():
             # Fallback to available provider
-            logger.warning(
-                f"⚠️ {provider_name}을 사용할 수 없어 다른 제공자로 대체합니다"
-            )
+            logger.warning(f"⚠️ {provider_name}을 사용할 수 없어 다른 제공자로 대체합니다")
 
             # 사용 가능한 제공자 찾기 (우선순위: gemini > openai > anthropic)
             fallback_priority = ["gemini", "openai", "anthropic"]

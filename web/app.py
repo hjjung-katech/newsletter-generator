@@ -3,22 +3,23 @@ Newsletter Generator Web Service
 Flask application that provides web interface for the CLI newsletter generator
 """
 
-import os
-import sys
-import logging
-import subprocess
-import threading
-import signal
 import atexit
-import time
-from flask import Flask, render_template, request, jsonify, send_file
-from flask_cors import CORS
-import redis
-from rq import Queue
-import sqlite3
-from datetime import datetime, timedelta
-import uuid
 import json
+import logging
+import os
+import signal
+import sqlite3
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from datetime import datetime, timedelta
+
+import redis
+from flask import Flask, jsonify, render_template, request, send_file
+from flask_cors import CORS
+from rq import Queue
 
 # Import database utilities with logging
 try:
@@ -40,14 +41,14 @@ except Exception:
 # Redirect print() to structured logger with level inference
 try:
     import builtins
-    
+
     # Store original print function to avoid recursion
     _original_print = builtins.print
 
     def _print_to_logger(*args, **kwargs):
         message = " ".join(str(a) for a in args)
         lowered = message.lower()
-        
+
         # Use original print to avoid recursion with Rich library
         try:
             if any(tag in message for tag in ["[ERROR]", "❌"]) or "오류" in message:
@@ -76,42 +77,55 @@ graceful_wrapper = None
 
 try:
     from newsletter.utils.shutdown_manager import (
-        get_shutdown_manager,
-        register_shutdown_task,
-        managed_thread,
-        managed_process,
         ShutdownPhase,
-        is_shutdown_requested
+        get_shutdown_manager,
+        is_shutdown_requested,
+        managed_process,
+        managed_thread,
+        register_shutdown_task,
     )
     from web.graceful_shutdown import create_graceful_app
-    
+
     shutdown_manager = get_shutdown_manager()
     logger.info("Shutdown manager initialized successfully")
-    
+
 except ImportError as e:
     logger.warning(f"Graceful shutdown not available: {e}")
+
     # Fallback functions
     def register_shutdown_task(*args, **kwargs):
         return False
+
     def managed_thread(name, thread):
         class DummyContext:
-            def __enter__(self): return thread
-            def __exit__(self, *args): pass
+            def __enter__(self):
+                return thread
+
+            def __exit__(self, *args):
+                pass
+
         return DummyContext()
+
     def managed_process(name, process):
         class DummyContext:
-            def __enter__(self): return process
-            def __exit__(self, *args): pass
+            def __enter__(self):
+                return process
+
+            def __exit__(self, *args):
+                pass
+
         return DummyContext()
+
     def is_shutdown_requested():
         return False
+
 
 # Binary compatibility setup
 try:
     from binary_compatibility import (
-        is_frozen,
-        get_resource_path,
         get_external_resource_path,
+        get_resource_path,
+        is_frozen,
         run_comprehensive_diagnostics,
     )
 
@@ -135,6 +149,7 @@ except ImportError:
 
 # Import path manager for unified path handling
 from path_manager import get_path_manager
+
 
 # Helper to get correct paths when bundled with PyInstaller
 def resource_path(relative_path: str) -> str:
@@ -271,10 +286,11 @@ from tasks import generate_newsletter_task
 # Add the parent directory to the path to import newsletter modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import logging
+
 # Real newsletter CLI integration
 import subprocess
 import tempfile
-import logging
 
 # 현재 디렉토리를 파이썬 패스에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -319,6 +335,7 @@ class RealNewsletterCLI:
         # Newsletter 모듈 import 가능성 확인
         try:
             import newsletter
+
             logger.info("Newsletter module found and importable")
         except ImportError as e:
             raise Exception(f"Newsletter module not importable: {e}")
@@ -362,9 +379,7 @@ class RealNewsletterCLI:
                 "status": "success" if llm_providers else "error",
             }
 
-            print(
-                f"[완료] API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능"
-            )
+            print(f"[완료] API 키 검사 완료: {len(llm_providers)}개 LLM 제공자 사용 가능")
             if llm_providers:
                 print(f"   사용 가능한 LLM: {', '.join(llm_providers)}")
             if has_serper:
@@ -426,28 +441,39 @@ class RealNewsletterCLI:
             elif domain:
                 # CLI와 동일한 로직: 도메인에서 키워드 생성 후 뉴스레터 생성
                 logger.info(f"Generating keywords from domain: {domain}")
-                
+
                 # Step 1: Generate keywords from domain (CLI 로직과 동일)
                 from newsletter import tools
+
                 try:
-                    generated_keywords = tools.generate_keywords_with_gemini(domain, count=suggest_count)
+                    generated_keywords = tools.generate_keywords_with_gemini(
+                        domain, count=suggest_count
+                    )
                     if generated_keywords and len(generated_keywords) > 0:
                         keyword_list = generated_keywords
-                        logger.info(f"Generated {len(keyword_list)} keywords: {', '.join(keyword_list)}")
-                        input_description = f"domain: {domain} -> keywords: {','.join(keyword_list)}"
-                        
+                        logger.info(
+                            f"Generated {len(keyword_list)} keywords: {', '.join(keyword_list)}"
+                        )
+                        input_description = (
+                            f"domain: {domain} -> keywords: {','.join(keyword_list)}"
+                        )
+
                         # Step 2: Generate newsletter with generated keywords (CLI 로직과 동일)
                         html_content, status = generate_newsletter(
                             keywords=keyword_list,  # 생성된 키워드들 사용
                             news_period_days=period,
-                            domain=domain,          # 도메인 정보도 전달
+                            domain=domain,  # 도메인 정보도 전달
                             template_style=template_style,
                             email_compatible=email_compatible,
                         )
                     else:
-                        logger.warning(f"Failed to generate keywords from domain: {domain}")
+                        logger.warning(
+                            f"Failed to generate keywords from domain: {domain}"
+                        )
                         # 키워드 생성 실패 시 폴백 (기존 방식)
-                        input_description = f"domain: {domain} (fallback to direct domain use)"
+                        input_description = (
+                            f"domain: {domain} (fallback to direct domain use)"
+                        )
                         html_content, status = generate_newsletter(
                             keywords=[domain],
                             news_period_days=period,
@@ -856,7 +882,7 @@ class MockNewsletterCLI:
 </head>
 <body>
     <div class="mock-notice">
-        <strong>[WARNING] Mock Mode:</strong> This is a test newsletter generated using mock data. 
+        <strong>[WARNING] Mock Mode:</strong> This is a test newsletter generated using mock data.
         Template Style: {template_style} | Email Compatible: {email_compatible} | Period: {period} days
     </div>
     <div class="header">
@@ -912,7 +938,7 @@ class MockNewsletterCLI:
 </head>
 <body>
     <div class="mock-notice">
-        <strong>[WARNING] Mock Mode:</strong> This is a test newsletter generated using mock data. 
+        <strong>[WARNING] Mock Mode:</strong> This is a test newsletter generated using mock data.
         Template Style: {template_style} | Email Compatible: {email_compatible} | Period: {period} days
     </div>
     <div class="header">
@@ -980,12 +1006,13 @@ app = Flask(
 )
 CORS(app)  # Enable CORS for frontend-backend communication
 
+
 # Setup application-wide shutdown tasks
 def setup_app_shutdown_tasks():
     """Setup application-wide shutdown tasks"""
     if not shutdown_manager:
         return
-        
+
     # Close database connections
     def cleanup_database():
         try:
@@ -994,7 +1021,7 @@ def setup_app_shutdown_tasks():
             logger.info("Database connections cleaned up")
         except Exception as e:
             logger.error(f"Error cleaning up database: {e}")
-    
+
     # Cleanup Redis connections
     def cleanup_redis():
         try:
@@ -1003,7 +1030,7 @@ def setup_app_shutdown_tasks():
                 logger.info("Redis connection closed")
         except Exception as e:
             logger.error(f"Error closing Redis connection: {e}")
-    
+
     # Cleanup in-memory tasks
     def cleanup_in_memory_tasks():
         try:
@@ -1013,37 +1040,38 @@ def setup_app_shutdown_tasks():
                     task_info["status"] = "cancelled"
                     task_info["error"] = "Application shutdown"
                     cancelled_count += 1
-            
+
             if cancelled_count > 0:
                 logger.info(f"Cancelled {cancelled_count} in-memory tasks")
             else:
                 logger.info("No in-memory tasks to cancel")
         except Exception as e:
             logger.error(f"Error cleaning up in-memory tasks: {e}")
-    
+
     # Register shutdown tasks
     register_shutdown_task(
         name="cleanup_database",
         callback=cleanup_database,
         phase=ShutdownPhase.CLEANING_RESOURCES,
-        priority=40
+        priority=40,
     )
-    
+
     register_shutdown_task(
-        name="cleanup_redis", 
+        name="cleanup_redis",
         callback=cleanup_redis,
         phase=ShutdownPhase.CLEANING_RESOURCES,
-        priority=45
+        priority=45,
     )
-    
+
     register_shutdown_task(
         name="cleanup_in_memory_tasks",
         callback=cleanup_in_memory_tasks,
         phase=ShutdownPhase.WAITING_FOR_TASKS,
-        priority=30
+        priority=30,
     )
-    
+
     logger.info("Application shutdown tasks registered")
+
 
 # Setup shutdown tasks
 setup_app_shutdown_tasks()
@@ -1100,21 +1128,23 @@ path_manager = get_path_manager()
 DATABASE_PATH = path_manager.get_database_path()
 
 print(f"[PATH] Using DATABASE_PATH: {DATABASE_PATH}")
-print(f"[PATH] Environment: {'PyInstaller exe' if path_manager.is_frozen else 'Development'}")
+print(
+    f"[PATH] Environment: {'PyInstaller exe' if path_manager.is_frozen else 'Development'}"
+)
 
 
 def init_db():
     """Initialize SQLite database with required tables.
-    
+
     This function is called automatically on first run or when database doesn't exist.
     """
     print("[INIT] Initializing database...")
-    
+
     # Check if this is first run
     is_first_run = path_manager.is_first_run()
     if is_first_run:
         print("[INIT] First run detected - creating fresh database")
-    
+
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
@@ -1146,16 +1176,22 @@ def init_db():
         )
     """
     )
-    
+
     # Create indexes for better performance
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)"
+    )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_status ON history(status)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_schedules_enabled ON schedules(enabled)")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_schedules_enabled ON schedules(enabled)"
+    )
 
     conn.commit()
     conn.close()
-    
+
     if is_first_run:
         print("[INIT] Fresh database created successfully")
         # Try to copy .env template if needed
@@ -1264,7 +1300,7 @@ def generate_newsletter():
             try:
                 from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
             except ImportError:
-                from time_utils import get_utc_now, to_iso_utc      # Development
+                from time_utils import get_utc_now, to_iso_utc  # Development
             in_memory_tasks[job_id] = {
                 "status": "processing",
                 "started_at": to_iso_utc(get_utc_now()),
@@ -1282,7 +1318,7 @@ def generate_newsletter():
                             "updated_at": to_iso_utc(get_utc_now()),
                         }
                         return
-                    
+
                     print(f"[INFO] Starting background processing for job {job_id}")
                     print(f"[INFO] Data: {data}")
                     print(f"[INFO] Current time: {to_iso_utc(get_utc_now())}")
@@ -1407,9 +1443,11 @@ def generate_newsletter():
                             f"[WARNING] Failed to update database with error for job {job_id}: {db_error}"
                         )
 
-            thread = threading.Thread(target=background_task, name=f"newsletter-job-{job_id}")
+            thread = threading.Thread(
+                target=background_task, name=f"newsletter-job-{job_id}"
+            )
             thread.daemon = True
-            
+
             # Register thread with shutdown manager if available
             if shutdown_manager:
                 with managed_thread(f"newsletter-job-{job_id}", thread):
@@ -1450,26 +1488,38 @@ def suggest_keywords():
         try:
             # Import the suggest_keywords function from CLI
             from newsletter.cli import suggest_keywords as cli_suggest_keywords
-            
+
             # Generate keywords using the existing CLI functionality
             suggested_keywords = cli_suggest_keywords(topic, count)
-            
+
             if suggested_keywords and len(suggested_keywords) > 0:
-                print(f"[INFO] Successfully generated {len(suggested_keywords)} keywords")
-                return jsonify({
-                    "success": True,
-                    "keywords": suggested_keywords,
-                    "topic": topic,  # New field
-                    "domain": topic,  # Legacy field for backward compatibility
-                    "count": len(suggested_keywords)
-                }), 200
+                print(
+                    f"[INFO] Successfully generated {len(suggested_keywords)} keywords"
+                )
+                return (
+                    jsonify(
+                        {
+                            "success": True,
+                            "keywords": suggested_keywords,
+                            "topic": topic,  # New field
+                            "domain": topic,  # Legacy field for backward compatibility
+                            "count": len(suggested_keywords),
+                        }
+                    ),
+                    200,
+                )
             else:
                 print(f"[WARNING] No keywords generated for topic: '{topic}'")
-                return jsonify({
-                    "success": False,
-                    "error": "No keywords could be generated for the given topic",
-                    "keywords": []
-                }), 200
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "No keywords could be generated for the given topic",
+                            "keywords": [],
+                        }
+                    ),
+                    200,
+                )
 
         except Exception as cli_error:
             logger.error(f"CLI keyword generation failed: {str(cli_error)}")
@@ -1480,21 +1530,20 @@ def suggest_keywords():
             elif "quota" in error_msg.lower() or "429" in error_msg:
                 error_msg = "API quota exceeded. Please try again later or check your API limits."
             elif "network" in error_msg.lower() or "connection" in error_msg.lower():
-                error_msg = "Network connection error. Please check your internet connection."
-            
-            return jsonify({
-                "success": False,
-                "error": error_msg,
-                "keywords": []
-            }), 500
+                error_msg = (
+                    "Network connection error. Please check your internet connection."
+                )
+
+            return jsonify({"success": False, "error": error_msg, "keywords": []}), 500
 
     except Exception as e:
         logger.error(f"Error in suggest_keywords endpoint: {e}")
-        return jsonify({
-            "success": False,
-            "error": f"Server error: {str(e)}",
-            "keywords": []
-        }), 500
+        return (
+            jsonify(
+                {"success": False, "error": f"Server error: {str(e)}", "keywords": []}
+            ),
+            500,
+        )
 
 
 @app.route("/newsletter", methods=["GET"])
@@ -1538,7 +1587,9 @@ def get_newsletter():
         # 뉴스레터 생성
         result = newsletter_cli.generate_newsletter(
             keywords=keywords,
-            domain=topic if topic else None,  # GET endpoint uses topic parameter as domain
+            domain=(
+                topic if topic else None
+            ),  # GET endpoint uses topic parameter as domain
             template_style=template_style,
             email_compatible=email_compatible,
             period=period,
@@ -1571,13 +1622,13 @@ def process_newsletter_sync(data):
 
         # Extract parameters (support both new 'topic' and legacy 'domain' for compatibility)
         keywords = data.get("keywords", "")
-        topic = data.get("topic", "").strip() or data.get("domain", "").strip()  # Support legacy domain parameter
+        topic = (
+            data.get("topic", "").strip() or data.get("domain", "").strip()
+        )  # Support legacy domain parameter
         template_style = data.get("template_style", "compact")
         period = data.get("period", 14)
         email = data.get("email", "")  # 이메일 주소 추가
-        use_template_system = data.get(
-            "use_template_system", True
-        )  # 템플릿 시스템 사용 여부
+        use_template_system = data.get("use_template_system", True)  # 템플릿 시스템 사용 여부
         suggest_count = data.get("suggest_count", 10)  # 도메인 키워드 생성 개수
 
         # Smart email_compatible logic: 이메일이 있으면 자동으로 email_compatible=True
@@ -1733,9 +1784,7 @@ def process_newsletter_sync(data):
                     except ImportError:
                         return (
                             jsonify(
-                                {
-                                    "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
-                                }
+                                {"error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."}
                             ),
                             500,
                         )
@@ -1808,8 +1857,8 @@ def process_newsletter_in_memory(data, job_id):
     try:
         from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
     except ImportError:
-        from time_utils import get_utc_now, to_iso_utc      # Development
-        
+        from time_utils import get_utc_now, to_iso_utc  # Development
+
     try:
         print(f"[INFO] Starting newsletter processing for job {job_id}")
         result = process_newsletter_sync(data)
@@ -1951,10 +2000,16 @@ def get_job_status(job_id):
 def get_history():
     """Get recent newsletter generation history with unified time handling"""
     try:
-        from web.time_utils import parse_sqlite_timestamp, format_display_time  # PyInstaller
+        from web.time_utils import (  # PyInstaller
+            format_display_time,
+            parse_sqlite_timestamp,
+        )
     except ImportError:
-        from time_utils import parse_sqlite_timestamp, format_display_time      # Development
-    
+        from time_utils import (  # Development
+            format_display_time,
+            parse_sqlite_timestamp,
+        )
+
     print(f"[INFO] Fetching history from database")
 
     try:
@@ -1964,9 +2019,9 @@ def get_history():
         # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
         cursor.execute(
             """
-            SELECT id, params, result, created_at, status 
-            FROM history 
-            ORDER BY 
+            SELECT id, params, result, created_at, status
+            FROM history
+            ORDER BY
                 CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
                 created_at DESC
             LIMIT 20
@@ -2006,9 +2061,9 @@ def get_history():
             print(f"[WARNING] Failed to parse timestamp for job {job_id}: {e}")
             # Fallback to original timestamp
             time_info = {
-                'utc_iso': created_at,
-                'kst_display': created_at,
-                'timestamp': 0
+                "utc_iso": created_at,
+                "kst_display": created_at,
+                "timestamp": 0,
             }
 
         history.append(
@@ -2016,9 +2071,9 @@ def get_history():
                 "id": job_id,
                 "params": parsed_params,
                 "result": parsed_result,
-                "created_at": time_info['utc_iso'],  # Always return UTC ISO format
-                "created_at_display": time_info['kst_display'],  # KST for display
-                "created_at_timestamp": time_info['timestamp'],  # Unix timestamp for JS
+                "created_at": time_info["utc_iso"],  # Always return UTC ISO format
+                "created_at_display": time_info["kst_display"],  # KST for display
+                "created_at_timestamp": time_info["timestamp"],  # Unix timestamp for JS
                 "time_info": time_info,  # Complete time information
                 "status": status,
             }
@@ -2036,49 +2091,68 @@ def create_schedule():
     if not data or not data.get("rrule") or not data.get("email"):
         return jsonify({"error": "Missing required fields: rrule, email"}), 400
 
-    # Keywords나 topic (or legacy domain) 중 하나는 필수  
+    # Keywords나 topic (or legacy domain) 중 하나는 필수
     if not data.get("keywords") and not data.get("topic") and not data.get("domain"):
         return jsonify({"error": "Either keywords or topic is required"}), 400
 
     try:
         try:
-            from web.time_utils import get_utc_now, get_kst_now, to_utc, to_iso_utc, format_display_time  # PyInstaller
+            from web.time_utils import (  # PyInstaller
+                format_display_time,
+                get_kst_now,
+                get_utc_now,
+                to_iso_utc,
+                to_utc,
+            )
         except ImportError:
-            from time_utils import get_utc_now, get_kst_now, to_utc, to_iso_utc, format_display_time      # Development
-        from dateutil.rrule import rrulestr
+            from time_utils import (
+                get_utc_now,
+                get_kst_now,
+                to_utc,
+                to_iso_utc,
+                format_display_time,
+            )  # Development
         from dateutil import tz
-        
+        from dateutil.rrule import rrulestr
+
         # 현재 시간을 UTC와 KST로 가져오기
         now_utc = get_utc_now()
         now_kst = get_kst_now()
-        
+
         rrule_str = data["rrule"]
-        
+
         # RRULE을 KST 기준으로 파싱하되, UTC로 저장
-        seoul_tz = tz.gettz('Asia/Seoul')
+        seoul_tz = tz.gettz("Asia/Seoul")
         rrule = rrulestr(rrule_str, dtstart=now_kst.replace(tzinfo=None))
         next_run_naive = rrule.after(now_kst.replace(tzinfo=None))
 
         if not next_run_naive:
             return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
-            
+
         # 다음 실행 시간을 KST로 해석한 후 UTC로 변환
         next_run_kst = next_run_naive.replace(tzinfo=seoul_tz)
         next_run_utc = to_utc(next_run_kst)
-        
+
         # 테스트 모드 검증: 10분 이내 스케줄인지 확인
         time_until_execution = (next_run_utc - now_utc).total_seconds() / 60  # minutes
         is_test_schedule = time_until_execution <= 10
-        
+
         # 스케줄링 간격 검증
         if time_until_execution < 1:
-            return jsonify({
-                "error": "스케줄 시간이 너무 가깝습니다", 
-                "details": "최소 1분 이후 시간을 선택해주세요."
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": "스케줄 시간이 너무 가깝습니다",
+                        "details": "최소 1분 이후 시간을 선택해주세요.",
+                    }
+                ),
+                400,
+            )
         elif 1 <= time_until_execution <= 10:
             # 테스트 모드 자동 활성화
-            logger.info(f"Test mode activated: schedule in {time_until_execution:.1f} minutes")
+            logger.info(
+                f"Test mode activated: schedule in {time_until_execution:.1f} minutes"
+            )
         elif time_until_execution < 30:
             # 경고 메시지 (허용하되 주의 안내)
             logger.warning(f"Short-term schedule: {time_until_execution:.1f} minutes")
@@ -2088,7 +2162,7 @@ def create_schedule():
 
     schedule_id = str(uuid.uuid4())
 
-    # 주제 기반 vs 키워드 기반 구분하여 스케줄 데이터 준비  
+    # 주제 기반 vs 키워드 기반 구분하여 스케줄 데이터 준비
     topic = data.get("topic") or data.get("domain")  # Support legacy domain parameter
     if topic:
         # 주제 기반 예약: 매번 새로운 키워드 생성
@@ -2124,13 +2198,19 @@ def create_schedule():
     expires_at = None
     if is_test_schedule:
         expires_at = to_iso_utc(now_utc + timedelta(hours=1))
-    
+
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO schedules (id, params, rrule, next_run, is_test, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (schedule_id, json.dumps(schedule_params), rrule_str, next_run_utc.isoformat(), 
-         1 if is_test_schedule else 0, expires_at),
+        (
+            schedule_id,
+            json.dumps(schedule_params),
+            rrule_str,
+            next_run_utc.isoformat(),
+            1 if is_test_schedule else 0,
+            expires_at,
+        ),
     )
     conn.commit()
     conn.close()
@@ -2138,37 +2218,41 @@ def create_schedule():
     # 클라이언트에게 시간 정보 상세히 제공 (unified format)
     next_run_time_info = format_display_time(next_run_utc)
     current_time_info = format_display_time(now_utc)
-    
+
     response_data = {
         "status": "scheduled",
         "schedule_id": schedule_id,
-        "next_run": next_run_time_info['utc_iso'],  # UTC ISO format
-        "next_run_display": next_run_time_info['kst_display'],  # KST display
-        "next_run_timestamp": next_run_time_info['timestamp'],  # Unix timestamp
-        "current_time": current_time_info['utc_iso'],  # UTC ISO format
-        "current_time_display": current_time_info['kst_display'],  # KST display
+        "next_run": next_run_time_info["utc_iso"],  # UTC ISO format
+        "next_run_display": next_run_time_info["kst_display"],  # KST display
+        "next_run_timestamp": next_run_time_info["timestamp"],  # Unix timestamp
+        "current_time": current_time_info["utc_iso"],  # UTC ISO format
+        "current_time_display": current_time_info["kst_display"],  # KST display
         "timezone": "Asia/Seoul",
         "rrule": rrule_str,
         "created_at": to_iso_utc(now_utc),  # UTC ISO format
         "time_info": {
             "next_run": next_run_time_info,
-            "current_time": current_time_info
+            "current_time": current_time_info,
         },
         "is_test": is_test_schedule,
     }
-    
+
     # 테스트 모드 관련 추가 정보
     if is_test_schedule:
-        response_data.update({
-            "test_mode": True,
-            "expires_at": expires_at,
-            "time_until_execution_minutes": round(time_until_execution, 1),
-            "warning": "테스트 모드: 이 스케줄은 1시간 후 자동 비활성화됩니다."
-        })
+        response_data.update(
+            {
+                "test_mode": True,
+                "expires_at": expires_at,
+                "time_until_execution_minutes": round(time_until_execution, 1),
+                "warning": "테스트 모드: 이 스케줄은 1시간 후 자동 비활성화됩니다.",
+            }
+        )
     elif time_until_execution < 30:
-        response_data.update({
-            "warning": f"단기 스케줄: {round(time_until_execution, 1)}분 후 실행됩니다. 테스트 목적이 아니라면 30분 이후 시간을 권장합니다."
-        })
+        response_data.update(
+            {
+                "warning": f"단기 스케줄: {round(time_until_execution, 1)}분 후 실행됩니다. 테스트 목적이 아니라면 30분 이후 시간을 권장합니다."
+            }
+        )
 
     return jsonify(response_data), 201
 
@@ -2177,14 +2261,28 @@ def create_schedule():
 def get_schedules():
     """Get all active schedules with unified timezone information"""
     try:
-        from web.time_utils import get_utc_now, get_kst_now, to_utc, to_kst, format_display_time, parse_sqlite_timestamp  # PyInstaller
+        from web.time_utils import (  # PyInstaller
+            format_display_time,
+            get_kst_now,
+            get_utc_now,
+            parse_sqlite_timestamp,
+            to_kst,
+            to_utc,
+        )
     except ImportError:
-        from time_utils import get_utc_now, get_kst_now, to_utc, to_kst, format_display_time, parse_sqlite_timestamp      # Development
-    
-    # 현재 시간을 UTC와 KST로 가져오기  
+        from time_utils import (  # Development
+            format_display_time,
+            get_kst_now,
+            get_utc_now,
+            parse_sqlite_timestamp,
+            to_kst,
+            to_utc,
+        )
+
+    # 현재 시간을 UTC와 KST로 가져오기
     now_utc = get_utc_now()
     now_kst = get_kst_now()
-    
+
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute(
@@ -2196,13 +2294,13 @@ def get_schedules():
     schedules = []
     for row in rows:
         schedule_id, params, rrule, next_run, created_at, enabled = row
-        
+
         # 시간 정보 처리 (unified time handling)
         try:
             # next_run을 UTC datetime으로 파싱
             next_run_utc = to_utc(next_run)
             next_run_kst = to_kst(next_run_utc)
-            
+
             # 다음 실행까지의 시간 계산
             time_until_next = next_run_kst - now_kst
             time_until_text = ""
@@ -2210,7 +2308,7 @@ def get_schedules():
                 days = time_until_next.days
                 hours, remainder = divmod(int(time_until_next.total_seconds()), 3600)
                 minutes, _ = divmod(remainder, 60)
-                
+
                 if days > 0:
                     time_until_text = f"{days}일 {hours}시간 후"
                 elif hours > 0:
@@ -2219,19 +2317,19 @@ def get_schedules():
                     time_until_text = f"{minutes}분 후"
             else:
                 time_until_text = "지연됨"
-                
+
             # 시간 정보 포맷팅
             next_run_time_info = format_display_time(next_run_utc)
-            
+
         except Exception as e:
             next_run_utc = None
             time_until_text = "시간 처리 오류"
             next_run_time_info = {
-                'utc_iso': next_run,
-                'kst_display': 'Unknown',
-                'timestamp': 0
+                "utc_iso": next_run,
+                "kst_display": "Unknown",
+                "timestamp": 0,
             }
-        
+
         # created_at 시간 정보 처리
         try:
             if created_at:
@@ -2239,46 +2337,52 @@ def get_schedules():
                 created_time_info = format_display_time(created_dt)
             else:
                 created_time_info = {
-                    'utc_iso': '',
-                    'kst_display': 'Unknown',
-                    'timestamp': 0
+                    "utc_iso": "",
+                    "kst_display": "Unknown",
+                    "timestamp": 0,
                 }
         except Exception as e:
             created_time_info = {
-                'utc_iso': created_at,
-                'kst_display': 'Unknown',
-                'timestamp': 0
+                "utc_iso": created_at,
+                "kst_display": "Unknown",
+                "timestamp": 0,
             }
-        
+
         schedule_data = {
             "id": schedule_id,
             "params": json.loads(params) if params else None,
             "rrule": rrule,
-            "next_run": next_run_time_info['utc_iso'],  # UTC ISO format
-            "next_run_display": next_run_time_info['kst_display'],  # KST display
-            "next_run_timestamp": next_run_time_info['timestamp'],  # Unix timestamp for JS
+            "next_run": next_run_time_info["utc_iso"],  # UTC ISO format
+            "next_run_display": next_run_time_info["kst_display"],  # KST display
+            "next_run_timestamp": next_run_time_info[
+                "timestamp"
+            ],  # Unix timestamp for JS
             "time_until_next": time_until_text,
-            "created_at": created_time_info['utc_iso'],  # UTC ISO format
-            "created_at_display": created_time_info['kst_display'],  # KST display
+            "created_at": created_time_info["utc_iso"],  # UTC ISO format
+            "created_at_display": created_time_info["kst_display"],  # KST display
             "enabled": bool(enabled),
             "is_overdue": next_run_utc < now_utc if next_run_utc else False,
             "time_info": {
                 "next_run": next_run_time_info,
-                "created_at": created_time_info
-            }
+                "created_at": created_time_info,
+            },
         }
         schedules.append(schedule_data)
 
     # 현재 시간 정보도 함께 반환 (unified format)
     current_time_info = format_display_time(now_utc)
-    return jsonify({
-        "schedules": schedules,
-        "current_time": current_time_info['utc_iso'],  # UTC ISO format
-        "current_time_display": current_time_info['kst_display'],  # KST display 
-        "current_timestamp": current_time_info['timestamp'],  # Unix timestamp for JS
-        "timezone": "Asia/Seoul",
-        "time_info": current_time_info
-    })
+    return jsonify(
+        {
+            "schedules": schedules,
+            "current_time": current_time_info["utc_iso"],  # UTC ISO format
+            "current_time_display": current_time_info["kst_display"],  # KST display
+            "current_timestamp": current_time_info[
+                "timestamp"
+            ],  # Unix timestamp for JS
+            "timezone": "Asia/Seoul",
+            "time_info": current_time_info,
+        }
+    )
 
 
 @app.route("/api/time-sync")
@@ -2287,11 +2391,11 @@ def get_server_time():
     try:
         from web.time_utils import get_timezone_info  # PyInstaller
     except ImportError:
-        from time_utils import get_timezone_info      # Development
-    
+        from time_utils import get_timezone_info  # Development
+
     # 통합된 시간대 정보 가져오기
     timezone_info = get_timezone_info()
-    
+
     return jsonify(timezone_info)
 
 
@@ -2336,11 +2440,11 @@ def run_schedule_now(schedule_id):
         # 즉시 뉴스레터 생성 작업 큐에 추가
         if redis_conn and task_queue:
             job = task_queue.enqueue(
-                generate_newsletter_task, 
-                params, 
+                generate_newsletter_task,
+                params,
                 f"manual_{schedule_id}",  # job_id 매개변수 추가
                 params.get("send_email", False),  # send_email 매개변수 추가
-                job_timeout="10m"
+                job_timeout="10m",
             )
 
             return jsonify(
@@ -2353,11 +2457,10 @@ def run_schedule_now(schedule_id):
         else:
             # Redis가 없는 경우 직접 실행
             import uuid
+
             fallback_job_id = f"manual_{schedule_id}_{uuid.uuid4().hex[:8]}"
             result = generate_newsletter_task(
-                params, 
-                fallback_job_id, 
-                params.get("send_email", False)
+                params, fallback_job_id, params.get("send_email", False)
             )
             return jsonify({"status": "completed", "result": result})
 
@@ -2449,7 +2552,7 @@ def health_check():
     try:
         from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
     except ImportError:
-        from time_utils import get_utc_now, to_iso_utc      # Development
+        from time_utils import get_utc_now, to_iso_utc  # Development
     health_status = {
         "status": "healthy",
         "timestamp": to_iso_utc(get_utc_now()),
@@ -2575,56 +2678,64 @@ def setup_status():
     try:
         # Get setup status from PathManager
         status = path_manager.get_setup_status()
-        
+
         # Add additional API key validation
         from newsletter.llm_factory import validate_api_keys
+
         api_keys_available = validate_api_keys()
-        
+
         # Enhance status with more details
         enhanced_status = {
             **status,
             "api_keys_available": api_keys_available,
             "has_serper": "serper" in api_keys_available,
-            "has_llm_provider": bool(set(api_keys_available) & {"gemini", "openai", "anthropic"}),
+            "has_llm_provider": bool(
+                set(api_keys_available) & {"gemini", "openai", "anthropic"}
+            ),
             "docs": {
                 "user_guide_available": status["user_guide_available"],
                 "quick_start_available": status["quick_start_available"],
-            }
+            },
         }
-        
+
         # Determine next action recommendation
         if status["stage"] == "initial_setup":
             enhanced_status["recommendation"] = {
                 "action": "configure_env",
                 "message": "Please configure your API keys in the .env file",
-                "priority": "high"
+                "priority": "high",
             }
         elif status["stage"] == "api_key_setup":
             enhanced_status["recommendation"] = {
-                "action": "add_api_keys", 
+                "action": "add_api_keys",
                 "message": "Add your Gemini and Serper API keys to get started",
-                "priority": "high"
+                "priority": "high",
             }
         else:
             enhanced_status["recommendation"] = {
                 "action": "ready",
                 "message": "System is ready to generate newsletters",
-                "priority": "low"
+                "priority": "low",
             }
-        
+
         return jsonify(enhanced_status)
-        
+
     except Exception as e:
         logger.error(f"Setup status check failed: {e}")
-        return jsonify({
-            "stage": "error",
-            "error": str(e),
-            "recommendation": {
-                "action": "check_logs",
-                "message": "Please check the logs for detailed error information",
-                "priority": "high"
-            }
-        }), 500
+        return (
+            jsonify(
+                {
+                    "stage": "error",
+                    "error": str(e),
+                    "recommendation": {
+                        "action": "check_logs",
+                        "message": "Please check the logs for detailed error information",
+                        "priority": "high",
+                    },
+                }
+            ),
+            500,
+        )
 
 
 @app.route("/api/docs/<doc_name>")
@@ -2637,29 +2748,32 @@ def get_documentation(doc_name):
             doc_path = path_manager.get_quick_start_path()
         else:
             return jsonify({"error": "Document not found"}), 404
-            
+
         if not os.path.exists(doc_path):
-            return jsonify({
-                "error": "Document file not found",
-                "requested": doc_name,
-                "path": doc_path
-            }), 404
-            
-        with open(doc_path, 'r', encoding='utf-8') as f:
+            return (
+                jsonify(
+                    {
+                        "error": "Document file not found",
+                        "requested": doc_name,
+                        "path": doc_path,
+                    }
+                ),
+                404,
+            )
+
+        with open(doc_path, "r", encoding="utf-8") as f:
             content = f.read()
-            
-        return jsonify({
-            "name": doc_name,
-            "content": content,
-            "type": "markdown"
-        })
-        
+
+        return jsonify({"name": doc_name, "content": content, "type": "markdown"})
+
     except Exception as e:
         logger.error(f"Failed to load documentation {doc_name}: {e}")
-        return jsonify({
-            "error": f"Failed to load documentation: {str(e)}",
-            "name": doc_name
-        }), 500
+        return (
+            jsonify(
+                {"error": f"Failed to load documentation: {str(e)}", "name": doc_name}
+            ),
+            500,
+        )
 
 
 @app.route("/test")
@@ -2748,11 +2862,7 @@ def send_email_api():
                 send_email_func = mail.send_email
             except ImportError:
                 return (
-                    jsonify(
-                        {
-                            "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
-                        }
-                    ),
+                    jsonify({"error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."}),
                     500,
                 )
 
@@ -2768,9 +2878,7 @@ def send_email_api():
         # 이메일 발송
         send_email_func(to=email, subject=subject, html=html_content)
 
-        return jsonify(
-            {"success": True, "message": "이메일이 성공적으로 발송되었습니다"}
-        )
+        return jsonify({"success": True, "message": "이메일이 성공적으로 발송되었습니다"})
 
     except Exception as e:
         logging.error(f"Email sending failed: {e}")
@@ -2802,9 +2910,7 @@ def check_email_config():
                 "from_email_configured": config_status["from_email_configured"],
                 "ready": config_status["ready"],
                 "message": (
-                    "이메일 발송 준비 완료"
-                    if config_status["ready"]
-                    else "환경변수 설정이 필요합니다"
+                    "이메일 발송 준비 완료" if config_status["ready"] else "환경변수 설정이 필요합니다"
                 ),
             }
         )
@@ -2917,9 +3023,7 @@ def get_newsletter_html(job_id):
         )
 
         if html_content:
-            print(
-                f"[🔴 CRITICAL DEBUG] ✅ HTML FOUND! Preview: {html_content[:200]}..."
-            )
+            print(f"[🔴 CRITICAL DEBUG] ✅ HTML FOUND! Preview: {html_content[:200]}...")
             print(f"[🔴 CRITICAL DEBUG] ✅ RETURNING HTML CONTENT")
             return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
         else:
@@ -2957,7 +3061,7 @@ def test_iframe():
         <meta charset="utf-8">
         <title>🔴 IFRAME TEST</title>
         <style>
-            body {{ 
+            body {{
                 background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
                 color: white;
                 font-family: Arial, sans-serif;
@@ -2993,15 +3097,15 @@ def start_schedule_runner():
     try:
         # 스케줄러 import
         from schedule_runner import ScheduleRunner
-        
+
         print("[INFO] Starting Newsletter Schedule Runner...")
-        
+
         # 스케줄러 인스팴스 생성
         runner = ScheduleRunner(
             db_path=DATABASE_PATH,
-            redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+            redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
         )
-        
+
         def scheduler_loop():
             """스케줄러 루프 실행"""
             print("[INFO] Schedule runner thread started")
@@ -3010,35 +3114,37 @@ def start_schedule_runner():
                     try:
                         executed_count = runner.run_once()
                         if executed_count > 0:
-                            print(f"[INFO] Executed {executed_count} scheduled newsletters")
+                            print(
+                                f"[INFO] Executed {executed_count} scheduled newsletters"
+                            )
                         time.sleep(300)  # 5분 간격으로 체크 (중복 실행 방지)
                     except Exception as e:
                         logger.error(f"Schedule runner error: {e}")
                         time.sleep(30)  # 에러 발생 시 30초 후 재시도
-                        
+
                 print("[INFO] Schedule runner thread stopping due to shutdown request")
-                        
+
             except Exception as e:
                 logger.error(f"Fatal schedule runner error: {e}")
             finally:
                 print("[INFO] Schedule runner thread terminated")
-        
+
         # 백그라운드 스레드로 스케줄러 시작
         scheduler_thread = threading.Thread(
-            target=scheduler_loop,
-            name="newsletter-scheduler",
-            daemon=True
+            target=scheduler_loop, name="newsletter-scheduler", daemon=True
         )
-        
+
         # Graceful shutdown에 스레드 등록
         if shutdown_manager:
             with managed_thread("newsletter-scheduler", scheduler_thread):
                 scheduler_thread.start()
-                print("[INFO] Newsletter scheduler started with graceful shutdown support")
+                print(
+                    "[INFO] Newsletter scheduler started with graceful shutdown support"
+                )
         else:
             scheduler_thread.start()
             print("[INFO] Newsletter scheduler started (no graceful shutdown)")
-            
+
     except Exception as e:
         logger.error(f"Failed to start schedule runner: {e}")
         print("[WARNING] Newsletter scheduling will not work properly")
@@ -3075,19 +3181,19 @@ app_initialization_status = initialize_app()
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     debug = os.environ.get("FLASK_ENV") == "development"
-    
+
     print(f"[INFO] Starting Flask app on port {port}, debug={debug}")
-    
+
     if graceful_wrapper:
         print("[INFO] Using graceful shutdown wrapper")
         try:
             # Use graceful wrapper for better shutdown handling
             graceful_wrapper.run(
-                host="0.0.0.0", 
-                port=port, 
+                host="0.0.0.0",
+                port=port,
                 debug=debug,
                 threaded=True,
-                use_reloader=False  # Disable reloader for better shutdown handling
+                use_reloader=False,  # Disable reloader for better shutdown handling
             )
         except KeyboardInterrupt:
             print("[INFO] Received KeyboardInterrupt - shutting down gracefully")
@@ -3107,5 +3213,5 @@ if __name__ == "__main__":
         except Exception as e:
             logger.error(f"Application error: {e}")
             raise
-    
+
     print("[INFO] Application terminated")

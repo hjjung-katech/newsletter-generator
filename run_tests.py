@@ -25,8 +25,8 @@ import sys
 
 # F-14: Windows 한글 인코딩 문제 해결 (강화된 버전)
 if sys.platform.startswith("win"):
-    import locale
     import io
+    import locale
 
     # UTF-8 인코딩 강제 설정
     os.environ["PYTHONIOENCODING"] = "utf-8"
@@ -58,8 +58,8 @@ if sys.platform.startswith("win"):
     if hasattr(sys, "_setdefaultencoding"):
         sys._setdefaultencoding("utf-8")
 
-import subprocess
 import argparse
+import subprocess
 from pathlib import Path
 
 
@@ -294,11 +294,11 @@ def main():
   python run_tests.py dev              # 개발용 빠른 테스트
   python run_tests.py ci               # CI/CD용 전체 검증
   python run_tests.py integration      # 실제 API 포함 검증
-  
+
 디렉토리별 실행 예시:
   python run_tests.py --api            # API 테스트만
   python run_tests.py --unit-tests     # 단위 테스트만
-  
+
 유틸리티 예시:
   python run_tests.py --format         # 코드 포맷팅
   python run_tests.py --list --all     # 모든 테스트 목록
@@ -323,16 +323,12 @@ def main():
     # 유틸리티 옵션
     parser.add_argument("--format", action="store_true", help="코드 포맷팅 실행")
     parser.add_argument("--list", action="store_true", help="테스트 목록 출력")
-    parser.add_argument(
-        "--all", action="store_true", help="모든 카테고리 포함 (--list와 함께 사용)"
-    )
+    parser.add_argument("--all", action="store_true", help="모든 카테고리 포함 (--list와 함께 사용)")
 
     # 테스트 실행 옵션
     parser.add_argument("--verbose", "-v", action="store_true", help="상세 출력 모드")
     parser.add_argument("--coverage", action="store_true", help="커버리지 리포트 생성")
-    parser.add_argument(
-        "--include-backup", action="store_true", help="백업 테스트 포함"
-    )
+    parser.add_argument("--include-backup", action="store_true", help="백업 테스트 포함")
 
     args = parser.parse_args()
 
@@ -407,9 +403,7 @@ def main():
             "not real_api and not e2e and not deployment and not manual",
             "--tb=line",
         ]
-        return run_command(
-            cmd, f"{args.env.upper()} 환경 테스트 (전체 검증, 서버 의존성 제외)"
-        )
+        return run_command(cmd, f"{args.env.upper()} 환경 테스트 (전체 검증, 서버 의존성 제외)")
 
     elif args.env == "integration":
         # 통합 환경: 모든 테스트 실행 (E2E 제외, 실제 API 포함)

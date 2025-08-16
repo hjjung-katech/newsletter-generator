@@ -1,5 +1,4 @@
 import os
-import sys
 
 # 웹 서비스 모드 체크 - Flask 앱 중복 실행 방지
 if os.environ.get("WEB_SERVICE_MODE") == "1":

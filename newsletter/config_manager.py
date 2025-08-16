@@ -1,13 +1,12 @@
 import os
-from pathlib import Path
-from typing import Any, Dict, Optional
-
-import yaml
-from dotenv import load_dotenv
 
 # 환경 변수 로드
 import sys
-import os
+from pathlib import Path
+from typing import Any, Dict
+
+import yaml
+from dotenv import load_dotenv
 
 # PyInstaller 환경에서의 경로 처리
 if getattr(sys, "frozen", False):
@@ -19,19 +18,20 @@ else:
     env_path = ".env"
 
 try:
-    load_dotenv(env_path, encoding='utf-8')
+    load_dotenv(env_path, encoding="utf-8")
 except UnicodeDecodeError:
     # Windows에서 BOM 또는 인코딩 문제가 있을 경우
     try:
         import chardet
-        with open(env_path, 'rb') as f:
+
+        with open(env_path, "rb") as f:
             raw_data = f.read()
-        detected_encoding = chardet.detect(raw_data)['encoding']
+        detected_encoding = chardet.detect(raw_data)["encoding"]
         load_dotenv(env_path, encoding=detected_encoding)
     except Exception:
         # chardet이 없거나 다른 오류 발생 시 latin-1로 시도
         try:
-            load_dotenv(env_path, encoding='latin-1')
+            load_dotenv(env_path, encoding="latin-1")
         except Exception:
             # 마지막으로 인코딩 없이 시도
             load_dotenv(env_path)
@@ -41,7 +41,7 @@ except Exception as e:
 
 import json
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict
 
 
 def load_template_config() -> Dict[str, Any]:
@@ -219,9 +219,7 @@ class ConfigManager:
                 raise e
 
             # Centralized settings 실패 시 fallback to legacy
-            self._log_warning(
-                f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}"
-            )
+            self._log_warning(f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}")
 
             # 레거시 fallback (호환성을 위해 유지)
             from newsletter.compat_env import getenv_compat
@@ -329,9 +327,7 @@ class ConfigManager:
 
         if not required_keys.issubset(config_keys):
             missing_keys = required_keys - config_keys
-            self._log_warning(
-                f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
-            )
+            self._log_warning(f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다.")
             return default_weights
 
         try:
@@ -341,15 +337,11 @@ class ConfigManager:
             if abs(total - 1.0) < 0.01:  # 허용 오차
                 return weights
             else:
-                self._log_warning(
-                    f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
-                )
+                self._log_warning(f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다.")
                 return default_weights
 
         except (ValueError, TypeError) as e:
-            self._log_warning(
-                f"스코어링 가중치 값이 올바르지 않습니다: {e}. 기본값을 사용합니다."
-            )
+            self._log_warning(f"스코어링 가중치 값이 올바르지 않습니다: {e}. 기본값을 사용합니다.")
             return default_weights
 
     def _get_default_llm_config(self) -> Dict[str, Any]:

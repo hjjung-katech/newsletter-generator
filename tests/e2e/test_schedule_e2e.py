@@ -2,11 +2,13 @@
 # -*- coding: utf-8 -*-
 """스케줄 End-to-End 테스트"""
 
-import pytest
-import requests
 import json
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
+import pytest
+import requests
+
 
 def check_web_server(base_url="http://localhost:8000"):
     try:
@@ -15,17 +17,18 @@ def check_web_server(base_url="http://localhost:8000"):
     except requests.ConnectionError:
         return False
 
+
 @pytest.mark.e2e
 class TestScheduleE2E:
     @pytest.fixture(autouse=True)
     def ensure_web_server(self):
         if not check_web_server():
             pytest.skip("웹 서버가 실행되지 않음. 먼저 'python web/app.py' 실행 필요")
-    
+
     @pytest.fixture
     def base_url(self):
         return "http://localhost:8000"
-    
+
     def test_schedule_creation_and_deletion(self, base_url):
         # 스케줄 생성
         now_kst = datetime.now(timezone(timedelta(hours=9)))
@@ -34,7 +37,7 @@ class TestScheduleE2E:
         schedule_data = {
             "keywords": ["API 테스트", "E2E"],
             "email": "test@example.com",
-            "rrule": rrule
+            "rrule": rrule,
         }
         response = requests.post(f"{base_url}/api/schedule", json=schedule_data)
         assert response.status_code == 201

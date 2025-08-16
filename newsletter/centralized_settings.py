@@ -9,10 +9,10 @@ F-14 중앙집중식 설정 관리 모듈
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, Literal, Tuple, Type
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import (
@@ -20,6 +20,7 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
 from .utils.error_handling import handle_exception
 
 # 테스트 모드 플래그
@@ -34,7 +35,7 @@ def is_running_in_pytest() -> bool:
 
 def clear_settings_cache():
     """F-14: 설정 캐시를 클리어하여 테스트 격리 지원"""
-    if 'get_settings' in globals():
+    if "get_settings" in globals():
         get_settings.cache_clear()
 
 
@@ -72,9 +73,10 @@ def _load_dotenv_if_needed():
     """필요한 경우에만 .env 파일 로드"""
     if _should_load_dotenv() and not _test_mode:
         try:
-            from dotenv import load_dotenv
-            import sys
             import os
+            import sys
+
+            from dotenv import load_dotenv
 
             # PyInstaller 환경에서의 경로 처리
             if getattr(sys, "frozen", False):
@@ -146,9 +148,7 @@ class CentralizedSettings(BaseSettings):
 
     # 필수 설정 (F-14: SERPER_API_KEY를 Optional로 변경)
     serper_api_key: SecretStr | None = None
-    postmark_server_token: SecretStr | None = Field(
-        None, description="Postmark 서버 토큰"
-    )
+    postmark_server_token: SecretStr | None = Field(None, description="Postmark 서버 토큰")
     email_sender: str | None = Field(None, description="발송자 이메일")
 
     # LLM API 키 (하나 이상 필수)
@@ -255,9 +255,7 @@ class CentralizedSettings(BaseSettings):
         return (
             init_settings,  # 명시적으로 전달된 값이 최우선
             test_env_source,  # 테스트 모드 또는 일반 환경변수
-            (
-                dotenv_settings if not _test_mode else init_settings
-            ),  # 테스트 모드에서는 .env 무시
+            (dotenv_settings if not _test_mode else init_settings),  # 테스트 모드에서는 .env 무시
             file_secret_settings,
         )
 

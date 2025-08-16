@@ -11,11 +11,11 @@ from unittest.mock import MagicMock, Mock, patch
 import feedparser
 
 from newsletter.sources import (
+    NaverNewsAPISource,
     NewsSource,
     NewsSourceManager,
-    SerperAPISource,
     RSSFeedSource,
-    NaverNewsAPISource,
+    SerperAPISource,
     configure_default_sources,
 )
 
@@ -137,7 +137,7 @@ class TestRSSFeedSource(unittest.TestCase):
                 </item>
             </channel>
         </rss>"""
-        
+
         mock_fetch_url_content.return_value = rss_xml
 
         # 소스 객체 생성 및 테스트

@@ -1,29 +1,34 @@
 import os
-from pathlib import Path
+
 
 # 순환 import 방지를 위한 lazy import
 def _get_config_manager():
     """config_manager를 lazy import로 가져오기"""
     try:
         from .config_manager import config_manager
+
         return config_manager
     except Exception:
         # 테스트 환경이나 import 실패 시 fallback
         class MockConfigManager:
             def __init__(self):
-                self.SERPER_API_KEY = os.getenv('SERPER_API_KEY')
-                self.GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-                self.OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
-                self.ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY')
-                self.GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-                self.NAVER_CLIENT_ID = os.getenv('NAVER_CLIENT_ID')
-                self.NAVER_CLIENT_SECRET = os.getenv('NAVER_CLIENT_SECRET')
-                self.ADDITIONAL_RSS_FEEDS = os.getenv('ADDITIONAL_RSS_FEEDS', "")
-                self.POSTMARK_SERVER_TOKEN = os.getenv('POSTMARK_SERVER_TOKEN')
-                self.EMAIL_SENDER = os.getenv('EMAIL_SENDER') or os.getenv('POSTMARK_FROM_EMAIL')
-                self.GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
-                self.GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
-        
+                self.SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+                self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+                self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+                self.ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+                self.GOOGLE_APPLICATION_CREDENTIALS = os.getenv(
+                    "GOOGLE_APPLICATION_CREDENTIALS"
+                )
+                self.NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID")
+                self.NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET")
+                self.ADDITIONAL_RSS_FEEDS = os.getenv("ADDITIONAL_RSS_FEEDS", "")
+                self.POSTMARK_SERVER_TOKEN = os.getenv("POSTMARK_SERVER_TOKEN")
+                self.EMAIL_SENDER = os.getenv("EMAIL_SENDER") or os.getenv(
+                    "POSTMARK_FROM_EMAIL"
+                )
+                self.GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+                self.GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+
             def get_llm_config(self):
                 return {
                     "default_provider": "gemini",
@@ -94,14 +99,29 @@ def _get_config_manager():
                         },
                     },
                 }
-            
+
             def get_major_news_sources(self):
                 return {
-                    "tier1": ["연합뉴스", "조선일보", "중앙일보", "동아일보", "한국일보", "경향신문"],
-                    "tier2": ["매일경제", "한국경제", "서울경제", "이데일리", "뉴스1", "뉴시스"]
+                    "tier1": [
+                        "연합뉴스",
+                        "조선일보",
+                        "중앙일보",
+                        "동아일보",
+                        "한국일보",
+                        "경향신문",
+                    ],
+                    "tier2": [
+                        "매일경제",
+                        "한국경제",
+                        "서울경제",
+                        "이데일리",
+                        "뉴스1",
+                        "뉴시스",
+                    ],
                 }
-        
+
         return MockConfigManager()
+
 
 # config_manager 인스턴스 가져오기
 config_manager = _get_config_manager()
@@ -136,21 +156,24 @@ ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2
 # Mock 모드 설정 - 환경 변수에서 로드, 기본값은 False
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
 
+
 # 경고 메시지 출력 (ConfigManager에서 처리하므로 간소화)
 def log_message(level, message):
     """로거가 없는 경우를 위한 fallback 함수"""
     # 테스트 환경에서는 경고 최소화
-    if 'pytest' in os.getenv('_', '') or os.getenv('TESTING') == '1':
+    if "pytest" in os.getenv("_", "") or os.getenv("TESTING") == "1":
         return
     try:
         from .utils.logger import get_logger
+
         logger = get_logger()
         getattr(logger, level)(message)
     except ImportError:
         print(f"[{level.upper()}] {message}")
 
+
 # 테스트가 아닌 경우에만 경고 메시지 출력
-if not ('pytest' in os.getenv('_', '') or os.getenv('TESTING') == '1'):
+if not ("pytest" in os.getenv("_", "") or os.getenv("TESTING") == "1"):
     # 필수 API 키 검증
     if not SERPER_API_KEY:
         log_message("warning", "Warning: SERPER_API_KEY not found in .env file.")
@@ -195,5 +218,6 @@ if not ('pytest' in os.getenv('_', '') or os.getenv('TESTING') == '1'):
 
     if MOCK_MODE:
         log_message(
-            "warning", "Running in MOCK MODE - using sample data instead of real API calls"
+            "warning",
+            "Running in MOCK MODE - using sample data instead of real API calls",
         )

@@ -13,12 +13,12 @@ class NewsletterApp {
         this.lastLoadedJobId = null;
         this.pollCount = 0;
         this.debug = window.location.hostname === 'localhost'; // 로컬에서만 디버깅
-        
+
         // 시간 동기화 관련
         this.serverTimeOffset = 0; // 서버와 클라이언트 시간 차이 (ms)
         this.timeSyncInterval = null;
         this.lastTimeSyncTime = null;
-        
+
         this.init();
     }
 
@@ -51,12 +51,12 @@ class NewsletterApp {
             this.updateScheduleOptions();
             this.updateSchedulePreview();
         });
-        
+
         // Time change
         document.getElementById('scheduleTime').addEventListener('change', () => {
             this.updateSchedulePreview();
         });
-        
+
         // Weekday changes
         document.querySelectorAll('.weekday').forEach(checkbox => {
             checkbox.addEventListener('change', () => {
@@ -103,7 +103,7 @@ class NewsletterApp {
         const panelId = panelMap[tabId];
         if (panelId) {
             document.getElementById(panelId).classList.remove('hidden');
-            
+
             // Load data for specific tabs
             if (tabId === 'historyTab') {
                 this.loadHistory();
@@ -130,7 +130,7 @@ class NewsletterApp {
     toggleScheduleSettings(enabled) {
         const scheduleSettings = document.getElementById('scheduleSettings');
         const schedulePreview = document.getElementById('schedulePreview');
-        
+
         if (enabled) {
             scheduleSettings.classList.remove('hidden');
             schedulePreview.classList.remove('hidden');
@@ -154,21 +154,21 @@ class NewsletterApp {
 
     async generateNewsletter() {
         console.log('🔴 CRITICAL DEBUG: generateNewsletter() called');
-        
+
         // 🔴 CRITICAL FIX: 중복 실행 방지
         if (this.isGenerating) {
             console.log('🔴 WARNING: 이미 뉴스레터 생성 중입니다. 요청을 무시합니다.');
             return;
         }
-        
+
         // 기존 폴링 중단
         if (this.isPolling) {
             console.log('🔴 WARNING: 기존 폴링을 중단하고 새 작업을 시작합니다.');
             this.stopPolling();
         }
-        
+
         this.isGenerating = true; // 생성 중 플래그 설정
-        
+
         const data = this.collectFormData();
         if (!data) {
             console.log('🔴 CRITICAL DEBUG: collectFormData failed in generateNewsletter');
@@ -177,16 +177,16 @@ class NewsletterApp {
         }
 
         console.log('🔴 CRITICAL DEBUG: Data to send:', data);
-        
+
         // 스케줄이 설정된 경우 스케줄 생성 API 호출
         if (data.schedule) {
             this.showProgress('스케줄을 생성하고 있습니다...');
             await this.createSchedule(data);
             return;
         }
-        
+
         this.showProgress();
-        
+
         try {
             console.log('🔴 CRITICAL DEBUG: Making POST request to /api/generate');
             const response = await fetch('/api/generate', {
@@ -200,7 +200,7 @@ class NewsletterApp {
             console.log('🔴 CRITICAL DEBUG: Response status:', response.status);
             const result = await response.json();
             console.log('🔴 CRITICAL DEBUG: Response data:', result);
-            
+
             if (response.ok) {
                 this.currentJobId = result.job_id;
                 if (result.status === 'completed') {
@@ -225,7 +225,7 @@ class NewsletterApp {
 
     async previewNewsletter() {
         console.log('🔴 CRITICAL DEBUG: previewNewsletter() called');
-        
+
         // Similar to generate but without email sending
         const data = this.collectFormData();
         if (!data) {
@@ -261,7 +261,7 @@ class NewsletterApp {
                 return null;
             }
             data.domain = domain;
-            
+
             // Add suggest_count for domain method
             const suggestCountSelect = document.getElementById('suggest-count');
             if (suggestCountSelect) {
@@ -310,25 +310,25 @@ class NewsletterApp {
     showProgress(customMessage = null) {
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('resultsSection').classList.add('hidden');
-        
+
         let progress = 0;
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
-        
+
         // 사용자 정의 메시지가 있으면 고정 메시지 사용
         if (customMessage) {
             progressText.textContent = customMessage;
             progressBar.style.width = '50%';
             return;
         }
-        
+
         // Simulate progress for newsletter generation
         const interval = setInterval(() => {
             progress += Math.random() * 10;
             if (progress > 90) progress = 90;
-            
+
             progressBar.style.width = progress + '%';
-            
+
             if (progress < 30) {
                 progressText.textContent = '뉴스 수집 중...';
             } else if (progress < 60) {
@@ -341,7 +341,7 @@ class NewsletterApp {
         // Clear interval when polling starts
         setTimeout(() => clearInterval(interval), 5000);
     }
-    
+
     hideProgress() {
         document.getElementById('progressSection').classList.add('hidden');
     }
@@ -352,18 +352,18 @@ class NewsletterApp {
             console.log('🔴 WARNING: 이미 폴링 중입니다. 기존 폴링을 중단합니다.');
             this.stopPolling();
         }
-        
+
         this.currentJobId = jobId; // Store current job ID
         this.pollCount = 0; // 폴링 횟수 카운터 추가
         this.maxPollCount = 900; // 최대 15분 (900초)
         this.isPolling = true; // 폴링 상태 플래그 추가
-        
+
         console.log('🔴 STARTING POLLING for job:', jobId);
-        
+
         this.pollInterval = setInterval(async () => {
             try {
                 this.pollCount++;
-                
+
                 // 최대 폴링 횟수 초과 시 중단
                 if (this.pollCount > this.maxPollCount) {
                     this.stopPolling();
@@ -389,7 +389,7 @@ class NewsletterApp {
                     result.job_id = jobId;
                     console.log('🔴 CRITICAL DEBUG: Polling completed, passing entire result object to showResults');
                     this.showResults(result);
-                    
+
                     // Show email success message
                     if (result.sent) {
                         this.showEmailSuccess(result.email_to || result.email);
@@ -416,15 +416,15 @@ class NewsletterApp {
             isPolling: this.isPolling,
             pollCount: this.pollCount
         });
-        
+
         if (this.pollInterval) {
             clearInterval(this.pollInterval);
             this.pollInterval = null;
         }
-        
+
         this.isPolling = false; // 폴링 상태 플래그 리셋
         this.pollCount = 0; // 카운터 리셋
-        
+
         console.log('🔴 ✅ POLLING STOPPED');
     }
 
@@ -432,10 +432,10 @@ class NewsletterApp {
         console.log('🔴 CRITICAL DEBUG: showResults called with:', result);
         console.log('🔴 CRITICAL DEBUG: result keys:', Object.keys(result || {}));
         console.log('🔴 CRITICAL DEBUG: generation_stats:', result.generation_stats);
-        
+
         // 🔴 CRITICAL FIX: 작업 완료 시 플래그 리셋
         this.isGenerating = false;
-        
+
         document.getElementById('progressSection').classList.add('hidden');
         document.getElementById('resultsSection').classList.remove('hidden');
 
@@ -443,14 +443,14 @@ class NewsletterApp {
         progressBar.style.width = '100%';
 
         const preview = document.getElementById('newsletterPreview');
-        
+
         // Create detailed results display
         let detailsHtml = '';
-        
+
         // Generation Statistics (handle both possible locations)
         const stats = result.generation_stats || result.result?.generation_stats || {};
         console.log('🔴 CRITICAL DEBUG: Using stats:', stats);
-        
+
         if (stats && Object.keys(stats).length > 0) {
             detailsHtml += `
                 <div class="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -487,7 +487,7 @@ class NewsletterApp {
                 </div>
             `;
         }
-        
+
         // Processing Information
         if (result.processing_info) {
             const info = result.processing_info;
@@ -519,7 +519,7 @@ class NewsletterApp {
                 </div>
             `;
         }
-        
+
         // Input Parameters
         if (result.input_params) {
             const params = result.input_params;
@@ -545,7 +545,7 @@ class NewsletterApp {
                 </div>
             `;
         }
-        
+
         // Newsletter Content
         detailsHtml += `
             <div class="p-4 bg-white rounded-lg border border-gray-200">
@@ -553,9 +553,9 @@ class NewsletterApp {
                     <i class="fas fa-newspaper mr-2"></i>Newsletter Content
                 </h4>
                 <div class="border rounded bg-gray-50">
-                    ${result.html_content || result.content ? 
-                        `<iframe id="newsletterFrame" 
-                                 style="width: 100%; height: 600px; border: none;" 
+                    ${result.html_content || result.content ?
+                        `<iframe id="newsletterFrame"
+                                 style="width: 100%; height: 600px; border: none;"
                                  sandbox="allow-same-origin allow-scripts">
                                  <p>Loading newsletter...</p>
                          </iframe>` :
@@ -575,7 +575,7 @@ class NewsletterApp {
             usingContent: !!htmlContent,
             contentLength: htmlContent?.length || 0
         });
-        
+
         if (htmlContent) {
             console.log('🔴 CRITICAL FRONTEND DEBUG:', {
                 hasJobId: !!result.job_id,
@@ -583,27 +583,27 @@ class NewsletterApp {
                 jobId: result.job_id,
                 contentPreview: htmlContent.substring(0, 200)
             });
-            
+
             // 🔴 CRITICAL FIX: 중복 iframe 로딩 방지
             if (this.lastLoadedJobId === result.job_id) {
                 console.log('🔴 WARNING: 동일한 job_id의 iframe이 이미 로딩되었습니다:', result.job_id);
                 return;
             }
-            
+
             const self = this; // Capture this for use in setTimeout
             setTimeout(() => {
                 const iframe = document.getElementById('newsletterFrame');
                 if (iframe) {
                     console.log('🔴 IFRAME FOUND, proceeding with content load');
-                    
+
                     // 로딩된 job_id 기록
                     self.lastLoadedJobId = result.job_id;
-                    
+
                     // Try API endpoint first if job_id is available
                     if (result.job_id) {
                         const apiUrl = `/api/newsletter-html/${result.job_id}`;
                         console.log(`🔴 TRYING API ENDPOINT: ${apiUrl}`);
-                        
+
                         // Test API endpoint directly first
                         fetch(apiUrl)
                             .then(response => {
@@ -614,14 +614,14 @@ class NewsletterApp {
                             .then(html => {
                                 console.log('🔴 API RESPONSE HTML LENGTH:', html.length);
                                 console.log('🔴 API RESPONSE PREVIEW:', html.substring(0, 300));
-                                
+
                                 // Now set iframe src
                                 iframe.src = apiUrl;
-                                
+
                                 iframe.onload = () => {
                                     console.log('🔴 ✅ IFRAME LOADED SUCCESSFULLY via API');
                                 };
-                                
+
                                 iframe.onerror = () => {
                                     console.log('🔴 ❌ IFRAME FAILED TO LOAD, trying blob URL');
                                     self.loadContentWithBlobUrl(iframe, htmlContent);
@@ -651,12 +651,12 @@ class NewsletterApp {
         // Reload history
         this.loadHistory();
     }
-    
+
     renderStepTimes(stepTimes) {
         if (!stepTimes || Object.keys(stepTimes).length === 0) return '';
-        
+
         const maxTime = Math.max(...Object.values(stepTimes));
-        
+
         return `
             <div class="mt-3 p-3 bg-white rounded shadow-sm">
                 <div class="font-medium text-gray-700 mb-3">Processing Steps</div>
@@ -676,29 +676,29 @@ class NewsletterApp {
             </div>
         `;
     }
-    
+
     loadContentWithBlobUrl(iframe, htmlContent) {
         console.log('🔴 LOADING WITH BLOB URL, content length:', htmlContent.length);
         console.log('🔴 HTML CONTENT PREVIEW:', htmlContent.substring(0, 200));
-        
+
         try {
             const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
             const blobUrl = URL.createObjectURL(blob);
             console.log('🔴 BLOB URL CREATED:', blobUrl);
-            
+
             iframe.src = blobUrl;
-            
+
             // Clean up blob URL after iframe loads
             iframe.onload = () => {
                 console.log('🔴 ✅ BLOB URL LOADED SUCCESSFULLY');
                 URL.revokeObjectURL(blobUrl);
             };
-            
+
             // Handle blob load errors
             iframe.onerror = () => {
                 console.error('🔴 ❌ BLOB URL FAILED, trying srcdoc');
                 iframe.srcdoc = htmlContent; // Final fallback using srcdoc
-                
+
                 // Test if srcdoc works
                 setTimeout(() => {
                     if (iframe.contentDocument && iframe.contentDocument.body) {
@@ -713,7 +713,7 @@ class NewsletterApp {
             console.log('🔴 TRYING SRCDOC AS FALLBACK');
             // Ultimate fallback - use srcdoc
             iframe.srcdoc = htmlContent;
-            
+
             // Test if srcdoc works
             setTimeout(() => {
                 if (iframe.contentDocument && iframe.contentDocument.body) {
@@ -728,7 +728,7 @@ class NewsletterApp {
     updateResultButtons(result) {
         const downloadBtn = document.getElementById('downloadBtn');
         const sendEmailBtn = document.getElementById('sendEmailBtn');
-        
+
         // Enable/disable buttons based on result status
         if (result.status === 'success' && (result.html_content || result.content)) {
             downloadBtn.disabled = false;
@@ -761,9 +761,9 @@ class NewsletterApp {
                 </button>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // Auto-remove after 5 seconds
         setTimeout(() => {
             if (notification.parentNode) {
@@ -790,9 +790,9 @@ class NewsletterApp {
                             <h4 class="text-sm font-medium text-gray-900">
                                 ${this.formatHistoryKeywords(item)}
                             </h4>
-                            ${item.result?.generation_info?.generated_keywords ? 
+                            ${item.result?.generation_info?.generated_keywords ?
                               `<p class="text-xs text-blue-600 mt-1">🔄 생성된 키워드: ${item.result.generation_info.generated_keywords.join(', ')}</p>` : ''}
-                            ${item.result?.generation_info?.generation_time ? 
+                            ${item.result?.generation_info?.generation_time ?
                               `<p class="text-xs text-gray-400 mt-1">⏰ 키워드 생성 시간: ${new Date(item.result.generation_info.generation_time).toLocaleString()}</p>` : ''}
                             <p class="text-sm text-gray-500">${item.created_at_display || new Date(item.created_at).toLocaleString()}</p>
                             <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -803,9 +803,9 @@ class NewsletterApp {
                         </div>
                         <div class="space-x-2">
                             ${item.status === 'completed' ? `
-                                <button onclick="app.viewHistoryItem('${item.id}')" 
+                                <button onclick="app.viewHistoryItem('${item.id}')"
                                         class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
-                                <button onclick="app.rerunHistoryItem('${item.id}')" 
+                                <button onclick="app.rerunHistoryItem('${item.id}')"
                                         class="text-green-600 hover:text-green-900 text-sm">다시 실행</button>
                             ` : ''}
                         </div>
@@ -821,40 +821,40 @@ class NewsletterApp {
         // 새로운 데이터 구조 우선 처리 (source_type, source_value)
         const sourceType = item.result?.source_type || item.params?.source_type;
         const sourceValue = item.result?.source_value || item.params?.source_value;
-        
+
         // 1. source_type이 정의된 경우 (최신 시스템)
         if (sourceType && sourceValue) {
             if (sourceType === 'domain' || sourceType === 'topic') {
                 return `🎯 주제: ${sourceValue}`;
             } else if (sourceType === 'keywords') {
                 // source_value가 문자열이면 파싱, 배열이면 그대로 사용
-                const keywords = Array.isArray(sourceValue) ? sourceValue : 
+                const keywords = Array.isArray(sourceValue) ? sourceValue :
                                typeof sourceValue === 'string' ? sourceValue.split(',').map(k => k.trim()) : [sourceValue];
                 return `📝 키워드: ${keywords.join(', ')}`;
             }
         }
-        
+
         // 2. 레거시 데이터 구조 fallback (keywords, domain)
         if (item.params?.keywords) {
-            const keywords = Array.isArray(item.params.keywords) ? 
-                           item.params.keywords : 
+            const keywords = Array.isArray(item.params.keywords) ?
+                           item.params.keywords :
                            [item.params.keywords];
             return `📝 키워드: ${keywords.join(', ')}`;
         }
-        
+
         if (item.params?.domain) {
             return `🎯 도메인: ${item.params.domain}`;
         }
-        
+
         if (item.params?.topic) {
             return `🎯 주제: ${item.params.topic}`;
         }
-        
+
         // 3. 최후 fallback
         if (sourceValue) {
             return `📝 정보: ${sourceValue}`;
         }
-        
+
         return `📝 키워드: 정보 없음`;
     }
 
@@ -864,10 +864,10 @@ class NewsletterApp {
             const data = await response.json();
 
             const schedulesList = document.getElementById('schedulesList');
-            
+
             // 기존 내용 초기화
             schedulesList.innerHTML = '';
-            
+
             // 현재 서버 시간 표시 (unified format)
             if (data.current_time_display || data.current_time_kst) {
                 const currentTimeDisplay = document.createElement('div');
@@ -884,19 +884,19 @@ class NewsletterApp {
                         </div>
                     </div>
                 `;
-                
+
                 // 기존 시간 표시 제거 후 새로 추가
                 const existingTimeDisplay = schedulesList.querySelector('.bg-blue-50');
                 if (existingTimeDisplay) {
                     existingTimeDisplay.remove();
                 }
                 schedulesList.appendChild(currentTimeDisplay);
-                
+
                 this.updateTimeDifference(data.current_time || data.server_time);
             }
-            
+
             const schedules = data.schedules || data;
-            
+
             if (!Array.isArray(schedules) || schedules.length === 0) {
                 const noSchedulesDiv = document.createElement('div');
                 noSchedulesDiv.innerHTML = '<p class="text-gray-500 mt-4">예약된 발송이 없습니다.</p>';
@@ -909,10 +909,10 @@ class NewsletterApp {
                     <div class="flex justify-between items-start">
                         <div class="flex-1">
                             <h4 class="text-sm font-medium text-gray-900 mb-2">
-                                ${schedule.params?.source_type === 'domain' || schedule.params?.source_type === 'topic' ? 
+                                ${schedule.params?.source_type === 'domain' || schedule.params?.source_type === 'topic' ?
                                   `🎯 주제: ${schedule.params.source_value || schedule.params?.domain || schedule.params?.topic || 'Unknown'} (매번 새 키워드 생성)` :
-                                  schedule.params?.keywords ? 
-                                  `📝 키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
+                                  schedule.params?.keywords ?
+                                  `📝 키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` :
                                   `📝 키워드: ${schedule.params?.source_value || 'Unknown'}`}
                             </h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
@@ -923,7 +923,7 @@ class NewsletterApp {
                                     <span class="font-medium">템플릿:</span> ${schedule.params?.template_style || 'compact'}
                                 </div>
                                 <div class="col-span-full">
-                                    <span class="font-medium">다음 실행:</span> 
+                                    <span class="font-medium">다음 실행:</span>
                                     <span class="font-mono ${schedule.is_overdue ? 'text-red-600' : 'text-blue-600'}">${schedule.next_run_display || schedule.next_run_kst || new Date(schedule.next_run).toLocaleString()}</span>
                                     ${schedule.time_until_next ? `<span class="ml-2 text-xs px-2 py-1 rounded-full ${schedule.is_overdue ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}">${schedule.time_until_next}</span>` : ''}
                                 </div>
@@ -933,11 +933,11 @@ class NewsletterApp {
                             </div>
                         </div>
                         <div class="ml-4 space-x-2">
-                            <button onclick="app.runScheduleNow('${schedule.id}')" 
+                            <button onclick="app.runScheduleNow('${schedule.id}')"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                                 즉시 실행
                             </button>
-                            <button onclick="app.cancelSchedule('${schedule.id}')" 
+                            <button onclick="app.cancelSchedule('${schedule.id}')"
                                     class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
                                 취소
                             </button>
@@ -945,11 +945,11 @@ class NewsletterApp {
                     </div>
                 </div>
             `).join('');
-            
+
             const schedulesContainer = document.createElement('div');
             schedulesContainer.innerHTML = schedulesHtml;
             schedulesList.appendChild(schedulesContainer);
-            
+
         } catch (error) {
             console.error('Failed to load schedules:', error);
             const schedulesList = document.getElementById('schedulesList');
@@ -978,14 +978,14 @@ class NewsletterApp {
 
     async runScheduleNow(scheduleId) {
         if (!confirm('이 스케줄을 지금 즉시 실행하시겠습니까?')) return;
-        
+
         try {
             const response = await fetch(`/api/schedule/${scheduleId}/run`, {
                 method: 'POST'
             });
-            
+
             const result = await response.json();
-            
+
             if (response.ok) {
                 if (result.status === 'queued') {
                     alert(`뉴스레터 생성이 시작되었습니다.\nJob ID: ${result.job_id}`);
@@ -999,9 +999,9 @@ class NewsletterApp {
             alert('Network error: ' + error.message);
         }
     }
-    
+
     // ===== 시간 동기화 관련 메소드들 =====
-    
+
     async initTimeSync() {
         try {
             await this.syncServerTime();
@@ -1011,39 +1011,39 @@ class NewsletterApp {
             console.error('Failed to initialize time sync:', error);
         }
     }
-    
+
     async syncServerTime() {
         try {
             const startTime = Date.now();
             const response = await fetch('/api/time-sync');
             const data = await response.json();
             const endTime = Date.now();
-            
+
             // 네트워크 지연을 고려한 서버 시간 계산 (unified format)
             const networkDelay = (endTime - startTime) / 2;
             const serverTime = new Date(data.utc_time || data.server_time_iso).getTime();
             const adjustedServerTime = serverTime + networkDelay;
-            
+
             this.serverTimeOffset = adjustedServerTime - endTime;
             this.lastTimeSyncTime = endTime;
-            
+
             console.log(`Time sync completed. Offset: ${this.serverTimeOffset}ms, Delay: ${networkDelay}ms`);
-            
+
             // UI 업데이트 (unified format)
             this.updateTimeDifference(data.utc_time || data.server_time_iso);
-            
+
         } catch (error) {
             console.error('Time sync failed:', error);
         }
     }
-    
+
     updateTimeDifference(serverTimeIso) {
         try {
             const serverTime = new Date(serverTimeIso);
             const clientTime = new Date();
             const diffMs = Math.abs(serverTime.getTime() - clientTime.getTime());
             const diffMinutes = Math.floor(diffMs / (1000 * 60));
-            
+
             const timeDiffInfo = document.getElementById('timeDiffInfo');
             if (timeDiffInfo) {
                 if (diffMinutes === 0) {
@@ -1061,15 +1061,15 @@ class NewsletterApp {
             console.error('Failed to update time difference:', error);
         }
     }
-    
+
     getCurrentServerTime() {
         if (!this.lastTimeSyncTime) return new Date();
-        
+
         const now = Date.now();
         const timeSinceSync = now - this.lastTimeSyncTime;
         return new Date(now + this.serverTimeOffset);
     }
-    
+
     startTimeDisplay() {
         // 현재 시간을 1초마다 업데이트
         setInterval(() => {
@@ -1078,7 +1078,7 @@ class NewsletterApp {
             if (currentServerTimeEl) {
                 currentServerTimeEl.textContent = serverTime.toLocaleString('ko-KR', {
                     year: 'numeric',
-                    month: '2-digit', 
+                    month: '2-digit',
                     day: '2-digit',
                     hour: '2-digit',
                     minute: '2-digit',
@@ -1088,22 +1088,22 @@ class NewsletterApp {
             }
         }, 1000);
     }
-    
+
     // ===== 스케줄 설정 관련 메소드들 =====
-    
+
     getScheduleSettings() {
         try {
             const frequency = document.getElementById('frequency').value;
             const time = document.getElementById('scheduleTime').value;
-            
+
             if (!time) {
                 this.showError('발송 시간을 설정해주세요.');
                 return null;
             }
-            
+
             // RRULE 생성
             let rrule = `FREQ=${frequency}`;
-            
+
             // 요일 설정 (주간 발송인 경우)
             if (frequency === 'WEEKLY') {
                 const selectedDays = Array.from(document.querySelectorAll('.weekday:checked'))
@@ -1114,11 +1114,11 @@ class NewsletterApp {
                 }
                 rrule += `;BYDAY=${selectedDays.join(',')}`;
             }
-            
+
             // 시간 설정
             const [hour, minute] = time.split(':');
             rrule += `;BYHOUR=${hour};BYMINUTE=${minute}`;
-            
+
             // 다음 실행 시간 미리보기 계산
             const nextRun = this.calculateNextRun(rrule);
             const nextRunText = nextRun ? nextRun.toLocaleString('ko-KR', {
@@ -1129,7 +1129,7 @@ class NewsletterApp {
                 minute: '2-digit',
                 timeZone: 'Asia/Seoul'
             }) + ' KST' : '계산 실패';
-            
+
             return {
                 rrule: rrule,
                 frequency: frequency,
@@ -1142,27 +1142,27 @@ class NewsletterApp {
             return null;
         }
     }
-    
+
     calculateNextRun(rruleString) {
         try {
             // 간단한 RRULE 파싱 및 다음 실행 시간 계산
             // 실제로는 서버에서 더 정확히 계산되지만, UI 미리보기용
-            
+
             const now = this.getCurrentServerTime();
             const parts = rruleString.split(';');
             const freq = parts.find(p => p.startsWith('FREQ='))?.split('=')[1];
             const hourPart = parts.find(p => p.startsWith('BYHOUR='))?.split('=')[1];
             const minutePart = parts.find(p => p.startsWith('BYMINUTE='))?.split('=')[1];
             const daysPart = parts.find(p => p.startsWith('BYDAY='))?.split('=')[1];
-            
+
             if (!freq || !hourPart || !minutePart) return null;
-            
+
             const hour = parseInt(hourPart);
             const minute = parseInt(minutePart);
-            
+
             let nextRun = new Date(now);
             nextRun.setHours(hour, minute, 0, 0);
-            
+
             // 이미 지난 시간이면 다음으로
             if (nextRun <= now) {
                 if (freq === 'DAILY') {
@@ -1174,14 +1174,14 @@ class NewsletterApp {
                     nextRun.setMonth(nextRun.getMonth() + 1);
                 }
             }
-            
+
             return nextRun;
         } catch (error) {
             console.error('Failed to calculate next run:', error);
             return null;
         }
     }
-    
+
     async createSchedule(data) {
         try {
             const scheduleData = {
@@ -1194,9 +1194,9 @@ class NewsletterApp {
                 period: data.period,
                 rrule: data.schedule.rrule
             };
-            
+
             console.log('Creating schedule with data:', scheduleData);
-            
+
             const response = await fetch('/api/schedule', {
                 method: 'POST',
                 headers: {
@@ -1204,10 +1204,10 @@ class NewsletterApp {
                 },
                 body: JSON.stringify(scheduleData)
             });
-            
+
             let result;
             const contentType = response.headers.get('content-type');
-            
+
             if (contentType && contentType.includes('application/json')) {
                 result = await response.json();
             } else {
@@ -1215,11 +1215,11 @@ class NewsletterApp {
                 const text = await response.text();
                 throw new Error(`Server returned non-JSON response (status: ${response.status}): ${text.substring(0, 100)}...`);
             }
-            
+
             if (response.ok) {
                 this.isGenerating = false;
                 this.hideProgress();
-                
+
                 // 성공 메시지 표시
                 // 테스트 모드 또는 경고 메시지 구성
                 let warningHtml = '';
@@ -1271,7 +1271,7 @@ class NewsletterApp {
                                 </div>
                                 ${warningHtml}
                                 <div class="mt-3">
-                                    <button onclick="app.switchTab('scheduleManageTab')" 
+                                    <button onclick="app.switchTab('scheduleManageTab')"
                                             class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm">
                                         스케줄 관리로 이동
                                     </button>
@@ -1280,19 +1280,19 @@ class NewsletterApp {
                         </div>
                     </div>
                 `;
-                
+
                 document.getElementById('resultsSection').classList.remove('hidden');
                 document.getElementById('newsletterPreview').innerHTML = successHtml;
-                
+
                 // 스케줄 목록 새로고침
                 this.loadSchedules();
-                
+
             } else {
                 this.isGenerating = false;
                 this.hideProgress();
                 this.showError('스케줄 생성 실패: ' + (result.error || 'Unknown error'));
             }
-            
+
         } catch (error) {
             console.error('Failed to create schedule:', error);
             this.isGenerating = false;
@@ -1300,27 +1300,27 @@ class NewsletterApp {
             this.showError('스케줄 생성 중 오류 발생: ' + error.message);
         }
     }
-    
+
     updateSchedulePreview() {
         try {
             const scheduleSettings = this.getScheduleSettings();
             const previewElement = document.getElementById('nextRunPreview');
             const testModeWarning = document.getElementById('testModeWarning');
-            
+
             if (!previewElement) return;
-            
+
             if (scheduleSettings && scheduleSettings.next_run_preview) {
                 previewElement.innerHTML = `
                     <div class="font-mono">${scheduleSettings.next_run_preview}</div>
                     <div class="text-xs mt-1">
-                        <div>빈도: ${scheduleSettings.frequency === 'DAILY' ? '매일' : 
-                                      scheduleSettings.frequency === 'WEEKLY' ? '매주' : 
+                        <div>빈도: ${scheduleSettings.frequency === 'DAILY' ? '매일' :
+                                      scheduleSettings.frequency === 'WEEKLY' ? '매주' :
                                       scheduleSettings.frequency === 'MONTHLY' ? '매월' : scheduleSettings.frequency}</div>
                         <div>시간: ${scheduleSettings.time}</div>
                         <div>RRULE: <code class="text-xs bg-blue-100 px-1 rounded">${scheduleSettings.rrule}</code></div>
                     </div>
                 `;
-                
+
                 // 테스트 모드 감지 (10분 이내 스케줄)
                 if (scheduleSettings.time_until_execution_minutes !== undefined) {
                     const minutesUntil = scheduleSettings.time_until_execution_minutes;
@@ -1425,7 +1425,7 @@ class NewsletterApp {
                 alert('다운로드 기능을 위해 페이지를 새로고침하거나 뉴스레터를 다시 생성해주세요.');
                 return;
             }
-            
+
             alert('다운로드할 뉴스레터가 없습니다.');
             return;
         }
@@ -1456,7 +1456,7 @@ class NewsletterApp {
         try {
             const configResponse = await fetch('/api/email-config');
             const configResult = await configResponse.json();
-            
+
             if (!configResult.ready) {
                 if (confirm('이메일 설정이 완료되지 않았습니다. 테스트 이메일을 발송해보시겠습니까?')) {
                     await this.sendTestEmail(email);
@@ -1483,7 +1483,7 @@ class NewsletterApp {
             });
 
             const result = await response.json();
-            
+
             if (response.ok) {
                 alert('이메일이 성공적으로 발송되었습니다!');
             } else {
@@ -1510,7 +1510,7 @@ class NewsletterApp {
             });
 
             const result = await response.json();
-            
+
             if (response.ok) {
                 alert(`테스트 이메일이 ${email}로 발송되었습니다!\n메시지 ID: ${result.message_id || 'N/A'}`);
             } else {
@@ -1525,21 +1525,21 @@ class NewsletterApp {
         try {
             const response = await fetch('/api/email-config');
             const result = await response.json();
-            
+
             let message = '이메일 설정 상태:\n';
             message += `Postmark 토큰: ${result.postmark_token_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;
             message += `발신자 이메일: ${result.from_email_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;
             message += `전체 상태: ${result.ready ? '✓ 준비 완료' : '✗ 설정 필요'}`;
-            
+
             alert(message);
-            
+
             if (!result.ready) {
                 const testEmail = prompt('테스트 이메일을 발송해보시겠습니까? (이메일 주소 입력)');
                 if (testEmail) {
                     await this.sendTestEmail(testEmail);
                 }
             }
-            
+
         } catch (error) {
             alert('설정 확인 실패: ' + error.message);
         }
@@ -1580,9 +1580,9 @@ class NewsletterApp {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ 
+                body: JSON.stringify({
                     domain: domain,
-                    count: suggestCount 
+                    count: suggestCount
                 })
             });
 
@@ -1592,7 +1592,7 @@ class NewsletterApp {
                 // Store suggested keywords for editing
                 this.suggestedKeywords = [...data.keywords];
                 this.currentDomain = domain;
-                
+
                 // Display editable keywords
                 this.renderEditableKeywords(data.keywords, domain);
             } else {
@@ -1610,13 +1610,13 @@ class NewsletterApp {
     addKeywordToInput(keyword) {
         const keywordsInput = document.getElementById('keywords');
         const currentKeywords = keywordsInput.value.trim();
-        
+
         if (currentKeywords) {
             keywordsInput.value = currentKeywords + ', ' + keyword;
         } else {
             keywordsInput.value = keyword;
         }
-        
+
         // Switch to keywords method
         document.getElementById('keywordsMethod').checked = true;
         this.toggleInputMethod();
@@ -1625,7 +1625,7 @@ class NewsletterApp {
     useAllKeywords(keywords) {
         const keywordsInput = document.getElementById('keywords');
         keywordsInput.value = keywords.join(', ');
-        
+
         // Switch to keywords method
         document.getElementById('keywordsMethod').checked = true;
         this.toggleInputMethod();
@@ -1633,47 +1633,47 @@ class NewsletterApp {
 
     renderEditableKeywords(keywords, domain) {
         const resultDiv = document.getElementById('keywords-result');
-        
+
         // Create editable keywords HTML
         const editableKeywords = keywords.map((keyword, index) => `
             <div class="inline-flex items-center bg-blue-100 text-blue-800 text-sm px-3 py-2 rounded-full mr-2 mb-2 group">
-                <input type="text" 
-                       value="${keyword}" 
+                <input type="text"
+                       value="${keyword}"
                        class="bg-transparent border-none outline-none text-sm min-w-0 flex-1"
                        onchange="app.updateKeyword(${index}, this.value)"
                        onkeypress="if(event.key==='Enter') this.blur()">
-                <button onclick="app.removeKeyword(${index})" 
+                <button onclick="app.removeKeyword(${index})"
                         class="ml-2 text-blue-600 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity">
                     <i class="fas fa-times text-xs"></i>
                 </button>
             </div>
         `).join('');
-        
+
         resultDiv.innerHTML = `
             <div class="space-y-4">
                 <div>
                     <div class="text-sm text-gray-700 mb-2">생성된 키워드 (클릭하여 편집):</div>
                     <div class="flex flex-wrap" id="editable-keywords">
                         ${editableKeywords}
-                        <button onclick="app.addNewKeyword()" 
+                        <button onclick="app.addNewKeyword()"
                                 class="inline-flex items-center bg-gray-100 text-gray-600 text-sm px-3 py-2 rounded-full hover:bg-gray-200">
                             <i class="fas fa-plus mr-1"></i>추가
                         </button>
                     </div>
                 </div>
-                
+
                 <div class="flex flex-wrap gap-2">
-                    <button onclick="app.useEditedKeywords()" 
+                    <button onclick="app.useEditedKeywords()"
                             class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-md">
                         <i class="fas fa-edit mr-1"></i>수정된 키워드로 뉴스레터 생성
                     </button>
-                    
-                    <button onclick="app.generateDirectFromDomain('${domain}')" 
+
+                    <button onclick="app.generateDirectFromDomain('${domain}')"
                             class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-md">
                         <i class="fas fa-rocket mr-1"></i>도메인에서 직접 생성
                     </button>
-                    
-                    <button onclick="app.resetKeywords()" 
+
+                    <button onclick="app.resetKeywords()"
                             class="bg-gray-500 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded-md">
                         <i class="fas fa-undo mr-1"></i>원래대로
                     </button>
@@ -1709,14 +1709,14 @@ class NewsletterApp {
             alert('최소 하나 이상의 키워드가 필요합니다.');
             return;
         }
-        
+
         const keywordsInput = document.getElementById('keywords');
         keywordsInput.value = validKeywords.join(', ');
-        
+
         // Switch to keywords method
         document.getElementById('keywordsMethod').checked = true;
         this.toggleInputMethod();
-        
+
         // Show success message
         const resultDiv = document.getElementById('keywords-result');
         resultDiv.innerHTML = `<div class="text-green-600 text-sm">키워드가 설정되었습니다. 뉴스레터를 생성해보세요.</div>`;
@@ -1727,16 +1727,16 @@ class NewsletterApp {
         if (!confirm(`주제 "${domain}"에서 직접 뉴스레터를 생성하시겠습니까? (키워드 수정 없이 진행)`)) {
             return;
         }
-        
+
         // Set domain method and generate directly
         document.getElementById('domainMethod').checked = true;
         document.getElementById('domain').value = domain;
         this.toggleInputMethod();
-        
+
         // Clear results and show generating message
         const resultDiv = document.getElementById('keywords-result');
         resultDiv.innerHTML = `<div class="text-blue-600 text-sm">도메인에서 직접 뉴스레터를 생성하고 있습니다...</div>`;
-        
+
         // Generate newsletter
         this.generateNewsletter();
     }

@@ -12,7 +12,6 @@ from newsletter.tools import (
 
 
 class TestThemeExtraction(unittest.TestCase):
-
     def test_extract_common_theme_fallback_single_keyword(self):
         """Test that fallback returns single keyword unchanged"""
         result = extract_common_theme_fallback(["AI 기술"])
@@ -30,9 +29,7 @@ class TestThemeExtraction(unittest.TestCase):
 
     def test_extract_common_theme_fallback_more_than_three_keywords(self):
         """Test that fallback formats more than three keywords correctly"""
-        result = extract_common_theme_fallback(
-            ["AI", "머신러닝", "딥러닝", "자연어처리"]
-        )
+        result = extract_common_theme_fallback(["AI", "머신러닝", "딥러닝", "자연어처리"])
         self.assertEqual(result, "AI 외 3개 분야")
 
     def test_extract_common_theme_from_string(self):

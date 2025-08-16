@@ -1,6 +1,6 @@
 # 이메일 호환성 테스트 결과가 저장되는 디렉토리입니다.
-# 
+#
 # 자동 생성되는 파일들:
 # - email_compatibility_report_*.html (호환성 테스트 보고서)
 # - test_email_*.html (테스트용 이메일 파일)
-# - *_email_compatible.html (이메일 호환 버전) 
+# - *_email_compatible.html (이메일 호환 버전)

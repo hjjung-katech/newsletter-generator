@@ -3,8 +3,8 @@
 """
 
 import logging
-from typing import Optional, Any, Callable
 from functools import wraps
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 

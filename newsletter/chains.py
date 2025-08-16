@@ -5,8 +5,8 @@ Newsletter Generator - LangChain Chains
 
 import datetime
 import json
-import os
 import logging
+import os
 
 from langchain_core.messages import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
@@ -16,54 +16,57 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from newsletter.article_filter import select_top_articles
 
 from . import config
-from .compose import (
-    NewsletterConfig,
-    compose_compact_newsletter_html,
-    compose_newsletter,
-    create_grouped_sections,
-    extract_key_definitions_for_compact,
-)
+from .compose import NewsletterConfig, compose_newsletter, create_grouped_sections
 from .template_manager import TemplateManager
-from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 
 def robust_json_parse(text, fallback_data, operation_name="JSON 파싱"):
     """
     연결 오류에 강한 JSON 파싱 함수
-    
+
     Args:
         text: 파싱할 텍스트
         fallback_data: 파싱 실패 시 반환할 기본 데이터
         operation_name: 오류 로그에 표시할 작업 이름
     """
-    import re
     import json
-    import socket
-    
+    import re
+
     try:
         # 네트워크 연결 오류 감지
         error_str = str(text).lower()
-        if any(keyword in error_str for keyword in [
-            "연결", "강제", "끊", "reset", "connection", "timeout", "network", "10054"
-        ]):
+        if any(
+            keyword in error_str
+            for keyword in [
+                "연결",
+                "강제",
+                "끊",
+                "reset",
+                "connection",
+                "timeout",
+                "network",
+                "10054",
+            ]
+        ):
             logger.warning(f"네트워크 오류로 인한 {operation_name} 실패, 기본 구조 사용")
             return fallback_data
 
         # 다양한 JSON 추출 시도
         json_str = None
-        
+
         # 1. 코드 블록 내 JSON
         json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
         if json_match:
             json_str = json_match.group(1).strip()
-        
+
         # 2. 중괄호로 감싸진 JSON
         if not json_str:
             json_match = re.search(r"\{.*\}", text, re.DOTALL)
             if json_match:
                 json_str = json_match.group()
-        
+
         # 3. 전체 텍스트 (마지막 시도)
         if not json_str:
             json_str = text.strip()
@@ -78,21 +81,22 @@ def robust_json_parse(text, fallback_data, operation_name="JSON 파싱"):
                 # JSON 정리 시도
                 if attempt == 0:
                     # 줄바꿈 문자 정리
-                    json_str = json_str.replace('\n', ' ').replace('\r', '')
+                    json_str = json_str.replace("\n", " ").replace("\r", "")
                 elif attempt == 1:
                     # 불완전한 JSON 완성 시도
-                    if not json_str.endswith('}'):
-                        json_str += '}'
-                    if not json_str.startswith('{'):
-                        json_str = '{' + json_str
+                    if not json_str.endswith("}"):
+                        json_str += "}"
+                    if not json_str.startswith("{"):
+                        json_str = "{" + json_str
                 else:
                     raise json_error
-                        
+
     except Exception as e:
         logger.error(f"{operation_name} 오류: {e}")
         logger.debug(f"원본 텍스트: {text[:500]}...")
-        
+
     return fallback_data
+
 
 # 로거 초기화
 logger = get_logger(__name__)
@@ -224,7 +228,7 @@ COMPOSITION_PROMPT = """
 
 **매우 중요한 지시사항:**
 - 위에 제공된 **주제 키워드({keywords})**와 **실제 카테고리 요약 내용**만을 사용하세요
-- 주제 키워드와 관련 없는 내용은 절대 포함하지 마세요  
+- 주제 키워드와 관련 없는 내용은 절대 포함하지 마세요
 - newsletter_topic은 제공된 키워드를 기반으로만 설정하세요
 - introduction_message는 제공된 카테고리 요약의 실제 내용만을 반영하세요
 - 제공된 뉴스 내용이 없더라도 키워드 주제에 맞는 유용한 뉴스레터를 작성하세요
@@ -392,8 +396,9 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
         # Fallback to original Gemini implementation
         if not config.GEMINI_API_KEY:
             # 테스트 환경에서는 Mock LLM 반환
-            if config.IS_TESTING or os.getenv('TESTING') == '1':
+            if config.IS_TESTING or os.getenv("TESTING") == "1":
                 from unittest.mock import MagicMock
+
                 mock_llm = MagicMock()
                 mock_llm.invoke.return_value = MagicMock(content="Test response")
                 return mock_llm
@@ -510,25 +515,30 @@ def create_categorization_chain(is_compact=False):
         if is_compact:
             fallback_data = {
                 "categories": [
-                    {"title": "주요 동향", "article_indices": list(range(1, 11))}  # 최대 10개 기사
+                    {
+                        "title": "주요 동향",
+                        "article_indices": list(range(1, 11)),
+                    }  # 최대 10개 기사
                 ]
             }
         else:
             fallback_data = {
                 "categories": [
-                    {"title": "기타", "article_indices": list(range(1, 6))}  # 최대 5개 기사
+                    {
+                        "title": "기타",
+                        "article_indices": list(range(1, 6)),
+                    }  # 최대 5개 기사
                 ]
             }
-        
+
         result = robust_json_parse(text, fallback_data, "카테고리 분류")
-        
+
         # 결과 로그 (성공한 경우만)
         if result != fallback_data:
             logger.info(
-                f"카테고리 분류 결과: "
-                f"{json.dumps(result, ensure_ascii=False, indent=2)}"
+                f"카테고리 분류 결과: " f"{json.dumps(result, ensure_ascii=False, indent=2)}"
             )
-        
+
         return result
 
     return chain | RunnableLambda(parse_json_response)
@@ -619,14 +629,10 @@ def create_summarization_chain(is_compact=False):
 
             # 개별 카테고리 처리에 try-catch 추가 (연결 문제 대응)
             try:
-                logger.info(
-                    f"카테고리 '{category.get('title', '제목 없음')}' 요약 생성 중..."
-                )
+                logger.info(f"카테고리 '{category.get('title', '제목 없음')}' 요약 생성 중...")
                 summary_result = llm.invoke(messages)
                 summary_text = summary_result.content
-                logger.info(
-                    f"카테고리 '{category.get('title', '제목 없음')}' 요약 생성 완료"
-                )
+                logger.info(f"카테고리 '{category.get('title', '제목 없음')}' 요약 생성 완료")
 
                 # JSON 파싱 시작
                 try:
@@ -646,9 +652,7 @@ def create_summarization_chain(is_compact=False):
                     else:
                         fallback_summary = {
                             "title": category_title,
-                            "summary_paragraphs": [
-                                f"{category_title} 분야의 주요 동향입니다."
-                            ],
+                            "summary_paragraphs": [f"{category_title} 분야의 주요 동향입니다."],
                             "definitions": [
                                 {
                                     "term": "기술동향",
@@ -656,11 +660,11 @@ def create_summarization_chain(is_compact=False):
                                 }
                             ],
                         }
-                    
+
                     summary_json = robust_json_parse(
-                        summary_text, 
-                        fallback_summary, 
-                        f"카테고리 '{category_title}' 요약"
+                        summary_text,
+                        fallback_summary,
+                        f"카테고리 '{category_title}' 요약",
                     )
 
                     # 카테고리 제목 추가
@@ -691,8 +695,7 @@ def create_summarization_chain(is_compact=False):
                                     }
                                 ]
                             elif any(
-                                keyword in category_title
-                                for keyword in ["기술", "개발"]
+                                keyword in category_title for keyword in ["기술", "개발"]
                             ):
                                 compact_result["definitions"] = [
                                     {
@@ -705,8 +708,7 @@ def create_summarization_chain(is_compact=False):
                                     }
                                 ]
                             elif any(
-                                keyword in category_title
-                                for keyword in ["정책", "규제"]
+                                keyword in category_title for keyword in ["정책", "규제"]
                             ):
                                 compact_result["definitions"] = [
                                     {
@@ -914,14 +916,12 @@ def create_composition_chain():
             "generation_date": datetime.date.today().strftime("%Y-%m-%d"),
             "recipient_greeting": "안녕하세요, 독자 여러분",
             "introduction_message": "이번 뉴스레터에서는 주요 산업 동향을 살펴봅니다.",
-            "food_for_thought": {
-                "message": "산업의 변화에 어떻게 대응해 나갈지 생각해 보시기 바랍니다."
-            },
+            "food_for_thought": {"message": "산업의 변화에 어떻게 대응해 나갈지 생각해 보시기 바랍니다."},
             "closing_message": "다음 뉴스레터에서 다시 만나뵙겠습니다.",
             "editor_signature": "편집자 드림",
             "company_name": "Tech Insights",
         }
-        
+
         return robust_json_parse(text, fallback_data, "종합 구성")
 
     # 체인 구성
@@ -1026,13 +1026,10 @@ def create_rendering_chain():
                 combined_data["newsletter_topic"] = keywords
 
         # 기본 템플릿 설정 추가
-        combined_data["company_name"] = template_manager.get(
-            "company.name", "R&D 기획단"
-        )
+        combined_data["company_name"] = template_manager.get("company.name", "R&D 기획단")
         combined_data["footer_disclaimer"] = template_manager.get(
             "footer.disclaimer",
-            "이 뉴스레터는 정보 제공용으로만 사용되며, "
-            "투자 권유를 목적으로 하지 않습니다.",
+            "이 뉴스레터는 정보 제공용으로만 사용되며, " "투자 권유를 목적으로 하지 않습니다.",
         )
         combined_data["editor_signature"] = template_manager.get(
             "editor.signature", "편집자 드림"
@@ -1111,13 +1108,13 @@ def create_rendering_chain():
             if "introduction_message" not in combined_data:
                 newsletter_topic = combined_data.get("newsletter_topic", "")
                 if newsletter_topic:
-                    combined_data["introduction_message"] = (
-                        f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                    )
+                    combined_data[
+                        "introduction_message"
+                    ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
                 else:
-                    combined_data["introduction_message"] = (
-                        "이번 주 주요 산업 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                    )
+                    combined_data[
+                        "introduction_message"
+                    ] = "이번 주 주요 산업 동향과 기술 발전 현황을 정리하여 보내드립니다."
             combined_data["closing_message"] = combined_data.get(
                 "closing_message",
                 "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
@@ -1202,9 +1199,7 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 분야의 중요성�
         if hasattr(intro_response, "content") and intro_response.content:
             introduction_message = str(intro_response.content).strip()
         else:
-            logger.warning(
-                f"LLM 소개 메시지 응답에서 유효한 content를 찾을 수 없음: {intro_response}"
-            )
+            logger.warning(f"LLM 소개 메시지 응답에서 유효한 content를 찾을 수 없음: {intro_response}")
             introduction_message = f"이번 주는 {newsletter_topic} 분야의 특별한 뉴스 수집이 어려웠지만, 해당 분야의 지속적인 발전과 전략적 중요성을 고려할 때 지속적인 관심과 모니터링이 필요합니다."
 
         # 키워드 기반 생각해 볼 거리 생성
@@ -1231,10 +1226,10 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전
         if hasattr(thought_response, "content") and thought_response.content:
             food_for_thought_message = str(thought_response.content).strip()
         else:
-            logger.warning(
-                f"LLM 생각해볼거리 응답에서 유효한 content를 찾을 수 없음: {thought_response}"
+            logger.warning(f"LLM 생각해볼거리 응답에서 유효한 content를 찾을 수 없음: {thought_response}")
+            food_for_thought_message = (
+                f"{newsletter_topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다."
             )
-            food_for_thought_message = f"{newsletter_topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다."
 
     except Exception as e:
         logger.warning(f"LLM 기반 콘텐츠 생성 실패: {e}")
@@ -1263,9 +1258,7 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전
         "introduction_message": introduction_message,
         "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
         "editor_signature": "편집자 드림",
-        "company_name": template_manager.get(
-            "company.name", "산업통상자원 R&D 전략기획단"
-        ),
+        "company_name": template_manager.get("company.name", "산업통상자원 R&D 전략기획단"),
         "company_logo_url": template_manager.get(
             "company.logo_url", "/static/logo.png"
         ),
@@ -1275,9 +1268,7 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전
         "copyright_year": template_manager.get(
             "company.copyright_year", datetime.date.today().strftime("%Y")
         ),
-        "company_tagline": template_manager.get(
-            "company.tagline", "최신 기술 동향을 한눈에"
-        ),
+        "company_tagline": template_manager.get("company.tagline", "최신 기술 동향을 한눈에"),
         "footer_contact": template_manager.get(
             "footer.contact_info", "문의사항: hjjung2@osp.re.kr"
         ),
@@ -1340,9 +1331,7 @@ def get_newsletter_chain(is_compact=False):
 
             # 빈 기사 배열 처리 - 유용한 뉴스레터를 생성하도록 개선
             if not articles or len(articles) == 0:
-                logger.info(
-                    "뉴스 기사가 수집되지 않았지만, 키워드 기반 유용한 뉴스레터를 생성합니다."
-                )
+                logger.info("뉴스 기사가 수집되지 않았지만, 키워드 기반 유용한 뉴스레터를 생성합니다.")
                 return handle_no_articles_scenario(data, is_compact)
 
             # 1. 분류 단계 실행
@@ -1482,9 +1471,7 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 빠
                                 return message
 
                         # content가 없거나 빈 경우 기본값 사용
-                        logger.warning(
-                            f"LLM 응답에서 유효한 content를 찾을 수 없음: {response}"
-                        )
+                        logger.warning(f"LLM 응답에서 유효한 content를 찾을 수 없음: {response}")
                         return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다."
 
                     except Exception as e:
@@ -1574,22 +1561,22 @@ R&D 전략기획단 전문위원들을 대상으로, 이번 주 뉴스레터의 
                             )
                         else:
                             # 빈 응답인 경우 기본값 사용
-                            result_data["introduction_message"] = (
-                                f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                            )
+                            result_data[
+                                "introduction_message"
+                            ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
                     else:
                         logger.warning(
                             f"LLM 소개문구 응답에서 유효한 content를 찾을 수 없음: {response}"
                         )
-                        result_data["introduction_message"] = (
-                            f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                        )
+                        result_data[
+                            "introduction_message"
+                        ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
 
                 except Exception as e:
                     logger.warning(f"LLM 기반 introduction_message 생성 실패: {e}")
-                    result_data["introduction_message"] = (
-                        f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                    )
+                    result_data[
+                        "introduction_message"
+                    ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
 
                 logger.debug("Compact 최종 데이터 구조:")
                 logger.debug(f"  - top_articles: {len(result_data['top_articles'])}개")

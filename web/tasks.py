@@ -3,19 +3,20 @@ Background tasks for newsletter generation
 Uses Redis Queue (RQ) for asynchronous processing
 """
 
-import os
-import sys
 import json
+import os
 import sqlite3
-from datetime import datetime, timedelta
 import subprocess
+import sys
 import traceback
+from datetime import datetime, timedelta
+
+# Import PathManager for unified path handling
+from path_manager import get_path_manager
 
 # Add the parent directory to the path to import newsletter modules
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-# Import PathManager for unified path handling
-from path_manager import get_path_manager
 
 # Use PathManager for consistent path handling across all modules
 path_manager = get_path_manager()
@@ -23,7 +24,9 @@ DATABASE_PATH = path_manager.get_database_path()
 
 print(f"[DEBUG] tasks.py using PathManager DATABASE_PATH: {DATABASE_PATH}")
 print(f"[DEBUG] Database file exists: {os.path.exists(DATABASE_PATH)}")
-print(f"[DEBUG] Environment: {'PyInstaller exe' if path_manager.is_frozen else 'Development'}")
+print(
+    f"[DEBUG] Environment: {'PyInstaller exe' if path_manager.is_frozen else 'Development'}"
+)
 
 
 def update_job_status(job_id, status, result=None):
@@ -34,16 +37,21 @@ def update_job_status(job_id, status, result=None):
     # Check if record exists
     cursor.execute("SELECT id FROM history WHERE id = ?", (job_id,))
     record_exists = cursor.fetchone()
-    
+
     if not record_exists:
         # Create new record for scheduled jobs
         try:
             from web.time_utils import get_utc_now, to_iso_utc  # PyInstaller
         except ImportError:
-            from time_utils import get_utc_now, to_iso_utc      # Development
+            from time_utils import get_utc_now, to_iso_utc  # Development
         cursor.execute(
             "INSERT INTO history (id, params, status, created_at) VALUES (?, ?, ?, ?)",
-            (job_id, json.dumps({"source": "scheduled"}), status, to_iso_utc(get_utc_now()))
+            (
+                job_id,
+                json.dumps({"source": "scheduled"}),
+                status,
+                to_iso_utc(get_utc_now()),
+            ),
         )
         print(f"[DEBUG] Created new history record for scheduled job: {job_id}")
     else:
@@ -54,7 +62,9 @@ def update_job_status(job_id, status, result=None):
                 (status, json.dumps(result), job_id),
             )
         else:
-            cursor.execute("UPDATE history SET status = ? WHERE id = ?", (status, job_id))
+            cursor.execute(
+                "UPDATE history SET status = ? WHERE id = ?", (status, job_id)
+            )
         print(f"[DEBUG] Updated existing history record: {job_id} -> {status}")
 
     conn.commit()
@@ -94,20 +104,21 @@ def generate_newsletter_task(data, job_id, send_email=False):
         try:
             # Import newsletter modules
             import sys
+
             project_root = os.path.dirname(os.path.dirname(__file__))
             if project_root not in sys.path:
                 sys.path.insert(0, project_root)
-                
+
             from newsletter import graph, tools
             from newsletter.utils.logger import get_logger
-            
+
             print(f"📊 Source type: {source_type}")
             print(f"📊 Source value: {source_value}")
             print(f"📊 Suggest count: {suggest_count}")
             print(f"📊 Template style: {template_style}")
             print(f"📊 Period: {period} days")
             print(f"📊 Email compatible: {email_compatible}")
-            
+
             # 키워드 생성 로직 (동적 vs 정적)
             if source_type == "domain":
                 # 도메인 기반: 매번 새로운 키워드 생성
@@ -117,45 +128,51 @@ def generate_newsletter_task(data, job_id, send_email=False):
                 )
                 if not keyword_list:
                     raise ValueError(f"도메인 '{source_value}'에서 키워드를 생성할 수 없습니다")
-                
+
                 # 생성된 키워드를 로그에 출력
                 print(f"✅ Generated keywords: {', '.join(keyword_list)}")
-                
+
                 # 결과에 포함할 정보
                 generation_info = {
                     "source_type": "domain",
                     "domain": source_value,
                     "generated_keywords": keyword_list,
                     "suggest_count": suggest_count,
-                    "generation_time": to_iso_utc(get_utc_now())
+                    "generation_time": to_iso_utc(get_utc_now()),
                 }
             else:
                 # 키워드 기반: 고정된 키워드 사용
                 print(f"📝 Using fixed keywords: {source_value}")
-                keyword_str = source_value if isinstance(source_value, str) else ",".join(source_value)
-                keyword_list = [kw.strip() for kw in keyword_str.split(",") if kw.strip()]
-                
+                keyword_str = (
+                    source_value
+                    if isinstance(source_value, str)
+                    else ",".join(source_value)
+                )
+                keyword_list = [
+                    kw.strip() for kw in keyword_str.split(",") if kw.strip()
+                ]
+
                 if not keyword_list:
                     raise ValueError("키워드가 비어있습니다")
-                
+
                 # 결과에 포함할 정보
                 generation_info = {
                     "source_type": "keywords",
-                    "fixed_keywords": keyword_list
+                    "fixed_keywords": keyword_list,
                 }
 
             if not keyword_list:
                 raise ValueError("키워드 목록이 비어있습니다")
-            
+
             print(f"🔍 Using keywords: {keyword_list}")
-            
+
             # Set output directory for newsletter generation using PathManager
             output_dir = path_manager.get_output_dir()
             print(f"🔧 Setting output directory: {output_dir}")
-            
+
             # Set environment variable for newsletter module to use
-            os.environ['NEWSLETTER_OUTPUT_DIR'] = output_dir
-            
+            os.environ["NEWSLETTER_OUTPUT_DIR"] = output_dir
+
             # Call the core newsletter generation function
             domain_param = source_value if source_type == "domain" else None
             html_content, status = graph.generate_newsletter(
@@ -165,13 +182,13 @@ def generate_newsletter_task(data, job_id, send_email=False):
                 template_style=template_style,
                 email_compatible=email_compatible,
             )
-            
+
             if status != "success":
                 raise RuntimeError(f"Newsletter generation failed: {status}")
-                
+
             print(f"✅ Newsletter generated successfully")
             print(f"📝 Content length: {len(html_content)} characters")
-            
+
             # Create a result object that matches subprocess.run structure
             class DirectCallResult:
                 def __init__(self, html_content, generation_info):
@@ -180,19 +197,24 @@ def generate_newsletter_task(data, job_id, send_email=False):
                     self.stderr = ""
                     self.html_content = html_content
                     self.generation_info = generation_info
-                    
+
             result = DirectCallResult(html_content, generation_info)
-            
+
         except Exception as e:
             print(f"❌ Direct function call failed: {str(e)}")
             import traceback
+
             print(f"🔍 Full traceback: {traceback.format_exc()}")
             # Fall back to original subprocess method for development
             try:
                 # CLI 명령어 구성
                 cmd = [
                     os.path.join(
-                        os.path.dirname(__file__), "..", ".venv", "Scripts", "python.exe"
+                        os.path.dirname(__file__),
+                        "..",
+                        ".venv",
+                        "Scripts",
+                        "python.exe",
                     ),
                     "-m",
                     "newsletter.cli",
@@ -209,9 +231,20 @@ def generate_newsletter_task(data, job_id, send_email=False):
 
                 # 새로운 구조에 맞게 키워드 또는 도메인 추가
                 if source_type == "domain":
-                    cmd.extend(["--domain", source_value, "--suggest-count", str(suggest_count)])
+                    cmd.extend(
+                        [
+                            "--domain",
+                            source_value,
+                            "--suggest-count",
+                            str(suggest_count),
+                        ]
+                    )
                 else:
-                    keyword_str = source_value if isinstance(source_value, str) else ",".join(keyword_list)
+                    keyword_str = (
+                        source_value
+                        if isinstance(source_value, str)
+                        else ",".join(keyword_list)
+                    )
                     cmd.extend(["--keywords", keyword_str])
 
                 print(f"🔄 Falling back to CLI subprocess: {' '.join(cmd)}")
@@ -233,15 +266,17 @@ def generate_newsletter_task(data, job_id, send_email=False):
                     timeout=300,
                 )
             except Exception as subprocess_error:
-                raise RuntimeError(f"Both direct call and subprocess failed. Direct: {str(e)}, Subprocess: {str(subprocess_error)}")
+                raise RuntimeError(
+                    f"Both direct call and subprocess failed. Direct: {str(e)}, Subprocess: {str(subprocess_error)}"
+                )
 
         print(f"✅ Newsletter generation completed")
-        if hasattr(result, 'stdout') and result.stdout:
+        if hasattr(result, "stdout") and result.stdout:
             print(f"📝 Output: {str(result.stdout)[:500]}...")
-        if hasattr(result, 'stderr') and result.stderr:
+        if hasattr(result, "stderr") and result.stderr:
             print(f"⚠️ Errors: {str(result.stderr)[:500]}...")
 
-        if hasattr(result, 'returncode') and result.returncode != 0:
+        if hasattr(result, "returncode") and result.returncode != 0:
             raise RuntimeError(
                 f"Newsletter generation failed with return code {result.returncode}: {getattr(result, 'stderr', 'Unknown error')}"
             )
@@ -250,9 +285,9 @@ def generate_newsletter_task(data, job_id, send_email=False):
         html_content = None
         latest_file = "direct_generation"
         encoding_used = "utf-8"
-        
+
         # Check if we got HTML content directly from the function call
-        if hasattr(result, 'html_content') and result.html_content:
+        if hasattr(result, "html_content") and result.html_content:
             html_content = result.html_content
             print(f"📄 Using HTML content from direct function call")
             print(f"📊 Content length: {len(html_content)} characters")
@@ -260,7 +295,7 @@ def generate_newsletter_task(data, job_id, send_email=False):
             # Fallback: Read from file (for subprocess method)
             print(f"📁 Looking for generated HTML file...")
             output_dir = path_manager.get_output_dir()
-            
+
             # Ensure output directory exists
             if not os.path.exists(output_dir):
                 raise FileNotFoundError(f"Output directory not found: {output_dir}")
@@ -271,7 +306,9 @@ def generate_newsletter_task(data, job_id, send_email=False):
                 search_terms = [source_value.lower()]
             else:
                 if isinstance(source_value, str):
-                    search_terms = [kw.strip().lower() for kw in source_value.split(",")]
+                    search_terms = [
+                        kw.strip().lower() for kw in source_value.split(",")
+                    ]
                 else:
                     search_terms = [str(kw).strip().lower() for kw in keyword_list]
 
@@ -326,10 +363,12 @@ def generate_newsletter_task(data, job_id, send_email=False):
             raise RuntimeError("HTML 콘텐츠를 가져올 수 없습니다 (직접 호출 및 파일 읽기 모두 실패)")
 
         # 결과에 generation_info 포함
-        result_generation_info = generation_info if 'generation_info' in locals() else {}
-        if hasattr(result, 'generation_info'):
+        result_generation_info = (
+            generation_info if "generation_info" in locals() else {}
+        )
+        if hasattr(result, "generation_info"):
             result_generation_info = result.generation_info
-        
+
         # 결과 구성
         result_data = {
             "status": "success",
@@ -361,7 +400,7 @@ def generate_newsletter_task(data, job_id, send_email=False):
                 if source_type == "domain":
                     # 도메인 기반: "도메인명 주간 산업동향"
                     subject = f"{source_value} 주간 산업동향"
-                    
+
                     # 실제 사용된 키워드 정보 추가
                     if result_generation_info.get("generated_keywords"):
                         keyword_info = f" (키워드: {', '.join(result_generation_info['generated_keywords'])})"
@@ -370,14 +409,20 @@ def generate_newsletter_task(data, job_id, send_email=False):
                 else:
                     # 키워드 기반: 키워드 개수에 따라 처리
                     if isinstance(source_value, str):
-                        keywords_list = [kw.strip() for kw in source_value.split(",") if kw.strip()]
+                        keywords_list = [
+                            kw.strip() for kw in source_value.split(",") if kw.strip()
+                        ]
                     else:
-                        keywords_list = keyword_list if 'keyword_list' in locals() else []
-                    
+                        keywords_list = (
+                            keyword_list if "keyword_list" in locals() else []
+                        )
+
                     if len(keywords_list) == 1:
                         subject = f"{keywords_list[0]} 주간 산업동향"
                     elif len(keywords_list) > 1:
-                        subject = f"{keywords_list[0]} 외 {len(keywords_list)-1}개 분야 주간 산업동향"
+                        subject = (
+                            f"{keywords_list[0]} 외 {len(keywords_list)-1}개 분야 주간 산업동향"
+                        )
                     else:
                         subject = "주간 산업동향 뉴스레터"
 

@@ -179,7 +179,7 @@ Newsletter Generator는 두 가지 템플릿 스타일을 지원합니다:
 ### Compact 스타일 (간결)
 
 - **목적**: 바쁜 임원진을 위한 빠른 개요
-- **특징**: 
+- **특징**:
   - 최대 10개 기사
   - 최대 3개 주제 그룹
   - 최대 3개 용어 정의
@@ -466,4 +466,4 @@ done
 - [CLI 참조](CLI_REFERENCE.md) - 모든 명령어와 옵션의 상세 설명
 - [예시 모음](EXAMPLES.md) - 다양한 사용 시나리오와 예시
 - [FAQ](FAQ.md) - 자주 묻는 질문과 답변
-- [개발자 가이드](../dev/DEVELOPMENT_GUIDE.md) - 커스터마이징 및 확장 방법 
+- [개발자 가이드](../dev/DEVELOPMENT_GUIDE.md) - 커스터마이징 및 확장 방법

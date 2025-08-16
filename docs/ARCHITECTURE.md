@@ -32,10 +32,10 @@ Newsletter Generator는 여러 LLM 제공자를 통합 지원하며, 기능별�
 class LLMFactory:
     providers = {
         "gemini": GeminiProvider(),
-        "openai": OpenAIProvider(), 
+        "openai": OpenAIProvider(),
         "anthropic": AnthropicProvider()
     }
-    
+
     def get_llm_for_task(task: str) -> LLM:
         # 기능별 최적화된 LLM 반환
         # 자동 fallback 지원
@@ -84,7 +84,7 @@ html_generation: gemini-pro      # 복잡한 작업에만 고성능 모델
 *   `--to`: 뉴스레터를 발송할 이메일 주소
 *   `--output-format`: 로컬 저장 시 파일 형식 (`html`, `md`, 기본값: `html`)
 *   `--drive`: Google Drive에 뉴스레터 저장 여부
-*   필터링 옵션: 
+*   필터링 옵션:
     *   `--max-per-source INT`: 도메인별 최대 기사 수를 지정합니다.
     *   `--no-filter-duplicates`: 중복 기사 필터링을 비활성화합니다.
     *   `--no-major-sources-filter`: 주요 뉴스 소스 우선순위 지정을 비활성화합니다.
@@ -221,7 +221,7 @@ flowchart TD
         LLM_FACTORY --> GEMINI["Google Gemini<br/>Flash/Pro/2.5-Pro"]
         LLM_FACTORY --> OPENAI["OpenAI GPT<br/>4o/4o-mini/4-turbo"]
         LLM_FACTORY --> ANTHROPIC["Anthropic Claude<br/>3.5-Sonnet/3-Sonnet/3-Haiku"]
-        
+
         FALLBACK["자동 Fallback 시스템<br/>할당량 초과 시 자동 전환"]
         GEMINI --> FALLBACK
         OPENAI --> FALLBACK
@@ -250,7 +250,7 @@ flowchart TD
     A1 --> S4
     E3 --> S5
     E2 --> S6
-    
+
     style LLM_FACTORY fill:#e1f5fe
     style FALLBACK fill:#fff3e0
     style GEMINI fill:#e8f5e8
@@ -271,7 +271,7 @@ flowchart LR
         HG["HTML 생성<br/>Gemini Pro<br/>복잡한 구조화"]
         AS["기사 점수<br/>Gemini Flash<br/>빠른 판단"]
     end
-    
+
     TASK_INPUT["작업 요청"] --> LLM_FACTORY
     LLM_FACTORY --> KG
     LLM_FACTORY --> TE
@@ -280,7 +280,7 @@ flowchart LR
     LLM_FACTORY --> IG
     LLM_FACTORY --> HG
     LLM_FACTORY --> AS
-    
+
     KG --> FALLBACK_SYS["Fallback 시스템"]
     TE --> FALLBACK_SYS
     NS --> FALLBACK_SYS

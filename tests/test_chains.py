@@ -11,16 +11,11 @@ from newsletter.chains import (
 
 
 class TestChains(unittest.TestCase):
-
     def test_prompts_contain_appropriate_content(self):
         # 각 프롬프트에 적절한 내용이 포함되어 있는지 확인
-        self.assertIn(
-            "당신은 뉴스들을 분석하고 분류하는 전문 편집자입니다", CATEGORIZATION_PROMPT
-        )
+        self.assertIn("당신은 뉴스들을 분석하고 분류하는 전문 편집자입니다", CATEGORIZATION_PROMPT)
         self.assertIn("당신은 뉴스들을 분석하고 요약하여", SUMMARIZATION_PROMPT)
-        self.assertIn(
-            "당신은 뉴스들을 분석하고 요약하여, HTML 형식으로", COMPOSITION_PROMPT
-        )
+        self.assertIn("당신은 뉴스들을 분석하고 요약하여, HTML 형식으로", COMPOSITION_PROMPT)
 
         # 공통 내용 확인
         self.assertIn(

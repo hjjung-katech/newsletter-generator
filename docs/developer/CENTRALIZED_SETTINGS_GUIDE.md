@@ -1,6 +1,6 @@
 # 🛠️ F-14 Centralized Settings Layer - Developer Guide
 
-> **F-14 중앙집중식 설정 시스템 개발자 가이드**  
+> **F-14 중앙집중식 설정 시스템 개발자 가이드**
 > 설정 필드 추가/변경, 테스트, 모범 사례
 
 ## 📋 목차
@@ -36,7 +36,7 @@ F-14 Centralized Settings Layer는 애플리케이션의 모든 환경변수를 
 ```python
 class CentralizedSettings(BaseSettings):
     # 기존 필드들...
-    
+
     # 새로운 필드 추가
     new_feature_api_key: SecretStr | None = None
     new_feature_enabled: bool = Field(False, description="새 기능 활성화 여부")
@@ -63,7 +63,7 @@ def _validate_new_feature_key(cls, v: SecretStr | None) -> SecretStr | None:
 mapping = {
     # 기존 매핑들...
     "new_feature_api_key": lambda s: (
-        s.new_feature_api_key.get_secret_value() 
+        s.new_feature_api_key.get_secret_value()
         if s.new_feature_api_key else None
     ),
     "new_feature_enabled": lambda s: s.new_feature_enabled,
@@ -80,14 +80,14 @@ def _load_environment_variables(self):
     try:
         from newsletter.centralized_settings import get_settings
         settings = get_settings()
-        
+
         # 기존 필드들...
         self.NEW_FEATURE_API_KEY = (
             settings.new_feature_api_key.get_secret_value()
             if settings.new_feature_api_key else None
         )
         self.NEW_FEATURE_ENABLED = settings.new_feature_enabled
-        
+
     except Exception:
         # Fallback
         self.NEW_FEATURE_API_KEY = getenv_compat("NEW_FEATURE_API_KEY")
@@ -209,7 +209,7 @@ RUN_INTEGRATION_TESTS=1 python -m pytest tests/integration/test_environment_prof
 def test_local_settings_validation():
     """로컬 환경에서 설정 검증"""
     from newsletter.centralized_settings import get_settings
-    
+
     try:
         settings = get_settings()
         print("✅ Settings validation passed")
@@ -237,23 +237,23 @@ report_migration_status()
 class CentralizedSettings(BaseSettings):
     # ✅ 좋은 예
     api_timeout: int = Field(
-        30, 
-        ge=1, 
-        le=300, 
+        30,
+        ge=1,
+        le=300,
         description="API 타임아웃 (초, 1-300 범위)"
     )
-    
+
     feature_enabled: bool = Field(
-        False, 
+        False,
         description="기능 활성화 여부"
     )
-    
+
     secret_key: SecretStr = Field(
-        ..., 
+        ...,
         min_length=32,
         description="32자 이상의 비밀 키"
     )
-    
+
     # ❌ 피해야 할 예
     timeout: int = 30  # 설명과 검증 없음
     key: str  # 타입만 명시, 보안 고려 없음
@@ -266,13 +266,13 @@ class CentralizedSettings(BaseSettings):
 @classmethod
 def _validate_custom_field(cls, v: str) -> str:
     """커스텀 필드 검증
-    
+
     Args:
         v: 검증할 값
-        
+
     Returns:
         str: 검증된 값
-        
+
     Raises:
         ValueError: 검증 실패 시
     """
@@ -399,4 +399,4 @@ api_key = settings.serper_api_key.get_secret_value()
 
 - **구현 버전**: v0.6.0
 - **최종 업데이트**: 2025-06-11
-- **호환성**: Python 3.10+, Pydantic 2.0+ 
+- **호환성**: Python 3.10+, Pydantic 2.0+

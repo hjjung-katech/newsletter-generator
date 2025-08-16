@@ -6,10 +6,15 @@ for the newsletter generator to reduce maintenance burden and improve build proc
 """
 
 import os
-from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_dynamic_libs
+
+from PyInstaller.utils.hooks import (
+    collect_all,
+    collect_data_files,
+    collect_dynamic_libs,
+)
 
 # Get project root directory
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # =============================================================================
 # HIDDEN IMPORTS
@@ -18,132 +23,236 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # 📋 Basic Framework Modules
 basic_imports = [
     # Web Framework
-    "flask", "flask_cors", "werkzeug", "jinja2", "jinja2.runtime", 
-    "jinja2.loaders", "jinja2.utils",
-    
+    "flask",
+    "flask_cors",
+    "werkzeug",
+    "jinja2",
+    "jinja2.runtime",
+    "jinja2.loaders",
+    "jinja2.utils",
     # Database & Storage
-    "sqlite3", "redis", "rq", "rq.worker", "rq.job", "rq.queue",
-    
+    "sqlite3",
+    "redis",
+    "rq",
+    "rq.worker",
+    "rq.job",
+    "rq.queue",
     # Configuration & Environment
-    "pydantic", "pydantic_settings", "python_dotenv", "dotenv",
-    "yaml", "PyYAML", "chardet",
-    
+    "pydantic",
+    "pydantic_settings",
+    "python_dotenv",
+    "dotenv",
+    "yaml",
+    "PyYAML",
+    "chardet",
     # HTTP & Web Scraping
-    "requests", "requests.adapters", "urllib3", "urllib3.util.retry",
-    "beautifulsoup4", "bs4", "feedparser",
-    
+    "requests",
+    "requests.adapters",
+    "urllib3",
+    "urllib3.util.retry",
+    "beautifulsoup4",
+    "bs4",
+    "feedparser",
     # Date & Time
-    "dateutil", "dateutil.rrule", "dateutil.parser", "dateutil.tz",
+    "dateutil",
+    "dateutil.rrule",
+    "dateutil.parser",
+    "dateutil.tz",
     "pytz",
-    
     # Utilities
-    "rich", "rich.console", "typer", "uuid", "json", "re", "time",
-    "threading", "multiprocessing", "concurrent.futures",
+    "rich",
+    "rich.console",
+    "typer",
+    "uuid",
+    "json",
+    "re",
+    "time",
+    "threading",
+    "multiprocessing",
+    "concurrent.futures",
 ]
 
 # 🤖 AI/LLM Core Modules
 ai_core_imports = [
     # LangChain Core
-    "langchain", "langchain_core", "langchain_community",
-    "langchain.callbacks", "langchain.callbacks.base",
-    "langchain.prompts", "langchain.tools", "langchain.chains",
-    "langchain.llms", "langchain.chat_models",
-    "langchain_core.messages", "langchain_core.output_parsers", 
-    "langchain_core.runnables", "langchain_core.tools",
-    "langchain_core.outputs", "langchain_core.callbacks",
-    
+    "langchain",
+    "langchain_core",
+    "langchain_community",
+    "langchain.callbacks",
+    "langchain.callbacks.base",
+    "langchain.prompts",
+    "langchain.tools",
+    "langchain.chains",
+    "langchain.llms",
+    "langchain.chat_models",
+    "langchain_core.messages",
+    "langchain_core.output_parsers",
+    "langchain_core.runnables",
+    "langchain_core.tools",
+    "langchain_core.outputs",
+    "langchain_core.callbacks",
     # LangGraph
-    "langgraph", "langgraph.graph", "langgraph.prebuilt",
-    
+    "langgraph",
+    "langgraph.graph",
+    "langgraph.prebuilt",
     # LangSmith (monitoring)
-    "langsmith", "langsmith.client",
+    "langsmith",
+    "langsmith.client",
 ]
 
 # 🌐 LLM Provider Specific Modules
 llm_providers = [
     # Google Gemini
-    "langchain_google_genai", 
-    "google", "google.generativeai", "google.ai", "google.ai.generativelanguage",
-    "google.api_core", "google.auth", "google.cloud",
-    "google.generativeai", "google.generativeai.client",
-    "google.generativeai.types", "google.generativeai.models",
-    
+    "langchain_google_genai",
+    "google",
+    "google.generativeai",
+    "google.ai",
+    "google.ai.generativelanguage",
+    "google.api_core",
+    "google.auth",
+    "google.cloud",
+    "google.generativeai",
+    "google.generativeai.client",
+    "google.generativeai.types",
+    "google.generativeai.models",
     # OpenAI
     "langchain_openai",
-    "openai", "openai.api_resources", "openai.error",
-    
+    "openai",
+    "openai.api_resources",
+    "openai.error",
     # Anthropic
     "langchain_anthropic",
-    "anthropic", "anthropic.client", "anthropic.types",
-    
+    "anthropic",
+    "anthropic.client",
+    "anthropic.types",
     # API clients common modules
-    "httpx", "httpx._client", "httpx._config", "httpx._models",
-    "aiohttp", "aiohttp.client", "aiohttp.connector",
+    "httpx",
+    "httpx._client",
+    "httpx._config",
+    "httpx._models",
+    "aiohttp",
+    "aiohttp.client",
+    "aiohttp.connector",
 ]
 
 # 📧 Email & Communication
 email_imports = [
-    "postmarker", "postmarker.core", "postmarker.models",
-    "premailer", "markdownify", "tenacity", "tenacity.stop", "tenacity.wait",
+    "postmarker",
+    "postmarker.core",
+    "postmarker.models",
+    "premailer",
+    "markdownify",
+    "tenacity",
+    "tenacity.stop",
+    "tenacity.wait",
 ]
 
 # 🔍 Data Processing & Analysis
 data_processing = [
-    "pandas", "numpy", 
-    "chromadb", "faiss", "faiss.swigfaiss",
+    "pandas",
+    "numpy",
+    "chromadb",
+    "faiss",
+    "faiss.swigfaiss",
     "sentence_transformers",  # If used for embeddings
 ]
 
 # 🔒 Security & Monitoring
 security_monitoring = [
-    "sentry_sdk", "sentry_sdk.integrations", "sentry_sdk.integrations.flask",
+    "sentry_sdk",
+    "sentry_sdk.integrations",
+    "sentry_sdk.integrations.flask",
     "sentry_sdk.integrations.logging",
 ]
 
 # 🔧 System & OS specific
 system_imports = [
-    "platform", "subprocess", "pathlib", "tempfile", "shutil",
-    "signal", "atexit", "traceback", "logging", "logging.config",
+    "platform",
+    "subprocess",
+    "pathlib",
+    "tempfile",
+    "shutil",
+    "signal",
+    "atexit",
+    "traceback",
+    "logging",
+    "logging.config",
 ]
 
 # ⚙️ Newsletter specific modules
 newsletter_modules = [
-    "newsletter", "newsletter.cli", "newsletter.main", "newsletter.settings",
-    "newsletter.collect", "newsletter.sources", "newsletter.article_filter",
-    "newsletter.compose", "newsletter.deliver", "newsletter.summarize",
-    "newsletter.chains", "newsletter.graph", "newsletter.tools",
-    "newsletter.llm_factory", "newsletter.cost_tracking", "newsletter.scoring",
-    "newsletter.config", "newsletter.config_manager", "newsletter.centralized_settings",
-    "newsletter.template_manager", "newsletter.date_utils", "newsletter.html_utils",
-    "newsletter.compat_env", "newsletter.logging_conf",
-    "newsletter.security", "newsletter.security.config", 
-    "newsletter.security.middleware", "newsletter.security.logging",
+    "newsletter",
+    "newsletter.cli",
+    "newsletter.main",
+    "newsletter.settings",
+    "newsletter.collect",
+    "newsletter.sources",
+    "newsletter.article_filter",
+    "newsletter.compose",
+    "newsletter.deliver",
+    "newsletter.summarize",
+    "newsletter.chains",
+    "newsletter.graph",
+    "newsletter.tools",
+    "newsletter.llm_factory",
+    "newsletter.cost_tracking",
+    "newsletter.scoring",
+    "newsletter.config",
+    "newsletter.config_manager",
+    "newsletter.centralized_settings",
+    "newsletter.template_manager",
+    "newsletter.date_utils",
+    "newsletter.html_utils",
+    "newsletter.compat_env",
+    "newsletter.logging_conf",
+    "newsletter.security",
+    "newsletter.security.config",
+    "newsletter.security.middleware",
+    "newsletter.security.logging",
     "newsletter.security.validation",
-    "newsletter.utils", "newsletter.utils.logger", "newsletter.utils.error_handling",
-    "newsletter.utils.file_naming", "newsletter.utils.subprocess_utils",
-    "newsletter.utils.test_mode", "newsletter.utils.convert_legacy_data",
+    "newsletter.utils",
+    "newsletter.utils.logger",
+    "newsletter.utils.error_handling",
+    "newsletter.utils.file_naming",
+    "newsletter.utils.subprocess_utils",
+    "newsletter.utils.test_mode",
+    "newsletter.utils.convert_legacy_data",
     "newsletter.utils.shutdown_manager",
-    
     # Latest additional modules
-    "newsletter.template_config", "newsletter.email_processing",
-    "newsletter.file_utils", "newsletter.validation",
+    "newsletter.template_config",
+    "newsletter.email_processing",
+    "newsletter.file_utils",
+    "newsletter.validation",
 ]
 
 # 🌐 Web specific modules
 web_modules = [
-    "web", "web.app", "web.tasks", "web.mail", "web.suggest", 
-    "web.worker", "web.schedule_runner", "web.web_types",
-    "web.graceful_shutdown", "web.time_utils",
-    
+    "web",
+    "web.app",
+    "web.tasks",
+    "web.mail",
+    "web.suggest",
+    "web.worker",
+    "web.schedule_runner",
+    "web.web_types",
+    "web.graceful_shutdown",
+    "web.time_utils",
     # Binary compatibility modules (important!)
-    "web.binary_compatibility", "binary_compatibility",
+    "web.binary_compatibility",
+    "binary_compatibility",
 ]
 
 # Combine all hidden imports
 hiddenimports = (
-    basic_imports + ai_core_imports + llm_providers + email_imports +
-    data_processing + security_monitoring + system_imports +
-    newsletter_modules + web_modules
+    basic_imports
+    + ai_core_imports
+    + llm_providers
+    + email_imports
+    + data_processing
+    + security_monitoring
+    + system_imports
+    + newsletter_modules
+    + web_modules
 )
 
 # =============================================================================
@@ -153,26 +262,21 @@ hiddenimports = (
 # Define data files to be included in the bundle
 datas = [
     # Essential templates and static files only
-    (os.path.join(project_root, 'templates'), 'templates'),
-    (os.path.join(project_root, 'web', 'templates'), 'templates'),
-    (os.path.join(project_root, 'web', 'static'), 'static'),
-    
+    (os.path.join(project_root, "templates"), "templates"),
+    (os.path.join(project_root, "web", "templates"), "templates"),
+    (os.path.join(project_root, "web", "static"), "static"),
     # Configuration files (templates only, not user data)
-    (os.path.join(project_root, 'config.yml'), '.'),
-    (os.path.join(project_root, 'config'), 'config'),
-    
+    (os.path.join(project_root, "config.yml"), "."),
+    (os.path.join(project_root, "config"), "config"),
     # Documentation files for user guidance
-    (os.path.join(project_root, 'web', 'docs'), 'docs'),
-    
+    (os.path.join(project_root, "web", "docs"), "docs"),
     # Environment template (not actual .env for security)
-    (os.path.join(project_root, '.env.example'), '.'),
-    
+    (os.path.join(project_root, ".env.example"), "."),
     # Essential Python modules only (not development artifacts)
-    (os.path.join(project_root, 'web', 'web_types.py'), 'web'),
-    (os.path.join(project_root, 'web', 'path_manager.py'), 'web'),
-    (os.path.join(project_root, 'web', 'binary_compatibility.py'), 'web'),
-    (os.path.join(project_root, 'web', 'graceful_shutdown.py'), 'web'),
-    
+    (os.path.join(project_root, "web", "web_types.py"), "web"),
+    (os.path.join(project_root, "web", "path_manager.py"), "web"),
+    (os.path.join(project_root, "web", "binary_compatibility.py"), "web"),
+    (os.path.join(project_root, "web", "graceful_shutdown.py"), "web"),
     # Note: User data files are excluded to ensure clean deployments:
     # - .env (user configures their own)
     # - storage.db (auto-created on first run)
@@ -189,8 +293,8 @@ datas = [(src, dst) for src, dst in datas if os.path.exists(src)]
 
 # Define binary files
 binaries = [
-    (os.path.join(project_root, 'web', 'web_types.py'), 'web'),
-    (os.path.join(project_root, 'web', 'binary_compatibility.py'), 'web'),
+    (os.path.join(project_root, "web", "web_types.py"), "web"),
+    (os.path.join(project_root, "web", "binary_compatibility.py"), "web"),
 ]
 
 # Filter out non-existent binary files
@@ -204,12 +308,12 @@ binaries = [(src, dst) for src, dst in binaries if os.path.exists(src)]
 collect_all_packages = [
     # Only include essential packages, not the entire newsletter module
     # newsletter module is handled via hiddenimports for better control
-    'langchain',
-    'langchain_core',
-    'langchain_google_genai',
-    'langchain_openai',
-    'langchain_anthropic',
-    'langgraph',
+    "langchain",
+    "langchain_core",
+    "langchain_google_genai",
+    "langchain_openai",
+    "langchain_anthropic",
+    "langgraph",
 ]
 
 # Collect data files from packages
@@ -231,7 +335,7 @@ for package in collect_all_packages:
 # =============================================================================
 
 # Collect dynamic libraries for specific packages
-collect_libs_packages = ['google', 'grpc', 'grpcio']
+collect_libs_packages = ["google", "grpc", "grpcio"]
 
 for package in collect_libs_packages:
     try:
@@ -249,17 +353,31 @@ for package in collect_libs_packages:
 # Modules to exclude (optional - helps reduce bundle size)
 excludes = [
     # Exclude test modules
-    'tests', 'test', 'pytest', 'unittest',
+    "tests",
+    "test",
+    "pytest",
+    "unittest",
     # Exclude development tools
-    'IPython', 'jupyter', 'notebook',
+    "IPython",
+    "jupyter",
+    "notebook",
     # Exclude unused GUI toolkits
-    'tkinter', 'PyQt5', 'PyQt6', 'PySide2', 'PySide6',
+    "tkinter",
+    "PyQt5",
+    "PyQt6",
+    "PySide2",
+    "PySide6",
     # Exclude matplotlib if not used
-    'matplotlib',
+    "matplotlib",
     # Exclude development/debug files
-    'pdb', 'debugpy', 'profiling',
+    "pdb",
+    "debugpy",
+    "profiling",
     # Exclude user data that should not be in bundle
-    'output', 'logs', 'storage.db', '.env',
+    "output",
+    "logs",
+    "storage.db",
+    ".env",
 ]
 
 print(f"[HOOK] Newsletter hook loaded:")

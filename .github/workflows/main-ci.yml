@@ -23,13 +23,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Cache dependencies
         uses: actions/cache@v3
         with:
@@ -39,27 +39,27 @@ jobs:
           key: ${{ runner.os }}-quality-${{ env.CACHE_VERSION }}-${{ hashFiles('requirements*.txt') }}
           restore-keys: |
             ${{ runner.os }}-quality-${{ env.CACHE_VERSION }}-
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install black isort flake8 mypy bandit
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-      
+
       - name: Code formatting (Black)
         run: black --check --diff newsletter tests web
-      
+
       - name: Import sorting (isort)
         run: isort --check-only --diff --profile black newsletter tests web
-      
+
       - name: Linting (flake8)
         run: flake8 newsletter tests web --max-line-length=88 --ignore=E203,W503
-      
+
       - name: Type checking (mypy)
         run: |
           mypy newsletter --ignore-missing-imports || true
-      
+
       - name: Basic security scan (Bandit)
         run: |
           bandit -r newsletter web -f txt --skip B104,B110 || true
@@ -80,24 +80,24 @@ jobs:
             python-version: '3.11'
           - os: windows-latest
             python-version: '3.12'
-    
+
     runs-on: ${{ matrix.os }}
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-      
+
       - name: Create required directories
         run: |
           mkdir -p output
@@ -105,7 +105,7 @@ jobs:
           mkdir -p debug_files
           mkdir -p templates
         shell: bash
-      
+
       - name: Run unit tests
         env:
           MOCK_MODE: 'true'
@@ -120,7 +120,7 @@ jobs:
           EMAIL_SENDER: test@example.com
         run: |
           pytest -m unit --tb=short --junitxml=test-results-unit.xml --cov=newsletter --cov-report=xml --cov-report=html
-      
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -138,28 +138,28 @@ jobs:
     name: Mock API Tests
     needs: [unit-tests]
     runs-on: ubuntu-latest
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-      
+
       - name: Create required directories
         run: |
           mkdir -p output
           mkdir -p debug_files
           mkdir -p templates
-      
+
       - name: Run mock API tests
         env:
           MOCK_MODE: 'true'
@@ -173,7 +173,7 @@ jobs:
           EMAIL_SENDER: test@example.com
         run: |
           pytest -m mock_api --tb=short --junitxml=test-results-mock-api.xml
-      
+
       - name: Run web mail tests
         env:
           MOCK_MODE: 'true'
@@ -183,7 +183,7 @@ jobs:
           EMAIL_SENDER: test@example.com
         run: |
           pytest tests/test_web_mail.py -v --tb=short
-      
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -199,30 +199,30 @@ jobs:
     needs: [mock-api-tests]
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'push' && 
+      github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-      
+
       - name: Create required directories
         run: |
           mkdir -p output
           mkdir -p debug_files
           mkdir -p templates
-      
+
       - name: Run integration tests
         env:
           RUN_INTEGRATION_TESTS: '1'
@@ -244,7 +244,7 @@ jobs:
             echo "Running integration tests with real APIs"
             pytest -m integration --tb=short --junitxml=test-results-integration.xml
           fi
-      
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -260,16 +260,16 @@ jobs:
     needs: [unit-tests, mock-api-tests]
     runs-on: ubuntu-latest
     if: always()
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download all test results
         uses: actions/download-artifact@v4
         with:
           pattern: test-results-*
           merge-multiple: true
-      
+
       - name: Publish test results
         uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
@@ -278,7 +278,7 @@ jobs:
             test-results-*.xml
           check_name: Test Results
           comment_mode: always
-      
+
       - name: Generate test summary
         run: |
           echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
@@ -299,32 +299,32 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
-      
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller build
-      
+
       - name: Test package build
         run: |
           python -m build
-      
+
       - name: Test PyInstaller build (Windows)
         if: matrix.os == 'windows-latest'
         run: |
           python build_web_exe_enhanced.py
         continue-on-error: true
-      
+
       - name: Upload build artifacts
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4

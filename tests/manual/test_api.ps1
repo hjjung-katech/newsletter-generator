@@ -19,22 +19,22 @@ try {
     Write-Host "`n🔍 Checking server availability..." -ForegroundColor Yellow
     $healthCheck = Invoke-RestMethod -Uri "$baseUrl/" -Method Get -TimeoutSec 5
     Write-Host "✅ Server is running" -ForegroundColor Green
-    
+
     Write-Host "`n🚀 Starting newsletter generation..." -ForegroundColor Yellow
     $startTime = Get-Date
-    
+
     $response = Invoke-RestMethod -Uri "$baseUrl/api/generate" -Method Post -Body $testData -ContentType "application/json" -TimeoutSec 300
-    
+
     $endTime = Get-Date
     $duration = ($endTime - $startTime).TotalSeconds
-    
+
     Write-Host "⏱️  Request completed in $([math]::Round($duration, 2)) seconds" -ForegroundColor Green
     Write-Host "✅ Newsletter generation successful!" -ForegroundColor Green
     Write-Host "   Status: $($response.status)" -ForegroundColor White
     Write-Host "   Subject: $($response.subject)" -ForegroundColor White
     Write-Host "   Content length: $($response.html_content.Length)" -ForegroundColor White
     Write-Host "   Articles count: $($response.articles_count)" -ForegroundColor White
-    
+
     # Check if it's using real CLI or mock
     if ($response.cli_output) {
         $cliPreview = $response.cli_output.Substring(0, [Math]::Min(200, $response.cli_output.Length))
@@ -43,13 +43,13 @@ try {
     } else {
         Write-Host "⚠️  No CLI output detected - likely using Mock" -ForegroundColor Yellow
     }
-    
+
     # Save result for inspection
     $response.html_content | Out-File -FilePath "test_newsletter_result.html" -Encoding UTF8
     Write-Host "💾 Newsletter saved to test_newsletter_result.html" -ForegroundColor Green
-    
+
     Write-Host "`n🎉 Test completed successfully!" -ForegroundColor Green
-    
+
 } catch {
     Write-Host "❌ Test failed: $($_.Exception.Message)" -ForegroundColor Red
     if ($_.Exception.Message -like "*ConnectFailure*" -or $_.Exception.Message -like "*timeout*") {

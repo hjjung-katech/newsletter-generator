@@ -2,10 +2,10 @@
 보안 미들웨어 모듈
 """
 
-import time
 import json
-from typing import Callable, Dict, Optional
+import time
 from pathlib import Path
+from typing import Callable, Dict
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware

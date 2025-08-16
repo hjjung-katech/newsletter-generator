@@ -8,6 +8,7 @@ Windows without a separate Python installation.
 
 import os
 import shutil
+
 import PyInstaller.__main__
 
 

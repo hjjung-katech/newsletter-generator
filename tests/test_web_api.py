@@ -185,8 +185,8 @@ class TestWebAPI:
 
         result = json.loads(response.data)
         assert isinstance(result, dict)
-        assert 'schedules' in result
-        assert isinstance(result['schedules'], list)
+        assert "schedules" in result
+        assert isinstance(result["schedules"], list)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ import requests
 from rich.console import Console
 
 from . import article_filter, config
-from .sources import NewsSourceManager, configure_default_sources
+from .sources import configure_default_sources
 from .utils.logger import get_structured_logger as get_logger
 
 console = Console()
@@ -84,10 +84,10 @@ def collect_articles(
                     articles, max_per_domain=2
                 )
                 # 주요 언론사 필터 적용
-                filtered_grouped_articles[keyword] = (
-                    article_filter.filter_articles_by_major_sources(
-                        domain_filtered, max_per_topic=max_per_source
-                    )
+                filtered_grouped_articles[
+                    keyword
+                ] = article_filter.filter_articles_by_major_sources(
+                    domain_filtered, max_per_topic=max_per_source
                 )
 
             return filtered_grouped_articles

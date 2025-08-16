@@ -7,16 +7,16 @@ from unittest.mock import Mock
 
 class MockAIMessage:
     """Mock AIMessage that doesn't require discriminator fields"""
-    
+
     def __init__(self, content="", **kwargs):
         self.content = content
         self.type = "ai"
         for key, value in kwargs.items():
             setattr(self, key, value)
-    
+
     def __str__(self):
         return self.content
-    
+
     def __repr__(self):
         return f"MockAIMessage(content='{self.content}')"
 

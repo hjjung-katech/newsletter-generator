@@ -7,7 +7,6 @@ import json
 import logging
 import logging.config
 import os
-import sys
 from datetime import datetime
 from typing import Any, Dict
 
@@ -122,7 +121,7 @@ def setup_logging():
     logging.config.dictConfig(LOGGING_CONFIG)
 
     # 루트 로거에 구조화 어댑터 적용
-    logger = logging.getLogger()
+    logging.getLogger()
 
     print(
         f"✅ Logging configured - Level: {os.getenv('LOG_LEVEL', 'INFO')}, Format: {os.getenv('LOG_FORMAT', 'json')}"

@@ -33,6 +33,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    restart_policy: 
+    restart_policy:
       condition: on-failure
       max_attempts: 3

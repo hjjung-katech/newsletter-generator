@@ -6,8 +6,9 @@ Processes background tasks for newsletter generation
 
 import os
 import sys
+
 import redis
-from rq import Worker, Queue
+from rq import Queue, Worker
 
 # Queue name from centralized settings
 try:

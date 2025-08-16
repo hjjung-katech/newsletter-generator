@@ -9,17 +9,15 @@
 - 색상 코딩된 출력
 """
 
+# Store original print function to avoid recursion issues with web/app.py print override
+import builtins
 import logging
 import os
-import sys
-import io
 import time
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-# Store original print function to avoid recursion issues with web/app.py print override
-import builtins
 _original_print = builtins.print
 
 try:
@@ -35,6 +33,7 @@ try:
     )
     from rich.table import Table
     from rich.text import Text
+
     RICH_AVAILABLE = True
     # Rich console 인스턴스
     console = Console()
@@ -42,53 +41,54 @@ except ImportError as e:
     _original_print(f"[WARNING] Rich library import failed: {e}")
     _original_print("[WARNING] Falling back to basic logging without rich formatting")
     RICH_AVAILABLE = False
-    
+
     # Mock implementations to prevent AttributeError
     class MockBox:
         ROUNDED = "rounded"
         DOUBLE = "double"
-    
+
     class MockConsole:
         def print(self, *args, **kwargs):
             # Fallback to original print, stripping rich markup
             message = str(args[0]) if args else ""
             # Remove rich markup tags
             import re
-            clean_message = re.sub(r'\[/?[^\]]*\]', '', message)
+
+            clean_message = re.sub(r"\[/?[^\]]*\]", "", message)
             _original_print(clean_message)
-    
+
     class MockTable:
         def __init__(self, title=None, box=None):
             self.title = title
             self.rows = []
-            
+
         def add_column(self, *args, **kwargs):
             pass
-            
+
         def add_row(self, *args, **kwargs):
             self.rows.append(args)
-    
+
     class MockPanel:
         def __init__(self, text, title=None, box=None, padding=None):
             self.text = text
             self.title = title
-    
+
     class MockProgress:
         def __init__(self, *args, **kwargs):
             pass
-            
+
         def __enter__(self):
             return self
-            
+
         def __exit__(self, *args):
             pass
-            
+
         def add_task(self, *args, **kwargs):
             return "mock_task"
-            
+
         def update(self, *args, **kwargs):
             pass
-    
+
     box = MockBox()
     console = MockConsole()
     Panel = MockPanel
@@ -115,8 +115,9 @@ class NewsletterLogger:
 
         # Test mode detection for safer logging
         import sys
+
         self.test_mode = "pytest" in sys.modules or os.getenv("TESTING") == "1"
-        
+
         # 표준 로거 설정
         self.logger = logging.getLogger(name)
         self.logger.setLevel(self.log_level)
@@ -125,16 +126,17 @@ class NewsletterLogger:
         if not self.logger.handlers:
             # UTF-8 인코딩을 지원하는 스트림 핸들러 생성
             handler = logging.StreamHandler(sys.stdout)
-            
+
             # Windows에서 UTF-8 인코딩 설정
-            if sys.platform == 'win32':
-                import locale
-                if sys.stdout.encoding != 'utf-8':
-                    sys.stdout.reconfigure(encoding='utf-8')
-            
+            if sys.platform == "win32":
+                pass
+
+                if sys.stdout.encoding != "utf-8":
+                    sys.stdout.reconfigure(encoding="utf-8")
+
             formatter = logging.Formatter(
                 "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                datefmt='%Y-%m-%d %H:%M:%S'
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
@@ -212,9 +214,7 @@ class NewsletterLogger:
     def step_brief(self, message: str, count: Optional[int] = None, **kwargs):
         """간결한 단계 진행 상황 표시 (핵심 정보만)"""
         if count is not None:
-            console.print(
-                f"[cyan]🔄 {message}[/cyan] [bold]({count}개)[/bold]", **kwargs
-            )
+            console.print(f"[cyan]🔄 {message}[/cyan] [bold]({count}개)[/bold]", **kwargs)
         else:
             console.print(f"[cyan]🔄 {message}[/cyan]", **kwargs)
         self.logger.info(f"STEP_BRIEF: {message}")

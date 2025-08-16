@@ -29,22 +29,23 @@ def pytest_configure(config):
     """pytest 구성 설정"""
     # 테스트 환경 디렉토리 자동 생성
     from pathlib import Path
-    
+
     # test_logs 디렉토리 생성 (로깅 오류 방지)
     test_logs_dir = Path("test_logs")
     test_logs_dir.mkdir(exist_ok=True)
-    
+
     # 기타 테스트용 디렉토리들 생성
     for test_dir in ["temp", "output", "logs"]:
         Path(test_dir).mkdir(exist_ok=True)
-    
+
     # 설정 캐시 클리어 (테스트 격리)
     try:
         from newsletter.centralized_settings import clear_settings_cache
+
         clear_settings_cache()
     except ImportError:
         pass
-    
+
     # 커스텀 마크 등록
     config.addinivalue_line(
         "markers", "unit: pure unit tests without external dependencies"
@@ -167,48 +168,51 @@ def clear_settings_cache_fixture():
     """각 테스트 실행 전후 설정 캐시 클리어 (자동 적용)"""
     import importlib
     from unittest.mock import _patch
-    
+
     # 테스트 실행 전 클리어
     try:
         from newsletter.centralized_settings import clear_settings_cache
+
         clear_settings_cache()
     except ImportError:
         pass
-    
+
     # 모든 newsletter 관련 모듈 캐시 정리
     modules_to_clear = [
-        name for name in sys.modules.keys() 
-        if name.startswith('newsletter.') or name == 'newsletter'
+        name
+        for name in sys.modules.keys()
+        if name.startswith("newsletter.") or name == "newsletter"
     ]
-    
+
     # Mock 상태 백업
     original_env = dict(os.environ)
-    
+
     yield  # 테스트 실행
-    
+
     # 테스트 실행 후 정리
     try:
         from newsletter.centralized_settings import clear_settings_cache
+
         clear_settings_cache()
     except ImportError:
         pass
-    
+
     # 환경 변수 복원 (테스트가 변경했을 수 있는 것들)
     os.environ.clear()
     os.environ.update(original_env)
-    
+
     # 활성 Mock 패치 정리
     try:
         # 모든 활성 패치를 정리
         for patcher in _patch.patches:
-            if hasattr(patcher, 'stop'):
+            if hasattr(patcher, "stop"):
                 try:
                     patcher.stop()
                 except RuntimeError:
                     pass  # 이미 stop된 경우 무시
     except:
         pass
-    
+
     # 모듈 상태 정리 (변경된 속성들 복원)
     for module_name in modules_to_clear:
         if module_name in sys.modules:

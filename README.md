@@ -59,21 +59,21 @@
    # 필수 API 키
    SERPER_API_KEY=your_serper_key_here
    OPENAI_API_KEY=sk-...
-   
+
    # 이메일 발송 (Postmark)
    POSTMARK_SERVER_TOKEN=your_postmark_token
    EMAIL_SENDER=newsletter@yourdomain.com
-   
+
    # 웹 애플리케이션
    SECRET_KEY=your-secret-key-here
    FLASK_ENV=production
    # Railway는 자동으로 PORT를 주입합니다. 로컬 개발 기본값은 5000입니다.
    PORT=5000
-   
+
    # 선택사항 - 모니터링
    SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
    LOG_LEVEL=INFO
-   
+
    # 개발/테스트 모드 (운영환경에서는 false)
    MOCK_MODE=false
    ```
@@ -274,7 +274,7 @@ APP_ENV=development  # .env 파일 자동 로드
 DEBUG=true
 LOG_LEVEL=DEBUG
 
-# Testing  
+# Testing
 APP_ENV=testing     # GitHub Actions에서 설정
 MOCK_MODE=true
 
@@ -660,5 +660,5 @@ newsletter test-llm --task keyword_generation --prompt "자율주행 관련 키�
 #### 작업별 최적화
 각 작업에 가장 적합한 LLM이 자동으로 선택됩니다:
 - 키워드 생성: 창의성이 중요한 작업
-- 뉴스 요약: 정확성이 중요한 작업  
+- 뉴스 요약: 정확성이 중요한 작업
 - HTML 생성: 구조화된 작업

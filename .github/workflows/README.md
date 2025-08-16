@@ -142,7 +142,7 @@ GEMINI_API_KEY=test-key
 ### Integration Tests (Optional)
 ```
 OPENAI_API_KEY          # Real OpenAI API key
-SERPER_API_KEY          # Real Serper API key  
+SERPER_API_KEY          # Real Serper API key
 GEMINI_API_KEY          # Real Google Gemini API key
 ANTHROPIC_API_KEY       # Real Anthropic API key
 POSTMARK_SERVER_TOKEN   # Email service token

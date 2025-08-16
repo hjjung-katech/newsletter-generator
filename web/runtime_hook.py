@@ -3,9 +3,9 @@ Enhanced Runtime hook for PyInstaller to handle all module conflicts and setup.
 This hook ensures comprehensive module loading and environment setup for binary execution.
 """
 
-import sys
-import os
 import logging
+import os
+import sys
 
 _log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
 _log_level = getattr(logging, _log_level_name, logging.INFO)
@@ -277,26 +277,26 @@ def _setup_graceful_shutdown():
         if getattr(sys, "frozen", False):
             # Import and initialize shutdown manager
             from newsletter.utils.shutdown_manager import get_shutdown_manager
-            
+
             shutdown_manager = get_shutdown_manager()
             logger.info("Graceful shutdown manager initialized for exe environment")
-            
+
             # Register runtime hook cleanup
             def runtime_cleanup():
                 logger.info("Runtime hook cleanup called")
-            
+
             from newsletter.utils.shutdown_manager import ShutdownPhase
-            
+
             shutdown_manager.register_shutdown_task(
                 name="runtime_hook_cleanup",
                 callback=runtime_cleanup,
                 phase=ShutdownPhase.CLEANING_RESOURCES,
                 priority=100,
-                timeout=2.0
+                timeout=2.0,
             )
-            
+
             logger.info("Runtime hook shutdown task registered")
-            
+
     except ImportError:
         logger.warning("Shutdown manager not available - graceful shutdown disabled")
     except Exception as e:

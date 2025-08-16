@@ -211,7 +211,7 @@
   ```
   tests/
   ├── unit_tests/          # 단위 테스트
-  ├── integration/         # 통합 테스트  
+  ├── integration/         # 통합 테스트
   ├── manual/              # 수동 테스트
   └── api_tests/           # API 테스트
   ```
@@ -390,7 +390,7 @@
 ### Fixed
 - LangGraph 워크플로우 에러 수정
   - 요약 단계에서 데이터 구조 불일치 문제 해결
-  - 뉴스레터 작성 완료 단계 추가 
+  - 뉴스레터 작성 완료 단계 추가
   - 최종 HTML 파일 저장 기능 자동화
 
 ---
@@ -400,7 +400,7 @@
 ### Fixed
 - LangSmith 및 Google Generative AI 호환성 문제 해결
   - `request_timeout` → `timeout`으로 매개변수 이름 변경
-  - `streaming` → `disable_streaming`으로 매개변수 이름 변경 
+  - `streaming` → `disable_streaming`으로 매개변수 이름 변경
   - LangSmith Client API 변경사항 반영 (`get_tracing_callback` → `LangChainTracer` 직접 생성)
   - 프롬프트 형식 수정으로 들여쓰기 문제 해결
 
@@ -439,4 +439,4 @@
 - HTML 및 Markdown 형식 뉴스레터 생성
 - 중복 기사 감지 및 제거
 - 주요 뉴스 소스 우선순위 필터링
-- 키워드별 기사 그룹화 
+- 키워드별 기사 그룹화

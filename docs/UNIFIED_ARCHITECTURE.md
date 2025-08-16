@@ -59,23 +59,23 @@ The main function that orchestrates the entire 10-step process:
 def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") -> str:
     """
     뉴스레터를 생성하는 통합 함수 (compact와 detailed 공용)
-    
+
     Args:
         data: 뉴스레터 데이터
         template_dir: 템플릿 디렉토리 경로
         style: 뉴스레터 스타일 ("compact" 또는 "detailed")
-    
+
     Returns:
         str: 렌더링된 HTML 뉴스레터
     """
     config = NewsletterConfig.get_config(style)
-    
+
     # 10-step unified flow
     top_articles = extract_and_prepare_top_articles(data, config["top_articles_count"])
     grouped_sections = create_grouped_sections(data, top_articles, config["max_groups"], config["max_articles"])
     definitions = extract_definitions(data, grouped_sections, config)
     food_for_thought = extract_food_for_thought(data)
-    
+
     return render_newsletter_template(data, template_dir, config, top_articles, grouped_sections, definitions, food_for_thought)
 ```
 
@@ -271,4 +271,4 @@ Key achievements:
 - ✅ Improved testability and maintainability
 - ✅ Created extensible architecture for future newsletter styles
 
-The system now provides a clean, efficient, and scalable solution for generating newsletters in multiple formats while maintaining code quality and development velocity. 
+The system now provides a clean, efficient, and scalable solution for generating newsletters in multiple formats while maintaining code quality and development velocity.

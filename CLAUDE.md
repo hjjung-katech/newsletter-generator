@@ -106,7 +106,7 @@ python build_web_exe_enhanced.py
 The system follows a modular architecture with clear separation of concerns:
 
 1. **CLI Interface** (`newsletter/cli.py`) - Main command-line interface using Typer
-2. **Web Interface** (`web/app.py`) - Flask-based web application 
+2. **Web Interface** (`web/app.py`) - Flask-based web application
 3. **Core Processing Pipeline**:
    - **Collection** (`newsletter/collect.py`) - News gathering from multiple sources
    - **Processing** (`newsletter/chains.py`, `newsletter/graph.py`) - LangGraph workflows for AI processing

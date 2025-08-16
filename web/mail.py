@@ -1,9 +1,10 @@
 # web/mail.py
-from postmarker.core import PostmarkClient
-import os
 import logging
+import os
 import sys
 from pathlib import Path
+
+from postmarker.core import PostmarkClient
 from tenacity import retry, stop_after_attempt
 
 # 프로젝트 루트를 sys.path에 추가
@@ -115,10 +116,7 @@ def send_email(to: str, subject: str, html: str, **kwargs):
         raise RuntimeError(error_msg)
 
     if not from_email:
-        error_msg = (
-            "EMAIL_SENDER 환경변수가 설정되지 않았습니다. "
-            "발신자 이메일 주소를 설정해주세요."
-        )
+        error_msg = "EMAIL_SENDER 환경변수가 설정되지 않았습니다. " "발신자 이메일 주소를 설정해주세요."
         logging.error(error_msg)
         raise RuntimeError(error_msg)
 
@@ -204,6 +202,4 @@ def send_test_email(to: str):
         token_masked=("***" + (token or "")[-4:] if token else "Not Set"),
     )
 
-    return send_email(
-        to=to, subject="Newsletter Generator 테스트 이메일", html=test_html
-    )
+    return send_email(to=to, subject="Newsletter Generator 테스트 이메일", html=test_html)
