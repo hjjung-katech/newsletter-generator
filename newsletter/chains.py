@@ -242,7 +242,10 @@ COMPOSITION_PROMPT = """
   "newsletter_topic": "제공된 키워드({keywords})를 기반으로 한 구체적인 뉴스레터 주제",
   "generation_date": "{current_date}",
   "recipient_greeting": "안녕하세요, R&D 전략기획단 전문위원 여러분",
-  "introduction_message": "키워드 주제에 맞는 구체적이고 유용한 소개 문구 (뉴스가 없어도 해당 분야의 중요성이나 동향에 대한 통찰 제공)",
+  "introduction_message": (
+      "키워드 주제에 맞는 구체적이고 유용한 소개 문구 "
+      "(뉴스가 없어도 해당 분야의 중요성이나 동향에 대한 통찰 제공)"
+  ),
   "food_for_thought": {{
     "quote": "관련 명언 (선택사항)",
     "author": "명언 출처 (선택사항)",
@@ -441,7 +444,7 @@ def format_articles(data):
         date = article.get("date", "날짜 없음")
 
         formatted_articles.append(
-            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n"
+            f"기사 #{i + 1}:\n제목: {title}\nURL: {url}\n출처: {source}\n"
             f"날짜: {date}\n내용:\n{content}\n"
         )
 
@@ -596,7 +599,7 @@ def create_summarization_chain(is_compact=False):
             # 카테고리 기사들을 포맷팅
             formatted_articles = "\n---\n".join(
                 [
-                    f"기사 #{i+1}:\n제목: {article.get('title', '제목 없음')}\n"
+                    f"기사 #{i + 1}:\n제목: {article.get('title', '제목 없음')}\n"
                     f"URL: {article.get('url', '#')}\n"
                     f"출처: {article.get('source', '출처 없음')}\n"
                     f"날짜: {article.get('date', '날짜 없음')}\n"

@@ -127,9 +127,11 @@ class TestModeEnvSource(PydanticBaseSettingsSource):
         if self.settings_cls.model_config.get("case_sensitive"):
             prepare_field_value = self.prepare_field_value
         else:
-            prepare_field_value = lambda field_name, field, value, value_is_complex: self.prepare_field_value(
-                field_name, field, value, value_is_complex
-            )
+
+            def prepare_field_value(field_name, field, value, value_is_complex):
+                return self.prepare_field_value(
+                    field_name, field, value, value_is_complex
+                )
 
         for field_name, field in self.settings_cls.model_fields.items():
             field_value, field_key, value_is_complex = self.get_field_value(
