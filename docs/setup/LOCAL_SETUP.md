@@ -15,7 +15,7 @@ python -m venv .venv
 # Windows
 .venv\Scripts\activate
 
-# macOS/Linux  
+# macOS/Linux
 source .venv/bin/activate
 ```
 
@@ -120,7 +120,7 @@ redis-server
 net start redis
 ```
 
-> **💡 Windows 팁**: 
+> **💡 Windows 팁**:
 > - Chocolatey가 없다면 [chocolatey.org](https://chocolatey.org/install)에서 설치
 > - Scoop이 없다면 PowerShell에서 `iwr -useb get.scoop.sh | iex` 실행
 > - 직접 다운로드 시 압축 해제 후 PATH에 추가 필요
@@ -171,7 +171,7 @@ python app.py
 
 ### 단독 실행 모드 (기본, 권장)
 - **명령어**: `python web/app.py`
-- **특징**: 
+- **특징**:
   - Redis 불필요
   - 즉시 실행 가능
   - 백그라운드 작업은 스레드로 처리
@@ -329,11 +329,11 @@ redis-server
 
 ### 웹 서버 포트 충돌
 ```bash
-# 다른 포트로 실행
+# 다른 포트로 실행 (예: 6000)
 cd web
-PORT=8000 python app.py
+PORT=6000 python app.py
 # 또는
-python app.py --port 8000
+python app.py --port 6000
 ```
 
 ## 추가 팁
@@ -358,4 +358,4 @@ LOG_LEVEL=DEBUG python app.py
 curl -X POST http://localhost:5000/api/generate \
   -H "Content-Type: application/json" \
   -d '{"keywords": ["AI", "기술"], "period": 7}'
-``` 
+```

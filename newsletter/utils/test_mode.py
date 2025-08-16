@@ -5,8 +5,6 @@ Utilities for running the newsletter generator in test mode.
 import json
 import logging
 import os
-import sys
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -202,9 +200,9 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         if timestamp and len(timestamp) >= 8:
             date_part = timestamp.split("_")[0] if "_" in timestamp else timestamp[:8]
             if len(date_part) == 8:
-                content_data["generation_date"] = (
-                    f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
-                )
+                content_data[
+                    "generation_date"
+                ] = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
 
         if "generation_date" not in content_data:
             content_data["generation_date"] = datetime.datetime.now().strftime(
@@ -216,9 +214,9 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         if timestamp and "_" in timestamp:
             time_part = timestamp.split("_")[1]
             if len(time_part) >= 6:
-                content_data["generation_timestamp"] = (
-                    f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
-                )
+                content_data[
+                    "generation_timestamp"
+                ] = f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
 
         if "generation_timestamp" not in content_data:
             content_data["generation_timestamp"] = datetime.datetime.now().strftime(

@@ -2,9 +2,10 @@
 Web application common types
 """
 
-from typing import NewType, Optional, Dict, Any, Literal, Union, List
-from pydantic import BaseModel, Field, field_validator, model_validator
 import re
+from typing import Any, Dict, List, Literal, NewType, Optional, Union
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # 이메일 주소 타입
 EmailAddress = NewType("EmailAddress", str)
@@ -26,6 +27,10 @@ class GenerateNewsletterRequest(BaseModel):
     email_compatible: bool = False
     period: int = Field(default=14)
     email: Optional[str] = None  # 즉시 발송용 이메일 주소
+    use_template_system: bool = Field(
+        default=True, description="기존 Jinja2 템플릿 시스템 사용 여부"
+    )
+    suggest_count: int = Field(default=10, description="도메인에서 생성할 키워드 개수", ge=1, le=20)
 
     @field_validator("keywords")
     @classmethod

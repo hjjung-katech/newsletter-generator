@@ -4,7 +4,6 @@ from newsletter.html_utils import clean_html_markers
 
 
 class TestTools(unittest.TestCase):
-
     def test_clean_html_markers_with_filepath_comment(self):
         html_with_comment = """<!-- filepath: c:\\path\\to\\file.html -->
 ```html

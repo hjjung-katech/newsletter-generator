@@ -1,11 +1,11 @@
+import logging
 import os
 import uuid
 from typing import Any, Dict, List, Union
-import logging
 
 from . import config  # Import config module
-from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 # 로거 초기화
 logger = get_logger()
@@ -41,7 +41,7 @@ HTML Template Structure:
     <!-- 반복되는 카테고리 섹션 시작 -->
     <h3>[카테고리 번호]. [카테고리 제목]</h3>
     <p>[카테고리별 요약 내용: 여러 기사를 종합하여 해당 카테고리의 동향을 상세히 설명합니다.]</p>
-    
+
     <h4>이런 뜻이에요!</h4>
     <ul>
         <!-- 해당 카테고리에서 설명이 필요한 용어가 있다면 목록으로 제공 -->
@@ -137,9 +137,7 @@ def summarize_articles(
                         serialized={}, prompts=[], run_id=run_id_no_articles
                     )
                 except Exception as e_start:
-                    logger.debug(
-                        f"Callback on_llm_start (기사 없음) 실행 실패: {e_start}"
-                    )
+                    logger.debug(f"Callback on_llm_start (기사 없음) 실행 실패: {e_start}")
             if hasattr(cb, "on_llm_end"):  # or on_chain_end if it's a chain
                 try:
                     # Create a minimal mock response if needed by callbacks
@@ -218,7 +216,7 @@ def summarize_articles(
     try:
         # LLM 팩토리를 사용하여 뉴스 요약에 최적화된 모델 사용
         try:
-            from langchain_core.messages import HumanMessage, SystemMessage
+            from langchain_core.messages import HumanMessage
 
             from .llm_factory import get_llm_for_task
 
@@ -256,9 +254,7 @@ def summarize_articles(
                 title = article.get("title", "제목 없음")
                 url = article.get("url", "#")
                 content = article.get("content", "내용 없음")
-                articles_details.append(
-                    f"기사 제목: {title}\nURL: {url}\n내용:\n{content}"
-                )
+                articles_details.append(f"기사 제목: {title}\nURL: {url}\n내용:\n{content}")
 
         # Combine article details with newlines between each article
         articles_text = "\n\n---\n\n".join(articles_details)
@@ -272,6 +268,12 @@ def summarize_articles(
             full_prompt = f"{system_prompt}\n\n{prompt}"
             response = llm.invoke([HumanMessage(content=full_prompt)])
             html_content = response.content
+
+            # 마크다운 코드 블록 래핑 제거
+            from .html_utils import clean_html_markers
+
+            html_content = clean_html_markers(html_content)
+
             return html_content
 
         except Exception as e:

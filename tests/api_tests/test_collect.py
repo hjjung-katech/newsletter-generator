@@ -17,7 +17,6 @@ from newsletter.collect import (  # collect_articles_from_serper 추가
 
 
 class TestCollect(unittest.TestCase):
-
     @patch("newsletter.collect.article_filter.remove_duplicate_articles")
     @patch("newsletter.collect.configure_default_sources")
     def test_collect_articles_with_multiple_sources(
@@ -77,9 +76,7 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(result, [])
 
     @patch("newsletter.collect.requests.request")
-    @patch(
-        "newsletter.config.SERPER_API_KEY", "fake_api_key"
-    )  # SERPER_API_KEY 모의 처리
+    @patch("newsletter.config.SERPER_API_KEY", "fake_api_key")  # SERPER_API_KEY 모의 처리
     def test_collect_articles_from_serper_success(self, mock_request):
         """레거시 Serper 전용 수집 함수 테스트"""
         mock_response = mock_request.return_value
@@ -99,9 +96,7 @@ class TestCollect(unittest.TestCase):
             ]
         }
 
-        keywords_string = (
-            "test keyword1 OR test keyword2"  # collect_articles는 문자열을 받음
-        )
+        keywords_string = "test keyword1 OR test keyword2"  # collect_articles는 문자열을 받음
         result = collect_articles_from_serper(keywords_string)
 
         mock_request.assert_called_once()
@@ -115,9 +110,7 @@ class TestCollect(unittest.TestCase):
         for item in result:
             self.assertIsInstance(item, dict)
             self.assertIn("title", item)
-            self.assertIn(
-                "url", item
-            )  # 'link'에서 'url'로 변경 (collect_articles 반환 형식)
+            self.assertIn("url", item)  # 'link'에서 'url'로 변경 (collect_articles 반환 형식)
             self.assertIn("content", item)  # 'snippet'에서 'content'로 변경
 
         self.assertEqual(result[0]["title"], "Test Article 1")

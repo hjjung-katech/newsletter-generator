@@ -20,6 +20,7 @@ from typing import Literal
 
 from pydantic import BaseSettings, Field, SecretStr, field_validator
 from pydantic_settings import SettingsConfigDict
+
 from .utils.error_handling import handle_exception
 
 # ────────────────────────────────
@@ -44,9 +45,7 @@ class Settings(BaseSettings):
 
     # ── 필수 시크릿 ──────────────────────────────────────
     serper_api_key: SecretStr
-    postmark_server_token: SecretStr = Field(
-        ..., description="Postmark 이메일 발송용 서버 토큰"
-    )
+    postmark_server_token: SecretStr = Field(..., description="Postmark 이메일 발송용 서버 토큰")
     email_sender: str = Field(..., description="이메일 발송자 주소")
 
     # ── LLM API 키들 (하나 이상 필요) ──────────────────────
@@ -78,9 +77,7 @@ class Settings(BaseSettings):
     # ── 웹 & 인프라 설정 ────────────────────────────────────
     redis_url: str | None = Field(None, description="Redis 연결 URL (큐잉용)")
     rq_queue: str = Field("default", description="RQ 큐 이름")
-    database_url: str = Field(
-        "sqlite:///storage.db", description="데이터베이스 연결 URL"
-    )
+    database_url: str = Field("sqlite:///storage.db", description="데이터베이스 연결 URL")
 
     # ── Google & Naver 옵션 API ──────────────────────────
     google_application_credentials: str | None = None

@@ -1,12 +1,123 @@
 import os
+
+# 환경 변수 로드
+import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import yaml
 from dotenv import load_dotenv
 
-# 환경 변수 로드
-load_dotenv()
+# PyInstaller 환경에서의 경로 처리
+if getattr(sys, "frozen", False):
+    # PyInstaller로 빌드된 경우 - exe와 동일한 폴더에서 찾기
+    exe_dir = os.path.dirname(sys.executable)
+    env_path = os.path.join(exe_dir, ".env")
+else:
+    # 일반 Python 환경
+    env_path = ".env"
+
+try:
+    load_dotenv(env_path, encoding="utf-8")
+except UnicodeDecodeError:
+    # Windows에서 BOM 또는 인코딩 문제가 있을 경우
+    try:
+        import chardet
+
+        with open(env_path, "rb") as f:
+            raw_data = f.read()
+        detected_encoding = chardet.detect(raw_data)["encoding"]
+        load_dotenv(env_path, encoding=detected_encoding)
+    except Exception:
+        # chardet이 없거나 다른 오류 발생 시 latin-1로 시도
+        try:
+            load_dotenv(env_path, encoding="latin-1")
+        except Exception:
+            # 마지막으로 인코딩 없이 시도
+            load_dotenv(env_path)
+except Exception as e:
+    print(f"Warning: .env 파일 로딩 실패: {e}")
+    # .env 파일 로딩 실패해도 계속 진행 (환경변수에서 직접 읽기)
+
+import json
+import os
+from typing import Any, Dict
+
+
+def load_template_config() -> Dict[str, Any]:
+    """템플릿 시스템 설정을 로드합니다."""
+    # PyInstaller 환경 대응
+    if getattr(sys, "frozen", False):
+        # PyInstaller로 빌드된 경우 - exe와 동일한 폴더에서 찾기
+        exe_dir = os.path.dirname(sys.executable)
+        config_path = os.path.join(exe_dir, "config", "template_config.json")
+    else:
+        # 일반 Python 환경
+        config_path = os.path.join(
+            os.path.dirname(__file__), "..", "config", "template_config.json"
+        )
+
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        return config
+    except FileNotFoundError:
+        # 기본 설정 반환
+        return {
+            "newsletter_generation": {
+                "default_method": "template",
+                "template_system": {"enabled": True},
+                "llm_direct_system": {"enabled": True},
+            },
+            "api_settings": {"use_template_system_default": True},
+        }
+    except Exception as e:
+        print(f"설정 파일 로드 오류: {e}")
+        return {"newsletter_generation": {"default_method": "template"}}
+
+
+def should_use_template_system() -> bool:
+    """환경 변수와 설정 파일을 기반으로 템플릿 시스템 사용 여부를 결정합니다."""
+    # 1. 환경 변수 확인
+    env_setting = os.getenv("USE_TEMPLATE_SYSTEM")
+    if env_setting is not None:
+        return env_setting.lower() == "true"
+
+    # 2. 설정 파일 확인
+    try:
+        config = load_template_config()
+        return config.get("api_settings", {}).get("use_template_system_default", True)
+    except Exception:
+        # 3. 기본값
+        return True
+
+
+def get_template_name(template_style: str, email_compatible: bool = False) -> str:
+    """템플릿 스타일에 따른 템플릿 파일명을 반환합니다."""
+    try:
+        config = load_template_config()
+        templates = (
+            config.get("newsletter_generation", {})
+            .get("template_system", {})
+            .get("templates", {})
+        )
+
+        if email_compatible:
+            return templates.get(
+                "email_compatible", "newsletter_template_email_compatible.html"
+            )
+        elif template_style == "compact":
+            return templates.get("compact", "newsletter_template_compact.html")
+        else:
+            return templates.get("detailed", "newsletter_template.html")
+    except Exception:
+        # 기본값 반환
+        if email_compatible:
+            return "newsletter_template_email_compatible.html"
+        elif template_style == "compact":
+            return "newsletter_template_compact.html"
+        else:
+            return "newsletter_template.html"
 
 
 class ConfigManager:
@@ -108,9 +219,7 @@ class ConfigManager:
                 raise e
 
             # Centralized settings 실패 시 fallback to legacy
-            self._log_warning(
-                f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}"
-            )
+            self._log_warning(f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}")
 
             # 레거시 fallback (호환성을 위해 유지)
             from newsletter.compat_env import getenv_compat
@@ -138,7 +247,17 @@ class ConfigManager:
             return self._config_cache[config_file]
 
         try:
-            config_path = Path(config_file)
+            # PyInstaller 환경에서의 경로 처리
+            import sys
+
+            if getattr(sys, "frozen", False):
+                # PyInstaller로 빌드된 경우
+                base_path = sys._MEIPASS
+                config_path = Path(base_path) / config_file
+            else:
+                # 일반 Python 환경
+                config_path = Path(config_file)
+
             if not config_path.exists():
                 self._log_warning(f"설정 파일을 찾을 수 없습니다: {config_file}")
                 return {}
@@ -208,9 +327,7 @@ class ConfigManager:
 
         if not required_keys.issubset(config_keys):
             missing_keys = required_keys - config_keys
-            self._log_warning(
-                f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
-            )
+            self._log_warning(f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다.")
             return default_weights
 
         try:
@@ -220,15 +337,11 @@ class ConfigManager:
             if abs(total - 1.0) < 0.01:  # 허용 오차
                 return weights
             else:
-                self._log_warning(
-                    f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
-                )
+                self._log_warning(f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다.")
                 return default_weights
 
         except (ValueError, TypeError) as e:
-            self._log_warning(
-                f"스코어링 가중치 값이 올바르지 않습니다: {e}. 기본값을 사용합니다."
-            )
+            self._log_warning(f"스코어링 가중치 값이 올바르지 않습니다: {e}. 기본값을 사용합니다.")
             return default_weights
 
     def _get_default_llm_config(self) -> Dict[str, Any]:

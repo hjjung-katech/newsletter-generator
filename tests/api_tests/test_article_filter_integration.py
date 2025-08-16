@@ -203,7 +203,6 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch("newsletter.collect.console") as mock_collect_console,
             patch("newsletter.article_filter.console") as mock_filter_console,
         ):
-
             # Test with duplicate filtering enabled
             with patch.object(
                 article_filter,
@@ -359,7 +358,6 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch("newsletter.collect.console") as mock_collect_console,
             patch("newsletter.article_filter.console") as mock_filter_console,
         ):
-
             # Test with major sources filtering enabled
             with (
                 patch.object(
@@ -436,7 +434,6 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch("newsletter.cli.datetime"),
             patch("newsletter.cli.os"),
         ):
-
             # Only construct the argument object but don't run
             from newsletter import cli
 

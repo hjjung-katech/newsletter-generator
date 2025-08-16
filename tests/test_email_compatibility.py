@@ -23,6 +23,8 @@ from bs4 import BeautifulSoup
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
+from langchain_core.messages import AIMessage
+
 from newsletter import config
 from newsletter.chains import get_newsletter_chain
 from newsletter.compose import compose_newsletter
@@ -90,9 +92,7 @@ class TestEmailCompatibilityCore:
                     "explanation": "기계가 데이터로부터 패턴을 학습하는 기술입니다.",
                 }
             ],
-            "food_for_thought": {
-                "message": "AI 기술 발전에 대응하기 위한 전략적 사고가 필요합니다."
-            },
+            "food_for_thought": {"message": "AI 기술 발전에 대응하기 위한 전략적 사고가 필요합니다."},
             "recipient_greeting": "안녕하세요,",
             "introduction_message": "이번 주 AI 기술 동향을 정리해 드립니다.",
             "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다.",
@@ -122,9 +122,7 @@ class TestEmailCompatibilityCore:
 
         # 이메일 호환 구조 확인 (테이블 기반 레이아웃)
         tables = soup.find_all("table")
-        assert (
-            len(tables) > 0
-        ), "Email-compatible 템플릿은 테이블 기반 레이아웃을 사용해야 합니다"
+        assert len(tables) > 0, "Email-compatible 템플릿은 테이블 기반 레이아웃을 사용해야 합니다"
 
     def test_inline_css_processing(self, sample_data):
         """CSS가 인라인으로 처리되는지 테스트"""
@@ -135,15 +133,11 @@ class TestEmailCompatibilityCore:
 
         # 인라인 스타일이 존재하는지 확인
         elements_with_style = soup.find_all(attrs={"style": True})
-        assert (
-            len(elements_with_style) > 0
-        ), "Email-compatible 템플릿은 인라인 CSS를 사용해야 합니다"
+        assert len(elements_with_style) > 0, "Email-compatible 템플릿은 인라인 CSS를 사용해야 합니다"
 
         # CSS 변수 사용하지 않는지 확인
         style_content = str(soup)
-        assert (
-            "var(--" not in style_content
-        ), "Email-compatible 템플릿은 CSS 변수를 사용하면 안됩니다"
+        assert "var(--" not in style_content, "Email-compatible 템플릿은 CSS 변수를 사용하면 안됩니다"
 
     def test_template_style_handling(self, sample_data):
         """template_style에 따른 다른 콘텐츠 처리 테스트"""
@@ -159,9 +153,7 @@ class TestEmailCompatibilityCore:
         sample_data["template_style"] = "compact"
         compact_html = compose_newsletter(sample_data, template_dir, "email_compatible")
 
-        assert (
-            detailed_html != compact_html
-        ), "Detailed와 Compact 스타일은 다른 결과를 생성해야 합니다"
+        assert detailed_html != compact_html, "Detailed와 Compact 스타일은 다른 결과를 생성해야 합니다"
 
         # 두 결과 모두 유효한 HTML인지 확인
         for html in [detailed_html, compact_html]:
@@ -186,9 +178,7 @@ class TestEmailCompatibilityCore:
         for field in required_fields:
             field_value = sample_data.get(field, "")
             if field_value:
-                assert (
-                    field_value in html_content
-                ), f"필수 필드 '{field}'가 HTML에 포함되지 않았습니다"
+                assert field_value in html_content, f"필수 필드 '{field}'가 HTML에 포함되지 않았습니다"
 
     def test_content_integrity(self, sample_data):
         """콘텐츠 무결성 테스트 - 모든 데이터가 손실 없이 포함되는지"""
@@ -200,9 +190,7 @@ class TestEmailCompatibilityCore:
             for article in sample_data["top_articles"]:
                 title = article.get("title", "")
                 if title:
-                    assert (
-                        title in html_content
-                    ), f"기사 제목 '{title}'이 누락되었습니다"
+                    assert title in html_content, f"기사 제목 '{title}'이 누락되었습니다"
 
         # 정의(definitions)가 포함되었는지 확인
         if sample_data.get("definitions"):
@@ -279,20 +267,14 @@ class TestEmailCompatibilityIntegration:
         """Detailed + Email-Compatible 전체 파이프라인 테스트"""
         # LLM 모킹
         mock_llm_instance = MagicMock()
-        mock_llm.return_value = mock_llm_instance
-
-        # 카테고리 분류 응답 모킹
-        mock_llm_instance.invoke.side_effect = [
-            # 카테고리 분류 응답
-            MagicMock(
-                content='{"categories": [{"title": "AI 기술 발전", "article_indices": [1, 2]}]}'
+        mock_llm.invoke.side_effect = [
+            AIMessage(
+                content='{"categories": [{"title": "AI 기술 발전", "article_indices": [0, 1]}]}'
             ),
-            # 요약 응답
-            MagicMock(
+            AIMessage(
                 content='{"summary_paragraphs": ["AI 기술이 발전하고 있습니다."], "definitions": [{"term": "AI", "explanation": "인공지능"}], "news_links": [{"title": "AI 기술의 미래", "url": "https://example.com/ai-future", "source_and_date": "TechNews · 2025-05-29"}]}'
             ),
-            # 종합 구성 응답
-            MagicMock(
+            AIMessage(
                 content='{"newsletter_topic": "AI 기술", "generation_date": "2025-05-30", "recipient_greeting": "안녕하세요", "introduction_message": "AI 기술 동향입니다", "food_for_thought": {"message": "AI에 대해 생각해봅시다"}, "closing_message": "감사합니다", "editor_signature": "편집자"}'
             ),
         ]
@@ -323,16 +305,11 @@ class TestEmailCompatibilityIntegration:
 
         # LLM 모킹
         mock_llm_instance = MagicMock()
-        mock_llm.return_value = mock_llm_instance
-
-        # 카테고리 분류 응답 모킹
-        mock_llm_instance.invoke.side_effect = [
-            # 카테고리 분류 응답
-            MagicMock(
-                content='{"categories": [{"title": "AI 기술 발전", "article_indices": [1, 2]}]}'
+        mock_llm.invoke.side_effect = [
+            AIMessage(
+                content='{"categories": [{"title": "AI 기술 발전", "article_indices": [0, 1]}]}'
             ),
-            # 요약 응답 (compact 형식)
-            MagicMock(
+            AIMessage(
                 content='{"intro": "AI 기술 동향입니다", "definitions": [{"term": "AI", "explanation": "인공지능"}], "news_links": [{"title": "AI 기술의 미래", "url": "https://example.com/ai-future", "source_and_date": "TechNews · 2025-05-29"}]}'
             ),
         ]
@@ -421,9 +398,7 @@ class TestEmailCompatibilityValidation:
         ]
 
         for css_prop in unsupported_css:
-            assert (
-                css_prop not in html_content
-            ), f"이메일에서 지원되지 않는 CSS 속성 사용: {css_prop}"
+            assert css_prop not in html_content, f"이메일에서 지원되지 않는 CSS 속성 사용: {css_prop}"
 
     def test_link_validation(self):
         """링크 유효성 검증"""

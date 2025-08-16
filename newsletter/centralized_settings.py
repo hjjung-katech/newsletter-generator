@@ -9,10 +9,10 @@ F-14 중앙집중식 설정 관리 모듈
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, Literal, Tuple, Type
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import (
@@ -20,6 +20,7 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
 from .utils.error_handling import handle_exception
 
 # 테스트 모드 플래그
@@ -34,14 +35,8 @@ def is_running_in_pytest() -> bool:
 
 def clear_settings_cache():
     """F-14: 설정 캐시를 클리어하여 테스트 격리 지원"""
-    global _cached_settings
-    _cached_settings = None
-
-
-def disable_test_mode():
-    """F-14: 테스트 모드를 비활성화하여 실제 검증 수행"""
-    global _test_mode
-    _test_mode = False
+    if "get_settings" in globals():
+        get_settings.cache_clear()
 
 
 def enable_test_mode(test_env_vars: dict = None):
@@ -78,9 +73,21 @@ def _load_dotenv_if_needed():
     """필요한 경우에만 .env 파일 로드"""
     if _should_load_dotenv() and not _test_mode:
         try:
+            import os
+            import sys
+
             from dotenv import load_dotenv
 
-            load_dotenv(".env", override=False)
+            # PyInstaller 환경에서의 경로 처리
+            if getattr(sys, "frozen", False):
+                # PyInstaller로 빌드된 경우 - exe와 같은 디렉토리에서 .env 찾기
+                exe_dir = os.path.dirname(sys.executable)
+                env_path = os.path.join(exe_dir, ".env")
+            else:
+                # 일반 Python 환경
+                env_path = ".env"
+
+            load_dotenv(env_path, override=False)
         except ImportError:
             pass
 
@@ -141,9 +148,7 @@ class CentralizedSettings(BaseSettings):
 
     # 필수 설정 (F-14: SERPER_API_KEY를 Optional로 변경)
     serper_api_key: SecretStr | None = None
-    postmark_server_token: SecretStr | None = Field(
-        None, description="Postmark 서버 토큰"
-    )
+    postmark_server_token: SecretStr | None = Field(None, description="Postmark 서버 토큰")
     email_sender: str | None = Field(None, description="발송자 이메일")
 
     # LLM API 키 (하나 이상 필수)
@@ -163,10 +168,10 @@ class CentralizedSettings(BaseSettings):
     concurrent_requests: int = Field(5, description="동시 요청 수")
 
     # F-14: 테스트 모드 설정
-    test_mode: bool = Field(True, description="테스트 모드 활성화")
-    mock_api_responses: bool = Field(True, description="API 응답 모킹 활성화")
-    skip_real_api_calls: bool = Field(True, description="실제 API 호출 건너뛰기")
-    test_api_key_override: bool = Field(True, description="테스트용 API 키 오버라이드")
+    test_mode: bool = Field(False, description="테스트 모드 활성화")
+    mock_api_responses: bool = Field(False, description="API 응답 모킹 활성화")
+    skip_real_api_calls: bool = Field(False, description="실제 API 호출 건너뛰기")
+    test_api_key_override: bool = Field(False, description="테스트용 API 키 오버라이드")
 
     # 공통 설정
     secret_key: str = Field("dev-secret-key-change-in-production", min_length=16)
@@ -220,6 +225,10 @@ class CentralizedSettings(BaseSettings):
 
     @property
     def output_dir(self) -> Path:
+        # Check for web environment override first
+        web_output_dir = _get_env("NEWSLETTER_OUTPUT_DIR")
+        if web_output_dir:
+            return Path(web_output_dir)
         return self.base_dir / "output"
 
     # 모델 설정
@@ -227,7 +236,7 @@ class CentralizedSettings(BaseSettings):
         env_file=".env" if _should_load_dotenv() else None,
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="forbid",
+        extra="ignore",
     )
 
     @classmethod
@@ -246,9 +255,7 @@ class CentralizedSettings(BaseSettings):
         return (
             init_settings,  # 명시적으로 전달된 값이 최우선
             test_env_source,  # 테스트 모드 또는 일반 환경변수
-            (
-                dotenv_settings if not _test_mode else init_settings
-            ),  # 테스트 모드에서는 .env 무시
+            (dotenv_settings if not _test_mode else init_settings),  # 테스트 모드에서는 .env 무시
             file_secret_settings,
         )
 
@@ -329,10 +336,7 @@ class CentralizedSettings(BaseSettings):
         }
 
 
-# 테스트를 위한 캐시 클리어 함수
-def clear_settings_cache():
-    """테스트용으로 설정 캐시를 클리어합니다."""
-    get_settings.cache_clear()
+# Note: clear_settings_cache function is defined above to avoid duplicates
 
 
 @lru_cache
@@ -399,7 +403,7 @@ class F14PerformanceSettings:
     concurrent_requests: int = 5  # 동시 요청 수 제한
 
     # F-14: 테스트 모드 설정 추가
-    test_mode: bool = True  # 테스트 모드 (기본값: True)
-    mock_api_responses: bool = True  # API 응답 모킹 활성화
-    skip_real_api_calls: bool = True  # 실제 API 호출 건너뛰기
-    test_api_key_override: bool = True  # 테스트용 API 키 오버라이드 활성화
+    test_mode: bool = False  # 테스트 모드 (기본값: False)
+    mock_api_responses: bool = False  # API 응답 모킹 비활성화
+    skip_real_api_calls: bool = False  # 실제 API 호출 활성화
+    test_api_key_override: bool = False  # 테스트용 API 키 오버라이드 비활성화

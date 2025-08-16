@@ -153,4 +153,4 @@ docs/dev/
 
 - **Test execution time**: ~50% reduction with dependency optimization
 - **CI stability**: External dependency removal improves reliability
-- **Development efficiency**: Automated code quality checks 
+- **Development efficiency**: Automated code quality checks

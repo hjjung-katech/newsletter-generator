@@ -9,6 +9,8 @@
 - 색상 코딩된 출력
 """
 
+# Store original print function to avoid recursion issues with web/app.py print override
+import builtins
 import logging
 import os
 import time
@@ -16,21 +18,84 @@ from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from rich import box
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import (
-    BarColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
-from rich.table import Table
-from rich.text import Text
+_original_print = builtins.print
 
-# Rich console 인스턴스
-console = Console()
+try:
+    from rich import box
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.progress import (
+        BarColumn,
+        Progress,
+        SpinnerColumn,
+        TextColumn,
+        TimeElapsedColumn,
+    )
+    from rich.table import Table
+    from rich.text import Text
+
+    RICH_AVAILABLE = True
+    # Rich console 인스턴스
+    console = Console()
+except ImportError as e:
+    _original_print(f"[WARNING] Rich library import failed: {e}")
+    _original_print("[WARNING] Falling back to basic logging without rich formatting")
+    RICH_AVAILABLE = False
+
+    # Mock implementations to prevent AttributeError
+    class MockBox:
+        ROUNDED = "rounded"
+        DOUBLE = "double"
+
+    class MockConsole:
+        def print(self, *args, **kwargs):
+            # Fallback to original print, stripping rich markup
+            message = str(args[0]) if args else ""
+            # Remove rich markup tags
+            import re
+
+            clean_message = re.sub(r"\[/?[^\]]*\]", "", message)
+            _original_print(clean_message)
+
+    class MockTable:
+        def __init__(self, title=None, box=None):
+            self.title = title
+            self.rows = []
+
+        def add_column(self, *args, **kwargs):
+            pass
+
+        def add_row(self, *args, **kwargs):
+            self.rows.append(args)
+
+    class MockPanel:
+        def __init__(self, text, title=None, box=None, padding=None):
+            self.text = text
+            self.title = title
+
+    class MockProgress:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def add_task(self, *args, **kwargs):
+            return "mock_task"
+
+        def update(self, *args, **kwargs):
+            pass
+
+    box = MockBox()
+    console = MockConsole()
+    Panel = MockPanel
+    Table = MockTable
+    Progress = MockProgress
+    # Other classes as None since they're less critical
+    BarColumn = SpinnerColumn = TextColumn = TimeElapsedColumn = Text = None
 
 
 class NewsletterLogger:
@@ -48,44 +113,81 @@ class NewsletterLogger:
         self.step_start_times: Dict[str, float] = {}
         self.statistics: Dict[str, Any] = {}
 
+        # Test mode detection for safer logging
+        import sys
+
+        self.test_mode = "pytest" in sys.modules or os.getenv("TESTING") == "1"
+
         # 표준 로거 설정
         self.logger = logging.getLogger(name)
         self.logger.setLevel(self.log_level)
 
         # 핸들러가 이미 있는지 확인하여 중복 방지
         if not self.logger.handlers:
-            handler = logging.StreamHandler()
+            # UTF-8 인코딩을 지원하는 스트림 핸들러 생성
+            handler = logging.StreamHandler(sys.stdout)
+
+            # Windows에서 UTF-8 인코딩 설정
+            if sys.platform == "win32":
+                pass
+
+                if sys.stdout.encoding != "utf-8":
+                    sys.stdout.reconfigure(encoding="utf-8")
+
             formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
             )
             handler.setFormatter(formatter)
             self.logger.addHandler(handler)
+            # 부모 로거로 전파 방지 (중복 로그 방지)
+            self.logger.propagate = False
 
     def debug(self, message: str, **kwargs):
         """디버그 메시지 출력 (개발자용)"""
         if self.log_level <= logging.DEBUG:
-            console.print(f"[dim cyan][DEBUG][/dim cyan] {message}", **kwargs)
+            # In test mode, use simple output to avoid Rich recursion
+            if self.test_mode or not RICH_AVAILABLE:
+                _original_print(f"[DEBUG] {message}")
+            else:
+                console.print(f"[dim cyan][DEBUG][/dim cyan] {message}", **kwargs)
         self.logger.debug(message)
 
     def info(self, message: str, **kwargs):
         """일반 정보 메시지"""
         if self.log_level <= logging.INFO:
-            console.print(f"[blue][INFO][/blue] {message}", **kwargs)
+            # In test mode, use simple output to avoid Rich recursion
+            if self.test_mode or not RICH_AVAILABLE:
+                _original_print(f"[INFO] {message}")
+            else:
+                console.print(f"[blue][INFO][/blue] {message}", **kwargs)
         self.logger.info(message)
 
     def warning(self, message: str, **kwargs):
         """경고 메시지"""
-        console.print(f"[yellow][WARNING][/yellow] {message}", **kwargs)
+        # In test mode, use simple output to avoid Rich recursion
+        if self.test_mode or not RICH_AVAILABLE:
+            _original_print(f"[WARNING] {message}")
+        else:
+            console.print(f"[yellow][WARNING][/yellow] {message}", **kwargs)
         self.logger.warning(message)
 
     def error(self, message: str, **kwargs):
         """오류 메시지"""
-        console.print(f"[red][ERROR][/red] {message}", **kwargs)
+        # In test mode, use simple output to avoid Rich recursion
+        if self.test_mode or not RICH_AVAILABLE:
+            _original_print(f"[ERROR] {message}")
+        else:
+            console.print(f"[red][ERROR][/red] {message}", **kwargs)
         self.logger.error(message)
 
     def success(self, message: str, **kwargs):
         """성공 메시지"""
-        console.print(f"[green][SUCCESS][/green] {message}", **kwargs)
+        # In test mode, use simple output to avoid Rich recursion
+        if self.test_mode or not RICH_AVAILABLE:
+            _original_print(f"[SUCCESS] {message}")
+        else:
+            console.print(f"[green][SUCCESS][/green] {message}", **kwargs)
         self.logger.info(f"SUCCESS: {message}")
 
     def step(self, message: str, step_name: Optional[str] = None, **kwargs):
@@ -112,9 +214,7 @@ class NewsletterLogger:
     def step_brief(self, message: str, count: Optional[int] = None, **kwargs):
         """간결한 단계 진행 상황 표시 (핵심 정보만)"""
         if count is not None:
-            console.print(
-                f"[cyan]🔄 {message}[/cyan] [bold]({count}개)[/bold]", **kwargs
-            )
+            console.print(f"[cyan]🔄 {message}[/cyan] [bold]({count}개)[/bold]", **kwargs)
         else:
             console.print(f"[cyan]🔄 {message}[/cyan]", **kwargs)
         self.logger.info(f"STEP_BRIEF: {message}")
@@ -134,9 +234,9 @@ class NewsletterLogger:
         """키워드별 수집 결과 간략 표시"""
         total_articles = sum(keyword_counts.values())
 
-        console.print(f"[cyan]📰 뉴스 수집 결과:[/cyan]")
+        console.print(f"[cyan][뉴스] 수집 결과:[/cyan]")
         for keyword, count in keyword_counts.items():
-            console.print(f"  • [white]{keyword}:[/white] [bold]{count}개[/bold]")
+            console.print(f"  - [white]{keyword}:[/white] [bold]{count}개[/bold]")
         console.print(f"[bold cyan]  총 {total_articles}개 수집[/bold cyan]")
 
         self.update_statistics("total_collected_articles", total_articles)
@@ -291,7 +391,7 @@ class NewsletterLogger:
             return
 
         summary_text = Text()
-        summary_text.append("📊 생성 완료 요약\n\n", style="bold green")
+        summary_text.append("[요약] 생성 완료 요약\n\n", style="bold green")
 
         # 기사 관련 통계
         if "total_collected_articles" in self.statistics:
@@ -342,6 +442,16 @@ def get_logger(name: str = "newsletter", log_level: str = None) -> NewsletterLog
     if _global_logger is None:
         _global_logger = NewsletterLogger(name, log_level)
     return _global_logger
+
+
+def get_structured_logger(
+    name: str = "newsletter", log_level: str = None
+) -> NewsletterLogger:
+    """
+    프로젝트 전반에서 사용하는 구조화 로거를 반환합니다.
+    LOG_LEVEL 환경 변수(기본 INFO)에 따라 출력 수준을 제어할 수 있습니다.
+    """
+    return get_logger(name=name, log_level=log_level)
 
 
 def set_log_level(level: str):

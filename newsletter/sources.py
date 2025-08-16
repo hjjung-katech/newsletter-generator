@@ -6,21 +6,20 @@ Newsletter Generator - News Sources
 import json
 import os
 import re
-import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union, Final
+from typing import Any, Dict, Final, List
 
 import feedparser
 import requests
 from bs4 import BeautifulSoup
-from rich.console import Console
 from requests.adapters import HTTPAdapter
+from rich.console import Console
 from urllib3.util.retry import Retry
 
 from . import config
-from .date_utils import parse_date_string, standardize_date
-from .utils.logger import get_logger, show_collection_brief
+from .date_utils import standardize_date
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
@@ -95,15 +94,19 @@ class NewsSource:
         # 날짜 형식 표준화 (YYYY-MM-DD)
         standardized_date = standardize_date(raw_date)
 
-        # 반환할 기사 정보
+        # 기사 요약 내용 추출 (snippet 우선, 없으면 description, 없으면 content)
+        snippet_content = article.get(
+            "snippet",
+            article.get("description", article.get("content", "내용 없음")),
+        )
+
+        # 반환할 기사 정보 (snippet과 content 모두 포함)
         return {
             "title": article.get("title", "제목 없음"),
             "url": article.get("url", article.get("link", "#")),
             "link": article.get("link", article.get("url", "#")),
-            "content": article.get(
-                "snippet",
-                article.get("description", article.get("content", "내용 없음")),
-            ),
+            "snippet": snippet_content,  # 템플릿에서 사용하는 필드
+            "content": snippet_content,  # 호환성을 위해 content도 유지
             "source": article.get("source", self.name),
             "date": standardized_date,  # 표준화된 날짜 사용
             "original_date": original_date,  # 원래 날짜 형식 보존
@@ -123,18 +126,14 @@ class SerperAPISource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """Serper API를 통해 뉴스 기사를 검색"""
         if not self.api_key:
-            logger.warning(
-                "Serper API 키를 찾을 수 없습니다. Serper 소스를 건너뜁니다."
-            )
+            logger.warning("Serper API 키를 찾을 수 없습니다. Serper 소스를 건너뜁니다.")
             return []
 
         all_articles = []
         keyword_article_counts = {}
 
         for keyword in keywords:
-            logger.info(
-                f"Serper API를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다"
-            )
+            logger.info(f"Serper API를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다")
 
             url = "https://google.serper.dev/news"
             headers = {
@@ -203,7 +202,7 @@ class RSSFeedSource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """RSS 피드에서 뉴스 기사를 가져옴"""
         all_articles = []
-        keyword_article_counts = {}
+        keyword_article_counts = {keyword: 0 for keyword in keywords}
 
         for feed_url in self.feed_urls:
             try:
@@ -296,14 +295,10 @@ class RSSFeedSource(NewsSource):
                 for article in matched_entries[:num_results]:
                     all_articles.append(self._standardize_article(article))
 
-                logger.info(
-                    f"{feed_url}에서 {len(matched_entries)}개의 일치하는 기사를 찾았습니다"
-                )
+                logger.info(f"{feed_url}에서 {len(matched_entries)}개의 일치하는 기사를 찾았습니다")
 
             except Exception as e:
-                logger.error(
-                    f"RSS 피드 {feed_url}를 가져오는 중 오류가 발생했습니다: {e}"
-                )
+                logger.error(f"RSS 피드 {feed_url}를 가져오는 중 오류가 발생했습니다: {e}")
 
         # 키워드별 수집한 기사 수 출력
         for keyword, count in keyword_article_counts.items():
@@ -364,18 +359,14 @@ class NaverNewsAPISource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """네이버 뉴스 API를 통해 뉴스 기사를 검색"""
         if not self.client_id or not self.client_secret:
-            logger.warning(
-                "Naver API 자격 증명을 찾을 수 없습니다. Naver 뉴스 소스를 건너뜁니다."
-            )
+            logger.warning("Naver API 자격 증명을 찾을 수 없습니다. Naver 뉴스 소스를 건너뜁니다.")
             return []
 
         all_articles = []
         keyword_article_counts = {}
 
         for keyword in keywords:
-            logger.info(
-                f"Naver News API를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다"
-            )
+            logger.info(f"Naver News API를 사용하여 키워드 '{keyword}'에 대한 기사를 검색중입니다")
 
             url = f"https://openapi.naver.com/v1/search/news.json?query={keyword}&display={num_results}&sort=date"
             headers = {
@@ -497,9 +488,7 @@ class NewsSourceManager:
 
             unique_articles.append(article)
 
-        logger.info(
-            f"{len(articles) - len(unique_articles)}개의 중복된 기사를 제거했습니다"
-        )
+        logger.info(f"{len(articles) - len(unique_articles)}개의 중복된 기사를 제거했습니다")
         return unique_articles
 
     def filter_by_major_sources(

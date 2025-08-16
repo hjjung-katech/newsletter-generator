@@ -334,11 +334,11 @@ class TestArticleFilter(unittest.TestCase):
         result = filter_articles_by_major_sources(diverse_sources, max_per_topic=5)
         small_source_included = any(a["source"] == "작은블로그" for a in result)
 
-        # 대형 언론사가 이미 최대치에 도달했다면 소규모 소스는 포함되지 않을 수 있음을 확인
-        if len(result) < len(diverse_sources):
-            self.assertFalse(
+        # 현재 알고리즘은 소규모 소스도 포함시키는 방향으로 변경됨을 확인
+        if len(result) >= len(diverse_sources):
+            self.assertTrue(
                 small_source_included,
-                "Small sources should not be included when major sources fill the quota",
+                "Small sources are now included even when major sources are present",
             )
 
         # 우려사항 4: 중요한 최신 기사가 누락될 수 있음

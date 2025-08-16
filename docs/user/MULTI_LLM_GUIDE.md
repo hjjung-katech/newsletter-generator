@@ -45,13 +45,13 @@ DEBUG_COST_TRACKING=true
 llm_settings:
   # 기본 제공자
   default_provider: gemini
-  
+
   # 제공자별 API 키 (환경 변수로 설정하는 것을 권장)
   api_keys:
     gemini: ${GEMINI_API_KEY}
     openai: ${OPENAI_API_KEY}
     anthropic: ${ANTHROPIC_API_KEY}
-  
+
   # 제공자별 모델 설정
   provider_models:
     gemini:
@@ -66,7 +66,7 @@ llm_settings:
       fast: claude-3-haiku-20240307
       standard: claude-3-sonnet-20240229
       advanced: claude-3-5-sonnet-20241022
-  
+
   # 기능별 LLM 모델 설정
   models:
     keyword_generation:
@@ -75,35 +75,35 @@ llm_settings:
       temperature: 0.7
       max_retries: 3
       timeout: 30
-    
+
     theme_extraction:
       provider: anthropic
       model: claude-3-haiku-20240307
       temperature: 0.3
       max_retries: 2
       timeout: 60
-    
+
     news_summarization:
       provider: gemini
       model: gemini-2.5-pro
       temperature: 0.3
       max_retries: 3
       timeout: 120
-    
+
     section_regeneration:
       provider: anthropic
       model: claude-3-sonnet-20240229
       temperature: 0.5
       max_retries: 2
       timeout: 90
-    
+
     introduction_generation:
       provider: openai
       model: gpt-4o
       temperature: 0.6
       max_retries: 2
       timeout: 60
-    
+
     html_generation:
       provider: gemini
       model: gemini-1.5-pro
@@ -150,16 +150,16 @@ llm_settings:
     keyword_generation:
       provider: openai
       model: gpt-4o-mini  # $0.15/1M tokens (input)
-    
+
     theme_extraction:
       provider: anthropic
       model: claude-3-haiku-20240307  # $0.25/1M tokens (input)
-    
+
     # 복잡한 작업은 고성능 모델 사용
     news_summarization:
       provider: gemini
       model: gemini-2.5-pro  # $0.7/1K tokens (input)
-    
+
     html_generation:
       provider: openai
       model: gpt-4o  # $5.00/1M tokens (input)
@@ -320,4 +320,4 @@ python -c "from newsletter.config import LLM_CONFIG; print(LLM_CONFIG)"
 - [CLI 참조](CLI_REFERENCE.md)
 - [설치 가이드](../setup/INSTALLATION.md)
 - [개발자 가이드](../dev/DEVELOPMENT_GUIDE.md)
-- [아키텍처 문서](../ARCHITECTURE.md) 
+- [아키텍처 문서](../ARCHITECTURE.md)

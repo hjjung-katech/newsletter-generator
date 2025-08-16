@@ -1,4 +1,5 @@
-from flask import Blueprint, current_app, request, jsonify
+from flask import Blueprint, current_app, jsonify, request
+
 from newsletter.cli import suggest_keywords  # CLI 래퍼 함수 사용
 
 bp = Blueprint("suggest", __name__, url_prefix="/api")

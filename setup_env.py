@@ -62,7 +62,7 @@ FLASK_ENV=development
 # 디버그 모드
 DEBUG=true
 # 포트 설정
-PORT=5000
+PORT=8000
 """
 
 
@@ -144,13 +144,9 @@ def setup_env_interactive():
     openai_key = get_user_input("OpenAI API 키", "your_openai_api_key_here")
     anthropic_key = get_user_input("Anthropic API 키", "your_anthropic_api_key_here")
     naver_id = get_user_input("네이버 클라이언트 ID", "your_naver_client_id_here")
-    naver_secret = get_user_input(
-        "네이버 클라이언트 시크릿", "your_naver_client_secret_here"
-    )
+    naver_secret = get_user_input("네이버 클라이언트 시크릿", "your_naver_client_secret_here")
     google_creds = get_user_input("Google 인증서 경로", "path/to/your/credentials.json")
-    google_client_id = get_user_input(
-        "Google 클라이언트 ID", "your_google_client_id_here"
-    )
+    google_client_id = get_user_input("Google 클라이언트 ID", "your_google_client_id_here")
     google_client_secret = get_user_input(
         "Google 클라이언트 시크릿", "your_google_client_secret_here"
     )

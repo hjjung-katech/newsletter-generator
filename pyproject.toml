@@ -44,6 +44,8 @@ dependencies = [
     "langchain-anthropic>=0.1.0",
     "langchain-google-genai>=1.0.0",
     "postmarker>=0.21.3",
+    "rich>=14.0.0",
+    "typer>=0.15.0",
 ]
 
 [project.optional-dependencies]
@@ -202,6 +204,9 @@ python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 minversion = "6.0"
+# pytest-asyncio 설정
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
 addopts = [
     "-ra",
     "--strict-markers",

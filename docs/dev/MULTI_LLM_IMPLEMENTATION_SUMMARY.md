@@ -47,7 +47,7 @@ class LLMProvider(ABC):
 
 # 구체적 Provider 구현
 class GeminiProvider(LLMProvider)
-class OpenAIProvider(LLMProvider)  
+class OpenAIProvider(LLMProvider)
 class AnthropicProvider(LLMProvider)
 
 # Factory 클래스
@@ -120,7 +120,7 @@ llm_settings:
 결과: ✅ 성공 - ChatAnthropic
 
 === 테마 추출 ===
-설정: gemini / gemini-2.5-flash-preview-05-20 (temp: 0.2)  
+설정: gemini / gemini-2.5-flash-preview-05-20 (temp: 0.2)
 결과: ✅ 성공 - ChatGoogleGenerativeAI
 
 [... 8개 기능 모두 성공 ...]
@@ -167,4 +167,4 @@ newsletter run --keywords "AI,머신러닝" --output-format html
 4. ✅ Config 파일 기반 설정 시스템 완료
 5. ✅ 포괄적인 문서화 완료
 
-Newsletter Generator는 이제 각 작업에 가장 적합한 LLM을 자동으로 선택하여 **최상의 품질과 비용 효율성**을 제공합니다. 
+Newsletter Generator는 이제 각 작업에 가장 적합한 LLM을 자동으로 선택하여 **최상의 품질과 비용 효율성**을 제공합니다.

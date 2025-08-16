@@ -56,7 +56,7 @@
 <body>
     <div class="container">
         <h1>Newsletter Generator Test Interface</h1>
-        
+
         <div class="test-section">
             <h3>1. Health Check</h3>
             <button onclick="testHealth()">Test Health Endpoint</button>
@@ -65,7 +65,7 @@
 
         <div class="test-section">
             <h3>2. Generate Newsletter (Keywords)</h3>
-            <input type="text" id="keywords" placeholder="Enter keywords (comma-separated)" 
+            <input type="text" id="keywords" placeholder="Enter keywords (comma-separated)"
                    value="artificial intelligence, machine learning, technology">
             <br>
             <button onclick="generateKeywords()">Generate from Keywords</button>
@@ -74,7 +74,7 @@
 
         <div class="test-section">
             <h3>3. Generate Newsletter (Domain)</h3>
-            <input type="text" id="domain" placeholder="Enter domain URL" 
+            <input type="text" id="domain" placeholder="Enter domain URL"
                    value="https://example.com">
             <br>
             <button onclick="generateDomain()">Generate from Domain</button>
@@ -113,7 +113,7 @@
         async function generateKeywords() {
             const resultDiv = document.getElementById('keywordsResult');
             const keywords = document.getElementById('keywords').value.split(',').map(k => k.trim());
-            
+
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
@@ -125,12 +125,12 @@
                         keywords: keywords
                     })
                 });
-                
+
                 const data = await response.json();
                 currentJobId = data.job_id;
                 document.getElementById('jobId').value = currentJobId;
                 resultDiv.textContent = `Status: ${response.status}\nJob ID: ${data.job_id}\nMessage: ${data.message}`;
-                
+
                 // Auto-check status after 3 seconds
                 setTimeout(() => checkStatus(), 3000);
             } catch (error) {
@@ -141,7 +141,7 @@
         async function generateDomain() {
             const resultDiv = document.getElementById('domainResult');
             const domain = document.getElementById('domain').value;
-            
+
             try {
                 const response = await fetch('/api/generate', {
                     method: 'POST',
@@ -153,12 +153,12 @@
                         domain: domain
                     })
                 });
-                
+
                 const data = await response.json();
                 currentJobId = data.job_id;
                 document.getElementById('jobId').value = currentJobId;
                 resultDiv.textContent = `Status: ${response.status}\nJob ID: ${data.job_id}\nMessage: ${data.message}`;
-                
+
                 // Auto-check status after 3 seconds
                 setTimeout(() => checkStatus(), 3000);
             } catch (error) {
@@ -169,17 +169,17 @@
         async function checkStatus() {
             const resultDiv = document.getElementById('statusResult');
             const jobId = document.getElementById('jobId').value;
-            
+
             if (!jobId) {
                 resultDiv.textContent = 'Please enter a job ID';
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/api/status/${jobId}`);
                 const data = await response.json();
                 resultDiv.textContent = `Status: ${response.status}\nJob Status: ${data.status}\nDetails: ${JSON.stringify(data, null, 2)}`;
-                
+
                 // If job is still running, check again in 2 seconds
                 if (data.status === 'running' || data.status === 'pending') {
                     setTimeout(() => checkStatus(), 2000);
@@ -191,7 +191,7 @@
 
         async function viewHistory() {
             const resultDiv = document.getElementById('historyResult');
-            
+
             try {
                 const response = await fetch('/api/history');
                 const data = await response.json();

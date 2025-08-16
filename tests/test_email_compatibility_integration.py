@@ -249,10 +249,7 @@ class TestEmailCompatibilityIntegration:
             pytest.skip("네트워크 또는 이메일 서비스 오류로 인해 테스트 스킵")
 
         # 성공 메시지 확인
-        assert (
-            "이메일 전송 완료" in result.stdout
-            or "successfully" in result.stdout.lower()
-        )
+        assert "이메일 전송 완료" in result.stdout or "successfully" in result.stdout.lower()
 
     @pytest.mark.skipif(
         not os.getenv("TEST_EMAIL_RECIPIENT"),
@@ -284,10 +281,7 @@ class TestEmailCompatibilityIntegration:
             pytest.skip("네트워크 또는 이메일 서비스 오류로 인해 테스트 스킵")
 
         # 성공 메시지 확인
-        assert (
-            "이메일 전송 완료" in result.stdout
-            or "successfully" in result.stdout.lower()
-        )
+        assert "이메일 전송 완료" in result.stdout or "successfully" in result.stdout.lower()
 
     def _validate_email_compatible_html(self, html_content: str, template_style: str):
         """Email-compatible HTML 검증"""
@@ -306,16 +300,12 @@ class TestEmailCompatibilityIntegration:
         # viewport meta 태그는 선택적 (현재 템플릿에 없을 수 있음)
         viewport_meta = soup.find("meta", attrs={"name": "viewport"})
         if viewport_meta is None:
-            print(
-                "⚠️ INFO: viewport meta 태그가 없습니다. 이메일 호환성 개선을 위해 추가 권장합니다."
-            )
+            print("⚠️ INFO: viewport meta 태그가 없습니다. 이메일 호환성 개선을 위해 추가 권장합니다.")
 
         # 3. 테이블 기반 레이아웃 확인 (선택적)
         tables = soup.find_all("table")
         if len(tables) == 0:
-            print(
-                "⚠️ INFO: 테이블 기반 레이아웃이 아닙니다. 구형 이메일 클라이언트 호환성을 위해 테이블 사용을 권장합니다."
-            )
+            print("⚠️ INFO: 테이블 기반 레이아웃이 아닙니다. 구형 이메일 클라이언트 호환성을 위해 테이블 사용을 권장합니다.")
 
         # 4. 인라인 스타일 확인
         elements_with_style = soup.find_all(attrs={"style": True})
@@ -469,7 +459,7 @@ class TestEmailCompatibilityReport:
         <p>생성 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
         <p>테스트 ID: {timestamp}</p>
     </div>
-    
+
     <div class="test-section">
         <h2>✅ 자동 테스트 결과</h2>
         <p>pytest 기반 자동 테스트가 실행되었습니다.</p>
@@ -495,7 +485,7 @@ pytest tests/test_email_compatibility_integration.py -v
                 <li>모바일 Outlook 앱</li>
                 <li>회사 웹메일 (osp.re.kr)</li>
             </ul>
-            
+
             <h3>2. 렌더링 확인 항목</h3>
             <ul>
                 <li>레이아웃이 깨지지 않음</li>
@@ -585,7 +575,7 @@ pytest tests/test_email_compatibility_integration.py -v
             <li><strong><a href="https://app.mailjet.com/template" target="_blank">Mailjet Passport</a></strong> - 무료 이메일 미리보기</li>
             <li><strong><a href="https://templates.mailchimp.com/resources/email-client-css-support/" target="_blank">Mailchimp CSS Support Guide</a></strong> - CSS 지원 현황</li>
         </ul>
-        
+
         <h3>유료 도구</h3>
         <ul>
             <li><strong><a href="https://www.emailonacid.com" target="_blank">Email on Acid</a></strong> - 70+ 이메일 클라이언트 테스트</li>
@@ -613,7 +603,7 @@ pytest tests/test_email_compatibility_integration.py::TestEmailCompatibilityInte
 # Detailed + Email-Compatible 생성
 python -m newsletter run --keywords "AI,테스트" --template-style detailed --email-compatible
 
-# Compact + Email-Compatible 생성  
+# Compact + Email-Compatible 생성
 python -m newsletter run --keywords "AI,테스트" --template-style compact --email-compatible
 
 # 이메일 전송 테스트

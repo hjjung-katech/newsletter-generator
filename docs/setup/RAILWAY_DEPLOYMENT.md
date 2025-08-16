@@ -4,7 +4,7 @@
 Newsletter Generator를 Railway PaaS에 배포하기 위한 완전한 가이드입니다.
 
 > **💡 로컬 개발 vs 프로덕션 배포**
-> 
+>
 > - **로컬 개발**: Redis 불필요, `python web/app.py`만으로 실행 가능
 > - **프로덕션 배포**: Redis + 멀티 서비스 구성으로 확장성 및 안정성 확보
 
@@ -121,15 +121,15 @@ python app.py
 services:
   redis:
     image: redis:latest
-    
+
   web:
     build: ./web
     start: gunicorn app:app --workers 2
-    
+
   worker:
-    build: ./web  
+    build: ./web
     start: python worker.py
-    
+
   scheduler:
     build: ./web
     start: python schedule_runner.py
@@ -334,4 +334,4 @@ python app.py
 ```bash
 # Git push로 자동 배포
 git push origin main
-``` 
+```

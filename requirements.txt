@@ -26,6 +26,7 @@ pyasn1_modules==0.4.2
 Pygments==2.19.1
 pyparsing==3.2.3
 python-dotenv==1.1.0
+pytz==2025.2
 requests==2.32.3
 requests-oauthlib==2.0.0
 rich==14.0.0
@@ -66,3 +67,6 @@ premailer>=3.10.0  # CSS inlining for email compatibility
 # Email sending
 postmarker>=1.0
 tenacity>=8.0.0  # Retry functionality
+
+# Encoding detection for .env files
+chardet>=5.0.0

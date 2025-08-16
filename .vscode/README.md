@@ -41,7 +41,7 @@
    - 기본값: `${workspaceFolder}/.venv/Scripts/python.exe`
 
 2. **Conda 환경 이름 변경**:
-   - `settings.json`의 `terminal.integrated.profiles.windows.args` 값에서 
+   - `settings.json`의 `terminal.integrated.profiles.windows.args` 값에서
      `conda activate newsletter-env` 부분을 원하는 환경 이름으로 변경
 
 3. **테스트 경로 변경**:
@@ -53,4 +53,4 @@
 이 설정은 Windows 환경을 기준으로 작성되었습니다. 다른 OS를 사용하는 경우:
 
 - Linux/macOS: `settings.json`의 경로 구분자를 `/`로 수정
-- 터미널 프로필: OS에 맞는 프로필 구성 필요 (Linux/macOS: `terminal.integrated.profiles.osx` 또는 `terminal.integrated.profiles.linux`) 
+- 터미널 프로필: OS에 맞는 프로필 구성 필요 (Linux/macOS: `terminal.integrated.profiles.osx` 또는 `terminal.integrated.profiles.linux`)

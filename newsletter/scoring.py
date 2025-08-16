@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -14,8 +15,8 @@ from langchain_core.messages import AIMessage, HumanMessage
 from . import config
 from .chains import get_llm
 from .date_utils import parse_date_string
-from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {
@@ -49,13 +50,9 @@ def load_scoring_weights_from_config(
         logger.info("✅ 스코어링 가중치를 config_manager에서 로드했습니다.")
         return weights
     except ImportError:
-        logger.warning(
-            "config_manager를 가져올 수 없습니다. fallback 모드로 전환합니다."
-        )
+        logger.warning("config_manager를 가져올 수 없습니다. fallback 모드로 전환합니다.")
     except Exception as e:
-        logger.warning(
-            f"config_manager에서 가중치 로드 실패: {e}. fallback 모드로 전환합니다."
-        )
+        logger.warning(f"config_manager에서 가중치 로드 실패: {e}. fallback 모드로 전환합니다.")
 
     # 2순위: 직접 yaml 파일 읽기 (fallback)
     fallback_weights = {
@@ -67,10 +64,21 @@ def load_scoring_weights_from_config(
     }
 
     try:
+        import sys
+
         import yaml
 
-        if os.path.exists(config_file):
-            with open(config_file, "r", encoding="utf-8") as f:
+        # PyInstaller 환경에서의 경로 처리
+        if getattr(sys, "frozen", False):
+            # PyInstaller로 빌드된 경우
+            base_path = sys._MEIPASS
+            config_path = os.path.join(base_path, config_file)
+        else:
+            # 일반 Python 환경
+            config_path = config_file
+
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f)
 
             scoring_config = config_data.get("scoring", {})
@@ -85,9 +93,7 @@ def load_scoring_weights_from_config(
                     total = sum(weights.values())
 
                     if abs(total - 1.0) < 0.01:  # Allow small floating point errors
-                        logger.info(
-                            f"✅ 스코어링 가중치를 {config_file}에서 로드했습니다."
-                        )
+                        logger.info(f"✅ 스코어링 가중치를 {config_file}에서 로드했습니다.")
                         return weights
                     else:
                         logger.warning(
@@ -95,13 +101,9 @@ def load_scoring_weights_from_config(
                         )
                 else:
                     missing_keys = required_keys - config_keys
-                    logger.warning(
-                        f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
-                    )
+                    logger.warning(f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다.")
     except Exception as e:
-        logger.warning(
-            f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
-        )
+        logger.warning(f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다.")
 
     logger.info("⚠️  기본 스코어링 가중치를 사용합니다.")
     return fallback_weights
@@ -156,9 +158,65 @@ def _parse_llm_json(text: str) -> Dict[str, float]:
     return {"relevance": 1, "impact": 1, "novelty": 1}
 
 
+def _is_nested_connection_error(exception) -> bool:
+    """
+    중첩된 예외 구조에서 연결 오류를 감지합니다.
+    예: ('Connection aborted.', ConnectionResetError(...))
+    """
+    import socket
+
+    # Direct instance check
+    if isinstance(exception, (ConnectionResetError, ConnectionError, socket.error)):
+        return True
+
+    # Check for nested tuple exceptions (like requests library wraps)
+    if isinstance(exception, tuple) and len(exception) > 1:
+        for item in exception:
+            if isinstance(item, (ConnectionResetError, ConnectionError, socket.error)):
+                return True
+
+    # Check exception args for nested exceptions
+    if hasattr(exception, "args") and exception.args:
+        for arg in exception.args:
+            if isinstance(arg, (ConnectionResetError, ConnectionError, socket.error)):
+                return True
+            # Check nested tuples in args
+            if isinstance(arg, tuple):
+                for nested_item in arg:
+                    if isinstance(
+                        nested_item,
+                        (ConnectionResetError, ConnectionError, socket.error),
+                    ):
+                        return True
+
+    # String-based detection as fallback
+    error_str = str(exception).lower()
+    connection_keywords = [
+        "연결",
+        "강제",
+        "끊",
+        "reset",
+        "connection",
+        "timeout",
+        "network",
+        "10054",
+        "10061",
+        "10060",
+        "connection aborted",
+        "connection reset",
+        "현재 연결은",
+        "원격 호스트",
+        "강제로 끊",
+    ]
+
+    return any(keyword in error_str for keyword in connection_keywords)
+
+
 def request_llm_scores(
     article: Dict[str, Any], domain: str, llm=None
 ) -> Dict[str, float]:
+    import time
+
     if llm is None:
         llm = get_llm(temperature=0)
 
@@ -171,12 +229,42 @@ def request_llm_scores(
         summary=article.get("content") or article.get("snippet", ""),
     )
     message = HumanMessage(content=prompt)
-    result = llm.invoke([message])
-    if isinstance(result, AIMessage):
-        text = result.content
-    else:
-        text = str(result)
-    return _parse_llm_json(text)
+
+    # Enhanced retry logic for connection errors during scoring
+    max_retries = 3
+    base_delay = 2
+
+    for attempt in range(max_retries + 1):
+        try:
+            result = llm.invoke([message])
+            if isinstance(result, AIMessage):
+                text = result.content
+            else:
+                text = str(result)
+            return _parse_llm_json(text)
+
+        except Exception as e:
+            # Enhanced connection error detection
+            is_connection_error = _is_nested_connection_error(e)
+
+            if is_connection_error:
+                if attempt < max_retries:
+                    delay = base_delay * (2**attempt)  # Exponential backoff
+                    logger.warning(
+                        f"스코어링 연결 오류 (시도 {attempt + 1}/{max_retries + 1}), {delay}초 후 재시도: {e}"
+                    )
+                    time.sleep(delay)
+                    continue
+                else:
+                    logger.error(f"스코어링 최종 실패, 기본 점수 사용: {e}")
+                    return {"relevance": 3, "impact": 3, "novelty": 3}  # Default scores
+            else:
+                # Non-connection errors - log and return defaults immediately
+                logger.error(f"스코어링 오류 (재시도 불가), 기본 점수 사용: {e}")
+                return {"relevance": 3, "impact": 3, "novelty": 3}
+
+    # Should not reach here, but fallback
+    return {"relevance": 3, "impact": 3, "novelty": 3}
 
 
 def calculate_priority_score(
@@ -266,14 +354,12 @@ def score_articles(
         tier_stats[tier_name]["count"] += 1
         tier_stats[tier_name]["scores"].append(article["priority_score"])
 
-    logger.info("📊 Source Tier 분포 및 점수 통계:")
+    logger.info("[통계] Source Tier 분포 및 점수 통계:")
     for tier_name, stats in tier_stats.items():
         avg_score = (
             sum(stats["scores"]) / len(stats["scores"]) if stats["scores"] else 0
         )
-        logger.info(
-            f"  • {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}"
-        )
+        logger.info(f"  - {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}")
 
     if top_n is None:
         return scored_list

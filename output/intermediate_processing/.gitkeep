@@ -1,6 +1,6 @@
 # 중간 처리 파일들이 저장되는 디렉토리입니다.
-# 
+#
 # 자동 생성되는 파일들:
 # - *_render_data.json (렌더링 데이터)
 # - *_raw_articles.json (원본 기사 데이터)
-# - *_processed_*.json (처리된 데이터) 
+# - *_processed_*.json (처리된 데이터)

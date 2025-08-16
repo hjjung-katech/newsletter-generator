@@ -1,12 +1,12 @@
+import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
-import logging
+from typing import Any, Dict, List
 
 from langchain.callbacks.base import BaseCallbackHandler
 
-from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 # 로거 초기화
 logger = get_logger()
@@ -74,7 +74,6 @@ class GoogleGenAICostCB(BaseCallbackHandler):
         # If you need to log prompt_tokens on start, you might need to estimate
         # or get it from `serialized` if available.
         # For now, we will rely on on_llm_end for token counts from the response.
-        pass
 
     def on_llm_end(self, response, **kwargs):
         """Run when LLM ends running."""
@@ -166,7 +165,6 @@ class OpenAICostCB(BaseCallbackHandler):
         self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
     ) -> None:
         """Run when LLM starts running."""
-        pass
 
     def on_llm_end(self, response, **kwargs):
         """Run when LLM ends running."""
@@ -239,7 +237,6 @@ class AnthropicCostCB(BaseCallbackHandler):
         self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
     ) -> None:
         """Run when LLM starts running."""
-        pass
 
     def on_llm_end(self, response, **kwargs):
         """Run when LLM ends running."""
@@ -369,9 +366,7 @@ def get_tracking_callbacks():
     if is_tracing_enabled and api_key_set:
         try:
             from langchain.callbacks.tracers.langchain import LangChainTracer
-            from langsmith import (  # 이 부분은 LangChainTracer와 직접 관련 없음
-                traceable,
-            )
+            from langsmith import traceable  # 이 부분은 LangChainTracer와 직접 관련 없음
 
             project_name = os.environ.get("LANGCHAIN_PROJECT", "default-project")
             if debug_mode:

@@ -41,7 +41,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 ```yaml
 llm_settings:
   default_provider: "gemini"
-  
+
   models:
     # 키워드 생성 - 창의성이 중요하므로 Claude 사용
     keyword_generation:
@@ -50,7 +50,7 @@ llm_settings:
       temperature: 0.7
       max_retries: 2
       timeout: 60
-    
+
     # 테마 추출 - 빠른 분석을 위해 Flash 모델 사용
     theme_extraction:
       provider: "gemini"
@@ -58,7 +58,7 @@ llm_settings:
       temperature: 0.2
       max_retries: 2
       timeout: 60
-    
+
     # 뉴스 요약 - 정확성을 위해 최신 Gemini Pro 사용
     news_summarization:
       provider: "gemini"
@@ -66,7 +66,7 @@ llm_settings:
       temperature: 0.3
       max_retries: 3
       timeout: 120
-    
+
     # 섹션 재생성 - 구조화된 작업을 위해 Claude 사용
     section_regeneration:
       provider: "anthropic"
@@ -74,7 +74,7 @@ llm_settings:
       temperature: 0.3
       max_retries: 2
       timeout: 120
-    
+
     # 뉴스레터 소개 생성 - 자연스러운 글쓰기를 위해 Claude 사용
     introduction_generation:
       provider: "anthropic"
@@ -82,7 +82,7 @@ llm_settings:
       temperature: 0.4
       max_retries: 2
       timeout: 60
-    
+
     # HTML 생성 - 복잡한 구조화 작업을 위해 Gemini Pro 사용
     html_generation:
       provider: "gemini"
@@ -90,7 +90,7 @@ llm_settings:
       temperature: 0.2
       max_retries: 3
       timeout: 180
-    
+
     # 기사 점수 매기기 - 빠른 판단을 위해 Flash 모델 사용
     article_scoring:
       provider: "gemini"
@@ -98,7 +98,7 @@ llm_settings:
       temperature: 0.1
       max_retries: 2
       timeout: 30
-    
+
     # 번역 작업 - 정확성을 위해 Gemini Pro 사용
     translation:
       provider: "gemini"
@@ -135,12 +135,12 @@ provider_models:
     fast: "gemini-2.5-flash-preview-05-20"
     standard: "gemini-1.5-pro"
     advanced: "gemini-2.5-pro-preview-03-25"
-  
+
   anthropic:
     fast: "claude-3-5-haiku-latest"
     standard: "claude-3-7-sonnet-latest"
     advanced: "claude-sonnet-4-20250514"
-  
+
   openai:
     fast: "gpt-4o-mini"
     standard: "gpt-4o"
@@ -235,4 +235,4 @@ pip install langchain-openai
 3. 프롬프트 엔지니어링 적용
 4. 비용 vs 품질 트레이드오프 고려
 
-이 설정을 통해 Newsletter Generator는 각 작업에 가장 적합한 LLM을 자동으로 선택하여 최상의 결과를 제공합니다. 
+이 설정을 통해 Newsletter Generator는 각 작업에 가장 적합한 LLM을 자동으로 선택하여 최상의 결과를 제공합니다.

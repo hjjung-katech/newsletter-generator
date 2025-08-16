@@ -8,6 +8,12 @@ import traceback
 from datetime import datetime
 from typing import List, Optional
 
+# 웹 서비스 모드 체크 - Flask 앱 중복 실행 방지
+if os.environ.get("WEB_SERVICE_MODE") == "1":
+    # 웹 서비스에서 호출된 경우 Flask 앱 시작 방지
+    os.environ["FLASK_APP"] = "none"
+    os.environ["FLASK_ENV"] = "none"
+
 # F-14: Windows 한글 인코딩 문제 해결 (강화된 버전)
 if sys.platform.startswith("win"):
     import io
@@ -64,13 +70,10 @@ else:
     logger.warning(f".env file not found at: {dotenv_path}")
 
 from . import collect as news_collect
-from . import compose as news_compose
 from . import graph  # 새로운 LangGraph 모듈 임포트
 from . import tools  # Import the tools module
 from . import config
 from . import deliver as news_deliver
-from . import summarize as news_summarize
-from .compose import compose_compact_newsletter_html, compose_newsletter_html
 
 app = typer.Typer()
 console = Console()
@@ -158,6 +161,12 @@ def run(
         "--log-level",
         help="Logging level: DEBUG, INFO, WARNING, ERROR",
     ),
+    interactive: bool = typer.Option(
+        False,
+        "--interactive",
+        "-i",
+        help="Interactive mode: review and edit generated keywords before newsletter creation.",
+    ),
 ):
     """
     Generate and optionally send a newsletter based on keywords or domain.
@@ -165,7 +174,6 @@ def run(
     This command creates a newsletter by searching for recent news articles,
     processing them using AI, and optionally sending via email or saving to various formats.
     """
-    import time
 
     from . import deliver as news_deliver
     from . import graph, tools
@@ -196,9 +204,7 @@ def run(
             console.print("[cyan].env 파일에 다음을 추가하세요:[/cyan]")
             console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
             console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_token[/cyan]")
-            console.print(
-                "\n[yellow]참고: Postmark에서 발송자 이메일 주소가 인증되어야 합니다.[/yellow]"
-            )
+            console.print("\n[yellow]참고: Postmark에서 발송자 이메일 주소가 인증되어야 합니다.[/yellow]")
             raise typer.Exit(code=1)
 
         # POSTMARK_SERVER_TOKEN 설정 상태 확인
@@ -206,12 +212,8 @@ def run(
             console.print("[green]✅ Postmark 토큰 설정 완료[/green]")
         else:
             console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
-            console.print(
-                "[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]"
-            )
-            console.print(
-                "[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]"
-            )
+            console.print("[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]")
+            console.print("[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]")
             raise typer.Exit(code=1)
 
         # 이메일 호환 모드 권장
@@ -219,17 +221,13 @@ def run(
             console.print(
                 "[yellow]💡 이메일 발송 시 --email-compatible 옵션 사용을 권장합니다.[/yellow]"
             )
-            console.print(
-                "[yellow]   이 옵션은 이메일 클라이언트 호환성을 개선합니다.[/yellow]"
-            )
+            console.print("[yellow]   이 옵션은 이메일 클라이언트 호환성을 개선합니다.[/yellow]")
 
     elif email_compatible:
         console.print(
             "[yellow]💡 --email-compatible 옵션이 활성화되었지만 이메일 수신자가 지정되지 않았습니다.[/yellow]"
         )
-        console.print(
-            "[yellow]   이메일 발송을 원하시면 --to 옵션을 추가하세요.[/yellow]"
-        )
+        console.print("[yellow]   이메일 발송을 원하시면 --to 옵션을 추가하세요.[/yellow]")
 
     # 출력 형식 표시
     if output_format:
@@ -372,6 +370,12 @@ def run(
                     keyword_list = generated_keywords
                     final_keywords_str = ",".join(keyword_list)
                     logger.success(f"Generated keywords: {final_keywords_str}")
+
+                    # Interactive mode: allow user to review and edit keywords
+                    if interactive:
+                        keyword_list = interactive_keyword_review(keyword_list, domain)
+                        final_keywords_str = ",".join(keyword_list)
+                        console.print(f"[green]최종 키워드:[/green] {final_keywords_str}")
                 else:
                     logger.warning(
                         f"Failed to generate keywords for domain '{domain}'."
@@ -500,7 +504,6 @@ def run(
     safe_topic = tools.get_filename_safe_theme(keyword_list, domain)
 
     # 실제 파라미터를 반영한 스타일 설정
-    effective_style = template_style
     if email_compatible:
         # email_compatible인 경우 "email_compatible"를 사용하되 파일명에는 original style 반영
         file_style = f"{template_style}_email_compatible"
@@ -526,9 +529,7 @@ def run(
 
     # 뉴스레터 파일 저장
     if output_format:
-        with logger.step_context(
-            "local_save", f"뉴스레터를 {output_format.upper()}로 로컬 저장"
-        ):
+        with logger.step_context("local_save", f"뉴스레터를 {output_format.upper()}로 로컬 저장"):
             save_path = os.path.join(
                 output_directory, f"{filename_base}.{output_format}"
             )
@@ -564,9 +565,7 @@ def run(
     # 이메일 전송 로직 (LangGraph 경로에도 추가)
     if to:
         with logger.step_context("email_send", f"이메일 전송 to {to}"):
-            email_subject = (
-                f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
-            )
+            email_subject = f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
 
             # 이메일 발송 시 발송자 정보 다시 확인 및 표시
             console.print(f"\n[cyan]📤 이메일 발송 중...[/cyan]")
@@ -697,9 +696,7 @@ def suggest(
         logger.info("Please set it to use the keyword suggestion feature.")
         raise typer.Exit(code=1)
 
-    with logger.step_context(
-        "keyword_suggestion", f"도메인 '{domain}'에 대한 키워드 제안"
-    ):
+    with logger.step_context("keyword_suggestion", f"도메인 '{domain}'에 대한 키워드 제안"):
         suggested_keywords = tools.generate_keywords_with_gemini(domain, count=count)
 
     if suggested_keywords:
@@ -1117,9 +1114,7 @@ def test(
                 "search_keywords": keywords,
                 "sections": final_state.get("sections", []),
                 # 추가 필드들...
-                "recipient_greeting": final_state.get(
-                    "recipient_greeting", "안녕하세요,"
-                ),
+                "recipient_greeting": final_state.get("recipient_greeting", "안녕하세요,"),
                 "introduction_message": final_state.get(
                     "introduction_message",
                     "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
@@ -1349,9 +1344,7 @@ def check_llm():
             if info["available"]:
                 console.print(f"  • [green]{provider_name}[/green] - 사용 가능")
             else:
-                console.print(
-                    f"  • [red]{provider_name}[/red] - 사용 불가 (API 키 없음)"
-                )
+                console.print(f"  • [red]{provider_name}[/red] - 사용 불가 (API 키 없음)")
 
         # 현재 LLM 설정 표시
         console.print(f"\n[bold blue]📋 현재 LLM 설정[/bold blue]")
@@ -1382,9 +1375,7 @@ def check_llm():
 
         # 권장사항 표시
         if len(available_providers) == 0:
-            console.print(
-                f"\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]"
-            )
+            console.print(f"\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]")
             console.print("다음 중 하나 이상의 API 키를 .env 파일에 설정해주세요:")
             console.print("  • GEMINI_API_KEY")
             console.print("  • OPENAI_API_KEY")
@@ -1495,9 +1486,7 @@ def list_providers():
                 api_key_name = config.LLM_CONFIG.get("api_keys", {}).get(
                     provider_name, f"{provider_name.upper()}_API_KEY"
                 )
-                console.print(
-                    f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]"
-                )
+                console.print(f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]")
 
         # 기능별 모델 설정 표시
         console.print(f"\n[bold cyan]기능별 모델 설정[/bold cyan]")
@@ -1576,9 +1565,7 @@ def test_email(
         console.print(f"[cyan]Postmark 토큰:[/cyan] {masked_token}")
     else:
         console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
-        console.print(
-            "[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]"
-        )
+        console.print("[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]")
         console.print("[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]")
         if not dry_run:
             raise typer.Exit(code=1)
@@ -1660,13 +1647,13 @@ def test_email(
         <div class="header">
             <h1>📧 Newsletter Generator 이메일 테스트</h1>
         </div>
-        
+
         <div class="content">
             <div class="success">
                 <h2>✅ 이메일 발송 테스트 성공!</h2>
                 <p>이 이메일을 받으셨다면 Newsletter Generator의 Postmark 이메일 발송 기능이 정상적으로 작동하고 있습니다.</p>
             </div>
-            
+
             <h3>📋 테스트 정보</h3>
             <ul>
                 <li><strong>발송 시간:</strong> {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분 %S초')}</li>
@@ -1674,14 +1661,14 @@ def test_email(
                 <li><strong>이메일 서비스:</strong> Postmark API</li>
                 <li><strong>발송자:</strong> {config.EMAIL_SENDER}</li>
             </ul>
-            
+
             <h3>🔧 다음 단계</h3>
             <p>이메일 테스트가 성공했다면 이제 실제 뉴스레터를 생성하고 발송할 수 있습니다:</p>
             <pre style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
 newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
             </pre>
         </div>
-        
+
         <div class="footer">
             <p>이 메시지는 Newsletter Generator의 이메일 테스트 기능에 의해 자동으로 생성되었습니다.</p>
             <p>문의사항이 있으시면 개발팀에 연락해 주세요.</p>
@@ -1692,9 +1679,7 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         """
 
     if dry_run:
-        console.print(
-            "\n[yellow]🔍 DRY RUN MODE - 실제 이메일은 발송되지 않습니다[/yellow]"
-        )
+        console.print("\n[yellow]🔍 DRY RUN MODE - 실제 이메일은 발송되지 않습니다[/yellow]")
         console.print(f"[cyan]수신자:[/cyan] {to}")
         console.print(f"[cyan]제목:[/cyan] {subject}")
         console.print(f"[cyan]내용 길이:[/cyan] {len(html_content)} 문자")
@@ -1704,24 +1689,16 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         console.print(f"[cyan]발송자 이메일:[/cyan] {config.EMAIL_SENDER}")
 
         if not config.POSTMARK_SERVER_TOKEN:
-            console.print(
-                "\n[red]⚠️  POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]"
-            )
-            console.print(
-                "[yellow].env 파일에 POSTMARK_SERVER_TOKEN을 설정해주세요.[/yellow]"
-            )
+            console.print("\n[red]⚠️  POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
+            console.print("[yellow].env 파일에 POSTMARK_SERVER_TOKEN을 설정해주세요.[/yellow]")
 
-        console.print(
-            "\n[green]Dry run 완료. 실제 발송하려면 --dry-run 옵션을 제거하세요.[/green]"
-        )
+        console.print("\n[green]Dry run 완료. 실제 발송하려면 --dry-run 옵션을 제거하세요.[/green]")
         return
 
     # Check Postmark configuration
     if not config.POSTMARK_SERVER_TOKEN:
         console.print("\n[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
-        console.print(
-            "[yellow]이메일 발송을 위해 .env 파일에 다음을 설정해주세요:[/yellow]"
-        )
+        console.print("[yellow]이메일 발송을 위해 .env 파일에 다음을 설정해주세요:[/yellow]")
         console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_server_token[/cyan]")
         console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
         raise typer.Exit(code=1)
@@ -1744,9 +1721,7 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         )
 
         if success:
-            console.print(
-                f"\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]"
-            )
+            console.print(f"\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]")
             console.print(f"[green]수신자 {to}의 받은편지함을 확인해주세요.[/green]")
 
             # Save test email content for reference
@@ -1758,23 +1733,17 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
             try:
                 with open(test_file_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
-                console.print(
-                    f"[info]테스트 이메일 내용이 저장되었습니다: {test_file_path}[/info]"
-                )
+                console.print(f"[info]테스트 이메일 내용이 저장되었습니다: {test_file_path}[/info]")
             except Exception as e:
                 console.print(f"[yellow]테스트 파일 저장 실패: {e}[/yellow]")
 
         else:
             console.print(f"\n[bold red]❌ 이메일 발송에 실패했습니다.[/bold red]")
-            console.print(
-                "[yellow]Postmark 설정과 네트워크 연결을 확인해주세요.[/yellow]"
-            )
+            console.print("[yellow]Postmark 설정과 네트워크 연결을 확인해주세요.[/yellow]")
             raise typer.Exit(code=1)
 
     except Exception as e:
-        console.print(
-            f"\n[bold red]❌ 이메일 발송 중 오류가 발생했습니다: {e}[/bold red]"
-        )
+        console.print(f"\n[bold red]❌ 이메일 발송 중 오류가 발생했습니다: {e}[/bold red]")
         console.print("[yellow]설정을 확인하고 다시 시도해주세요.[/yellow]")
         raise typer.Exit(code=1)
 
@@ -1799,6 +1768,132 @@ def suggest_keywords(domain: str, count: int = 10) -> list[str]:
 
     # 기존 검증된 키워드 생성 함수 사용
     return tools.generate_keywords_with_gemini(domain, count=count)
+
+
+def interactive_keyword_review(keywords: List[str], domain: str) -> List[str]:
+    """
+    Interactive keyword review and editing function.
+    Allows users to add, edit, or remove keywords before newsletter generation.
+    """
+    console.print(f"\n[bold blue]🔍 키워드 검토 및 수정 모드[/bold blue]")
+    console.print(f"[cyan]도메인:[/cyan] {domain}")
+    console.print(f"[yellow]생성된 키워드를 검토하고 필요시 수정하세요.[/yellow]\n")
+
+    current_keywords = keywords.copy()
+
+    while True:
+        # Show current keywords
+        console.print("[bold]현재 키워드:[/bold]")
+        for i, keyword in enumerate(current_keywords, 1):
+            console.print(f"  {i}. {keyword}")
+
+        console.print(f"\n[bold cyan]선택 옵션:[/bold cyan]")
+        console.print("  [green]Enter[/green] - 현재 키워드로 계속 진행")
+        console.print("  [yellow]e <번호>[/yellow] - 키워드 편집 (예: e 1)")
+        console.print("  [red]d <번호>[/red] - 키워드 삭제 (예: d 2)")
+        console.print("  [blue]a[/blue] - 새 키워드 추가")
+        console.print("  [magenta]r[/magenta] - 모든 키워드 재생성")
+        console.print("  [red]q[/red] - 종료")
+
+        try:
+            user_input = input("\n명령을 입력하세요: ").strip()
+
+            if not user_input or user_input.lower() == "":
+                # Continue with current keywords
+                break
+
+            elif user_input.lower() == "q":
+                console.print("[red]사용자가 종료를 선택했습니다.[/red]")
+                raise typer.Exit(code=0)
+
+            elif user_input.lower() == "a":
+                # Add new keyword
+                new_keyword = input("추가할 키워드를 입력하세요: ").strip()
+                if new_keyword:
+                    current_keywords.append(new_keyword)
+                    console.print(f"[green]'{new_keyword}' 키워드가 추가되었습니다.[/green]")
+                else:
+                    console.print("[yellow]키워드가 입력되지 않았습니다.[/yellow]")
+
+            elif user_input.lower() == "r":
+                # Regenerate all keywords
+                console.print("[cyan]키워드를 재생성하고 있습니다...[/cyan]")
+                try:
+                    regenerated = tools.generate_keywords_with_gemini(
+                        domain, count=len(current_keywords)
+                    )
+                    if regenerated:
+                        current_keywords = regenerated
+                        console.print("[green]키워드가 재생성되었습니다.[/green]")
+                    else:
+                        console.print("[red]키워드 재생성에 실패했습니다.[/red]")
+                except Exception as e:
+                    console.print(f"[red]키워드 재생성 중 오류 발생: {e}[/red]")
+
+            elif user_input.lower().startswith("e "):
+                # Edit keyword
+                try:
+                    index_str = user_input[2:].strip()
+                    index = int(index_str) - 1
+                    if 0 <= index < len(current_keywords):
+                        old_keyword = current_keywords[index]
+                        console.print(f"현재 키워드: [yellow]{old_keyword}[/yellow]")
+                        new_keyword = input("새로운 키워드를 입력하세요: ").strip()
+                        if new_keyword:
+                            current_keywords[index] = new_keyword
+                            console.print(
+                                f"[green]키워드가 '{old_keyword}' → '{new_keyword}'로 변경되었습니다.[/green]"
+                            )
+                        else:
+                            console.print("[yellow]변경이 취소되었습니다.[/yellow]")
+                    else:
+                        console.print(
+                            f"[red]잘못된 번호입니다. 1-{len(current_keywords)} 사이의 숫자를 입력하세요.[/red]"
+                        )
+                except ValueError:
+                    console.print("[red]잘못된 형식입니다. 'e 1'과 같이 입력하세요.[/red]")
+
+            elif user_input.lower().startswith("d "):
+                # Delete keyword
+                try:
+                    index_str = user_input[2:].strip()
+                    index = int(index_str) - 1
+                    if 0 <= index < len(current_keywords):
+                        if len(current_keywords) <= 1:
+                            console.print("[red]최소 하나의 키워드는 필요합니다.[/red]")
+                        else:
+                            deleted_keyword = current_keywords.pop(index)
+                            console.print(
+                                f"[green]'{deleted_keyword}' 키워드가 삭제되었습니다.[/green]"
+                            )
+                    else:
+                        console.print(
+                            f"[red]잘못된 번호입니다. 1-{len(current_keywords)} 사이의 숫자를 입력하세요.[/red]"
+                        )
+                except ValueError:
+                    console.print("[red]잘못된 형식입니다. 'd 1'과 같이 입력하세요.[/red]")
+
+            else:
+                console.print("[red]알 수 없는 명령입니다.[/red]")
+
+        except KeyboardInterrupt:
+            console.print("\n[red]사용자가 중단했습니다.[/red]")
+            raise typer.Exit(code=0)
+        except EOFError:
+            console.print("\n[yellow]입력이 종료되었습니다. 현재 키워드로 진행합니다.[/yellow]")
+            break
+
+    if not current_keywords:
+        console.print("[red]키워드가 없습니다. 최소 하나의 키워드가 필요합니다.[/red]")
+        raise typer.Exit(code=1)
+
+    return current_keywords
+
+
+# Main function for backward compatibility with tests
+def main():
+    """Main entry point for the CLI application"""
+    app()
 
 
 if __name__ == "__main__":

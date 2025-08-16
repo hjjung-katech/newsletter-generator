@@ -6,9 +6,7 @@ Newsletter Generator - Custom Tools
 import json
 import os
 import re
-import time
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import markdownify
 import requests
@@ -16,21 +14,20 @@ from bs4 import BeautifulSoup
 from langchain.prompts import PromptTemplate
 from langchain.tools import tool
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.outputs import Generation, LLMResult
 from langchain_core.tools import ToolException
 from langchain_google_genai import ChatGoogleGenerativeAI
 from rich.console import Console
 
 from . import config
-from .utils.logger import get_logger, show_collection_brief
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
 console = Console()
 
 
-@tool
+@tool(description="Search for news articles using the Serper.dev API for each keyword.")
 def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     """
     Search for news articles using the Serper.dev API for each keyword.
@@ -58,9 +55,7 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
         url = "https://google.serper.dev/news"
 
         # 뉴스 전용 엔드포인트는 단순한 파라미터만 필요
-        payload = json.dumps(
-            {"q": keyword, "gl": "kr", "num": num_results}  # 한국 지역 결과
-        )
+        payload = json.dumps({"q": keyword, "gl": "kr", "num": num_results})  # 한국 지역 결과
 
         headers = {
             "X-API-KEY": config.SERPER_API_KEY,
@@ -124,8 +119,7 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
                     "title": item.get("title", "제목 없음"),
                     "url": item.get("link", ""),
                     "link": item.get("link", ""),  # 호환성을 위해 link도 추가
-                    "snippet": item.get("snippet")
-                    or item.get("description", "내용 없음"),
+                    "snippet": item.get("snippet") or item.get("description", "내용 없음"),
                     "source": item.get("source", "출처 없음"),
                     "date": item.get("date") or item.get("publishedAt") or "날짜 없음",
                 }
@@ -155,14 +149,14 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     if keyword_article_counts and total_collected > 0:
         show_collection_brief(keyword_article_counts)
     elif total_collected > 0:
-        logger.info(f"📰 총 {total_collected}개 기사 수집 완료")
+        logger.info(f"[뉴스] 총 {total_collected}개 기사 수집 완료")
     else:
-        logger.warning("⚠️  수집된 기사가 없습니다")
+        logger.warning("[경고] 수집된 기사가 없습니다")
 
     return all_collected_articles
 
 
-@tool
+@tool(description="Fetch the full content of an article from its URL.")
 def fetch_article_content(url: str) -> Dict[str, Any]:
     """
     Fetch the full content of an article from its URL.
@@ -264,7 +258,7 @@ def fetch_article_content(url: str) -> Dict[str, Any]:
         raise ToolException(f"Error fetching article content: {str(e)}")
 
 
-@tool
+@tool(description="Save newsletter content locally as HTML or Markdown.")
 def save_newsletter_locally(
     html_content: str, filename_base: str, output_format: str = "html"
 ) -> str:
@@ -448,9 +442,7 @@ def validate_and_refine_keywords(
 
             if len(test_results) >= min_results_per_keyword:
                 validated_keywords.append(keyword)
-                logger.info(
-                    f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]"
-                )
+                logger.info(f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]")
             else:
                 replacement_needed.append(keyword)
                 logger.info(
@@ -492,9 +484,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
     )
 
     if not has_any_api_key:
-        logger.warning(
-            "API 키가 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다."
-        )
+        logger.warning("API 키가 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다.")
         return extract_common_theme_fallback(keywords)
 
     try:
@@ -539,14 +529,10 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
             return extracted_theme.strip()
 
         except Exception as e:
-            logger.warning(
-                f"LLM 팩토리를 통한 테마 추출이 실패했습니다. 대체 방법을 사용합니다: {e}"
-            )
+            logger.warning(f"LLM 팩토리를 통한 테마 추출이 실패했습니다. 대체 방법을 사용합니다: {e}")
             # Check if API key is available before trying Gemini fallback
             if not api_key:
-                logger.warning(
-                    "GEMINI_API_KEY를 찾을 수 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다."
-                )
+                logger.warning("GEMINI_API_KEY를 찾을 수 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다.")
                 return extract_common_theme_fallback(keywords)
 
         # Fallback using LangChain Google GenAI
@@ -687,7 +673,6 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     Returns:
         list: 생성된 요약문 문단 목록
     """
-    from . import config
 
     # LLM 팩토리를 사용하여 섹션 재생성에 최적화된 모델 사용
     try:
@@ -717,11 +702,11 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
 
         prompt = f"""
         다음은 '{section_title}'에 관련된 뉴스 기사 목록입니다:
-        
+
         {news_links_text}
-        
+
         위 뉴스 기사들을 바탕으로 '{section_title}'에 대한 종합적인 요약문을 작성해주세요.
-        
+
         요구사항:
         1. 1개의 문단으로 나누어 작성해주세요. 각 문단은 최소 3-4문장 이상으로 구성해주세요.
         2. 문단은 주요 트렌드나 동향을 설명해주세요.
@@ -744,9 +729,7 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
         return paragraphs[:3]
 
     except Exception as e:
-        logger.warning(
-            f"LLM 팩토리를 통한 섹션 재생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
-        )
+        logger.warning(f"LLM 팩토리를 통한 섹션 재생성이 실패했습니다. 대체 방법을 사용합니다: {e}")
 
     # Fallback using LangChain Google GenAI
     from langchain_core.messages import HumanMessage
@@ -777,11 +760,11 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     # 프롬프트 구성
     prompt = f"""
     다음은 '{section_title}'에 관련된 뉴스 기사 목록입니다:
-    
+
     {news_links_text}
-    
+
     위 뉴스 기사들을 바탕으로 '{section_title}'에 대한 종합적인 요약문을 작성해주세요.
-    
+
     요구사항:
     1. 3개의 문단으로 나누어 작성해주세요. 각 문단은 최소 3-4문장 이상으로 구성해주세요.
     2. 첫 번째 문단은 주요 트렌드나 동향을 설명해주세요.
@@ -831,7 +814,6 @@ def generate_introduction_with_gemini(
     Returns:
         str: 생성된 소개 메시지
     """
-    from . import config
 
     # LLM 팩토리를 사용하여 소개 생성에 최적화된 모델 사용
     try:
@@ -850,14 +832,14 @@ def generate_introduction_with_gemini(
 
         prompt = f"""
         다음은 뉴스레터의 주제와 포함된 섹션 제목들입니다:
-        
+
         뉴스레터 주제: {safe_topic}
-        
+
         섹션 제목:
         {section_titles_text}
-        
+
         위 정보를 바탕으로 뉴스레터의 소개 메시지를 작성해주세요.
-        
+
         요구사항:
         1. 전문적이고 친절한 톤으로 작성해주세요.
         2. 2-3 문장으로 간결하게 작성해주세요.
@@ -865,7 +847,7 @@ def generate_introduction_with_gemini(
         4. 한국어로 작성해주세요.
         5. 각 섹션의 핵심 내용이 무엇인지 간략히 언급해주세요.
         6. 'R&D 전략 수립' 또는 '의사결정'에 도움이 될 수 있다는 점을 언급해주세요.
-        
+
         소개 메시지만 반환해 주세요.
         """
 
@@ -873,9 +855,7 @@ def generate_introduction_with_gemini(
         return response.content.strip()
 
     except Exception as e:
-        logger.warning(
-            f"LLM 팩토리를 통한 소개 생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
-        )
+        logger.warning(f"LLM 팩토리를 통한 소개 생성이 실패했습니다. 대체 방법을 사용합니다: {e}")
         # Fallback using LangChain Google GenAI
         from .llm_factory import get_llm_for_task
 
@@ -894,14 +874,14 @@ def generate_introduction_with_gemini(
     # 프롬프트 구성
     prompt = f"""
     다음은 뉴스레터의 주제와 포함된 섹션 제목들입니다:
-    
+
     뉴스레터 주제: {safe_topic}
-    
+
     섹션 제목:
     {section_titles_text}
-    
+
     위 정보를 바탕으로 뉴스레터의 소개 메시지를 작성해주세요.
-    
+
     요구사항:
     1. 전문적이고 친절한 톤으로 작성해주세요.
     2. 2-3 문장으로 간결하게 작성해주세요.
@@ -909,7 +889,7 @@ def generate_introduction_with_gemini(
     4. 한국어로 작성해주세요.
     5. 각 섹션의 핵심 내용이 무엇인지 간략히 언급해주세요.
     6. 'R&D 전략 수립' 또는 '의사결정'에 도움이 될 수 있다는 점을 언급해주세요.
-    
+
     소개 메시지만 반환해 주세요.
     """
 

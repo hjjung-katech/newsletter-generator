@@ -8,25 +8,22 @@ import os  # Added import
 import re  # Added import for regex date parsing
 import time
 from datetime import datetime, timedelta, timezone  # Added imports
-from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
 
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, StateGraph
-from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
 
-from . import collect as news_collect
-from . import config
+try:
+    from pydantic.v1 import (  # Updated import for Pydantic v1 compatibility
+        BaseModel,
+        Field,
+    )
+except ImportError:
+    from pydantic import BaseModel, Field  # Fallback to Pydantic v2
+
 from .chains import get_newsletter_chain
 from .date_utils import parse_date_string
 from .utils.file_naming import generate_unified_newsletter_filename
-from .utils.logger import (
-    get_logger,
-    show_filter_brief,
-    show_final_brief,
-    step_brief,
-    step_result,
-)
+from .utils.logger import get_logger, step_brief
 
 # 로거 초기화
 logger = get_logger()
@@ -154,7 +151,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
     # Save raw articles with unified naming
     try:
-        keywords_str = "_".join(state["keywords"]) if state["keywords"] else "unknown"
+        "_".join(state["keywords"]) if state["keywords"] else "unknown"
         domain_str = (
             state["domain"].replace(" ", "_") if state.get("domain") else "general"
         )
@@ -182,9 +179,14 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         days=state.get("news_period_days", 7)
     )
 
+    logger.info(f"[DEBUG] Date filtering setup:")
+    logger.info(f"[DEBUG] - Current time: {datetime.now(timezone.utc)}")
+    logger.info(f"[DEBUG] - Period days: {state.get('news_period_days', 7)}")
+    logger.info(f"[DEBUG] - Cutoff date: {cutoff_date}")
+
     initial_count = len(collected_articles)
 
-    for article in collected_articles:
+    for i, article in enumerate(collected_articles):
         date_str = article.get("date")
         if not date_str or date_str == "날짜 없음":
             articles_with_missing_date.append(article)
@@ -194,11 +196,31 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         if parsed_date is None:
             articles_unparseable_date += 1
             articles_with_unparseable_date.append(article)
+            logger.warning(f"[DEBUG] Article {i+1}: Failed to parse date '{date_str}'")
             continue
 
         articles_with_date += 1
+
+        # Debug logging for date filtering
+        time_diff = (
+            cutoff_date - parsed_date
+            if parsed_date < cutoff_date
+            else parsed_date - cutoff_date
+        )
+        days_diff = time_diff.total_seconds() / (24 * 3600)
+
         if parsed_date >= cutoff_date:
             articles_within_date_range.append(article)
+            logger.debug(
+                f"[DEBUG] Article {i+1}: PASSED filter - '{date_str}' -> {parsed_date} ({days_diff:.1f} days ago)"
+            )
+        else:
+            logger.warning(
+                f"[DEBUG] Article {i+1}: FILTERED OUT - '{date_str}' -> {parsed_date} (too old: {days_diff:.1f} days)"
+            )
+            logger.warning(
+                f"[DEBUG] Cutoff date: {cutoff_date}, Article date: {parsed_date}"
+            )
 
     # Combine kept articles (recent + missing + unparseable dates)
     filtered_articles = (
@@ -323,6 +345,50 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
         }
 
     except Exception as e:
+        from .scoring import _is_nested_connection_error
+
+        # Enhanced connection error detection using the same logic as scoring.py
+        is_connection_error = _is_nested_connection_error(e)
+
+        if is_connection_error:
+            logger.warning(f"연결 오류로 인한 스코어링 실패, 기본 점수로 계속 진행: {e}")
+
+            # Assign default scores to all articles and continue
+            try:
+                for article in processed_articles:
+                    article["priority_score"] = 50.0  # Default middle score
+                    article["scoring"] = {"relevance": 3, "impact": 3, "novelty": 3}
+                    article["source_tier_score"] = 0.5
+                    article["source_tier_name"] = "기본 (연결 오류)"
+
+                # Sort by publication date as fallback ranking
+                try:
+                    from .date_utils import parse_date_string
+
+                    ranked_articles = sorted(
+                        processed_articles,
+                        key=lambda a: parse_date_string(a.get("date", ""))
+                        or datetime.min.replace(tzinfo=timezone.utc),
+                        reverse=True,
+                    )
+                except Exception:
+                    ranked_articles = processed_articles
+
+                logger.info(f"연결 오류 복구: {len(ranked_articles)}개 기사에 기본 점수 할당 완료")
+
+                step_times = state.get("step_times", {})
+                step_times["score_articles"] = time.time() - start_time
+
+                return {
+                    **state,
+                    "ranked_articles": ranked_articles,
+                    "status": "scoring_complete",
+                    "step_times": step_times,
+                }
+
+            except Exception as fallback_error:
+                logger.error(f"기본 점수 할당 중 오류: {fallback_error}")
+
         logger.error(f"Error during article scoring: {e}")
         step_times = state.get("step_times", {})
         step_times["score_articles"] = time.time() - start_time
@@ -393,13 +459,12 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
                 "articles_count": len(ranked_articles),
             }
             sections = []
-            mode = template_style
         elif isinstance(result, dict):
             # 새로운 형식 (구조화된 결과)
             newsletter_html = result.get("html", "")
             structured_data = result.get("structured_data", {})
             sections = result.get("sections", [])
-            mode = result.get("mode", template_style)
+            result.get("mode", template_style)
 
             # 주요 메타데이터 추가
             structured_data.update(
@@ -495,7 +560,15 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
 
             # generate_unified_newsletter_filename이 이미 전체 경로를 반환함
             file_path = generate_unified_newsletter_filename(
-                domain_str, f"newsletter_{template_style}", keywords_str, "html"
+                topic=domain_str,
+                style=(
+                    f"{template_style}_email_compatible"
+                    if state.get("email_compatible", False)
+                    else template_style
+                ),
+                timestamp=None,  # 현재 시간 사용
+                use_current_date=True,
+                generation_type="original",
             )
 
             # 디렉토리 존재 확인 (파일 경로에서 디렉토리 부분 추출)
@@ -700,6 +773,4 @@ def generate_newsletter(
         return final_state["newsletter_html"], "success"  # type: ignore
     else:
         error_message = final_state.get("error", "알 수 없는 오류 발생")
-        return (
-            error_message if error_message is not None else "알 수 없는 오류 발생"
-        ), "error"
+        return (error_message if error_message is not None else "알 수 없는 오류 발생"), "error"

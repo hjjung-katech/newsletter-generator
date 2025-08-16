@@ -7,11 +7,7 @@ from typing import Any, Dict, List, Tuple
 import yaml
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .date_utils import (
-    extract_source_and_date,
-    format_date_for_display,
-    standardize_date,
-)
+from .date_utils import extract_source_and_date, format_date_for_display
 from .utils.logger import get_logger
 
 # 로거 초기화
@@ -78,36 +74,55 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
         # 리스트 형태로 제공된 경우 구조화된 데이터로 변환
         newsletter_data = {
             "newsletter_topic": "주간 산업 동향",
+            "top_articles": [],  # 상위 기사용
             "sections": [
                 {
                     "title": "주요 기술 동향",
-                    "summary_paragraphs": [
-                        "다음은 지난 한 주간의 주요 기술 동향 요약입니다."
-                    ],
+                    "summary_paragraphs": ["다음은 지난 한 주간의 주요 기술 동향 요약입니다."],
                     "news_links": [],
                 }
             ],
         }
 
-        for article in data:
+        # 상위 3개 기사를 top_articles로 설정
+        top_count = min(3, len(data))
+        for i, article in enumerate(data[:top_count]):
+            article_content = article.get("content") or article.get("snippet", "")
+            top_article = {
+                "title": article.get("title", "제목 없음"),
+                "url": article.get("url", "#"),
+                "snippet": (
+                    article_content[:200] + "..."
+                    if len(article_content) > 200
+                    else article_content
+                ),
+                "summary_text": article_content,
+                "source_and_date": f"{article.get('source', '출처 미상')}, {article.get('date', '날짜 미상')}",
+            }
+            newsletter_data["top_articles"].append(top_article)
+
+        # 나머지 기사들을 sections에 추가
+        for article in data[top_count:]:
             article_title = article.get("title", "제목 없음")
             article_url = article.get("url", "#")
             article_source = article.get("source", "출처 미상")
             article_date = article.get("date", "날짜 미상")
+            article_content = article.get("content") or article.get("snippet", "")
 
-            # 링크 정보 추가
+            # 링크 정보 추가 (content 필드를 snippet으로 매핑)
             link_info = {
                 "title": article_title,
                 "url": article_url,
+                "snippet": article_content,
+                "summary_text": article_content,
                 "source_and_date": f"{article_source}, {article_date}",
             }
             newsletter_data["sections"][0]["news_links"].append(link_info)
 
             # 첫 번째 기사 내용을 요약 본문으로 사용
             if len(newsletter_data["sections"][0]["summary_paragraphs"]) == 1:
-                summary = article.get("summary_text") or article.get("content", "")
                 # 간단한 문단 나누기 (실제로는 더 정교한 처리가 필요할 수 있음)
-                paragraphs = summary.split("\n\n")
+                paragraphs = article_content.split("\n\n") if article_content else [""]
                 newsletter_data["sections"][0]["summary_paragraphs"] = paragraphs[
                     :3
                 ]  # 최대 3개 문단
@@ -119,25 +134,19 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
         # 데이터에서 원래 template_style 확인 (graph.py에서 전달됨)
         original_template_style = data.get("template_style", "detailed")
 
-        # email_compatible 기본 설정을 가져옴
-        config = NewsletterConfig.get_config(style)
+        # 원래 template_style의 설정을 가져옴 (CLI 기존 기능 유지)
+        config = NewsletterConfig.get_config(original_template_style)
 
-        # 원래 template_style의 설정을 일부 적용
-        base_config = NewsletterConfig.get_config(original_template_style)
+        # email_compatible 템플릿 사용을 위해 template_name만 변경
+        config["template_name"] = "newsletter_template_email_compatible.html"
 
-        # 중요한 설정들을 원래 스타일에서 가져옴
-        config["max_articles"] = base_config["max_articles"]
-        config["max_groups"] = base_config["max_groups"]
-        config["max_definitions"] = base_config["max_definitions"]
-        config["summary_style"] = base_config["summary_style"]
-
-        print(
+        logger.info(
             f"Composing email-compatible newsletter with {original_template_style} content style..."
         )
     else:
         # 설정 가져오기
         config = NewsletterConfig.get_config(style)
-        print(
+        logger.info(
             f"Composing {style} newsletter for topic: {data.get('newsletter_topic', 'N/A')}..."
         )
 
@@ -503,9 +512,7 @@ def render_newsletter_template(
             **common_context,
             "tagline": data.get(
                 "tagline",
-                newsletter_settings.get(
-                    "tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."
-                ),
+                newsletter_settings.get("tagline", "이번 주, 주요 산업 동향을 미리 만나보세요."),
             ),
             "grouped_sections": grouped_sections,
         }
@@ -565,6 +572,72 @@ def render_newsletter_template(
 # 기존 함수들을 새로운 통합 함수로 래핑
 def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     """기존 detailed 뉴스레터 생성 함수 (호환성 유지)"""
+    # 데이터 형태 확인 및 변환
+    if isinstance(data, list):
+        # 리스트인 경우 딕셔너리로 변환 (템플릿이 기대하는 구조로)
+        top_articles = []
+        sections = [
+            {
+                "title": "주요 기술 동향",
+                "summary_paragraphs": ["다음은 지난 한 주간의 주요 기술 동향 요약입니다."],
+                "news_links": [],
+            }
+        ]
+
+        # 상위 3개 기사를 top_articles로 설정
+        top_count = min(3, len(data))
+        for article in data[:top_count]:
+            # summary_text 필드를 우선으로 하고, 없으면 content나 snippet 사용
+            article_content = (
+                article.get("summary_text")
+                or article.get("content")
+                or article.get("snippet", "")
+            )
+            top_article = {
+                "title": article.get("title", "제목 없음"),
+                "url": article.get("url", "#"),
+                "snippet": (
+                    article_content[:200] + "..."
+                    if len(article_content) > 200
+                    else article_content
+                ),
+                "summary_text": article_content,
+                "source_and_date": f"{article.get('source', '출처 미상')}, {article.get('date', '날짜 미상')}",
+            }
+            top_articles.append(top_article)
+
+        # 나머지 기사들을 sections에 추가
+        for article in data[top_count:]:
+            # summary_text 필드를 우선으로 하고, 없으면 content나 snippet 사용
+            article_content = (
+                article.get("summary_text")
+                or article.get("content")
+                or article.get("snippet", "")
+            )
+            link_info = {
+                "title": article.get("title", "제목 없음"),
+                "url": article.get("url", "#"),
+                "snippet": article_content,
+                "summary_text": article_content,
+                "source_and_date": f"{article.get('source', '출처 미상')}, {article.get('date', '날짜 미상')}",
+            }
+            sections[0]["news_links"].append(link_info)
+
+        data = {
+            "top_articles": top_articles,
+            "sections": sections,
+            "newsletter_topic": "주간 산업 동향",
+            "newsletter_title": "주간 산업 동향 뉴스 클리핑",
+        }
+    elif not isinstance(data, dict):
+        # 딕셔너리도 리스트도 아닌 경우 기본값으로 설정
+        data = {
+            "top_articles": [],
+            "sections": [],
+            "newsletter_topic": "주간 산업 동향",
+            "newsletter_title": "주간 산업 동향 뉴스 클리핑",
+        }
+
     # 템플릿 이름이 지정된 경우 사용, 아닌 경우 기본값 사용
     if template_name and template_name != "newsletter_template.html":
         # 사용자 정의 템플릿 처리
@@ -572,9 +645,7 @@ def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
             loader=FileSystemLoader(template_dir),
             autoescape=select_autoescape(["html", "xml"]),
         )
-        template = env.get_template(
-            template_name
-        )  # 여기서 TemplateNotFound 예외 발생 가능
+        template = env.get_template(template_name)  # 여기서 TemplateNotFound 예외 발생 가능
 
         # 현재 날짜와 시간 가져오기
         current_date = datetime.now().strftime("%Y-%m-%d")
@@ -627,15 +698,11 @@ def compose_compact_newsletter_html(
             loader=FileSystemLoader(template_dir),
             autoescape=select_autoescape(["html", "xml"]),
         )
-        template = env.get_template(
-            template_name
-        )  # 여기서 TemplateNotFound 예외 발생 가능
+        template = env.get_template(template_name)  # 여기서 TemplateNotFound 예외 발생 가능
 
         # 간단한 컨텍스트로 렌더링
         context = {
-            "newsletter_title": data.get(
-                "newsletter_topic", "주간 산업 동향 뉴스 클리핑"
-            ),
+            "newsletter_title": data.get("newsletter_topic", "주간 산업 동향 뉴스 클리핑"),
             "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
             "generation_date": data.get(
                 "generation_date", datetime.now().strftime("%Y-%m-%d")
@@ -692,7 +759,7 @@ def save_newsletter_with_config(
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(data_to_save, f, indent=2, ensure_ascii=False)
 
-    print(f"Saved newsletter data with embedded config to {output_path}")
+    logger.info(f"Saved newsletter data with embedded config to {output_path}")
 
 
 def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -710,9 +777,7 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
     )
 
     compact_data = {
-        "newsletter_title": newsletter_data.get(
-            "newsletter_topic", "주간 산업 동향 브리프"
-        ),
+        "newsletter_title": newsletter_data.get("newsletter_topic", "주간 산업 동향 브리프"),
         "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
         "company_name": newsletter_data.get("company_name", "Your Company"),
         "generation_date": newsletter_data.get("generation_date"),
@@ -733,9 +798,7 @@ def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str
 
     # Check if grouped_sections already exist in the input data
     if "grouped_sections" in newsletter_data:
-        logger.debug(
-            f"기존 그룹화된 섹션을 사용합니다: {len(newsletter_data['grouped_sections'])}개"
-        )
+        logger.debug(f"기존 그룹화된 섹션을 사용합니다: {len(newsletter_data['grouped_sections'])}개")
         compact_data["grouped_sections"] = newsletter_data["grouped_sections"]
     else:
         logger.debug("섹션에서 그룹화된 섹션을 생성합니다")
@@ -966,39 +1029,36 @@ def load_newsletter_settings(config_file: str = "config.yml") -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: 뉴스레터 설정 딕셔너리
     """
+    from .centralized_settings import get_settings
+
+    settings = get_settings()
+
+    # 기본 설정 (CentralizedSettings 기반)
+    default_settings = {
+        "newsletter_title": "주간 산업 동향 뉴스 클리핑",
+        "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
+        "publisher_name": "Your Company",
+        "company_name": "Your Company",
+        "company_tagline": "",
+        "editor_name": "",
+        "editor_title": "편집자",
+        "editor_email": settings.email_sender or "",
+        "footer_disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
+        "footer_contact": "",
+    }
+
     try:
-        from .config_manager import config_manager
+        if os.path.exists(config_file):
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = yaml.safe_load(f)
 
-        return config_manager.get_newsletter_settings()
-    except ImportError:
-        # Fallback to original implementation
-        default_settings = {
-            "newsletter_title": "주간 산업 동향 뉴스 클리핑",
-            "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
-            "publisher_name": "Your Company",
-            "company_name": "Your Company",
-            "company_tagline": "",
-            "editor_name": "",
-            "editor_title": "편집자",
-            "editor_email": "",
-            "footer_disclaimer": "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
-            "footer_contact": "",
-        }
+            newsletter_settings = config_data.get("newsletter_settings", {})
+            # 기본 설정과 병합
+            default_settings.update(newsletter_settings)
+    except Exception as e:
+        logger.warning(f"Could not load newsletter settings from {config_file}: {e}")
 
-        try:
-            if os.path.exists(config_file):
-                with open(config_file, "r", encoding="utf-8") as f:
-                    config_data = yaml.safe_load(f)
-
-                newsletter_settings = config_data.get("newsletter_settings", {})
-                # 기본 설정과 병합
-                default_settings.update(newsletter_settings)
-        except Exception as e:
-            print(
-                f"Warning: Could not load newsletter settings from {config_file}: {e}"
-            )
-
-        return default_settings
+    return default_settings
 
 
 # Example usage (for testing purposes):
@@ -1086,14 +1146,14 @@ if __name__ == "__main__":
 
     # Check if template directory and file exist
     if not os.path.isdir(template_directory):
-        print(f"Error: Template directory not found at {template_directory}")
+        logger.error(f"Template directory not found at {template_directory}")
     elif not os.path.exists(os.path.join(template_directory, template_file)):
-        print(
-            f"Error: Template file not found at {os.path.join(template_directory, template_file)}"
+        logger.error(
+            f"Template file not found at {os.path.join(template_directory, template_file)}"
         )
     else:
-        print(f"Template directory: {template_directory}")
-        print(f"Template file: {template_file}")
+        logger.info(f"Template directory: {template_directory}")
+        logger.info(f"Template file: {template_file}")
         try:
             # Combine data and config
             example_data_with_config = example_data.copy()
@@ -1114,7 +1174,7 @@ if __name__ == "__main__":
             os.makedirs(os.path.join(project_root, "output"), exist_ok=True)
             with open(output_filename, "w", encoding="utf-8") as f:
                 f.write(html_output)
-            print(f"Test newsletter saved to {output_filename}")
+            logger.info(f"Test newsletter saved to {output_filename}")
 
             # Save data with config for testing
             json_filename = os.path.join(
@@ -1129,4 +1189,4 @@ if __name__ == "__main__":
             save_newsletter_with_config(example_data, example_config, json_filename)
 
         except Exception as e:
-            print(f"An error occurred during test composition: {e}")
+            logger.error(f"An error occurred during test composition: {e}")

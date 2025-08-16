@@ -5,9 +5,10 @@
 
 import os
 import sys
-import pytest
-from unittest.mock import Mock, patch
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 # 테스트 환경 설정
 os.environ["TESTING"] = "1"
@@ -184,9 +185,10 @@ class TestSecurityMiddleware:
     @patch("newsletter.security.middleware.SecurityConfig")
     def test_security_headers_middleware(self, mock_config):
         """보안 헤더 미들웨어 테스트"""
-        from newsletter.security.middleware import SecurityHeadersMiddleware
         from fastapi import Request
         from starlette.responses import Response
+
+        from newsletter.security.middleware import SecurityHeadersMiddleware
 
         # Mock 설정
         mock_config.return_value.SECURITY_HEADERS = {
@@ -214,9 +216,11 @@ class TestSecurityMiddleware:
 
     def test_rate_limit_middleware(self):
         """레이트 리미트 미들웨어 테스트"""
-        from newsletter.security.middleware import RateLimitMiddleware
-        from fastapi import Request
         from pathlib import Path
+
+        from fastapi import Request
+
+        from newsletter.security.middleware import RateLimitMiddleware
 
         # 기존 캐시 파일 정리
         cache_file = Path("rate_limit_cache.json")
@@ -272,8 +276,9 @@ class TestMainApp:
 
     def test_health_endpoint(self):
         """헬스 체크 엔드포인트 테스트"""
-        from newsletter.main import app
         from fastapi.testclient import TestClient
+
+        from newsletter.main import app
 
         client = TestClient(app)
         response = client.get("/health")
@@ -284,8 +289,9 @@ class TestMainApp:
 
     def test_root_endpoint(self):
         """루트 엔드포인트 테스트"""
-        from newsletter.main import app
         from fastapi.testclient import TestClient
+
+        from newsletter.main import app
 
         client = TestClient(app)
         response = client.get("/")

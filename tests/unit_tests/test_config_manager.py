@@ -218,7 +218,6 @@ llm_settings:
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", mock_open(read_data="test: value")) as mock_file,
         ):
-
             # 첫 번째 호출
             config1 = manager.load_config_file("test.yml")
             # 두 번째 호출
