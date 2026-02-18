@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint test ci-check ci-fix clean install pre-commit
+.PHONY: help format lint test test-quick test-full test-nightly ci-check ci-fix clean install pre-commit
 
 # Python 실행 파일 설정
 PYTHON := python
@@ -48,6 +48,19 @@ lint: ## 린팅 실행 (flake8 + mypy + bandit)
 test: ## 단위 테스트 실행
 	@echo "🧪 단위 테스트 실행 중..."
 	MOCK_MODE=true $(PYTHON) -m pytest -m unit --tb=short
+
+test-quick: ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
+	@echo "⚡ Quick 게이트 실행 중..."
+	$(PYTHON) run_ci_checks.py --quick
+	MOCK_MODE=true $(PYTHON) -m pytest -m "unit" --maxfail=1 --tb=short
+
+test-full: ## PR 게이트 (전체 CI + 테스트)
+	@echo "🚦 Full 게이트 실행 중..."
+	$(PYTHON) run_ci_checks.py --full
+
+test-nightly: ## 야간 장기 시나리오 (스케줄/종료 회귀)
+	@echo "🌙 Nightly 게이트 실행 중..."
+	MOCK_MODE=true $(PYTHON) -m pytest tests/integration/test_schedule_execution.py tests/integration/test_graceful_shutdown.py --tb=short
 
 test-all: ## 모든 테스트 실행
 	@echo "🧪 전체 테스트 실행 중..."
