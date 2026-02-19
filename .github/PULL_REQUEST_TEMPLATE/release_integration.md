@@ -1,6 +1,10 @@
 ## Summary
 - What changed in this release branch and why.
 
+## Base
+- Base branch/tag: (e.g. `main` or `baseline/main-equivalent`)
+- Base commit SHA:
+
 ## Scope (in/out)
 ### In scope
 - 
@@ -17,6 +21,7 @@
   - [ ] `newsletter/utils/shutdown_manager.py`
 
 ## Test Evidence
+- [ ] preflight passed
 - [ ] format/lint passed
 - [ ] core unit tests passed
 - [ ] schedule/shutdown integration tests passed
@@ -24,11 +29,16 @@
 
 ### Commands run
 ```bash
+make preflight-release
 make test-quick
 make test-full
 # For scheduler/runtime-risk changes only
 make test-nightly
 ```
+
+## PR Metadata Applied
+- [ ] Labels applied in GitHub UI/API (`release`, `risk:*`, `area:*`)
+- [ ] Reviewers assigned in GitHub UI/API (code owner + ops owner)
 
 ## Rollback Plan
 - Tag to rollback to:
