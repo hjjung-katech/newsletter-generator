@@ -68,7 +68,7 @@ git restore --source=work -- \
   LOCAL_CI_GUIDE.md
 
 # 범위 검증 (manifest 외 파일 유입 방지)
-git diff --name-only --cached
+make validate-ci-manifest
 ```
 
 ## 5) 머지 후 운영
@@ -89,3 +89,15 @@ git diff --name-only --cached
 - [ ] `release/ci-platform` 브랜치 분리 및 PR 생성
 - [ ] `release/runtime-binary` 브랜치 분리 및 PR 생성
 - [ ] `release/scheduler-reliability` 브랜치 분리 및 PR 생성
+
+
+## 7) PR 메타데이터 실제 적용(자동화)
+
+본문 체크리스트만으로는 라벨/리뷰어가 반영되지 않으므로, PR 생성 직후 아래를 실행합니다.
+
+```bash
+make apply-pr-metadata PR=<number> REVIEWERS=<code_owner,ops_owner>
+```
+
+- 기본 라벨: `release`, `risk:medium`, `area:ci`
+- 리뷰어는 GitHub handle을 쉼표로 전달

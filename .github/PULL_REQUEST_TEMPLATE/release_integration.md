@@ -32,6 +32,10 @@
 make preflight-release
 make test-quick
 make test-full
+# release/ci-platform 범위 검증
+make validate-ci-manifest
+# PR 메타데이터 실제 적용
+make apply-pr-metadata PR=<number> REVIEWERS=<owner1,ops1>
 # For scheduler/runtime-risk changes only
 make test-nightly
 ```

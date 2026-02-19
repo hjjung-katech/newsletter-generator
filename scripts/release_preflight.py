@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-"""Release integration preflight checks.
-
-Purpose:
-- Fail fast before creating release/* branches or opening PRs
-- Separate environment/setup failures from code failures
-"""
+"""Release integration preflight checks."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -19,51 +15,77 @@ REQUIRED_FILES = [
     "docs/dev/MAIN_INTEGRATION_EXECUTION_PLAN.md",
     "docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md",
     "Makefile",
+    ".release/baseline.json",
+    ".release/manifests/release-ci-platform.txt",
 ]
-
 REQUIRED_CMDS = ["python", "git"]
 REQUIRED_PY_PACKAGES = ["flake8", "bandit"]
 
 
 def run(cmd: list[str]) -> tuple[int, str]:
+    p = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    return p.returncode, (p.stdout + p.stderr).strip()
+
+
+def git_rev_parse(ref: str) -> tuple[bool, str]:
+    code, out = run(["git", "rev-parse", "--verify", ref])
+    return code == 0, out.strip()
+
+
+def load_baseline() -> tuple[dict, str]:
+    path = Path(".release/baseline.json")
+    if not path.exists():
+        return {}, "missing file: .release/baseline.json"
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        return p.returncode, (p.stdout + p.stderr).strip()
-    except Exception as exc:  # defensive runtime error reporting
-        return 2, str(exc)
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {}, f"invalid baseline json: {exc}"
 
-
-def check_baseline_tag(tag: str) -> tuple[bool, str]:
-    code, out = run(["git", "rev-parse", "--verify", tag])
-    return (code == 0, out if out else f"missing tag: {tag}")
+    for key in ["tag", "commit", "owner"]:
+        if not data.get(key):
+            return {}, f"baseline json missing required key: {key}"
+    return data, ""
 
 
 def check_python_package(pkg: str) -> tuple[bool, str]:
     code, out = run([sys.executable, "-m", "pip", "show", pkg])
-    return (code == 0, out.splitlines()[0] if out else f"missing package: {pkg}")
+    return code == 0, (out.splitlines()[0] if out else f"missing package: {pkg}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--baseline-tag", default="baseline/main-equivalent")
+    parser.add_argument("--baseline-tag", default="")
     args = parser.parse_args()
 
     failures: list[str] = []
-    warnings: list[str] = []
 
-    # command checks
     for cmd in REQUIRED_CMDS:
         if shutil.which(cmd) is None:
             failures.append(f"missing command: {cmd}")
 
-    # file checks
     for rel in REQUIRED_FILES:
         if not Path(rel).exists():
             failures.append(f"missing file: {rel}")
 
-    ok, msg = check_baseline_tag(args.baseline_tag)
-    if not ok:
-        failures.append(f"baseline tag check failed: {msg}")
+    baseline, baseline_err = load_baseline()
+    if baseline_err:
+        failures.append(baseline_err)
+        baseline_tag = args.baseline_tag or "baseline/main-equivalent"
+        baseline_commit = ""
+    else:
+        baseline_tag = args.baseline_tag or baseline["tag"]
+        baseline_commit = baseline["commit"]
+
+    ok_tag, tag_sha = git_rev_parse(baseline_tag)
+    if not ok_tag:
+        failures.append(f"baseline tag check failed: missing tag `{baseline_tag}`")
+
+    if baseline_commit and ok_tag:
+        # allow short commit ids in config
+        if not tag_sha.startswith(baseline_commit):
+            failures.append(
+                f"baseline tag `{baseline_tag}` mismatch: expected {baseline_commit}, got {tag_sha[:12]}"
+            )
 
     for pkg in REQUIRED_PY_PACKAGES:
         ok, msg = check_python_package(pkg)
@@ -71,12 +93,9 @@ def main() -> int:
             failures.append(f"required package unavailable: {pkg} ({msg})")
 
     print("=== RELEASE PREFLIGHT REPORT ===")
-    print(f"baseline tag: {args.baseline_tag}")
-
-    if warnings:
-        print("\n[WARNINGS]")
-        for w in warnings:
-            print(f"- {w}")
+    print(f"baseline tag: {baseline_tag}")
+    if baseline_commit:
+        print(f"baseline commit(expected): {baseline_commit}")
 
     if failures:
         print("\n[FAILURES]")

@@ -1,0 +1,10 @@
+.github/workflows/README.md
+.github/workflows/deployment.yml
+.github/workflows/main-ci.yml
+.github/workflows/security-scan.yml
+.githooks/pre-push
+.pre-commit-config.yaml
+LOCAL_CI_GUIDE.md
+Makefile
+check_quality.py
+run_ci_checks.py

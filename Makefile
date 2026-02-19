@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint test test-quick test-full test-nightly preflight-release ci-check ci-fix clean install pre-commit
+.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit
 
 # Python 실행 파일 설정
 PYTHON := python
@@ -65,6 +65,15 @@ test-full: preflight-release ## PR 게이트 (전체 CI + 테스트)
 test-nightly: ## 야간 장기 시나리오 (스케줄/종료 회귀)
 	@echo "🌙 Nightly 게이트 실행 중..."
 	MOCK_MODE=true $(PYTHON) -m pytest tests/integration/test_schedule_execution.py tests/integration/test_graceful_shutdown.py --tb=short
+
+
+validate-ci-manifest: ## release/ci-platform 변경 범위(manifest) 검증
+	@echo "🧭 CI manifest 검증 실행 중..."
+	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged
+
+apply-pr-metadata: ## PR 라벨/리뷰어 적용 (PR=<number>, REVIEWERS=<a,b>)
+	@echo "🏷️ PR metadata 적용 중..."
+	$(PYTHON) scripts/apply_pr_metadata.py --pr $(PR) --reviewers "$(REVIEWERS)"
 
 test-all: ## 모든 테스트 실행
 	@echo "🧪 전체 테스트 실행 중..."
