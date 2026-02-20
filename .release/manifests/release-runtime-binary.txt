@@ -1,0 +1,11 @@
+build_web_exe.py
+build_web_exe_enhanced.py
+docs/setup/PYINSTALLER_WINDOWS.md
+newsletter/compat_env.py
+newsletter/utils/subprocess_utils.py
+pyinstaller_hooks/hook-newsletter.py
+requirements-minimal.txt
+web/binary_compatibility.py
+web/path_manager.py
+web/runtime_hook.py
+.release/manifests/release-runtime-binary.txt

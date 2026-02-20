@@ -5,8 +5,8 @@
 import os
 import shutil
 import subprocess
-from typing import List, Optional, Dict
 from pathlib import Path
+from typing import Dict, List, Optional
 
 
 def get_executable_path(cmd: str) -> str:

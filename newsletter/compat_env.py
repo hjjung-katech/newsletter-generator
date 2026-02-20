@@ -14,10 +14,10 @@ Legacy Compatibility Shim for Environment Variables
 
 import logging
 import os
-from typing import Any, List, Optional
+from typing import Any, List
 
-from .utils.subprocess_utils import run_command_safely
 from .utils.error_handling import handle_exception
+from .utils.subprocess_utils import run_command_safely
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,9 @@ def getenv_compat(key: str, default: Any = None) -> Any:
             "gemini_api_key": lambda s: (
                 s.gemini_api_key.get_secret_value() if s.gemini_api_key else None
             ),
-            "postmark_server_token": lambda s: s.postmark_server_token.get_secret_value(),
+            "postmark_server_token": (
+                lambda s: s.postmark_server_token.get_secret_value()
+            ),
             "email_sender": lambda s: s.email_sender,
             "secret_key": lambda s: s.secret_key,
             "port": lambda s: s.port,
@@ -72,7 +74,9 @@ def getenv_compat(key: str, default: Any = None) -> Any:
             "redis_url": lambda s: s.redis_url,
             "rq_queue": lambda s: s.rq_queue,
             "database_url": lambda s: s.database_url,
-            "google_application_credentials": lambda s: s.google_application_credentials,
+            "google_application_credentials": (
+                lambda s: s.google_application_credentials
+            ),
             "google_client_id": lambda s: s.google_client_id,
             "google_client_secret": lambda s: (
                 s.google_client_secret.get_secret_value()
@@ -129,9 +133,7 @@ def find_env_usage() -> List[str]:
         if result.returncode == 0:
             return result.stdout.splitlines()
     except Exception as e:
-        handle_exception(
-            e, "ripgrep으로 환경 변수 사용 검색", log_level=logging.WARNING
-        )
+        handle_exception(e, "ripgrep으로 환경 변수 사용 검색", log_level=logging.WARNING)
 
         # grep으로 대체 시도
         try:
