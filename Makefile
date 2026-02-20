@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit
+.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit
 
 # Python 실행 파일 설정
 PYTHON ?= python3
@@ -78,6 +78,10 @@ validate-ci-manifest: ## release/ci-platform 변경 범위(manifest) 검증
 validate-scheduler-manifest: ## release/scheduler-reliability 변경 범위(manifest) 검증
 	@echo "🧭 Scheduler manifest 검증 실행 중..."
 	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-scheduler-reliability.txt --source staged
+
+validate-runtime-bootstrap-manifest: ## runtime-binary bootstrap 변경 범위(manifest) 검증
+	@echo "🧭 Runtime bootstrap manifest 검증 실행 중..."
+	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-runtime-binary-bootstrap.txt --source staged
 
 apply-pr-metadata: ## PR 라벨/리뷰어 적용 (PR=<number>, REVIEWERS=<a,b> or .release/reviewer_roles.json)
 	@echo "🏷️ PR metadata 적용 중..."
