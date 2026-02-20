@@ -159,8 +159,8 @@ from tasks import generate_newsletter_task
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Real newsletter CLI integration
-import subprocess
-import tempfile
+from newsletter.api import GenerateNewsletterRequest, NewsletterGenerationError
+from newsletter.api import generate_newsletter as generate_newsletter_core
 
 # 현재 디렉토리를 파이썬 패스에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -225,7 +225,7 @@ class RealNewsletterCLI:
         required_keys = {
             "GEMINI_API_KEY": "Gemini (primary LLM)",
             "OPENAI_API_KEY": "OpenAI (fallback LLM)",
-            "POSTMARK_TOKEN": "Email service",
+            "POSTMARK_SERVER_TOKEN": "Email service",
         }
 
         configured = []
@@ -251,158 +251,32 @@ class RealNewsletterCLI:
         email_compatible=False,
         period=14,
     ):
-        """실제 CLI를 사용하여 뉴스레터 생성"""
+        """공유 코어 API를 사용하여 뉴스레터 생성"""
         try:
-            # CLI 명령어 구성 - --output 옵션 제거
-            cmd = [
-                sys.executable,
-                "-m",
-                "newsletter.cli",
-                "run",
-                "--output-format",
-                "html",
-                "--template-style",
-                template_style,
-                "--period",
-                str(period),
-                "--log-level",
-                "INFO",  # 웹서비스에서는 INFO 레벨로 설정
-            ]
-
-            # 키워드 또는 도메인 추가
-            if keywords:
-                # 키워드가 문자열인 경우 그대로, 리스트인 경우 조인
-                keyword_str = (
-                    keywords if isinstance(keywords, str) else ",".join(keywords)
-                )
-                cmd.extend(["--keywords", keyword_str])
-                input_description = f"keywords: {keyword_str}"
-            elif domain:
-                cmd.extend(["--domain", domain])
-                input_description = f"domain: {domain}"
-            else:
-                raise ValueError("Either keywords or domain must be provided")
-
-            # 이메일 호환성 옵션 추가
-            if email_compatible:
-                cmd.append("--email-compatible")
-
-            # CLI 실행 환경 설정 - 한국어 인코딩 문제 해결
-            env = dict(os.environ)
-            env["PYTHONPATH"] = self.module_root
-            # UTF-8 인코딩 강제 설정
-            env["PYTHONIOENCODING"] = "utf-8"
-            env["PYTHONUTF8"] = "1"
-            # Windows CMD 인코딩 설정
-            env["CHCP"] = "65001"
-
-            # CLI 실행
-            logging.info(f"Executing CLI command: {' '.join(cmd)}")
-            logging.info(f"Working directory: {self.runtime_work_dir}")
-            logging.info(f"Input: {input_description}")
-
-            # 바이트 모드로 실행하여 인코딩 문제 방지
-            result = subprocess.run(
-                cmd,
-                cwd=self.runtime_work_dir,
-                capture_output=True,
-                text=False,  # 바이트 모드 사용
-                timeout=self.timeout,
-                env=env,
+            request_payload = GenerateNewsletterRequest(
+                keywords=keywords,
+                domain=domain,
+                template_style=template_style,
+                email_compatible=email_compatible,
+                period=period,
             )
+            result = generate_newsletter_core(request_payload)
 
-            # 안전한 디코딩
-            stdout_text = ""
-            stderr_text = ""
+            return {
+                "content": result["html_content"],
+                "title": result["title"],
+                "status": result["status"],
+                "generation_stats": result.get("generation_stats", {}),
+                "input_params": result.get("input_params", {}),
+                "error": result.get("error"),
+            }
 
-            if result.stdout:
-                try:
-                    stdout_text = result.stdout.decode("utf-8")
-                except UnicodeDecodeError:
-                    try:
-                        stdout_text = result.stdout.decode("cp949")
-                    except UnicodeDecodeError:
-                        stdout_text = result.stdout.decode("latin1")
-
-            if result.stderr:
-                try:
-                    stderr_text = result.stderr.decode("utf-8")
-                except UnicodeDecodeError:
-                    try:
-                        stderr_text = result.stderr.decode("cp949")
-                    except UnicodeDecodeError:
-                        stderr_text = result.stderr.decode("latin1")
-
-            # 결과 객체에 디코딩된 텍스트 할당
-            result.stdout = stdout_text
-            result.stderr = stderr_text
-
-            logging.info(
-                f"CLI execution completed with return code: {result.returncode}"
-            )
-
-            # 결과 처리
-            if result.returncode != 0:
-                error_msg = (
-                    f"CLI execution failed (code {result.returncode}): {result.stderr}"
-                )
-                logging.error(error_msg)
-                logging.error(f"CLI stdout: {result.stdout}")
-                return self._fallback_response(keywords or domain, error_msg)
-
-            # CLI가 자동으로 생성한 HTML 파일 찾기
-            default_output_dir = os.path.join(self.runtime_work_dir, "output")
-            html_content = self._find_latest_html_file(default_output_dir, keywords)
-            if not html_content:
-                fallback_output_dir = os.path.join(self.project_root, "output")
-                html_content = self._find_latest_html_file(
-                    fallback_output_dir,
-                    keywords,
-                )
-
-            if html_content:
-                # 제목 추출
-                title = (
-                    self._extract_title_from_html(html_content)
-                    or f"Newsletter: {keywords or domain}"
-                )
-
-                # 성공 통계 정보 추출
-                stats = self._extract_generation_stats(result.stdout)
-
-                logging.info(f"Newsletter generated successfully: {title}")
-                logging.info(f"Generated HTML size: {len(html_content)} characters")
-
-                response = {
-                    "content": html_content,
-                    "title": title,
-                    "status": "success",
-                    "cli_output": result.stdout,
-                    "generation_stats": stats,
-                    "input_params": {
-                        "keywords": keywords,
-                        "domain": domain,
-                        "template_style": template_style,
-                        "email_compatible": email_compatible,
-                        "period": period,
-                    },
-                }
-
-                return response
-            else:
-                error_msg = f"No HTML output file found in {default_output_dir}"
-                logging.error(error_msg)
-                return self._fallback_response(keywords or domain, error_msg)
-
-        except subprocess.TimeoutExpired:
-            error_msg = f"뉴스레터 생성이 {self.timeout}초 후 타임아웃되었습니다. API 키 설정을 확인해주세요."
-            logging.error(f"CLI execution timed out after {self.timeout} seconds")
-            logging.error("타임아웃 원인: API 키 누락으로 인한 Mock 데이터 사용 또는 외부 API 응답 지연")
-            return self._fallback_response(keywords or domain, error_msg)
-
+        except NewsletterGenerationError as exc:
+            logging.error("Core generation failed: %s", exc)
+            return self._fallback_response(keywords or domain, str(exc))
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
-            logging.error(error_msg, exc_info=True)  # 스택 트레이스 포함
+            logging.error(error_msg, exc_info=True)
             return self._fallback_response(keywords or domain, error_msg)
 
     def _find_latest_html_file(self, output_dir, keywords=None):
@@ -934,8 +808,11 @@ def generate_newsletter():
                                 fallback_result = {
                                     "status": "completed",
                                     "title": "Newsletter Generated",
-                                    "content": task_result["result"].get(
-                                        "content", "Newsletter content available"
+                                    "html_content": task_result["result"].get(
+                                        "html_content",
+                                        task_result["result"].get(
+                                            "content", "Newsletter content available"
+                                        ),
                                     ),
                                     "error": f"JSON serialization failed: {str(json_error)}",
                                 }
@@ -1180,18 +1057,16 @@ def process_newsletter_sync(data):
                 # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
 
         response = {
-            "html_content": result["content"],
-            "subject": result["title"],
-            "articles_count": result.get("generation_stats", {}).get(
-                "articles_count", 0
-            ),
-            "status": result["status"],
-            "cli_output": result.get("cli_output", ""),
-            "error": result.get("error"),
+            "status": result.get("status", "error"),
+            "html_content": result.get("content", ""),
+            "title": result.get("title", "Newsletter"),
             "generation_stats": result.get("generation_stats", {}),
             "input_params": result.get("input_params", {}),
-            "html_size": len(result["content"]) if result.get("content") else 0,
-            "email_sent": email_sent,  # 이메일 발송 상태 추가
+            "error": result.get("error"),
+            "sent": email_sent,
+            "email_sent": email_sent,
+            "subject": result.get("title", "Newsletter"),  # compatibility alias
+            "html_size": len(result.get("content", "")),
             "processing_info": {
                 "using_real_cli": isinstance(newsletter_cli, RealNewsletterCLI),
                 "template_style": template_style,
@@ -1476,8 +1351,13 @@ def run_schedule_now(schedule_id):
 
         # 즉시 뉴스레터 생성 작업 큐에 추가
         if redis_conn and task_queue:
+            immediate_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
             job = task_queue.enqueue(
-                generate_newsletter_task, params, job_timeout="10m"
+                generate_newsletter_task,
+                params,
+                immediate_job_id,
+                params.get("send_email", False),
+                job_timeout="10m",
             )
 
             return jsonify(
@@ -1489,7 +1369,12 @@ def run_schedule_now(schedule_id):
             )
         else:
             # Redis가 없는 경우 직접 실행
-            result = generate_newsletter_task(params)
+            immediate_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
+            result = generate_newsletter_task(
+                params,
+                immediate_job_id,
+                params.get("send_email", False),
+            )
             return jsonify({"status": "completed", "result": result})
 
     except Exception as e:
