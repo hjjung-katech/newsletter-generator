@@ -4,7 +4,7 @@
 Newsletter Generator를 Railway PaaS에 배포하기 위한 완전한 가이드입니다.
 
 > **💡 로컬 개발 vs 프로덕션 배포**
-> 
+>
 > - **로컬 개발**: Redis 불필요, `python web/app.py`만으로 실행 가능
 > - **프로덕션 배포**: Redis + 멀티 서비스 구성으로 확장성 및 안정성 확보
 
@@ -33,10 +33,10 @@ Railway에서 다음과 같은 서비스들이 실행됩니다:
 OPENAI_API_KEY=sk-...
 ```
 
-### 2. SendGrid 이메일 설정
+### 2. Postmark 이메일 설정
 ```bash
-SENDGRID_API_KEY=SG.xxx
-FROM_EMAIL=newsletter@yourdomain.com
+POSTMARK_SERVER_TOKEN=ps_xxx
+EMAIL_SENDER=newsletter@yourdomain.com
 ```
 
 ### 3. Google 뉴스 API (선택사항)
@@ -78,21 +78,21 @@ services:
 
 **web 서비스:**
 - `OPENAI_API_KEY`
-- `SENDGRID_API_KEY`
-- `FROM_EMAIL`
+- `POSTMARK_SERVER_TOKEN`
+- `EMAIL_SENDER`
 - `SECRET_KEY`
 - `FLASK_ENV=production`
 
 **worker 서비스:**
 - `OPENAI_API_KEY`
-- `SENDGRID_API_KEY`
-- `FROM_EMAIL`
+- `POSTMARK_SERVER_TOKEN`
+- `EMAIL_SENDER`
 - `RQ_QUEUE=default`
 
 **scheduler 서비스:**
 - `OPENAI_API_KEY`
-- `SENDGRID_API_KEY`
-- `FROM_EMAIL`
+- `POSTMARK_SERVER_TOKEN`
+- `EMAIL_SENDER`
 
 ### 4. 도메인 설정
 1. Railway에서 제공하는 임시 도메인 확인
@@ -121,15 +121,15 @@ python app.py
 services:
   redis:
     image: redis:latest
-    
+
   web:
     build: ./web
     start: gunicorn app:app --workers 2
-    
+
   worker:
-    build: ./web  
+    build: ./web
     start: python worker.py
-    
+
   scheduler:
     build: ./web
     start: python schedule_runner.py
@@ -258,6 +258,31 @@ POST /api/schedule
 }
 ```
 
+## 배포 Smoke 체크리스트
+
+배포 직후 다음 순서로 점검하세요.
+
+1. Health check
+```bash
+curl -sS https://your-app.railway.app/health
+```
+
+2. Generation enqueue
+```bash
+curl -sS -X POST https://your-app.railway.app/api/generate \
+  -H 'Content-Type: application/json' \
+  -d '{"keywords":"AI,tech","template_style":"compact","period":7}'
+```
+
+3. Job status polling
+```bash
+curl -sS https://your-app.railway.app/api/status/<job_id>
+```
+
+4. Worker/scheduler logs
+- Railway web, worker, scheduler 서비스 로그에서 `failed` 여부 확인
+- scheduler는 `next_run` 선업데이트(중복 실행 방지) 로그 확인
+
 ### 스케줄 조회
 ```bash
 GET /api/schedules
@@ -334,4 +359,4 @@ python app.py
 ```bash
 # Git push로 자동 배포
 git push origin main
-``` 
+```

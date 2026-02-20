@@ -1,0 +1,7 @@
+interface:
+  display_name: "Web Smoke"
+  short_description: "Smoke test Flask web APIs"
+  default_prompt: "Use $web-smoke to validate /health and /api/generate flow for the Flask service."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Docs Config Sync"
+  short_description: "Align docs/env/runtime contracts"
+  default_prompt: "Use $docs-and-config-consistency to find and fix configuration drift across docs and code."
+
+policy:
+  allow_implicit_invocation: true

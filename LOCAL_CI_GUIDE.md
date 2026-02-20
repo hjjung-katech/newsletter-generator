@@ -175,6 +175,6 @@ pytest tests/test_specific.py::test_function -v
 
 ## 📚 추가 문서
 
-- [CI/CD 워크플로우 상세](docs/dev/ci-workflow.md)
+- [CI/CD 워크플로우 상세](docs/dev/CI_CD_GUIDE.md)
 - [GitHub Actions 설정](.github/workflows/main-ci.yml)
 - [Pre-commit 설정](.pre-commit-config.yaml)

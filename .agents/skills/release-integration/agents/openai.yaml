@@ -1,0 +1,7 @@
+interface:
+  display_name: "Release Integration"
+  short_description: "Run release preflight + manifest gates"
+  default_prompt: "Use $release-integration to run preflight and manifest-scoped release validation."
+
+policy:
+  allow_implicit_invocation: false

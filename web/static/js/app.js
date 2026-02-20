@@ -76,7 +76,7 @@ class NewsletterApp {
         const panelId = panelMap[tabId];
         if (panelId) {
             document.getElementById(panelId).classList.remove('hidden');
-            
+
             // Load data for specific tabs
             if (tabId === 'historyTab') {
                 this.loadHistory();
@@ -125,7 +125,7 @@ class NewsletterApp {
         if (!data) return;
 
         this.showProgress();
-        
+
         try {
             const response = await fetch('/api/generate', {
                 method: 'POST',
@@ -136,7 +136,7 @@ class NewsletterApp {
             });
 
             const result = await response.json();
-            
+
             if (response.ok) {
                 this.currentJobId = result.job_id;
                 if (result.status === 'completed') {
@@ -199,9 +199,9 @@ class NewsletterApp {
 
             const frequency = document.getElementById('frequency').value;
             const time = document.getElementById('scheduleTime').value;
-            
+
             let rrule = `FREQ=${frequency}`;
-            
+
             if (frequency === 'WEEKLY') {
                 const selectedDays = Array.from(document.querySelectorAll('.weekday:checked'))
                     .map(cb => cb.value);
@@ -225,18 +225,18 @@ class NewsletterApp {
     showProgress() {
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('resultsSection').classList.add('hidden');
-        
+
         let progress = 0;
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
-        
+
         // Simulate progress
         const interval = setInterval(() => {
             progress += Math.random() * 10;
             if (progress > 90) progress = 90;
-            
+
             progressBar.style.width = progress + '%';
-            
+
             if (progress < 30) {
                 progressText.textContent = '뉴스 수집 중...';
             } else if (progress < 60) {
@@ -254,11 +254,11 @@ class NewsletterApp {
         this.currentJobId = jobId; // Store current job ID
         this.pollCount = 0; // 폴링 횟수 카운터 추가
         this.maxPollCount = 900; // 최대 15분 (900초)
-        
+
         this.pollInterval = setInterval(async () => {
             try {
                 this.pollCount++;
-                
+
                 // 최대 폴링 횟수 초과 시 중단
                 if (this.pollCount > this.maxPollCount) {
                     this.stopPolling();
@@ -286,7 +286,7 @@ class NewsletterApp {
                         result.result.sent = result.sent;
                     }
                     this.showResults(result.result);
-                    
+
                     // Show email success message
                     if (result.sent) {
                         this.showEmailSuccess(result.result?.email_to);
@@ -323,10 +323,10 @@ class NewsletterApp {
         progressBar.style.width = '100%';
 
         const preview = document.getElementById('newsletterPreview');
-        
+
         // Create detailed results display
         let detailsHtml = '';
-        
+
         // Generation Statistics
         if (result.generation_stats) {
             const stats = result.generation_stats;
@@ -365,7 +365,7 @@ class NewsletterApp {
                 </div>
             `;
         }
-        
+
         // Processing Information
         if (result.processing_info) {
             const info = result.processing_info;
@@ -397,7 +397,7 @@ class NewsletterApp {
                 </div>
             `;
         }
-        
+
         // Input Parameters
         if (result.input_params) {
             const params = result.input_params;
@@ -423,7 +423,7 @@ class NewsletterApp {
                 </div>
             `;
         }
-        
+
         // Newsletter Content
         detailsHtml += `
             <div class="p-4 bg-white rounded-lg border border-gray-200">
@@ -431,15 +431,15 @@ class NewsletterApp {
                     <i class="fas fa-newspaper mr-2"></i>Newsletter Content
                 </h4>
                 <div class="border rounded bg-gray-50">
-                    ${result.html_content ? 
-                        (result.job_id ? 
-                            `<iframe id="newsletterFrame" 
-                                     style="width: 100%; height: 600px; border: none;" 
+                    ${result.html_content ?
+                        (result.job_id ?
+                            `<iframe id="newsletterFrame"
+                                     style="width: 100%; height: 600px; border: none;"
                                      src="/api/newsletter-html/${result.job_id}"
                                      sandbox="allow-same-origin allow-scripts">
                              </iframe>` :
-                            `<iframe id="newsletterFrame" 
-                                     style="width: 100%; height: 600px; border: none;" 
+                            `<iframe id="newsletterFrame"
+                                     style="width: 100%; height: 600px; border: none;"
                                      sandbox="allow-same-origin allow-scripts">
                              </iframe>`) :
                         '<p class="text-gray-500 p-4">Newsletter content could not be loaded.</p>'
@@ -458,7 +458,7 @@ class NewsletterApp {
                     const blob = new Blob([result.html_content], { type: 'text/html; charset=utf-8' });
                     const blobUrl = URL.createObjectURL(blob);
                     iframe.src = blobUrl;
-                    
+
                     // Clean up blob URL after iframe loads
                     iframe.onload = () => {
                         URL.revokeObjectURL(blobUrl);
@@ -473,12 +473,12 @@ class NewsletterApp {
         // Reload history
         this.loadHistory();
     }
-    
+
     renderStepTimes(stepTimes) {
         if (!stepTimes || Object.keys(stepTimes).length === 0) return '';
-        
+
         const maxTime = Math.max(...Object.values(stepTimes));
-        
+
         return `
             <div class="mt-3 p-3 bg-white rounded shadow-sm">
                 <div class="font-medium text-gray-700 mb-3">Processing Steps</div>
@@ -498,11 +498,11 @@ class NewsletterApp {
             </div>
         `;
     }
-    
+
     updateResultButtons(result) {
         const downloadBtn = document.getElementById('downloadBtn');
         const sendEmailBtn = document.getElementById('sendEmailBtn');
-        
+
         // Enable/disable buttons based on result status
         if (result.status === 'success' && result.html_content) {
             downloadBtn.disabled = false;
@@ -535,9 +535,9 @@ class NewsletterApp {
                 </button>
             </div>
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         // Auto-remove after 5 seconds
         setTimeout(() => {
             if (notification.parentNode) {
@@ -562,8 +562,8 @@ class NewsletterApp {
                     <div class="flex justify-between items-start">
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
-                                ${item.params?.keywords ? 
-                                  `키워드: ${Array.isArray(item.params.keywords) ? item.params.keywords.join(', ') : item.params.keywords}` : 
+                                ${item.params?.keywords ?
+                                  `키워드: ${Array.isArray(item.params.keywords) ? item.params.keywords.join(', ') : item.params.keywords}` :
                                   `도메인: ${item.params?.domain || 'Unknown'}`}
                             </h4>
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
@@ -575,9 +575,9 @@ class NewsletterApp {
                         </div>
                         <div class="space-x-2">
                             ${item.status === 'completed' ? `
-                                <button onclick="app.viewHistoryItem('${item.id}')" 
+                                <button onclick="app.viewHistoryItem('${item.id}')"
                                         class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
-                                <button onclick="app.rerunHistoryItem('${item.id}')" 
+                                <button onclick="app.rerunHistoryItem('${item.id}')"
                                         class="text-green-600 hover:text-green-900 text-sm">다시 실행</button>
                             ` : ''}
                         </div>
@@ -605,8 +605,8 @@ class NewsletterApp {
                     <div class="flex justify-between items-start">
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">
-                                ${schedule.params?.keywords ? 
-                                  `키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` : 
+                                ${schedule.params?.keywords ?
+                                  `키워드: ${Array.isArray(schedule.params.keywords) ? schedule.params.keywords.join(', ') : schedule.params.keywords}` :
                                   `도메인: ${schedule.params?.domain || 'Unknown'}`}
                             </h4>
                             <p class="text-sm text-gray-500">
@@ -620,11 +620,11 @@ class NewsletterApp {
                             </p>
                         </div>
                         <div class="space-x-2">
-                            <button onclick="app.runScheduleNow('${schedule.id}')" 
+                            <button onclick="app.runScheduleNow('${schedule.id}')"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                                 즉시 실행
                             </button>
-                            <button onclick="app.cancelSchedule('${schedule.id}')" 
+                            <button onclick="app.cancelSchedule('${schedule.id}')"
                                     class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
                                 취소
                             </button>
@@ -722,7 +722,7 @@ class NewsletterApp {
                 alert('다운로드 기능을 위해 페이지를 새로고침하거나 뉴스레터를 다시 생성해주세요.');
                 return;
             }
-            
+
             alert('다운로드할 뉴스레터가 없습니다.');
             return;
         }
@@ -753,13 +753,13 @@ class NewsletterApp {
         try {
             const configResponse = await fetch('/api/email-config');
             const configResult = await configResponse.json();
-            
+
             if (!configResult.ready) {
                 if (confirm('이메일 설정이 완료되지 않았습니다. 테스트 이메일을 발송해보시겠습니까?')) {
                     await this.sendTestEmail(email);
                     return;
                 } else {
-                    alert('이메일 발송을 위해 환경변수 설정이 필요합니다:\n- POSTMARK_SERVER_TOKEN\n- POSTMARK_FROM_EMAIL');
+                    alert('이메일 발송을 위해 환경변수 설정이 필요합니다:\n- POSTMARK_SERVER_TOKEN\n- EMAIL_SENDER');
                     return;
                 }
             }
@@ -780,7 +780,7 @@ class NewsletterApp {
             });
 
             const result = await response.json();
-            
+
             if (response.ok) {
                 alert('이메일이 성공적으로 발송되었습니다!');
             } else {
@@ -807,7 +807,7 @@ class NewsletterApp {
             });
 
             const result = await response.json();
-            
+
             if (response.ok) {
                 alert(`테스트 이메일이 ${email}로 발송되었습니다!\n메시지 ID: ${result.message_id || 'N/A'}`);
             } else {
@@ -822,21 +822,21 @@ class NewsletterApp {
         try {
             const response = await fetch('/api/email-config');
             const result = await response.json();
-            
+
             let message = '이메일 설정 상태:\n';
             message += `Postmark 토큰: ${result.postmark_token_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;
             message += `발신자 이메일: ${result.from_email_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;
             message += `전체 상태: ${result.ready ? '✓ 준비 완료' : '✗ 설정 필요'}`;
-            
+
             alert(message);
-            
+
             if (!result.ready) {
                 const testEmail = prompt('테스트 이메일을 발송해보시겠습니까? (이메일 주소 입력)');
                 if (testEmail) {
                     await this.sendTestEmail(testEmail);
                 }
             }
-            
+
         } catch (error) {
             alert('설정 확인 실패: ' + error.message);
         }
@@ -882,14 +882,14 @@ class NewsletterApp {
 
             if (response.ok && data.keywords && data.keywords.length > 0) {
                 // Display suggested keywords
-                const keywordsList = data.keywords.map(keyword => 
+                const keywordsList = data.keywords.map(keyword =>
                     `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2 mb-2 cursor-pointer hover:bg-blue-200" onclick="app.addKeywordToInput('${keyword}')">${keyword}</span>`
                 ).join('');
-                
+
                 resultDiv.innerHTML = `
                     <div class="text-sm text-gray-700 mb-2">추천 키워드 (클릭하여 추가):</div>
                     <div class="flex flex-wrap">${keywordsList}</div>
-                    <button onclick="app.useAllKeywords(${JSON.stringify(data.keywords).replace(/"/g, '&quot;')})" 
+                    <button onclick="app.useAllKeywords(${JSON.stringify(data.keywords).replace(/"/g, '&quot;')})"
                             class="mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
                         모든 키워드 사용
                     </button>
@@ -909,13 +909,13 @@ class NewsletterApp {
     addKeywordToInput(keyword) {
         const keywordsInput = document.getElementById('keywords');
         const currentKeywords = keywordsInput.value.trim();
-        
+
         if (currentKeywords) {
             keywordsInput.value = currentKeywords + ', ' + keyword;
         } else {
             keywordsInput.value = keyword;
         }
-        
+
         // Switch to keywords method
         document.getElementById('keywordsMethod').checked = true;
         this.toggleInputMethod();
@@ -924,7 +924,7 @@ class NewsletterApp {
     useAllKeywords(keywords) {
         const keywordsInput = document.getElementById('keywords');
         keywordsInput.value = keywords.join(', ');
-        
+
         // Switch to keywords method
         document.getElementById('keywordsMethod').checked = true;
         this.toggleInputMethod();

@@ -9,7 +9,7 @@ python-dotenv>=1.0.0
 # Database (sqlite3 is included in Python standard library)
 
 # Email
-sendgrid>=6.11.0
+postmarker>=0.21.3
 
 # Date/Time handling for RRULE
 python-dateutil>=2.8.0
