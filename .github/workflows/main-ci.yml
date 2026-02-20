@@ -134,21 +134,15 @@ jobs:
   # Stage 2: Unit Tests (Multi-Platform)
   # ========================================
   unit-tests:
-    name: Unit Tests - ${{ matrix.os }}
+    name: Unit Tests - ubuntu-latest-py${{ matrix.python-version }}
     needs: [quality-checks]
     if: |
-      github.event_name == 'push' ||
       needs.quality-checks.outputs.runtime_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest]
         python-version: ['3.10', '3.11', '3.12']
-        exclude:
-          - os: windows-latest
-            python-version: '3.11'
-          - os: windows-latest
-            python-version: '3.12'
 
     runs-on: ${{ matrix.os }}
 

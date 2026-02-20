@@ -8,6 +8,7 @@ LOCAL_CI_GUIDE.md
 Makefile
 check_quality.py
 run_ci_checks.py
+requirements-dev.txt
 .github/PULL_REQUEST_TEMPLATE/release_integration.md
 .release/baseline.json
 .release/manifests/release-ci-platform.txt
