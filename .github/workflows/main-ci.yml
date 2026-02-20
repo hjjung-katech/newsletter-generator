@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: '3.10'
+  # Default interpreter for non-matrix jobs (quality/mock/integration/report)
+  PYTHON_VERSION: '3.12'
   CACHE_VERSION: v1
 
 jobs:
