@@ -209,15 +209,34 @@ jobs:
           echo "Normalized artifact: output/newsletter.html"
           echo "File size: $(wc -c < output/newsletter.html) bytes"
 
+      - name: Check GitHub Pages availability
+        id: pages_check
+        run: |
+          status_code="$(curl -sS -o /tmp/pages.json -w '%{http_code}' \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'Authorization: Bearer ${{ github.token }}' \
+            "https://api.github.com/repos/${{ github.repository }}/pages")"
+
+          if [ "$status_code" = "200" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "✅ GitHub Pages is enabled for this repository."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "⚠️ GitHub Pages is not enabled (status=${status_code}). Skipping pages deploy steps."
+          fi
+
       - name: Setup GitHub Pages
+        if: steps.pages_check.outputs.enabled == 'true'
         uses: actions/configure-pages@v4
 
       - name: Upload to GitHub Pages
+        if: steps.pages_check.outputs.enabled == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: './output/'
 
       - name: Deploy to GitHub Pages
+        if: steps.pages_check.outputs.enabled == 'true'
         id: deployment
         uses: actions/deploy-pages@v4
 
