@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit
+.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check
 
 # Python 실행 파일 설정
 PYTHON ?= python3
@@ -106,6 +106,36 @@ ci-fix: ## CI 검사 + 자동 수정
 ci-full: ## 전체 CI 검사 (테스트 포함)
 	@echo "🚀 전체 CI 검사 실행 중..."
 	$(PYTHON) run_ci_checks.py --full
+
+skill-ci-gate: ## Skill: ci-gate
+	@echo "🧠 Skill ci-gate 실행 중..."
+	$(PYTHON) run_ci_checks.py --fix --full
+
+skill-docs-and-config-consistency: ## Skill: docs-and-config-consistency
+	@echo "🧠 Skill docs-and-config-consistency 검증 중..."
+	@! rg -nP 'SENDGRID_API_KEY|(?<!POSTMARK_)FROM_EMAIL=|POSTMARK_TOKEN|POSTMARK_API_TOKEN' README.md docs/setup web/.env.example web/requirements.txt
+
+skill-newsletter-smoke: ## Skill: newsletter-smoke
+	@echo "🧠 Skill newsletter-smoke 실행 중..."
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -c "from unittest.mock import patch; from newsletter.api import GenerateNewsletterRequest, generate_newsletter; sample='<html><head><title>Smoke</title></head><body>ok</body></html>'; info={'step_times': {'collect': 0.1}, 'total_time': 0.2}; p1=patch('newsletter.api.graph.generate_newsletter', return_value=(sample, 'success')); p2=patch('newsletter.api.graph.get_last_generation_info', return_value=info); p1.start(); p2.start(); r=generate_newsletter(GenerateNewsletterRequest(keywords='AI', period=7)); p2.stop(); p1.stop(); assert r['status']=='success'; assert r['title']=='Smoke'; assert '<html' in r['html_content'].lower(); print('newsletter-smoke: ok')"
+
+skill-web-smoke: ## Skill: web-smoke
+	@echo "🧠 Skill web-smoke 실행 중..."
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/test_web_api.py -q
+
+skill-scheduler-debug: ## Skill: scheduler-debug
+	@echo "🧠 Skill scheduler-debug 실행 중..."
+	MOCK_MODE=true TESTING=1 $(PYTHON) -m pytest tests/integration/test_schedule_execution.py tests/unit_tests/test_schedule_time_sync.py -q
+
+skill-release-integration: ## Skill: release-integration
+	@echo "🧠 Skill release-integration 실행 중..."
+	$(PYTHON) scripts/release_preflight.py
+	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged
+	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-scheduler-reliability.txt --source staged
+	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-runtime-binary-bootstrap.txt --source staged
+
+skills-check: skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug ## Run core skills verification
+	@echo "✅ skills-check 완료"
 
 pre-commit: ## Pre-commit hooks 설치
 	@echo "🔗 Pre-commit hooks 설치 중..."

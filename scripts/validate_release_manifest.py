@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 from pathlib import Path
 
@@ -31,8 +32,8 @@ def main() -> int:
     parser.add_argument(
         "--source",
         default="staged",
-        choices=["staged", "head"],
-        help="Check staged files or working tree against HEAD.",
+        choices=["staged", "head", "baseline"],
+        help="Check staged files, working tree against HEAD, or baseline...HEAD.",
     )
     args = parser.parse_args()
 
@@ -41,7 +42,14 @@ def main() -> int:
         raise SystemExit(f"missing manifest file: {manifest}")
 
     allowed = read_manifest(manifest)
-    diff_args = ["--cached"] if args.source == "staged" else ["HEAD"]
+    if args.source == "staged":
+        diff_args = ["--cached"]
+    elif args.source == "head":
+        diff_args = ["HEAD"]
+    else:
+        baseline_ref = os.getenv("CI_BASELINE_REF", "baseline/main-equivalent")
+        diff_args = [f"{baseline_ref}...HEAD"]
+
     changed = run(["git", "diff", "--name-only", *diff_args])
     changed_files = {x for x in changed.splitlines() if x.strip()}
 
@@ -49,6 +57,7 @@ def main() -> int:
 
     print("=== RELEASE MANIFEST VALIDATION ===")
     print(f"manifest: {manifest}")
+    print(f"source: {args.source}")
     print(f"changed files: {len(changed_files)}")
 
     if extra:
