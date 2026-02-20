@@ -47,6 +47,11 @@ make test-full
 make test-nightly
 ```
 
+- `run_ci_checks.py` 기본 검사 소스는 `staged`입니다.
+  - 릴리즈 전에 포함할 파일을 스테이징한 상태에서 게이트를 실행해야 합니다.
+  - 문서/CI 스크립트만 스테이징된 경우, `test-full`의 단위 테스트는 스킵됩니다.
+  - 런타임 코드(`newsletter/`, `web/`)가 스테이징된 경우 단위 테스트가 실행됩니다.
+
 - PR 템플릿: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
 - 리뷰어: 코드 오너 + 운영 담당
 - 머지 방식: 기본 squash merge (필요 시 merge commit)
@@ -96,8 +101,15 @@ make validate-ci-manifest
 본문 체크리스트만으로는 라벨/리뷰어가 반영되지 않으므로, PR 생성 직후 아래를 실행합니다.
 
 ```bash
+# 권장: 역할 파일(.release/reviewer_roles.json) 사용
+make apply-pr-metadata PR=<number>
+
+# 필요 시 명시적 핸들 override
 make apply-pr-metadata PR=<number> REVIEWERS=<code_owner,ops_owner>
 ```
 
 - 기본 라벨: `release`, `risk:medium`, `area:ci`
-- 리뷰어는 GitHub handle을 쉼표로 전달
+- 기본 역할 파일: `.release/reviewer_roles.json`
+  - `code_owner`: 실제 GitHub handle
+  - `ops_owner`: 실제 handle 또는 `virtual:*` 허용
+- `virtual:*`가 포함되거나 단일 관리자 저장소인 경우, PR 템플릿의 `PR Metadata Applied` 섹션을 운영 승인 기록으로 사용
