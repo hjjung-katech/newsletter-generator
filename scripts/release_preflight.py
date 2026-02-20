@@ -18,7 +18,10 @@ REQUIRED_FILES = [
     ".release/baseline.json",
     ".release/manifests/release-ci-platform.txt",
 ]
-REQUIRED_CMDS = ["python", "git"]
+REQUIRED_CMD_GROUPS = [
+    ("python", "python3"),
+    ("git",),
+]
 REQUIRED_PY_PACKAGES = ["flake8", "bandit"]
 
 
@@ -59,9 +62,9 @@ def main() -> int:
 
     failures: list[str] = []
 
-    for cmd in REQUIRED_CMDS:
-        if shutil.which(cmd) is None:
-            failures.append(f"missing command: {cmd}")
+    for cmd_group in REQUIRED_CMD_GROUPS:
+        if not any(shutil.which(cmd) for cmd in cmd_group):
+            failures.append(f"missing command: {' or '.join(cmd_group)}")
 
     for rel in REQUIRED_FILES:
         if not Path(rel).exists():
