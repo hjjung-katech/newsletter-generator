@@ -26,6 +26,8 @@ jobs:
   quality-checks:
     name: Code Quality & Security
     runs-on: ubuntu-latest
+    outputs:
+      runtime_changed: ${{ steps.changed-python.outputs.runtime_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,10 +74,15 @@ jobs:
           fi
 
           CHANGED="$(git diff --name-only "$RANGE" | grep -E '^(newsletter|tests|web|scripts)/.*\.py$' || true)"
+          RUNTIME_CHANGED="false"
+          if echo "$CHANGED" | grep -E '^(newsletter|web)/.*\.py$' >/dev/null; then
+            RUNTIME_CHANGED="true"
+          fi
           {
             echo "files<<EOF"
             echo "$CHANGED"
             echo "EOF"
+            echo "runtime_changed=$RUNTIME_CHANGED"
           } >> "$GITHUB_OUTPUT"
 
           if [ -n "$CHANGED" ]; then
@@ -129,6 +136,9 @@ jobs:
   unit-tests:
     name: Unit Tests - ${{ matrix.os }}
     needs: [quality-checks]
+    if: |
+      github.event_name == 'push' ||
+      needs.quality-checks.outputs.runtime_changed == 'true'
     strategy:
       fail-fast: false
       matrix:
