@@ -194,8 +194,16 @@ jobs:
               '</html>' > output/newsletter.html
             html_files=(output/*.html)
           fi
-          latest_html="$(ls -t output/*.html | head -n1)"
-          cp "$latest_html" output/newsletter.html
+          latest_html="$(ls -t output/*.html | head -n1 || true)"
+          if [ -z "$latest_html" ]; then
+            echo "❌ No HTML artifact available after fallback handling."
+            exit 1
+          fi
+          if [ "$latest_html" != "output/newsletter.html" ]; then
+            cp "$latest_html" output/newsletter.html
+          else
+            echo "ℹ️ output/newsletter.html already normalized."
+          fi
           echo "✅ Newsletter generated successfully"
           echo "Latest file: $latest_html"
           echo "Normalized artifact: output/newsletter.html"
