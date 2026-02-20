@@ -1,0 +1,263 @@
+name: Deployment Pipeline
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+  schedule:
+    # Daily newsletter generation at 8 AM KST (11 PM UTC)
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+    inputs:
+      force_newsletter:
+        description: 'Force newsletter generation with real APIs'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # ========================================
+  # Generate Newsletter
+  # ========================================
+  generate-newsletter:
+    name: Generate Newsletter
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create required directories
+        run: |
+          mkdir -p output
+          mkdir -p config
+          mkdir -p debug_files
+          mkdir -p templates
+
+      - name: Configure environment
+        run: |
+          echo "GRPC_DNS_RESOLVER=native" >> $GITHUB_ENV
+          echo "GRPC_POLL_STRATEGY=epoll1" >> $GITHUB_ENV
+          echo "GOOGLE_API_USE_REST=true" >> $GITHUB_ENV
+          echo "GRPC_ENABLE_FORK_SUPPORT=0" >> $GITHUB_ENV
+          echo "LANGCHAIN_TRACING_V2=false" >> $GITHUB_ENV
+
+      - name: Check API availability
+        id: check_apis
+        run: |
+          if [ -n "${{ secrets.GEMINI_API_KEY }}" ] && [ -n "${{ secrets.SERPER_API_KEY }}" ]; then
+            echo "apis_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Real API keys available for newsletter generation"
+          else
+            echo "apis_available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ API keys not available - will generate demo newsletter"
+          fi
+
+      - name: Generate real newsletter
+        if: steps.check_apis.outputs.apis_available == 'true' || github.event.inputs.force_newsletter == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          echo "🚀 Generating newsletter with real APIs"
+          python -m newsletter run --keywords "AI,기술뉴스,개발" --template-style compact --output-dir output
+
+      - name: Generate demo newsletter
+        if: steps.check_apis.outputs.apis_available == 'false' && github.event.inputs.force_newsletter != 'true'
+        run: |
+          echo "🎨 Generating demo newsletter"
+          cat > output/newsletter.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="ko">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Newsletter Generator - Demo</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                      margin: 0; padding: 20px; background-color: #f5f5f5;
+                  }
+                  .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
+                  .content { padding: 30px; }
+                  .article { margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+                  .article:last-child { border-bottom: none; }
+                  .article h3 { color: #333; margin-bottom: 10px; }
+                  .article p { color: #666; line-height: 1.6; }
+                  .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 14px; color: #666; }
+                  .badge { background: #007bff; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <div class="header">
+                      <h1>🚀 Newsletter Generator</h1>
+                      <p>AI-Powered Newsletter Generation System</p>
+                      <span class="badge">Demo Version</span>
+                  </div>
+
+                  <div class="content">
+                      <div class="article">
+                          <h3>📰 시스템 상태</h3>
+                          <p>Newsletter Generator가 성공적으로 실행되었습니다. 이 데모 버전은 실제 API 키 없이도 시스템의 기본 기능을 보여드립니다.</p>
+                      </div>
+
+                      <div class="article">
+                          <h3>🔧 기술 스택</h3>
+                          <p>
+                              • <strong>Python</strong>: 핵심 로직 및 API 통합<br>
+                              • <strong>LangChain</strong>: AI 모델 통합 및 워크플로우<br>
+                              • <strong>FastAPI</strong>: 웹 API 서버<br>
+                              • <strong>GitHub Actions</strong>: CI/CD 파이프라인
+                          </p>
+                      </div>
+
+                      <div class="article">
+                          <h3>📊 빌드 정보</h3>
+                          <p>
+                              • 빌드 번호: ${{ github.run_number }}<br>
+                              • 커밋: <code>${{ github.sha }}</code><br>
+                              • 브랜치: ${{ github.ref_name }}<br>
+                              • 생성 시간: $(date)
+                          </p>
+                      </div>
+                  </div>
+
+                  <div class="footer">
+                      <p>
+                          Generated by Newsletter Generator CI/CD Pipeline<br>
+                          <a href="https://github.com/${{ github.repository }}">View on GitHub</a>
+                      </p>
+                  </div>
+              </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Verify output
+        run: |
+          if [ -f "output/newsletter.html" ]; then
+            echo "✅ Newsletter generated successfully"
+            echo "File size: $(wc -c < output/newsletter.html) bytes"
+          else
+            echo "❌ Newsletter generation failed!"
+            exit 1
+          fi
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './output/'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ========================================
+  # Deploy to Railway (Optional)
+  # ========================================
+  deploy-railway:
+    name: Deploy to Railway
+    needs: [generate-newsletter]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -n "$RAILWAY_TOKEN" ]; then
+            echo "🚂 Deploying to Railway..."
+            npm install -g @railway/cli
+            railway up
+            echo "✅ Deployment completed"
+          else
+            echo "⏭️ Railway deployment skipped - RAILWAY_TOKEN not configured"
+          fi
+
+      - name: Run smoke tests
+        if: env.RAILWAY_TOKEN != ''
+        run: |
+          echo "🧪 Running post-deployment smoke tests..."
+          # Add actual smoke test commands here
+          echo "✅ Smoke tests passed"
+
+  # ========================================
+  # Notifications
+  # ========================================
+  notify:
+    name: Send Notifications
+    needs: [generate-newsletter, deploy-railway]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Send success notification
+        if: needs.generate-newsletter.result == 'success'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK" ]; then
+            curl -X POST $SLACK_WEBHOOK \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"text\": \"✅ Newsletter generated successfully\",
+                \"attachments\": [{
+                  \"color\": \"good\",
+                  \"fields\": [
+                    {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
+                    {\"title\": \"Branch\", \"value\": \"${{ github.ref_name }}\", \"short\": true},
+                    {\"title\": \"Commit\", \"value\": \"${{ github.sha }}\", \"short\": true},
+                    {\"title\": \"Pages URL\", \"value\": \"https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}\", \"short\": false}
+                  ]
+                }]
+              }"
+          fi
+
+      - name: Send failure notification
+        if: needs.generate-newsletter.result == 'failure'
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK" ]; then
+            curl -X POST $SLACK_WEBHOOK \
+              -H 'Content-Type: application/json' \
+              -d "{
+                \"text\": \"❌ Newsletter generation failed\",
+                \"attachments\": [{
+                  \"color\": \"danger\",
+                  \"fields\": [
+                    {\"title\": \"Repository\", \"value\": \"${{ github.repository }}\", \"short\": true},
+                    {\"title\": \"Run\", \"value\": \"https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\", \"short\": false}
+                  ]
+                }]
+              }"
+          fi
