@@ -1,0 +1,88 @@
+"""
+Runtime-aware path helpers for web app bootstrap.
+
+This module keeps filesystem decisions deterministic between development mode
+and PyInstaller one-file runtime.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Iterable
+
+
+def _is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
+def _bundle_root() -> Path:
+    if _is_frozen() and hasattr(sys, "_MEIPASS"):
+        return Path(getattr(sys, "_MEIPASS"))
+    return Path(__file__).resolve().parent
+
+
+def _web_dir() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def _first_existing_dir(candidates: Iterable[Path]) -> Path:
+    candidate_list = list(candidates)
+    for candidate in candidate_list:
+        if candidate.is_dir():
+            return candidate
+    return candidate_list[0]
+
+
+def resolve_template_dir() -> str:
+    web_dir = _web_dir()
+    if _is_frozen():
+        bundle_root = _bundle_root()
+        exe_dir = Path(sys.executable).resolve().parent
+        return str(
+            _first_existing_dir(
+                [
+                    exe_dir / "templates",
+                    bundle_root / "templates",
+                    bundle_root / "web" / "templates",
+                ]
+            )
+        )
+    return str(
+        _first_existing_dir([web_dir / "templates", web_dir.parent / "templates"])
+    )
+
+
+def resolve_static_dir() -> str:
+    web_dir = _web_dir()
+    if _is_frozen():
+        bundle_root = _bundle_root()
+        exe_dir = Path(sys.executable).resolve().parent
+        return str(
+            _first_existing_dir(
+                [
+                    exe_dir / "static",
+                    bundle_root / "static",
+                    bundle_root / "web" / "static",
+                ]
+            )
+        )
+    return str(_first_existing_dir([web_dir / "static", web_dir.parent / "static"]))
+
+
+def resolve_database_path() -> str:
+    if _is_frozen():
+        return str(Path(sys.executable).resolve().parent / "storage.db")
+    return str(_web_dir() / "storage.db")
+
+
+def resolve_project_root() -> str:
+    if _is_frozen():
+        return str(_bundle_root())
+    return str(_web_dir().parent)
+
+
+def resolve_env_file_path() -> str:
+    if _is_frozen():
+        return str(Path(sys.executable).resolve().parent / ".env")
+    return str(Path(resolve_project_root()) / ".env")

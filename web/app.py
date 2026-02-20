@@ -1,22 +1,42 @@
+# flake8: noqa
 """
 Newsletter Generator Web Service
 Flask application that provides web interface for the CLI newsletter generator
 """
 
-import os
-import sys
-from flask import Flask, render_template, request, jsonify, send_file
-from flask_cors import CORS
-import redis
-from rq import Queue
-import sqlite3
-from datetime import datetime
-import uuid
 import json
+import logging
+import os
+import sqlite3
+import sys
+import uuid
+from datetime import datetime
+
+import redis
+from flask import Flask, jsonify, render_template, request, send_file
+from flask_cors import CORS
+from rq import Queue
 
 # Add current directory to path for local imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
+
+try:
+    from runtime_paths import (
+        resolve_database_path,
+        resolve_env_file_path,
+        resolve_project_root,
+        resolve_static_dir,
+        resolve_template_dir,
+    )
+except ImportError:
+    from web.runtime_paths import (  # pragma: no cover
+        resolve_database_path,
+        resolve_env_file_path,
+        resolve_project_root,
+        resolve_static_dir,
+        resolve_template_dir,
+    )
 
 # Import web types module - will be loaded later to avoid conflicts
 
@@ -141,23 +161,23 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Real newsletter CLI integration
 import subprocess
 import tempfile
-import logging
 
 # 현재 디렉토리를 파이썬 패스에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 # 프로젝트 루트를 파이썬 패스에 추가
-project_root = os.path.dirname(current_dir)
+project_root = resolve_project_root()
 sys.path.insert(0, project_root)
 
 
 class RealNewsletterCLI:
     def __init__(self):
-        # CLI 경로 설정 - 프로젝트 루트에서 실행
-        self.project_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..")
-        )
+        # CLI 경로 설정 - dev에서는 프로젝트 루트, PyInstaller에서는 bundle 루트
+        self.project_root = resolve_project_root()
+        # 실행 결과물(output, storage)은 실행 파일 디렉토리에 남기도록 고정
+        self.runtime_work_dir = os.path.dirname(resolve_env_file_path())
+        self.module_root = self.project_root
         self.timeout = 900  # 15분 타임아웃으로 증가
 
         # 환경 확인
@@ -166,23 +186,37 @@ class RealNewsletterCLI:
     def _check_environment(self):
         """환경 설정 확인"""
         # 프로젝트 루트 확인
-        if not os.path.exists(os.path.join(self.project_root, "newsletter")):
+        module_candidates = [os.path.join(self.project_root, "newsletter")]
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            module_candidates.insert(0, os.path.join(sys._MEIPASS, "newsletter"))
+
+        module_path = next((p for p in module_candidates if os.path.exists(p)), None)
+        if not module_path:
             raise Exception(f"Newsletter module not found in {self.project_root}")
 
+        self.module_root = os.path.dirname(module_path)
+
         # .env 파일 확인
-        env_file = os.path.join(self.project_root, ".env")
+        env_candidates = [
+            resolve_env_file_path(),
+            os.path.join(self.project_root, ".env"),
+        ]
+        env_file = next(
+            (p for p in env_candidates if os.path.exists(p)), env_candidates[0]
+        )
         if not os.path.exists(env_file):
             print(f"⚠️  Warning: .env file not found at {env_file}")
-            print(f"⚠️  This may cause longer processing times or fallback to mock mode")
+            print(
+                f"⚠️  This may cause longer processing times or fallback to mock mode"
+            )
 
         # API 키 확인
         api_keys_status = self._check_api_keys()
 
         print(f"✅ Environment check passed")
         print(f"   Project root: {self.project_root}")
-        print(
-            f"   Newsletter module exists: {os.path.exists(os.path.join(self.project_root, 'newsletter'))}"
-        )
+        print(f"   Runtime work dir: {self.runtime_work_dir}")
+        print(f"   Newsletter module exists: {os.path.exists(module_path)}")
         print(f"   .env file exists: {os.path.exists(env_file)}")
         print(f"   API keys configured: {api_keys_status}")
 
@@ -255,7 +289,7 @@ class RealNewsletterCLI:
 
             # CLI 실행 환경 설정 - 한국어 인코딩 문제 해결
             env = dict(os.environ)
-            env["PYTHONPATH"] = self.project_root
+            env["PYTHONPATH"] = self.module_root
             # UTF-8 인코딩 강제 설정
             env["PYTHONIOENCODING"] = "utf-8"
             env["PYTHONUTF8"] = "1"
@@ -264,13 +298,13 @@ class RealNewsletterCLI:
 
             # CLI 실행
             logging.info(f"Executing CLI command: {' '.join(cmd)}")
-            logging.info(f"Working directory: {self.project_root}")
+            logging.info(f"Working directory: {self.runtime_work_dir}")
             logging.info(f"Input: {input_description}")
 
             # 바이트 모드로 실행하여 인코딩 문제 방지
             result = subprocess.run(
                 cmd,
-                cwd=self.project_root,
+                cwd=self.runtime_work_dir,
                 capture_output=True,
                 text=False,  # 바이트 모드 사용
                 timeout=self.timeout,
@@ -317,8 +351,14 @@ class RealNewsletterCLI:
                 return self._fallback_response(keywords or domain, error_msg)
 
             # CLI가 자동으로 생성한 HTML 파일 찾기
-            default_output_dir = os.path.join(self.project_root, "output")
+            default_output_dir = os.path.join(self.runtime_work_dir, "output")
             html_content = self._find_latest_html_file(default_output_dir, keywords)
+            if not html_content:
+                fallback_output_dir = os.path.join(self.project_root, "output")
+                html_content = self._find_latest_html_file(
+                    fallback_output_dir,
+                    keywords,
+                )
 
             if html_content:
                 # 제목 추출
@@ -357,9 +397,7 @@ class RealNewsletterCLI:
         except subprocess.TimeoutExpired:
             error_msg = f"뉴스레터 생성이 {self.timeout}초 후 타임아웃되었습니다. API 키 설정을 확인해주세요."
             logging.error(f"CLI execution timed out after {self.timeout} seconds")
-            logging.error(
-                "타임아웃 원인: API 키 누락으로 인한 Mock 데이터 사용 또는 외부 API 응답 지연"
-            )
+            logging.error("타임아웃 원인: API 키 누락으로 인한 Mock 데이터 사용 또는 외부 API 응답 지연")
             return self._fallback_response(keywords or domain, error_msg)
 
         except Exception as e:
@@ -566,7 +604,7 @@ class MockNewsletterCLI:
 </head>
 <body>
     <div class="mock-notice">
-        <strong>⚠️ Mock Mode:</strong> This is a test newsletter generated using mock data. 
+        <strong>⚠️ Mock Mode:</strong> This is a test newsletter generated using mock data.
         Template Style: {template_style} | Email Compatible: {email_compatible} | Period: {period} days
     </div>
     <div class="header">
@@ -622,7 +660,7 @@ class MockNewsletterCLI:
 </head>
 <body>
     <div class="mock-notice">
-        <strong>⚠️ Mock Mode:</strong> This is a test newsletter generated using mock data. 
+        <strong>⚠️ Mock Mode:</strong> This is a test newsletter generated using mock data.
         Template Style: {template_style} | Email Compatible: {email_compatible} | Period: {period} days
     </div>
     <div class="header">
@@ -683,7 +721,11 @@ except Exception as e:
     newsletter_cli = MockNewsletterCLI()
     print("⚠️  Falling back to MockNewsletterCLI")
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=resolve_template_dir(),
+    static_folder=resolve_static_dir(),
+)
 CORS(app)  # Enable CORS for frontend-backend communication
 
 # Enable detailed logging
@@ -722,7 +764,7 @@ except Exception as e:
 in_memory_tasks = {}
 
 # Database initialization
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
+DATABASE_PATH = resolve_database_path()
 
 
 def init_db():
@@ -1117,9 +1159,7 @@ def process_newsletter_sync(data):
                     except ImportError:
                         return (
                             jsonify(
-                                {
-                                    "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
-                                }
+                                {"error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."}
                             ),
                             500,
                         )
@@ -1261,9 +1301,9 @@ def get_history():
         # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
         cursor.execute(
             """
-            SELECT id, params, result, created_at, status 
-            FROM history 
-            ORDER BY 
+            SELECT id, params, result, created_at, status
+            FROM history
+            ORDER BY
                 CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
                 created_at DESC
             LIMIT 20
@@ -1742,11 +1782,7 @@ def send_email_api():
                 send_email_func = mail.send_email
             except ImportError:
                 return (
-                    jsonify(
-                        {
-                            "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
-                        }
-                    ),
+                    jsonify({"error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."}),
                     500,
                 )
 
@@ -1762,9 +1798,7 @@ def send_email_api():
         # 이메일 발송
         send_email_func(to=email, subject=subject, html=html_content)
 
-        return jsonify(
-            {"success": True, "message": "이메일이 성공적으로 발송되었습니다"}
-        )
+        return jsonify({"success": True, "message": "이메일이 성공적으로 발송되었습니다"})
 
     except Exception as e:
         logging.error(f"Email sending failed: {e}")
@@ -1796,9 +1830,7 @@ def check_email_config():
                 "from_email_configured": config_status["from_email_configured"],
                 "ready": config_status["ready"],
                 "message": (
-                    "이메일 발송 준비 완료"
-                    if config_status["ready"]
-                    else "환경변수 설정이 필요합니다"
+                    "이메일 발송 준비 완료" if config_status["ready"] else "환경변수 설정이 필요합니다"
                 ),
             }
         )
