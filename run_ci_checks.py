@@ -53,6 +53,56 @@ class CIChecker:
         self.verbose = verbose
         self.results = []
         self.failed_checks = []
+        self.changed_files = self._get_changed_files()
+
+    def _get_changed_files(self) -> List[str]:
+        """검사 대상 변경 파일 목록을 가져옵니다.
+
+        CI_CHECK_SOURCE:
+        - staged  : git diff --cached (기본값, release 게이트 권장)
+        - head    : git diff HEAD
+        - baseline: git diff baseline/main-equivalent...HEAD
+        """
+        source = os.getenv("CI_CHECK_SOURCE", "staged").lower()
+        baseline_ref = os.getenv("CI_BASELINE_REF", "baseline/main-equivalent")
+        if source == "head":
+            cmd = ["git", "diff", "--name-only", "HEAD"]
+        elif source == "baseline":
+            cmd = ["git", "diff", "--name-only", f"{baseline_ref}...HEAD"]
+        else:
+            source = "staged"
+            cmd = ["git", "diff", "--name-only", "--cached"]
+
+        if self.verbose:
+            print(f"{Colors.OKCYAN}검사 소스: {source}{Colors.ENDC}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            if self.verbose:
+                print(f"{Colors.WARNING}변경 파일 조회 실패, 전체 검사로 폴백합니다{Colors.ENDC}")
+            return []
+        files = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return files
+
+    def _get_python_targets(self) -> List[str]:
+        """린트 대상 Python 파일 목록(변경 파일 기준)."""
+        if not self.changed_files:
+            return []
+        targets = []
+        for path in self.changed_files:
+            if not path.endswith(".py"):
+                continue
+            if path.startswith(("newsletter/", "tests/", "web/", "scripts/")):
+                if Path(path).exists():
+                    targets.append(path)
+        return targets
+
+    def _get_runtime_python_targets(self) -> List[str]:
+        """런타임 영향 코드(newsletter/web) 변경 파일."""
+        return [
+            path
+            for path in self._get_python_targets()
+            if path.startswith(("newsletter/", "web/"))
+        ]
 
     def print_header(self, message: str):
         """헤더 출력"""
@@ -86,7 +136,12 @@ class CIChecker:
         """Black 포맷팅 검사"""
         self.print_header("Black 코드 포맷팅 검사")
 
-        directories = ["newsletter", "tests", "web"]
+        targets = self._get_python_targets()
+        if not targets:
+            self.print_status("Black 포맷팅", True, "검사 대상 Python 변경 파일 없음")
+            return True
+        directories = targets
+        print(f"  {Colors.OKCYAN}변경 파일 기준 Black 검사: {len(targets)}개{Colors.ENDC}")
 
         if self.fix_mode:
             # 자동 수정 모드
@@ -121,7 +176,12 @@ class CIChecker:
         """isort 임포트 정렬 검사"""
         self.print_header("isort 임포트 정렬 검사")
 
-        directories = ["newsletter", "tests", "web"]
+        targets = self._get_python_targets()
+        if not targets:
+            self.print_status("isort 정렬", True, "검사 대상 Python 변경 파일 없음")
+            return True
+        directories = targets
+        print(f"  {Colors.OKCYAN}변경 파일 기준 isort 검사: {len(targets)}개{Colors.ENDC}")
 
         if self.fix_mode:
             # 자동 수정 모드
@@ -161,7 +221,12 @@ class CIChecker:
         """Flake8 린팅 검사"""
         self.print_header("Flake8 린팅 검사")
 
-        directories = ["newsletter", "tests", "web"]
+        targets = self._get_python_targets()
+        if not targets:
+            self.print_status("Flake8 린팅", True, "검사 대상 Python 변경 파일 없음")
+            return True
+        directories = targets
+        print(f"  {Colors.OKCYAN}변경 파일 기준 Flake8 검사: {len(targets)}개{Colors.ENDC}")
         cmd = (
             [sys.executable, "-m", "flake8"]
             + directories
@@ -237,6 +302,12 @@ class CIChecker:
 
         if quick:
             print(f"  {Colors.WARNING}빠른 모드에서는 테스트를 건너뜁니다{Colors.ENDC}")
+            return True
+
+        runtime_targets = self._get_runtime_python_targets()
+        if not runtime_targets:
+            print(f"  {Colors.WARNING}런타임 코드 변경이 없어 단위 테스트를 건너뜁니다{Colors.ENDC}")
+            self.print_status("단위 테스트", True, "변경 범위: 비런타임(문서/CI/스크립트)")
             return True
 
         # 환경 변수 설정

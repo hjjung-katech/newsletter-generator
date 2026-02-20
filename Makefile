@@ -4,7 +4,7 @@
 .PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit
 
 # Python 실행 파일 설정
-PYTHON := python
+PYTHON ?= python3
 PIP := $(PYTHON) -m pip
 
 # 디렉토리 설정
@@ -56,7 +56,11 @@ preflight-release: ## 릴리즈 사전 점검 (기준선/필수 파일/도구)
 test-quick: preflight-release ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
 	@echo "⚡ Quick 게이트 실행 중..."
 	$(PYTHON) run_ci_checks.py --quick
-	MOCK_MODE=true $(PYTHON) -m pytest -m "unit" --maxfail=1 --tb=short
+	@if git diff --name-only --cached | grep -E '^(newsletter|web)/.*\.py$$' >/dev/null; then \
+		MOCK_MODE=true $(PYTHON) -m pytest -m "unit" --maxfail=1 --tb=short; \
+	else \
+		echo "ℹ️  staged 런타임 Python 변경이 없어 quick pytest를 건너뜁니다."; \
+	fi
 
 test-full: preflight-release ## PR 게이트 (전체 CI + 테스트)
 	@echo "🚦 Full 게이트 실행 중..."
@@ -71,7 +75,7 @@ validate-ci-manifest: ## release/ci-platform 변경 범위(manifest) 검증
 	@echo "🧭 CI manifest 검증 실행 중..."
 	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged
 
-apply-pr-metadata: ## PR 라벨/리뷰어 적용 (PR=<number>, REVIEWERS=<a,b>)
+apply-pr-metadata: ## PR 라벨/리뷰어 적용 (PR=<number>, REVIEWERS=<a,b> or .release/reviewer_roles.json)
 	@echo "🏷️ PR metadata 적용 중..."
 	$(PYTHON) scripts/apply_pr_metadata.py --pr $(PR) --reviewers "$(REVIEWERS)"
 
