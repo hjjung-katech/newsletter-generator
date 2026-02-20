@@ -28,6 +28,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -52,14 +54,66 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Detect changed Python files (scoped)
+        id: changed-python
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.sha }}"
+            RANGE="$BASE_SHA...$HEAD_SHA"
+          else
+            BEFORE_SHA="${{ github.event.before }}"
+            if [ -z "$BEFORE_SHA" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+              BEFORE_SHA="$(git rev-parse HEAD^)"
+            fi
+            RANGE="$BEFORE_SHA...${{ github.sha }}"
+          fi
+
+          CHANGED="$(git diff --name-only "$RANGE" | grep -E '^(newsletter|tests|web|scripts)/.*\.py$' || true)"
+          {
+            echo "files<<EOF"
+            echo "$CHANGED"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -n "$CHANGED" ]; then
+            echo "Changed Python files:"
+            echo "$CHANGED"
+          else
+            echo "No scoped Python file changes detected."
+          fi
+
       - name: Code formatting (Black)
-        run: black --check --diff newsletter tests web
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${{ steps.changed-python.outputs.files }}" ]; then
+            echo "Skip Black: no scoped Python file changes."
+            exit 0
+          fi
+          echo "${{ steps.changed-python.outputs.files }}" | xargs black --check --diff
 
       - name: Import sorting (isort)
-        run: isort --check-only --diff --profile black newsletter tests web
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${{ steps.changed-python.outputs.files }}" ]; then
+            echo "Skip isort: no scoped Python file changes."
+            exit 0
+          fi
+          echo "${{ steps.changed-python.outputs.files }}" | xargs isort --check-only --diff --profile black
 
       - name: Linting (flake8)
-        run: flake8 newsletter tests web --max-line-length=88 --ignore=E203,W503
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${{ steps.changed-python.outputs.files }}" ]; then
+            echo "Skip flake8: no scoped Python file changes."
+            exit 0
+          fi
+          echo "${{ steps.changed-python.outputs.files }}" | xargs flake8 --max-line-length=88 --ignore=E203,W503
 
       - name: Type checking (mypy)
         run: |
