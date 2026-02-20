@@ -1,0 +1,7 @@
+{
+  "tag": "baseline/main-equivalent",
+  "commit": "1e93460",
+  "source": "workflow consolidation commit",
+  "owner": "release-manager",
+  "notes": "Use this fixed baseline for release/* split integration branches."
+}
