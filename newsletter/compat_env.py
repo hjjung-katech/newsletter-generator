@@ -133,7 +133,11 @@ def find_env_usage() -> List[str]:
         if result.returncode == 0:
             return result.stdout.splitlines()
     except Exception as e:
-        handle_exception(e, "ripgrep으로 환경 변수 사용 검색", log_level=logging.WARNING)
+        handle_exception(
+            e,
+            "ripgrep으로 환경 변수 사용 검색",
+            log_level=logging.WARNING,
+        )
 
         # grep으로 대체 시도
         try:
@@ -145,7 +149,11 @@ def find_env_usage() -> List[str]:
             if result.returncode == 0:
                 return result.stdout.splitlines()
         except Exception as e:
-            handle_exception(e, "grep으로 환경 변수 사용 검색", log_level=logging.ERROR)
+            handle_exception(
+                e,
+                "grep으로 환경 변수 사용 검색",
+                log_level=logging.ERROR,
+            )
 
     return []
 
