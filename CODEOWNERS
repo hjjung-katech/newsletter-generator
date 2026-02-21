@@ -1,0 +1,11 @@
+# Default ownership
+* @hjjung-katech
+
+# Documentation
+README.md @hjjung-katech
+docs/** @hjjung-katech
+
+# Docs quality automation
+.github/workflows/docs-quality.yml @hjjung-katech
+scripts/check_markdown_links.py @hjjung-katech
+scripts/check_markdown_style.py @hjjung-katech

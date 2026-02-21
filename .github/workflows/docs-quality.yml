@@ -1,0 +1,53 @@
+name: Docs Quality
+
+on:
+  pull_request:
+    paths:
+      - '**/*.md'
+      - 'scripts/check_markdown_*.py'
+      - '.github/workflows/docs-quality.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - '**/*.md'
+      - 'scripts/check_markdown_*.py'
+      - '.github/workflows/docs-quality.yml'
+
+jobs:
+  docs-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Collect changed markdown files
+        id: changed_md
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            git diff --name-only --diff-filter=ACMRTUXB "origin/${{ github.base_ref }}"...HEAD -- '*.md' > /tmp/changed_md.txt
+          else
+            git diff --name-only --diff-filter=ACMRTUXB "${{ github.event.before }}" "${{ github.sha }}" -- '*.md' > /tmp/changed_md.txt
+          fi
+
+          echo "files=$(tr '\n' ' ' < /tmp/changed_md.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Check markdown links
+        run: python scripts/check_markdown_links.py
+
+      - name: Check markdown style
+        shell: bash
+        run: |
+          if [[ -n "${{ steps.changed_md.outputs.files }}" ]]; then
+            python scripts/check_markdown_style.py ${{ steps.changed_md.outputs.files }}
+          else
+            echo "No changed markdown files detected for style check."
+          fi

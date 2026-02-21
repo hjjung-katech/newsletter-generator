@@ -1,5 +1,13 @@
 # 📄 프로젝트 요구사항 문서 (PRD)
 
+> [!WARNING]
+> 이 문서는 과거 웹서비스 기획 이력입니다. 현재 운영 정본이 아닙니다.
+> 최신 운영/설정/API 기준은 아래 문서를 사용하세요.
+> - `docs/README.md`
+> - `docs/reference/environment-variables.md`
+> - `docs/reference/web-api.md`
+> - `docs/setup/RAILWAY_DEPLOYMENT.md`
+
 > **프로젝트명:** Newsletter Generator Web Service on Railway
 > **저장소:** [https://github.com/hjjung-katech/newsletter-generator](https://github.com/hjjung-katech/newsletter-generator)
 > **작성일:** 2025-05-30

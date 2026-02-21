@@ -31,6 +31,12 @@ This document provides a comprehensive guide for the CI/CD pipeline of the Newsl
 - **Triggers**: Schedule (daily at UTC 23:00), Manual dispatch
 - **Purpose**: Generate actual newsletters and deploy to GitHub Pages
 
+### 5. Docs Quality Workflow (`docs-quality.yml`)
+- **Triggers**: Push/PR with Markdown, docs scripts, workflow changes
+- **Checks**:
+  - Internal Markdown link integrity (`scripts/check_markdown_links.py`)
+  - Markdown style baseline (`scripts/check_markdown_style.py`)
+
 ## Dependency Management
 
 The project uses multiple dependency files for different purposes:
@@ -81,6 +87,13 @@ flake8 newsletter tests
 mypy newsletter
 ```
 
+## Documentation Quality Tools
+
+```bash
+# Run docs integrity/style checks
+make docs-check
+```
+
 ## Pull Request Checklist
 
 Before creating a Pull Request:
@@ -90,6 +103,7 @@ Before creating a Pull Request:
 - [ ] New features have tests
 - [ ] Documentation updated (if needed)
 - [ ] CHANGELOG.md updated (if needed)
+- [ ] Docs checks pass (`make docs-check`) when markdown/scripts/workflows changed
 
 ## Deployment Process
 
@@ -134,6 +148,7 @@ SERPER_API_KEY=dummy_key_for_testing
 .github/workflows/
 ├── ci.yml                 # Main CI workflow
 ├── code-quality.yml       # Code quality checks
+├── docs-quality.yml       # Docs link/style checks
 ├── test-tools.yml         # Tools testing
 └── newsletter.yml         # Newsletter generation
 
