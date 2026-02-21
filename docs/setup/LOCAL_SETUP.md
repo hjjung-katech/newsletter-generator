@@ -15,7 +15,7 @@ python -m venv .venv
 # Windows
 .venv\Scripts\activate
 
-# macOS/Linux  
+# macOS/Linux
 source .venv/bin/activate
 ```
 
@@ -50,8 +50,8 @@ OPENAI_API_KEY=your-openai-api-key-here
 SERPER_API_KEY=your-serper-api-key-here
 
 # 이메일 발송 (선택사항)
-SENDGRID_API_KEY=your-sendgrid-api-key-here
-FROM_EMAIL=newsletter@yourdomain.com
+POSTMARK_SERVER_TOKEN=your-postmark-server-token-here
+EMAIL_SENDER=newsletter@yourdomain.com
 
 # Flask 설정 (선택사항)
 SECRET_KEY=your-secret-key-here
@@ -120,7 +120,7 @@ redis-server
 net start redis
 ```
 
-> **💡 Windows 팁**: 
+> **💡 Windows 팁**:
 > - Chocolatey가 없다면 [chocolatey.org](https://chocolatey.org/install)에서 설치
 > - Scoop이 없다면 PowerShell에서 `iwr -useb get.scoop.sh | iex` 실행
 > - 직접 다운로드 시 압축 해제 후 PATH에 추가 필요
@@ -171,7 +171,7 @@ python app.py
 
 ### 단독 실행 모드 (기본, 권장)
 - **명령어**: `python web/app.py`
-- **특징**: 
+- **특징**:
   - Redis 불필요
   - 즉시 실행 가능
   - 백그라운드 작업은 스레드로 처리
@@ -358,4 +358,4 @@ LOG_LEVEL=DEBUG python app.py
 curl -X POST http://localhost:5000/api/generate \
   -H "Content-Type: application/json" \
   -d '{"keywords": ["AI", "기술"], "period": 7}'
-``` 
+```

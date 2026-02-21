@@ -1,0 +1,7 @@
+interface:
+  display_name: "Newsletter Smoke"
+  short_description: "Smoke test newsletter generation"
+  default_prompt: "Use $newsletter-smoke to run a fast mock-mode generation smoke test and report output validity."
+
+policy:
+  allow_implicit_invocation: true

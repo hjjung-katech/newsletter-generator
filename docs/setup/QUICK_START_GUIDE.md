@@ -34,7 +34,7 @@ source .venv/bin/activate
 # 기본 패키지 설치
 pip install -r requirements.txt
 
-# 웹 애플리케이션 패키지 설치  
+# 웹 애플리케이션 패키지 설치
 pip install -r web/requirements.txt
 ```
 
@@ -46,7 +46,7 @@ python setup_env.py
 
 설정 과정에서:
 1. **API 키 입력**: Gemini API와 Serper API 키를 입력하세요
-2. **이메일 설정**: SendGrid 키는 선택사항입니다 (건너뛰기 가능)
+2. **이메일 설정**: Postmark 키는 선택사항입니다 (건너뛰기 가능)
 
 ### 5단계: 데이터베이스 초기화
 ```bash
@@ -77,14 +77,14 @@ python app.py
 3. 새 프로젝트 생성 또는 기존 프로젝트 선택
 4. API 키 복사
 
-#### 2. Serper API 키 (필수) 
+#### 2. Serper API 키 (필수)
 1. [Serper](https://serper.dev/) 접속
 2. 회원가입 또는 로그인
 3. Dashboard에서 API 키 확인
 4. 무료 플랜으로 2,500회 검색 가능
 
-#### 3. SendGrid API 키 (선택사항)
-1. [SendGrid](https://sendgrid.com/) 접속
+#### 3. Postmark API 키 (선택사항)
+1. [Postmark](https://postmarkapp.com/) 접속
 2. 회원가입 후 API 키 생성
 3. 이메일 발송 기능을 위해 필요
 
@@ -96,8 +96,8 @@ python app.py
 # .env 파일 내용
 GEMINI_API_KEY=your-gemini-api-key-here
 SERPER_API_KEY=your-serper-api-key-here
-SENDGRID_API_KEY=your-sendgrid-api-key-here  # 선택사항
-FROM_EMAIL=newsletter@yourdomain.com  # 선택사항
+POSTMARK_SERVER_TOKEN=your-postmark-server-token-here  # 선택사항
+EMAIL_SENDER=newsletter@yourdomain.com  # 선택사항
 SECRET_KEY=your-secret-key-here
 FLASK_ENV=development
 ```
@@ -113,7 +113,7 @@ FLASK_ENV=development
 ### 기능 설명
 - **History**: 이전에 생성한 뉴스레터 목록
 - **Status**: 현재 진행 중인 작업 상태
-- **Email**: 생성된 뉴스레터를 이메일로 발송 (SendGrid 설정 필요)
+- **Email**: 생성된 뉴스레터를 이메일로 발송 (Postmark 설정 필요)
 
 ## 🔧 문제 해결
 
@@ -199,7 +199,7 @@ python -m newsletter.cli generate --keywords "AI,반도체" --email "your@email.
 
 ### 고급 기능
 - **스케줄링**: 정기적인 뉴스레터 발송
-- **이메일 발송**: SendGrid를 통한 자동 이메일 발송
+- **이메일 발송**: Postmark를 통한 자동 이메일 발송
 - **템플릿 커스터마이징**: HTML 템플릿 수정
 
 ### 프로덕션 배포
@@ -208,16 +208,16 @@ Railway, Heroku 등의 클라우드 플랫폼에 배포할 수 있습니다.
 
 ## 🆘 도움이 필요한 경우
 
-1. **문서 확인**: 
+1. **문서 확인**:
    - `docs/setup/LOCAL_SETUP.md` (상세한 로컬 설정)
    - `docs/setup/RAILWAY_DEPLOYMENT.md` (프로덕션 배포)
 
-2. **이슈 리포트**: 
+2. **이슈 리포트**:
    GitHub Issues에 문제를 보고해주세요.
 
-3. **로그 수집**: 
+3. **로그 수집**:
    문제 발생 시 터미널의 전체 로그를 복사해서 제공해주세요.
 
 ---
 
-**🎉 Newsletter Generator를 사용해주셔서 감사합니다!** 
+**🎉 Newsletter Generator를 사용해주셔서 감사합니다!**
