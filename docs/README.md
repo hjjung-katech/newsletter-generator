@@ -16,14 +16,17 @@
 ## Audience Paths
 
 - 사용자
+  - `setup/QUICK_START_GUIDE.md`
   - `user/USER_GUIDE.md`
   - `user/CLI_REFERENCE.md`
+  - `user/MULTI_LLM_GUIDE.md`
   - `user/email-sending.md`
 
 - 개발자
   - `dev/DEVELOPMENT_GUIDE.md`
   - `dev/CI_CD_GUIDE.md`
   - `developer/CENTRALIZED_SETTINGS_GUIDE.md`
+  - `technical/LLM_CONFIGURATION.md`
 
 - 운영/배포
   - `setup/RAILWAY_DEPLOYMENT.md`
@@ -50,4 +53,4 @@
 - `dev/MAIN_INTEGRATION_EXECUTION_PLAN.md`
 - `FIXES_SUMMARY.md`
 - `PROJECT_STRUCTURE.md`
-- `WEBSERVICE PRD.md`
+- `archive/webservice-prd.md`

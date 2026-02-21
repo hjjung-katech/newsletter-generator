@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check
+.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check
 
 # Python 실행 파일 설정
 PYTHON ?= python3
@@ -136,6 +136,12 @@ skill-release-integration: ## Skill: release-integration
 
 skills-check: skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug ## Run core skills verification
 	@echo "✅ skills-check 완료"
+
+docs-check: ## Markdown 링크/스타일 무결성 검사
+	@echo "🧾 문서 품질 검사 중..."
+	$(PYTHON) scripts/check_markdown_links.py
+	$(PYTHON) scripts/check_markdown_style.py
+	@echo "✅ docs-check 완료"
 
 pre-commit: ## Pre-commit hooks 설치
 	@echo "🔗 Pre-commit hooks 설치 중..."
