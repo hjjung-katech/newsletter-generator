@@ -588,7 +588,7 @@ flake8 newsletter tests --max-line-length=88 --ignore=E203,W503
 - **[📋 프로젝트 요구사항](docs/PRD.md)** - 프로젝트 목표 및 요구사항
 
 ### 프로젝트 정보
-- **[📄 변경사항](docs/CHANGELOG.md)** - 버전별 업데이트 내역
+- **[📄 변경사항](CHANGELOG.md)** - 버전별 업데이트 내역
 - **[📁 전체 문서 목록](docs/README.md)** - 모든 문서의 체계적 안내
 
 ## 🤝 기여하기

@@ -11,7 +11,7 @@
 | **최종 사용자** | [USER_GUIDE.md](user/USER_GUIDE.md), [CLI_REFERENCE.md](user/CLI_REFERENCE.md) | 뉴스레터 생성 및 사용법 |
 | **시스템 관리자** | [INSTALLATION.md](setup/INSTALLATION.md) | 설치, 설정, 배포 |
 | **개발자** | [DEVELOPMENT_GUIDE.md](dev/DEVELOPMENT_GUIDE.md), [ARCHITECTURE.md](ARCHITECTURE.md) | 개발 환경, 코드 기여 |
-| **프로젝트 관리자** | [PRD.md](PRD.md), [CHANGELOG.md](CHANGELOG.md) | 요구사항, 변경사항 추적 |
+| **프로젝트 관리자** | [PRD.md](PRD.md), [CHANGELOG.md](../CHANGELOG.md) | 요구사항, 변경사항 추적 |
 
 ## 📁 문서 구조
 
@@ -83,7 +83,7 @@
   - 기능 요구사항
   - 비기능 요구사항
   - 성공 지표
-- **[CHANGELOG.md](CHANGELOG.md)** - 📄 버전별 변경사항
+- **[CHANGELOG.md](../CHANGELOG.md)** - 📄 버전별 변경사항
   - 릴리스 노트
   - 기능 추가/변경/제거
   - 버그 수정
@@ -95,23 +95,23 @@
 ```mermaid
 graph TD
     A[README.md<br/>프로젝트 진입점] --> B[docs/README.md<br/>문서 네비게이션]
-    
+
     B --> C[user/USER_GUIDE.md<br/>사용자 매뉴얼]
     B --> D[setup/INSTALLATION.md<br/>설치 가이드]
     B --> E[dev/DEVELOPMENT_GUIDE.md<br/>개발 가이드]
-    
+
     C --> F[user/CLI_REFERENCE.md<br/>CLI 참조]
-    
+
     E --> G[dev/CI_CD_GUIDE.md<br/>CI/CD 가이드]
     E --> H[dev/CODE_QUALITY.md<br/>코드 품질]
     E --> I[ARCHITECTURE.md<br/>시스템 아키텍처]
     E --> M[dev/MULTI_LLM_IMPLEMENTATION_SUMMARY.md<br/>멀티 LLM 구현 보고서]
-    
+
     I --> J[UNIFIED_ARCHITECTURE.md<br/>통합 아키텍처]
-    
+
     B --> K[PRD.md<br/>요구사항]
     B --> L[CHANGELOG.md<br/>변경사항]
-    
+
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style C fill:#e8f5e8
@@ -137,7 +137,7 @@ graph TD
 ### 프로젝트를 이해하고 싶다면
 1. **[프로젝트 요구사항](PRD.md)** - 프로젝트 목표
 2. **[통합 아키텍처](UNIFIED_ARCHITECTURE.md)** - 기술적 설계
-3. **[변경사항](CHANGELOG.md)** - 프로젝트 진화
+3. **[변경사항](../CHANGELOG.md)** - 프로젝트 진화
 
 ## 📝 문서 작성 및 유지보수 가이드
 
@@ -164,4 +164,4 @@ graph TD
 - **주요 변경사항**: CHANGELOG.md에 기록
 - **문서 구조 변경**: 이 README.md 업데이트
 - **링크 무결성**: 정기적인 링크 검증
-- **내용 검토**: 분기별 문서 내용 검토 및 업데이트 
+- **내용 검토**: 분기별 문서 내용 검토 및 업데이트

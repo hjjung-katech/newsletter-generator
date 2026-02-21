@@ -266,7 +266,7 @@ newsletter test output/data.json --mode content
 
 - ✅ [사용자 가이드](user/USER_GUIDE.md)
 - ✅ [개발자 가이드](dev/DEVELOPMENT_GUIDE.md)
-- ✅ [API 참조](API_REFERENCE.md)
+- ✅ [CLI 참조](user/CLI_REFERENCE.md)
 - ✅ [설치 가이드](setup/INSTALLATION.md)
 
 ### 14.2 지원 채널

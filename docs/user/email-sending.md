@@ -150,7 +150,7 @@ curl http://localhost:5000/api/status/uuid-here
 
 ## 관련 문서
 
-- [설치 가이드](../setup/installation.md)
-- [환경 설정](../setup/configuration.md)
-- [API 문서](../technical/api.md)
-- [문제 해결](../setup/troubleshooting.md) 
+- [설치 가이드](../setup/INSTALLATION.md)
+- [환경 설정](../setup/LOCAL_SETUP.md)
+- [CLI 참조](CLI_REFERENCE.md)
+- [문제 해결](../setup/QUICK_START_GUIDE.md)
