@@ -153,4 +153,34 @@ docs/dev/
 
 - **Test execution time**: ~50% reduction with dependency optimization
 - **CI stability**: External dependency removal improves reliability
-- **Development efficiency**: Automated code quality checks 
+- **Development efficiency**: Automated code quality checks
+
+## Skill-Aligned Gate Mapping
+
+The repository uses six baseline skills and mapped Makefile targets:
+
+- `ci-gate` -> `make skill-ci-gate`
+- `docs-and-config-consistency` -> `make skill-docs-and-config-consistency`
+- `newsletter-smoke` -> `make skill-newsletter-smoke`
+- `web-smoke` -> `make skill-web-smoke`
+- `scheduler-debug` -> `make skill-scheduler-debug`
+- `release-integration` -> `make skill-release-integration`
+
+Recommended execution order:
+
+1. `make skill-docs-and-config-consistency`
+2. `make skill-newsletter-smoke`
+3. `make skill-web-smoke`
+4. `make skill-scheduler-debug`
+5. `make skill-release-integration`
+6. `make skill-ci-gate`
+
+## Release Checklist
+
+Before merge/release:
+
+1. `python scripts/release_preflight.py`
+2. `python scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged`
+3. `python scripts/validate_release_manifest.py --manifest .release/manifests/release-scheduler-reliability.txt --source staged`
+4. `python scripts/validate_release_manifest.py --manifest .release/manifests/release-runtime-binary-bootstrap.txt --source staged`
+5. `python run_ci_checks.py --fix --full`

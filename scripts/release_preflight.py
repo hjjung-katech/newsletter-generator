@@ -11,12 +11,26 @@ import sys
 from pathlib import Path
 
 REQUIRED_FILES = [
+    "AGENTS.md",
+    "web/AGENTS.md",
     ".github/PULL_REQUEST_TEMPLATE/release_integration.md",
     "docs/dev/MAIN_INTEGRATION_EXECUTION_PLAN.md",
     "docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md",
     "Makefile",
     ".release/baseline.json",
     ".release/manifests/release-ci-platform.txt",
+    ".agents/skills/ci-gate/SKILL.md",
+    ".agents/skills/ci-gate/agents/openai.yaml",
+    ".agents/skills/docs-and-config-consistency/SKILL.md",
+    ".agents/skills/docs-and-config-consistency/agents/openai.yaml",
+    ".agents/skills/newsletter-smoke/SKILL.md",
+    ".agents/skills/newsletter-smoke/agents/openai.yaml",
+    ".agents/skills/web-smoke/SKILL.md",
+    ".agents/skills/web-smoke/agents/openai.yaml",
+    ".agents/skills/scheduler-debug/SKILL.md",
+    ".agents/skills/scheduler-debug/agents/openai.yaml",
+    ".agents/skills/release-integration/SKILL.md",
+    ".agents/skills/release-integration/agents/openai.yaml",
 ]
 REQUIRED_CMD_GROUPS = [
     ("python", "python3"),

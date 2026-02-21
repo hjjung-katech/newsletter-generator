@@ -442,6 +442,38 @@ class TestScheduleIntegration:
                 mock_newsletter_generation.call_count == 1
             ), "Newsletter generation should be called only once"
 
+    def test_redis_enqueue_failure_falls_back_to_sync(
+        self, schedule_runner_with_db, mock_newsletter_generation
+    ):
+        """Redis enqueue failure should fallback to synchronous execution."""
+        from unittest.mock import MagicMock
+
+        fixed_now = datetime(2025, 8, 13, 15, 50, 0, tzinfo=timezone.utc)
+
+        schedule_runner_with_db.queue = MagicMock()
+        schedule_runner_with_db.queue.enqueue.side_effect = RuntimeError(
+            "redis unavailable"
+        )
+
+        schedule = {
+            "id": "redis_fallback_schedule",
+            "params": {"keywords": ["AI"], "send_email": False},
+            "rrule": "FREQ=DAILY;BYHOUR=15;BYMINUTE=50",
+            "next_run": fixed_now - timedelta(minutes=1),
+            "created_at": fixed_now - timedelta(days=1),
+            "is_test": False,
+        }
+
+        with patch("web.schedule_runner.datetime") as mock_datetime:
+            mock_datetime.now.return_value = fixed_now
+            mock_datetime.side_effect = lambda *args, **kw: datetime(*args, **kw)
+
+            success = schedule_runner_with_db.execute_schedule(schedule)
+
+        assert success, "Execution should succeed through fallback path"
+        schedule_runner_with_db.queue.enqueue.assert_called_once()
+        mock_newsletter_generation.assert_called_once()
+
 
 @pytest.mark.integration
 @pytest.mark.real_api
