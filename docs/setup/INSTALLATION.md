@@ -90,6 +90,8 @@ docker run -it --env-file .env newsletter-generator
 
 ## 환경 설정
 
+> 환경변수 정본은 `../reference/environment-variables.md`를 기준으로 유지합니다.
+
 ### 1. 환경 변수 파일 생성
 
 ```bash
@@ -458,7 +460,7 @@ rm -rf newsletter-env/
 
 설치가 완료되었다면:
 
-1. [설정 가이드](CONFIGURATION.md)에서 상세한 설정 방법을 확인하세요
+1. [설정 가이드](LOCAL_SETUP.md)에서 상세한 설정 방법을 확인하세요
 2. [사용자 가이드](../user/USER_GUIDE.md)에서 기본 사용법을 익히세요
 3. [CLI 참조](../user/CLI_REFERENCE.md)에서 모든 명령어를 확인하세요
-4. [예시 모음](../user/EXAMPLES.md)에서 다양한 사용 시나리오를 참고하세요 
+4. [예시 모음](../user/CLI_REFERENCE.md)에서 다양한 사용 시나리오를 참고하세요

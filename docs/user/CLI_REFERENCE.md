@@ -414,6 +414,8 @@ newsletter --version
 
 ## 환경 변수
 
+> 환경변수 정본은 `../reference/environment-variables.md`를 기준으로 유지합니다.
+
 CLI에서 사용하는 주요 환경 변수들입니다.
 
 ### 필수 환경 변수
@@ -588,6 +590,6 @@ CLI 명령어의 종료 코드 의미:
 ## 추가 리소스
 
 - [사용자 가이드](USER_GUIDE.md) - 상세한 사용법과 개념 설명
-- [예시 모음](EXAMPLES.md) - 다양한 시나리오별 예시
-- [FAQ](FAQ.md) - 자주 묻는 질문과 해결책
-- [설정 가이드](../setup/CONFIGURATION.md) - 환경 변수 및 설정 상세 가이드 
+- [예시 모음](#예시-모음) - 다양한 시나리오별 예시
+- [문제 해결 가이드](../setup/QUICK_START_GUIDE.md) - 자주 발생하는 문제와 해결책
+- [설정 가이드](../setup/LOCAL_SETUP.md) - 환경 변수 및 설정 상세 가이드
