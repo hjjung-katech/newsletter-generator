@@ -414,6 +414,8 @@ newsletter --version
 
 ## 환경 변수
 
+> 환경변수 정본은 `../reference/environment-variables.md`를 기준으로 유지합니다.
+
 CLI에서 사용하는 주요 환경 변수들입니다.
 
 ### 필수 환경 변수

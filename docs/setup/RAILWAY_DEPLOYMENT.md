@@ -28,6 +28,8 @@ Railway에서 다음과 같은 서비스들이 실행됩니다:
 
 ## 필수 환경변수 설정
 
+> 환경변수 정본은 `../reference/environment-variables.md`를, API 정본은 `../reference/web-api.md`를 기준으로 유지합니다.
+
 ### 1. OpenAI API
 ```bash
 OPENAI_API_KEY=sk-...

@@ -31,6 +31,8 @@ pip install -r web/requirements.txt
 
 ## 4. 환경 변수 설정
 
+> 환경변수 정본은 `../reference/environment-variables.md`를 기준으로 유지합니다.
+
 ### 자동 설정 (권장)
 ```bash
 # 자동 환경 설정 스크립트 실행

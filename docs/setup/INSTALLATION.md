@@ -90,6 +90,8 @@ docker run -it --env-file .env newsletter-generator
 
 ## 환경 설정
 
+> 환경변수 정본은 `../reference/environment-variables.md`를 기준으로 유지합니다.
+
 ### 1. 환경 변수 파일 생성
 
 ```bash
