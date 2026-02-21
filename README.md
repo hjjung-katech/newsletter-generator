@@ -1,6 +1,27 @@
 # Newsletter Generator
 
-키워드/도메인 기반으로 뉴스를 수집하고, 요약된 HTML 뉴스레터를 생성·발송하는 프로젝트입니다.
+[![CI/CD Pipeline](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml)
+[![Docs Quality](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/docs-quality.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/docs-quality.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Deploy Guide (Railway)](https://img.shields.io/badge/deploy-Railway-0B0D0E?logo=railway)](docs/setup/RAILWAY_DEPLOYMENT.md)
+
+키워드/도메인 기반으로 최신 뉴스를 수집하고, AI로 요약된 HTML 뉴스레터를 생성·발송하는 프로젝트입니다.
+
+## 핵심 포인트
+
+- Canonical runtime: `Flask + Postmark`
+- 문서 정본(SSOT) 기반 운영: `docs/README.md`
+- 로컬/배포 모두 동일한 품질 게이트 사용: `run_ci_checks.py`, `make docs-check`
+
+## 빠른 링크
+
+- 문서 허브: `docs/README.md`
+- 환경변수 계약: `docs/reference/environment-variables.md`
+- Web API 계약: `docs/reference/web-api.md`
+- Railway 배포: `docs/setup/RAILWAY_DEPLOYMENT.md`
+- 개발 가이드: `docs/dev/DEVELOPMENT_GUIDE.md`
 
 ## Quickstart (5분)
 
