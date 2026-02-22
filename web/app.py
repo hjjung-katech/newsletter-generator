@@ -1387,80 +1387,6 @@ def run_schedule_now(schedule_id):
         return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500
 
 
-@app.route("/debug/history-table")
-def debug_history_table():
-    """Debug endpoint to check history table status"""
-    try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
-
-        # Get table info
-        cursor.execute("PRAGMA table_info(history)")
-        table_info = cursor.fetchall()
-
-        # Get record count
-        cursor.execute("SELECT COUNT(*) FROM history")
-        total_count = cursor.fetchone()[0]
-
-        # Get recent records with minimal info
-        cursor.execute(
-            "SELECT id, status, created_at FROM history ORDER BY created_at DESC LIMIT 5"
-        )
-        recent_records = cursor.fetchall()
-
-        # Get status distribution
-        cursor.execute("SELECT status, COUNT(*) FROM history GROUP BY status")
-        status_distribution = cursor.fetchall()
-
-        conn.close()
-
-        return jsonify(
-            {
-                "table_info": table_info,
-                "total_records": total_count,
-                "recent_records": [
-                    {"id": r[0], "status": r[1], "created_at": r[2]}
-                    for r in recent_records
-                ],
-                "status_distribution": [
-                    {"status": r[0], "count": r[1]} for r in status_distribution
-                ],
-            }
-        )
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/debug/clear-pending")
-def clear_pending_records():
-    """Debug endpoint to clear pending records (개발용)"""
-    try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
-
-        # Get pending count before deletion
-        cursor.execute("SELECT COUNT(*) FROM history WHERE status = 'pending'")
-        pending_count = cursor.fetchone()[0]
-
-        # Delete pending records
-        cursor.execute("DELETE FROM history WHERE status = 'pending'")
-        deleted_count = cursor.rowcount
-
-        conn.commit()
-        conn.close()
-
-        return jsonify(
-            {
-                "message": f"Cleared {deleted_count} pending records",
-                "pending_before": pending_count,
-                "deleted": deleted_count,
-            }
-        )
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
 @app.route("/health")
 def health_check():
     """Enhanced health check endpoint for Railway"""
@@ -1589,44 +1515,12 @@ def health_check():
     return jsonify(health_status), status_code
 
 
-@app.route("/test")
-def test():
-    """Simple test route"""
-    return "Flask is working! Template folder: " + str(app.template_folder)
+try:
+    from routes_ops import register_ops_routes
+except ImportError:
+    from web.routes_ops import register_ops_routes  # pragma: no cover
 
-
-@app.route("/test-db")
-def test_db():
-    """Serve the database test HTML page"""
-    try:
-        with open(
-            os.path.join(os.path.dirname(os.path.dirname(__file__)), "test_api.html"),
-            "r",
-        ) as f:
-            return f.read()
-    except FileNotFoundError:
-        return "<h1>Test file not found</h1>", 404
-
-
-@app.route("/test-template")
-def test_template():
-    """Test template rendering"""
-    try:
-        return render_template("test.html")
-    except Exception as e:
-        return f"Template error: {str(e)}", 500
-
-
-@app.route("/test-api")
-def test_api():
-    """API test page"""
-    return render_template("test.html")
-
-
-@app.route("/manual-test")
-def manual_test():
-    """Manual test page for newsletter generation workflow"""
-    return render_template("manual_test.html")
+register_ops_routes(app, DATABASE_PATH)
 
 
 try:
