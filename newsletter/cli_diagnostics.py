@@ -19,7 +19,7 @@ def check_config():
     console.print("=" * 60)
 
     # 1. 이메일 설정 확인
-    console.print(f"\n[bold yellow]📧 이메일 발송 설정[/bold yellow]")
+    console.print("\n[bold yellow]📧 이메일 발송 설정[/bold yellow]")
 
     # EMAIL_SENDER 확인
     if config.EMAIL_SENDER:
@@ -52,7 +52,7 @@ def check_config():
         console.print("   위의 누락된 설정을 .env 파일에 추가해주세요")
 
     # 2. LLM 설정 확인
-    console.print(f"\n[bold yellow]🤖 LLM 설정[/bold yellow]")
+    console.print("\n[bold yellow]🤖 LLM 설정[/bold yellow]")
 
     # Gemini API Key 확인
     if config.GEMINI_API_KEY:
@@ -89,18 +89,18 @@ def check_config():
         console.print("[yellow]⚪ ANTHROPIC_API_KEY:[/yellow] 설정되지 않음 (선택사항)")
 
     # 3. Google Drive 설정 확인 (선택사항)
-    console.print(f"\n[bold yellow]☁️  Google Drive 설정[/bold yellow]")
+    console.print("\n[bold yellow]☁️  Google Drive 설정[/bold yellow]")
 
     credentials_path = "credentials.json"
     if os.path.exists(credentials_path):
-        console.print(f"[green]✅ credentials.json:[/green] 파일 존재")
+        console.print("[green]✅ credentials.json:[/green] 파일 존재")
         console.print("   - Google Drive 저장 기능 사용 가능")
     else:
         console.print("[yellow]⚪ credentials.json:[/yellow] 파일 없음")
         console.print("   - Google Drive 저장 기능 비활성화 (선택사항)")
 
     # 4. 출력 디렉토리 확인
-    console.print(f"\n[bold yellow]📁 출력 디렉토리[/bold yellow]")
+    console.print("\n[bold yellow]📁 출력 디렉토리[/bold yellow]")
 
     output_dir = "./output"
     if os.path.exists(output_dir):
@@ -118,11 +118,11 @@ def check_config():
         console.print(f"[yellow]⚪ 출력 디렉토리:[/yellow] {output_dir} (자동 생성됨)")
 
     # 5. 설정 파일 확인
-    console.print(f"\n[bold yellow]⚙️  설정 파일[/bold yellow]")
+    console.print("\n[bold yellow]⚙️  설정 파일[/bold yellow]")
 
     config_file = "config.yml"
     if os.path.exists(config_file):
-        console.print(f"[green]✅ config.yml:[/green] 파일 존재")
+        console.print("[green]✅ config.yml:[/green] 파일 존재")
         console.print("   - 사용자 정의 설정 적용 가능")
     else:
         console.print("[yellow]⚪ config.yml:[/yellow] 파일 없음")
@@ -130,13 +130,13 @@ def check_config():
 
     env_file = ".env"
     if os.path.exists(env_file):
-        console.print(f"[green]✅ .env:[/green] 파일 존재")
+        console.print("[green]✅ .env:[/green] 파일 존재")
     else:
         console.print("[red]❌ .env:[/red] 파일 없음")
         console.print("   - .env.example을 복사하여 .env 파일 생성 필요")
 
     # 6. 종합 상태 요약
-    console.print(f"\n[bold blue]📊 종합 상태 요약[/bold blue]")
+    console.print("\n[bold blue]📊 종합 상태 요약[/bold blue]")
     console.print("=" * 60)
 
     required_settings = [
@@ -212,13 +212,13 @@ def check_llm():
                 console.print(f"  • [red]{provider_name}[/red] - 사용 불가 (API 키 없음)")
 
         # 현재 LLM 설정 표시
-        console.print(f"\n[bold blue]📋 현재 LLM 설정[/bold blue]")
+        console.print("\n[bold blue]📋 현재 LLM 설정[/bold blue]")
         llm_config = config.LLM_CONFIG
         default_provider = llm_config.get("default_provider", "gemini")
         console.print(f"기본 제공자: [blue]{default_provider}[/blue]")
 
         # 작업별 설정 표시
-        console.print(f"\n[bold blue]🔧 작업별 LLM 할당[/bold blue]")
+        console.print("\n[bold blue]🔧 작업별 LLM 할당[/bold blue]")
         models_config = llm_config.get("models", {})
 
         for task, task_config in models_config.items():
@@ -240,7 +240,7 @@ def check_llm():
 
         # 권장사항 표시
         if len(available_providers) == 0:
-            console.print(f"\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]")
+            console.print("\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]")
             console.print("다음 중 하나 이상의 API 키를 .env 파일에 설정해주세요:")
             console.print("  • GEMINI_API_KEY")
             console.print("  • OPENAI_API_KEY")
@@ -279,12 +279,12 @@ def test_llm(
         from .llm_factory import get_llm_for_task
 
         # LLM 생성
-        console.print(f"[cyan]LLM 생성 중...[/cyan]")
+        console.print("[cyan]LLM 생성 중...[/cyan]")
         llm = get_llm_for_task(task, enable_fallback=False)
         console.print(f"[green]✅ LLM 생성 완료: {type(llm).__name__}[/green]")
 
         # 테스트 실행
-        console.print(f"[cyan]테스트 실행 중...[/cyan]")
+        console.print("[cyan]테스트 실행 중...[/cyan]")
         console.print(f"프롬프트: {prompt}")
 
         start_time = time.time()
@@ -295,10 +295,10 @@ def test_llm(
         response_time = end_time - start_time
         response_text = str(response).strip()
 
-        console.print(f"\n[bold green]📝 응답 결과[/bold green]")
+        console.print("\n[bold green]📝 응답 결과[/bold green]")
         console.print(f"응답 시간: {response_time:.2f}초")
         console.print(f"응답 길이: {len(response_text)}자")
-        console.print(f"\n[blue]응답 내용:[/blue]")
+        console.print("\n[blue]응답 내용:[/blue]")
         console.print(response_text)
 
     except Exception as e:
@@ -351,7 +351,7 @@ def list_providers():
                 console.print(f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]")
 
         # 기능별 모델 설정 표시
-        console.print(f"\n[bold cyan]기능별 모델 설정[/bold cyan]")
+        console.print("\n[bold cyan]기능별 모델 설정[/bold cyan]")
         console.print("=" * 50)
 
         models_config = config.LLM_CONFIG.get("models", {})
@@ -393,10 +393,10 @@ def test_email(
     This command allows you to test the email delivery system without generating a full newsletter.
     You can send a simple test message or use an existing HTML file as the email content.
     """
-    console.print(f"\n[bold blue]📧 이메일 발송 테스트[/bold blue]")
+    console.print("\n[bold blue]📧 이메일 발송 테스트[/bold blue]")
 
     # EMAIL_SENDER 설정 상태 확인 및 표시
-    console.print(f"\n[bold yellow]📋 이메일 설정 확인[/bold yellow]")
+    console.print("\n[bold yellow]📋 이메일 설정 확인[/bold yellow]")
 
     # EMAIL_SENDER 상태 확인
     if config.EMAIL_SENDER:
@@ -571,7 +571,7 @@ newsletter run --keywords \"AI,머신러닝\" --to {to} --output-format html
         raise typer.Exit(code=1)
 
     # Send the test email
-    console.print(f"\n[cyan]📤 이메일 발송 중...[/cyan]")
+    console.print("\n[cyan]📤 이메일 발송 중...[/cyan]")
     console.print(f"[info]발송자: {config.EMAIL_SENDER}[/info]")
     console.print(f"[info]수신자: {to}[/info]")
     console.print(f"[info]제목: {subject}[/info]")
@@ -582,7 +582,7 @@ newsletter run --keywords \"AI,머신러닝\" --to {to} --output-format html
         )
 
         if success:
-            console.print(f"\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]")
+            console.print("\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]")
             console.print(f"[green]수신자 {to}의 받은편지함을 확인해주세요.[/green]")
 
             # Save test email content for reference
@@ -599,7 +599,7 @@ newsletter run --keywords \"AI,머신러닝\" --to {to} --output-format html
                 console.print(f"[yellow]테스트 파일 저장 실패: {e}[/yellow]")
 
         else:
-            console.print(f"\n[bold red]❌ 이메일 발송에 실패했습니다.[/bold red]")
+            console.print("\n[bold red]❌ 이메일 발송에 실패했습니다.[/bold red]")
             console.print("[yellow]Postmark 설정과 네트워크 연결을 확인해주세요.[/yellow]")
             raise typer.Exit(code=1)
 
