@@ -1,6 +1,20 @@
 # Default ownership
 * @hjjung-katech
 
+# Runtime boundaries
+apps/** @hjjung-katech
+packages/newsletter_core/** @hjjung-katech
+newsletter/** @hjjung-katech
+web/** @hjjung-katech
+
+# Architecture governance
+scripts/architecture/** @hjjung-katech
+run_ci_checks.py @hjjung-katech
+
+# Test boundaries
+tests/contract/** @hjjung-katech
+tests/integration/** @hjjung-katech
+
 # Documentation
 README.md @hjjung-katech
 docs/** @hjjung-katech

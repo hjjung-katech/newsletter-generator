@@ -1,5 +1,50 @@
 # Changelog
 
+## [0.7.0] - 2026-02-22 - Architecture Refactoring Stack (PR-0 ~ PR-5)
+
+### 🚀 주요 기능
+
+#### 구조 가드레일 도입 (P0)
+- `scripts/architecture/check_import_boundaries.py` 추가
+- `scripts/architecture/check_import_cycles.py` 추가
+- `scripts/architecture/boundary_rules.yml`, `boundary_baseline.json` 추가
+- CI/로컬 게이트 연동:
+  - `run_ci_checks.py`
+  - `.github/workflows/main-ci.yml`
+  - `.github/workflows/ci.yml`
+  - `Makefile`
+
+#### 실행 경계 스켈레톤 도입
+- `apps/cli/main.py`, `apps/web/main.py`, `apps/worker/main.py`, `apps/scheduler/main.py` 추가
+- `packages/newsletter_core/src/newsletter_core/{public,application,domain,infrastructure,internal}` 추가
+
+#### 첫 수직 슬라이스 전환 (generation)
+- `collect/summarize/compose/deliver` 모듈을 `newsletter_core.application.generation`으로 이동
+- `newsletter/*` 경로에는 호환 shim 유지
+
+#### 퍼블릭 파사드/소비자 전환
+- `newsletter_core.public.{generation,settings,lifecycle}` 추가
+- CLI가 `newsletter_core.public.generation`를 직접 사용하도록 전환
+
+#### 경계 강화 및 품질 고정
+- facade contract 테스트 추가: `tests/contract/test_generation_facade.py`
+- 통합 테스트 정비: `tests/integration/test_cli_integration.py`
+- `web -> newsletter`는 전면 금지, `web`은 `newsletter_core.public` 경유 사용
+
+### 🔧 호환성 정책
+- `newsletter.api`는 `DeprecationWarning`과 함께 `newsletter_core.public.generation`을 re-export
+- shim 유지 기간: 다음 2개 정식 태그
+- shim 제거 시점: 도입 후 3번째 정식 태그
+
+### 🌟 병합/검증
+- PR 스택 병합 완료: `#40`, `#41`, `#42`, `#43`, `#44`, `#45` (+ aggregate `#46`)
+- `main` 머지 후 CI 성공:
+  - Main CI Pipeline (`22270734622`)
+  - Code Quality (`22270734610`)
+  - Email Tests (`22270734612`)
+  - Deployment Pipeline (`22270734616`)
+  - CI/CD Pipeline (`22270734619`)
+
 ## [0.6.0] - 2025-06-11 - F-14 Centralized Settings Layer 구현
 
 ### 🚀 주요 기능
@@ -211,7 +256,7 @@
   ```
   tests/
   ├── unit_tests/          # 단위 테스트
-  ├── integration/         # 통합 테스트  
+  ├── integration/         # 통합 테스트
   ├── manual/              # 수동 테스트
   └── api_tests/           # API 테스트
   ```
@@ -390,7 +435,7 @@
 ### Fixed
 - LangGraph 워크플로우 에러 수정
   - 요약 단계에서 데이터 구조 불일치 문제 해결
-  - 뉴스레터 작성 완료 단계 추가 
+  - 뉴스레터 작성 완료 단계 추가
   - 최종 HTML 파일 저장 기능 자동화
 
 ---
@@ -400,7 +445,7 @@
 ### Fixed
 - LangSmith 및 Google Generative AI 호환성 문제 해결
   - `request_timeout` → `timeout`으로 매개변수 이름 변경
-  - `streaming` → `disable_streaming`으로 매개변수 이름 변경 
+  - `streaming` → `disable_streaming`으로 매개변수 이름 변경
   - LangSmith Client API 변경사항 반영 (`get_tracing_callback` → `LangChainTracer` 직접 생성)
   - 프롬프트 형식 수정으로 들여쓰기 문제 해결
 
@@ -439,4 +484,4 @@
 - HTML 및 Markdown 형식 뉴스레터 생성
 - 중복 기사 감지 및 제거
 - 주요 뉴스 소스 우선순위 필터링
-- 키워드별 기사 그룹화 
+- 키워드별 기사 그룹화

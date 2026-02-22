@@ -28,14 +28,37 @@
   - `tests/contract/test_generation_facade.py`
   - updated `tests/integration/test_cli_integration.py`
 
+### Merged PR stack (remote)
+- PR-0: `#40` merged at `2026-02-22T04:50:59Z`
+- PR-1: `#41` merged at `2026-02-22T04:51:33Z`
+- PR-2: `#42` merged at `2026-02-22T04:51:48Z`
+- PR-3: `#43` merged at `2026-02-22T04:52:02Z`
+- PR-4: `#44` merged at `2026-02-22T04:52:12Z`
+- PR-5: `#45` merged at `2026-02-22T04:53:09Z`
+- Aggregate stack PR: `#46` merged at `2026-02-22T04:53:10Z`
+
+### Main CI confirmation (post-merge)
+- Final merge commit CI set completed with `success`:
+  - Main CI Pipeline: run `22270734622`
+  - Code Quality: run `22270734610`
+  - Email Tests: run `22270734612`
+  - Deployment Pipeline: run `22270734616`
+  - CI/CD Pipeline: run `22270734619`
+
+### Post-merge hardening (started)
+- `web -> newsletter` architecture rule tightened from allowlist to full forbid.
+- `web` runtime guidance updated to use `newsletter_core.public.generation`.
+- Legacy shim deprecation schedule documented in:
+  - `docs/technical/shim-deprecation-schedule.md`
+
 ### Compatibility policy
 - Legacy compatibility shims retained for 2 release cycles.
 - `newsletter.api` now emits `DeprecationWarning` and re-exports from `newsletter_core.public.generation`.
 
 ### Next checkpoints
 - Switch deployment/runtime commands to `apps/*` wrappers as primary entrypoints.
-- Move remaining worker/scheduler orchestration behind `newsletter_core.public` use-cases.
-- Remove legacy shims after deprecation window.
+- Track and enforce shim removal milestones by release tags.
+- Remove legacy shims at the third release tag after introduction.
 
 ### Verification snapshot (local)
 - Environment bootstrap:

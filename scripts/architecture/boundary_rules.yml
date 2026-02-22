@@ -17,18 +17,11 @@
       "message": "newsletter 계층은 web 계층을 import 하면 안 됩니다."
     },
     {
-      "id": "web_to_newsletter_allowlist",
-      "type": "allowlist_target_modules",
+      "id": "web_to_newsletter_forbidden",
+      "type": "forbid_prefix",
       "source_prefix": "web",
-      "target_root": "newsletter",
-      "allowed_targets": [
-        "newsletter.api",
-        "newsletter.centralized_settings",
-        "newsletter.config_manager",
-        "newsletter.cli",
-        "newsletter.utils.shutdown_manager"
-      ],
-      "message": "web 계층은 허용된 newsletter 공개/호환 진입점만 import 해야 합니다."
+      "target_prefix": "newsletter",
+      "message": "web 계층은 newsletter 레거시 패키지를 import 하면 안 됩니다. newsletter_core.public만 사용하세요."
     },
     {
       "id": "domain_no_infrastructure",
