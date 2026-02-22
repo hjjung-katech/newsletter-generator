@@ -48,22 +48,26 @@ if DEBUG:
     )
 
 
-@app.exception_handler(InputValidationError)
-async def validation_exception_handler(request: Request, exc: InputValidationError):
+@app.exception_handler(InputValidationError)  # type: ignore[untyped-decorator]
+async def validation_exception_handler(
+    request: Request, exc: InputValidationError
+) -> JSONResponse:
     """입력 검증 오류 처리"""
     logging.warning(f"Input validation error: {exc}")
     return JSONResponse(status_code=400, content={"error": "입력값이 유효하지 않습니다"})
 
 
-@app.exception_handler(FileValidationError)
-async def file_validation_exception_handler(request: Request, exc: FileValidationError):
+@app.exception_handler(FileValidationError)  # type: ignore[untyped-decorator]
+async def file_validation_exception_handler(
+    request: Request, exc: FileValidationError
+) -> JSONResponse:
     """파일 검증 오류 처리"""
     logging.warning(f"File validation error: {exc}")
     return JSONResponse(status_code=400, content={"error": "파일이 유효하지 않습니다"})
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
+@app.exception_handler(HTTPException)  # type: ignore[untyped-decorator]
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """HTTP 예외 처리"""
     logging.warning(f"HTTP exception: {exc.status_code} - {exc.detail}")
     return JSONResponse(
@@ -71,21 +75,21 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
+@app.exception_handler(Exception)  # type: ignore[untyped-decorator]
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """일반 예외 처리"""
     logging.error(f"Unexpected error: {exc}", exc_info=True)
     return JSONResponse(status_code=500, content={"error": "서버 내부 오류가 발생했습니다"})
 
 
-@app.get("/")
-async def root():
+@app.get("/")  # type: ignore[untyped-decorator]
+async def root() -> dict[str, str]:
     """루트 엔드포인트"""
     return {"message": "Newsletter Generator API", "version": "1.0.0"}
 
 
-@app.get("/health")
-async def health_check():
+@app.get("/health")  # type: ignore[untyped-decorator]
+async def health_check() -> dict[str, str]:
     """헬스 체크 엔드포인트"""
     return {"status": "healthy", "environment": ENVIRONMENT}
 
