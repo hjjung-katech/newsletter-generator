@@ -1698,93 +1698,12 @@ def send_email_api():
         return jsonify({"error": f"이메일 발송 실패: {str(e)}"}), 500
 
 
-@app.route("/api/email-config")
-def check_email_config():
-    """이메일 설정 상태를 확인"""
-    try:
-        # 이메일 설정 확인 함수 import
-        try:
-            import mail
+try:
+    from routes_email_api import register_email_api_routes
+except ImportError:
+    from web.routes_email_api import register_email_api_routes  # pragma: no cover
 
-            check_config_func = mail.check_email_configuration
-        except ImportError:
-            try:
-                from . import mail
-
-                check_config_func = mail.check_email_configuration
-            except ImportError:
-                return jsonify({"error": "이메일 모듈을 찾을 수 없습니다."}), 500
-
-        config_status = check_config_func()
-
-        return jsonify(
-            {
-                "postmark_token_configured": config_status["postmark_token_configured"],
-                "from_email_configured": config_status["from_email_configured"],
-                "ready": config_status["ready"],
-                "message": (
-                    "이메일 발송 준비 완료" if config_status["ready"] else "환경변수 설정이 필요합니다"
-                ),
-            }
-        )
-
-    except Exception as e:
-        logging.error(f"Email config check failed: {e}")
-        return jsonify({"error": f"설정 확인 실패: {str(e)}"}), 500
-
-
-@app.route("/api/test-email", methods=["POST"])
-def send_test_email_api():
-    """테스트 이메일을 발송"""
-    try:
-        data = request.get_json()
-        email = data.get("email")
-
-        if not email:
-            return jsonify({"error": "이메일 주소가 필요합니다"}), 400
-
-        # 이메일 형식 간단 검증
-        if "@" not in email or "." not in email:
-            return jsonify({"success": False, "error": "Invalid email format"}), 400
-
-        # 테스트 이메일 발송 함수 import
-        try:
-            import mail
-
-            send_test_func = mail.send_test_email
-        except ImportError:
-            try:
-                from . import mail
-
-                send_test_func = mail.send_test_email
-            except ImportError:
-                return jsonify({"error": "이메일 모듈을 찾을 수 없습니다."}), 500
-
-        response = send_test_func(to=email)
-
-        return jsonify(
-            {
-                "success": True,
-                "message": f"테스트 이메일이 {email}로 발송되었습니다",
-                "message_id": response.get("MessageID") if response else None,
-            }
-        )
-
-    except Exception as e:
-        logging.error(f"Test email sending failed: {e}")
-        # Handle RetryError from tenacity
-        from tenacity import RetryError
-
-        if isinstance(e, RetryError):
-            return (
-                jsonify(
-                    {
-                        "error": f"RetryError[<Future at {hex(id(e))} state=finished raised RuntimeError>]"
-                    }
-                ),
-                500,
-            )
-        return jsonify({"error": f"테스트 이메일 발송 실패: {str(e)}"}), 500
+register_email_api_routes(app)
 
 
 try:
