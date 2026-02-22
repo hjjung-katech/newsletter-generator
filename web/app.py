@@ -1387,132 +1387,17 @@ def run_schedule_now(schedule_id):
         return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500
 
 
-@app.route("/health")
-def health_check():
-    """Enhanced health check endpoint for Railway"""
-    import os
+try:
+    from routes_health import register_health_route
+except ImportError:
+    from web.routes_health import register_health_route  # pragma: no cover
 
-    # 기본 상태
-    health_status = {
-        "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
-        "service": "newsletter-generator",
-        "version": "1.0.0",
-    }
-
-    # 의존성 상태 체크
-    deps = {}
-    overall_status = "healthy"
-
-    # Redis 연결 상태
-    try:
-        if redis_conn:
-            redis_conn.ping()
-            deps["redis"] = {"status": "connected", "message": "Redis is healthy"}
-        else:
-            deps["redis"] = {"status": "unavailable", "message": "Redis not configured"}
-    except Exception as e:
-        deps["redis"] = {"status": "error", "message": f"Redis error: {str(e)}"}
-        overall_status = "degraded"
-
-    # 데이터베이스 상태
-    try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
-        conn.close()
-        deps["database"] = {
-            "status": "connected",
-            "message": "SQLite database is healthy",
-        }
-    except Exception as e:
-        deps["database"] = {"status": "error", "message": f"Database error: {str(e)}"}
-        overall_status = "error"
-
-    # 환경 변수 체크
-    env_vars = {
-        "SERPER_API_KEY": bool(os.getenv("SERPER_API_KEY")),
-        "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
-        "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
-        "SENTRY_DSN": bool(os.getenv("SENTRY_DSN")),
-    }
-
-    mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
-    testing_mode = bool(app.config.get("TESTING"))
-
-    # 최소 요구사항 확인
-    has_serper = env_vars["SERPER_API_KEY"]
-    has_llm = any([env_vars["OPENAI_API_KEY"], env_vars["GEMINI_API_KEY"]])
-
-    if has_serper and has_llm:
-        deps["config"] = {
-            "status": "healthy",
-            "message": "Required environment variables are set",
-        }
-    else:
-        missing = []
-        if not has_serper:
-            missing.append("SERPER_API_KEY")
-        if not has_llm:
-            missing.append("LLM API key (OpenAI or Gemini)")
-
-        deps["config"] = {
-            "status": "warning",
-            "message": f"Missing required variables: {', '.join(missing)}",
-        }
-        # In test/mock mode we keep service health green while surfacing config warnings.
-        if overall_status == "healthy" and not (mock_mode or testing_mode):
-            overall_status = "degraded"
-
-    # Mock 모드 체크
-    deps["mock_mode"] = {
-        "status": "info",
-        "enabled": mock_mode,
-        "message": (
-            "Running in mock mode" if mock_mode else "Running in production mode"
-        ),
-    }
-
-    # 뉴스레터 CLI 상태
-    try:
-        cli_type = type(newsletter_cli).__name__
-        deps["newsletter_cli"] = {
-            "status": "healthy",
-            "type": cli_type,
-            "message": f"Newsletter CLI is ready ({cli_type})",
-        }
-    except Exception as e:
-        deps["newsletter_cli"] = {"status": "error", "message": f"CLI error: {str(e)}"}
-        overall_status = "error"
-
-    # 파일 시스템 체크
-    try:
-        output_dir = os.path.join(os.path.dirname(__file__), "..", "output")
-        os.makedirs(output_dir, exist_ok=True)
-        test_file = os.path.join(output_dir, "health_check.txt")
-        with open(test_file, "w") as f:
-            f.write("health check")
-        os.remove(test_file)
-        deps["filesystem"] = {"status": "healthy", "message": "File system is writable"}
-    except Exception as e:
-        deps["filesystem"] = {
-            "status": "error",
-            "message": f"File system error: {str(e)}",
-        }
-        overall_status = "error"
-
-    health_status["status"] = overall_status
-    health_status["dependencies"] = deps
-
-    # HTTP 상태 코드 결정
-    status_code = 200
-    if overall_status == "error":
-        status_code = 503
-    elif overall_status == "degraded":
-        status_code = 200  # 여전히 서비스 가능하므로 200
-
-    return jsonify(health_status), status_code
+register_health_route(
+    app=app,
+    database_path=DATABASE_PATH,
+    redis_conn=redis_conn,
+    newsletter_cli=newsletter_cli,
+)
 
 
 try:
