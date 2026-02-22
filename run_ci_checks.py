@@ -59,19 +59,21 @@ class CIChecker:
         """검사 대상 변경 파일 목록을 가져옵니다.
 
         CI_CHECK_SOURCE:
-        - staged  : git diff --cached (기본값, release 게이트 권장)
-        - head    : git diff HEAD
+        - head    : git diff HEAD (기본값)
+        - staged  : git diff --cached
         - baseline: git diff baseline/main-equivalent...HEAD
         """
-        source = os.getenv("CI_CHECK_SOURCE", "staged").lower()
+        source = os.getenv("CI_CHECK_SOURCE", "head").lower()
         baseline_ref = os.getenv("CI_BASELINE_REF", "baseline/main-equivalent")
         if source == "head":
             cmd = ["git", "diff", "--name-only", "HEAD"]
+        elif source == "staged":
+            cmd = ["git", "diff", "--name-only", "--cached"]
         elif source == "baseline":
             cmd = ["git", "diff", "--name-only", f"{baseline_ref}...HEAD"]
         else:
-            source = "staged"
-            cmd = ["git", "diff", "--name-only", "--cached"]
+            source = "head"
+            cmd = ["git", "diff", "--name-only", "HEAD"]
 
         if self.verbose:
             print(f"{Colors.OKCYAN}검사 소스: {source}{Colors.ENDC}")
@@ -312,48 +314,65 @@ class CIChecker:
         """MyPy 타입 검사"""
         self.print_header("MyPy 타입 검사")
 
-        cmd = [sys.executable, "-m", "mypy", "newsletter", "--ignore-missing-imports"]
+        targets = self._get_runtime_python_targets()
+        if not targets:
+            self.print_status("MyPy 타입 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
+            return True
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--ignore-missing-imports",
+            "--follow-imports=skip",
+        ] + targets
         returncode, stdout, stderr = self.run_command(cmd)
 
-        # mypy는 오류가 있어도 CI에서 계속 진행하므로 경고만 표시
         if returncode == 0:
             self.print_status("MyPy 타입 검사", True)
             return True
         else:
-            self.print_status("MyPy 타입 검사", True, "타입 오류가 있지만 CI는 통과합니다 (경고)")
-            if self.verbose and stdout:
-                errors = stdout.split("\n")[:5]
+            self.print_status("MyPy 타입 검사", False, "타입 오류가 발견되었습니다")
+            if stdout:
+                errors = stdout.split("\n")[:10]
                 for error in errors:
                     if error.strip():
                         print(f"      {Colors.WARNING}{error}{Colors.ENDC}")
-            return True  # CI에서는 실패하지 않음
+            return False
 
     def check_bandit(self) -> bool:
         """Bandit 보안 검사"""
         self.print_header("Bandit 보안 검사")
 
+        targets = self._get_runtime_python_targets()
+        if not targets:
+            self.print_status("Bandit 보안 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
+            return True
+
         cmd = [
             sys.executable,
             "-m",
             "bandit",
-            "-r",
-            "newsletter",
-            "web",
             "-f",
             "txt",
             "--skip",
             "B104,B110",
-        ]
+        ] + targets
         returncode, stdout, stderr = self.run_command(cmd)
 
-        # bandit도 CI에서 실패하지 않음
         if returncode == 0:
             self.print_status("Bandit 보안 검사", True)
+            return True
         else:
-            self.print_status("Bandit 보안 검사", True, "보안 이슈가 있지만 CI는 통과합니다 (경고)")
-            if self.verbose and stdout:
-                print(f"      {Colors.WARNING}보안 이슈를 검토하세요{Colors.ENDC}")
-        return True
+            self.print_status("Bandit 보안 검사", False, "보안 이슈가 발견되었습니다")
+            if stdout:
+                lines = stdout.split("\n")[:20]
+                for line in lines:
+                    if line.strip():
+                        print(f"      {Colors.WARNING}{line}{Colors.ENDC}")
+            if stderr and self.verbose:
+                print(f"      {Colors.WARNING}{stderr[:1000]}{Colors.ENDC}")
+            return False
 
     def run_tests(self, quick: bool = False) -> bool:
         """테스트 실행"""
@@ -361,12 +380,6 @@ class CIChecker:
 
         if quick:
             print(f"  {Colors.WARNING}빠른 모드에서는 테스트를 건너뜁니다{Colors.ENDC}")
-            return True
-
-        runtime_targets = self._get_runtime_python_targets()
-        if not runtime_targets:
-            print(f"  {Colors.WARNING}런타임 코드 변경이 없어 단위 테스트를 건너뜁니다{Colors.ENDC}")
-            self.print_status("단위 테스트", True, "변경 범위: 비런타임(문서/CI/스크립트)")
             return True
 
         # 환경 변수 설정
@@ -518,9 +531,9 @@ def main():
   python run_ci_checks.py --fix --full # 자동 수정 + 전체 검사
 
 권장 워크플로우:
-  1. 커밋 전: python run_ci_checks.py --fix
-  2. 푸시 전: python run_ci_checks.py --full
-  3. PR 전: python run_ci_checks.py --full --verbose
+  1. 개발 중: make check
+  2. 푸시 전: make check-full
+  3. PR 전: make check-full (필요 시 이 스크립트에 --verbose 사용)
         """,
     )
 
@@ -529,11 +542,20 @@ def main():
         action="store_true",
         help="자동으로 수정 가능한 문제 해결 (black, isort)",
     )
+    parser.add_argument(
+        "--source",
+        choices=["head", "staged", "baseline"],
+        default=os.getenv("CI_CHECK_SOURCE", "head"),
+        help="변경 파일 탐지 소스 (기본: head)",
+    )
     parser.add_argument("--quick", action="store_true", help="빠른 검사만 실행 (포맷팅, 린팅)")
     parser.add_argument("--full", action="store_true", help="전체 검사 실행 (테스트 포함)")
     parser.add_argument("--verbose", "-v", action="store_true", help="상세 출력")
 
     args = parser.parse_args()
+
+    # 변경 파일 소스 설정을 명시적으로 고정
+    os.environ["CI_CHECK_SOURCE"] = args.source
 
     # 필요한 패키지 확인 (패키지명과 import명이 다른 경우 처리)
     package_imports = {
