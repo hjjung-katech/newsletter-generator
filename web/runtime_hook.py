@@ -276,7 +276,7 @@ def _setup_graceful_shutdown():
         # Only setup in PyInstaller environment
         if getattr(sys, "frozen", False):
             # Import and initialize shutdown manager
-            from newsletter.utils.shutdown_manager import get_shutdown_manager
+            from newsletter_core.public.lifecycle import get_shutdown_manager
 
             shutdown_manager = get_shutdown_manager()
             logger.info("Graceful shutdown manager initialized for exe environment")
@@ -285,7 +285,7 @@ def _setup_graceful_shutdown():
             def runtime_cleanup():
                 logger.info("Runtime hook cleanup called")
 
-            from newsletter.utils.shutdown_manager import ShutdownPhase
+            from newsletter_core.public.lifecycle import ShutdownPhase
 
             shutdown_manager.register_shutdown_task(
                 name="runtime_hook_cleanup",

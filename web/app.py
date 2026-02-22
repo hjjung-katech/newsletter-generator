@@ -54,7 +54,7 @@ def set_sentry_tags(**kwargs):
 
 # Centralized Settings 사용한 Sentry 설정
 try:
-    from newsletter.centralized_settings import get_settings
+    from newsletter_core.public.settings import get_settings
 
     settings = get_settings()
 
@@ -159,8 +159,13 @@ from tasks import generate_newsletter_task
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Real newsletter CLI integration
-from newsletter.api import GenerateNewsletterRequest, NewsletterGenerationError
-from newsletter.api import generate_newsletter as generate_newsletter_core
+from newsletter_core.public.generation import (
+    GenerateNewsletterRequest,
+    NewsletterGenerationError,
+)
+from newsletter_core.public.generation import (
+    generate_newsletter as generate_newsletter_core,
+)
 
 # 현재 디렉토리를 파이썬 패스에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1507,6 +1512,9 @@ def health_check():
         "SENTRY_DSN": bool(os.getenv("SENTRY_DSN")),
     }
 
+    mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+    testing_mode = bool(app.config.get("TESTING"))
+
     # 최소 요구사항 확인
     has_serper = env_vars["SERPER_API_KEY"]
     has_llm = any([env_vars["OPENAI_API_KEY"], env_vars["GEMINI_API_KEY"]])
@@ -1527,11 +1535,11 @@ def health_check():
             "status": "warning",
             "message": f"Missing required variables: {', '.join(missing)}",
         }
-        if overall_status == "healthy":
+        # In test/mock mode we keep service health green while surfacing config warnings.
+        if overall_status == "healthy" and not (mock_mode or testing_mode):
             overall_status = "degraded"
 
     # Mock 모드 체크
-    mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
     deps["mock_mode"] = {
         "status": "info",
         "enabled": mock_mode,

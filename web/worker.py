@@ -6,12 +6,13 @@ Processes background tasks for newsletter generation
 
 import os
 import sys
+
 import redis
-from rq import Worker, Queue
+from rq import Queue, Worker
 
 # Queue name from centralized settings
 try:
-    from newsletter.centralized_settings import get_settings
+    from newsletter_core.public.settings import get_settings
 
     settings = get_settings()
     QUEUE_NAME = settings.rq_queue
@@ -23,12 +24,12 @@ except Exception:
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import task functions
-from tasks import generate_newsletter_task
+from tasks import generate_newsletter_task  # noqa: E402,F401
 
 if __name__ == "__main__":
     # Get Redis connection from centralized settings
     try:
-        from newsletter.centralized_settings import get_settings
+        from newsletter_core.public.settings import get_settings
 
         settings = get_settings()
         redis_url = settings.redis_url or "redis://localhost:6379/0"
