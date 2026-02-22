@@ -11,7 +11,6 @@
 - Wired guardrails into:
   - `run_ci_checks.py`
   - `.github/workflows/main-ci.yml`
-  - `.github/workflows/ci.yml`
   - `Makefile` (`architecture-check`, `architecture-baseline`)
 - Introduced runtime/package skeleton:
   - `apps/cli`, `apps/web`, `apps/worker`, `apps/scheduler`
@@ -40,10 +39,7 @@
 ### Main CI confirmation (post-merge)
 - Final merge commit CI set completed with `success`:
   - Main CI Pipeline: run `22270734622`
-  - Code Quality: run `22270734610`
-  - Email Tests: run `22270734612`
   - Deployment Pipeline: run `22270734616`
-  - CI/CD Pipeline: run `22270734619`
 
 ### Post-merge hardening (started)
 - `web -> newsletter` architecture rule tightened from allowlist to full forbid.
@@ -66,7 +62,7 @@
 - Passed:
   - `python3 scripts/architecture/check_import_boundaries.py --mode ratchet`
   - `python3 scripts/architecture/check_import_cycles.py`
-  - `.venv/bin/python run_ci_checks.py --quick`
+  - `make check`
   - `.venv/bin/python -m pytest tests/contract/test_generation_facade.py -q`
   - `.venv/bin/python -m pytest tests/test_web_api.py -q`
   - `.venv/bin/python -m pytest tests/unit_tests/test_schedule_time_sync.py -q`

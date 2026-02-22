@@ -25,6 +25,7 @@
 - 개발자
   - `dev/DEVELOPMENT_GUIDE.md`
   - `dev/CI_CD_GUIDE.md`
+  - `dev/REFACTORING_EXECUTION_PLAN.md`
   - `developer/CENTRALIZED_SETTINGS_GUIDE.md`
   - `technical/LLM_CONFIGURATION.md`
 

@@ -65,6 +65,10 @@ pip install -r requirements.txt
 
 # 5. 개발 모드로 설치
 pip install -e .
+
+# 6. 로컬 검증 게이트 실행
+make doctor
+make check
 ```
 
 ### 방법 2: PyPI 설치 (향후 지원 예정)

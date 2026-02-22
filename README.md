@@ -1,8 +1,8 @@
 # Newsletter Generator
 
-[![CI/CD Pipeline](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/code-quality.yml)
+[![Main CI](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/main-ci.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/main-ci.yml)
 [![Docs Quality](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/docs-quality.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/docs-quality.yml)
+[![Security Scan](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/security-scan.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/security-scan.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy Guide (Railway)](https://img.shields.io/badge/deploy-Railway-0B0D0E?logo=railway)](docs/setup/RAILWAY_DEPLOYMENT.md)
@@ -12,8 +12,9 @@
 ## 핵심 포인트
 
 - Canonical runtime: `Flask + Postmark`
+- Experimental FastAPI path: `apps/experimental/main.py` (`api_experimental` extra required)
 - 문서 정본(SSOT) 기반 운영: `docs/README.md`
-- 로컬/배포 모두 동일한 품질 게이트 사용: `run_ci_checks.py`, `make docs-check`
+- 로컬/배포 모두 동일한 품질 게이트 사용: `make check`, `make check-full`
 
 ## 빠른 링크
 
@@ -77,7 +78,8 @@ python -m newsletter.cli run --keywords "AI,반도체" --period 7 --template-sty
 ## 품질 게이트
 
 ```bash
-python run_ci_checks.py --fix --full
+make check       # 빠른/일상 게이트
+make check-full  # PR 전 전체 게이트
 ```
 
 ## 기여

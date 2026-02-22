@@ -1,10 +1,13 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check
+.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check
 
-# Python 실행 파일 설정
-PYTHON ?= python3
+# 실행 경로/인터프리터 설정
+EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
+PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+VENV_PYTHON := $(PROJECT_ROOT)/.venv/bin/python
+PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
 PIP := $(PYTHON) -m pip
 
 # 디렉토리 설정
@@ -24,6 +27,42 @@ help: ## 도움말 표시
 	@echo "  make ci-check    # CI 검사 실행"
 	@echo "  make test        # 테스트 실행"
 
+bootstrap: ## 로컬 가상환경/의존성/훅 설치
+	@echo "🧱 로컬 개발 환경 bootstrap 중..."
+	python3 -m venv .venv
+	$(VENV_PYTHON) -m pip install --upgrade pip
+	$(VENV_PYTHON) -m pip install -r requirements.txt
+	$(VENV_PYTHON) -m pip install -r requirements-dev.txt
+	$(VENV_PYTHON) -m pre_commit install
+	@echo "✅ bootstrap 완료"
+
+doctor: ## 작업 경로/인터프리터 전제 조건 검증
+	@echo "🩺 환경 점검 중..."
+	@current_dir="$$(pwd)"; \
+	if [ "$$current_dir" != "$(EXPECTED_CWD)" ]; then \
+		echo "❌ 잘못된 작업 경로: $$current_dir"; \
+		echo "   올바른 경로: $(EXPECTED_CWD)"; \
+		exit 1; \
+	fi
+	@repo_root="$$(git rev-parse --show-toplevel 2>/dev/null || true)"; \
+	if [ "$$repo_root" != "$(EXPECTED_CWD)" ]; then \
+		echo "❌ Git 루트 불일치: $$repo_root"; \
+		echo "   예상 루트: $(EXPECTED_CWD)"; \
+		exit 1; \
+	fi
+	@if [ ! -x "$(VENV_PYTHON)" ]; then \
+		echo "❌ 가상환경 Python 없음: $(VENV_PYTHON)"; \
+		echo "   먼저 'make bootstrap'을 실행하세요."; \
+		exit 1; \
+	fi
+	@echo "✅ 환경 점검 통과 (PYTHON=$(PYTHON))"
+
+check: doctor test-quick docs-check skills-check ## 표준 로컬 게이트
+	@echo "✅ check 완료"
+
+check-full: doctor test-full docs-check skills-check ## PR 전 전체 게이트
+	@echo "✅ check-full 완료"
+
 install: ## 의존성 설치
 	$(PIP) install -r requirements.txt
 	$(PIP) install -r requirements-dev.txt
@@ -42,8 +81,8 @@ format-check: ## 포맷팅 검사만 (수정하지 않음)
 lint: ## 린팅 실행 (flake8 + mypy + bandit)
 	@echo "🔍 린팅 검사 중..."
 	$(PYTHON) -m flake8 $(SRC_DIRS) --max-line-length=88 --ignore=E203,W503,E501
-	$(PYTHON) -m mypy newsletter --ignore-missing-imports || true
-	$(PYTHON) -m bandit -r newsletter web -f txt --skip B104,B110 || true
+	$(PYTHON) -m mypy newsletter --ignore-missing-imports
+	$(PYTHON) -m bandit -r newsletter web -f txt --skip B104,B110
 
 architecture-check: ## 아키텍처 경계/사이클 검사
 	@echo "🏗️ 아키텍처 경계 검사 실행 중..."
@@ -126,7 +165,7 @@ skill-docs-and-config-consistency: ## Skill: docs-and-config-consistency
 
 skill-newsletter-smoke: ## Skill: newsletter-smoke
 	@echo "🧠 Skill newsletter-smoke 실행 중..."
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -c "from unittest.mock import patch; from newsletter.api import GenerateNewsletterRequest, generate_newsletter; sample='<html><head><title>Smoke</title></head><body>ok</body></html>'; info={'step_times': {'collect': 0.1}, 'total_time': 0.2}; p1=patch('newsletter.api.graph.generate_newsletter', return_value=(sample, 'success')); p2=patch('newsletter.api.graph.get_last_generation_info', return_value=info); p1.start(); p2.start(); r=generate_newsletter(GenerateNewsletterRequest(keywords='AI', period=7)); p2.stop(); p1.stop(); assert r['status']=='success'; assert r['title']=='Smoke'; assert '<html' in r['html_content'].lower(); print('newsletter-smoke: ok')"
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -c "from unittest.mock import patch; from newsletter_core.public.generation import GenerateNewsletterRequest, generate_newsletter; sample='<html><head><title>Smoke</title></head><body>ok</body></html>'; info={'step_times': {'collect': 0.1}, 'total_time': 0.2}; p1=patch('newsletter_core.public.generation.graph.generate_newsletter', return_value=(sample, 'success')); p2=patch('newsletter_core.public.generation.graph.get_last_generation_info', return_value=info); p1.start(); p2.start(); r=generate_newsletter(GenerateNewsletterRequest(keywords='AI', period=7)); p2.stop(); p1.stop(); assert r['status']=='success'; assert r['title']=='Smoke'; assert '<html' in r['html_content'].lower(); print('newsletter-smoke: ok')"
 
 skill-web-smoke: ## Skill: web-smoke
 	@echo "🧠 Skill web-smoke 실행 중..."
