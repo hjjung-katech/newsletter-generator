@@ -139,7 +139,18 @@ jobs:
             echo "Skip mypy: no runtime Python file changes."
             exit 0
           fi
-          echo "$STRICT_RUNTIME_FILES" | xargs mypy --ignore-missing-imports --follow-imports=skip
+          MYPY_ARGS=()
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            if [[ "$file" == web/*.py ]]; then
+              module="${file%.py}"
+              module="${module//\//.}"
+              MYPY_ARGS+=("-m" "$module")
+            else
+              MYPY_ARGS+=("$file")
+            fi
+          done <<< "$STRICT_RUNTIME_FILES"
+          mypy --ignore-missing-imports --follow-imports=skip "${MYPY_ARGS[@]}"
 
       - name: Basic security scan (Bandit)
         shell: bash

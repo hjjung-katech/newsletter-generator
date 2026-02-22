@@ -142,6 +142,22 @@ class CIChecker:
             if path in LEGACY_RUNTIME_GATE_EXCLUDES and Path(path).exists()
         ]
 
+    def _build_mypy_target_args(self, targets: List[str]) -> List[str]:
+        """mypy 대상 인자를 생성합니다.
+
+        NOTE:
+        - web/*.py 는 web/types.py 이름 충돌을 피하기 위해 module mode(-m)로 전달합니다.
+        - 그 외 경로는 파일 경로 그대로 전달합니다.
+        """
+        args: List[str] = []
+        for target in targets:
+            if target.startswith("web/") and target.endswith(".py"):
+                module_name = target[:-3].replace("/", ".")
+                args.extend(["-m", module_name])
+            else:
+                args.append(target)
+        return args
+
     def print_header(self, message: str):
         """헤더 출력"""
         print(f"\n{Colors.HEADER}{'=' * 70}{Colors.ENDC}")
@@ -351,7 +367,7 @@ class CIChecker:
             "mypy",
             "--ignore-missing-imports",
             "--follow-imports=skip",
-        ] + targets
+        ] + self._build_mypy_target_args(targets)
         returncode, stdout, stderr = self.run_command(cmd)
 
         if returncode == 0:
