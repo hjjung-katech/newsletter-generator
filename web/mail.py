@@ -1,9 +1,10 @@
 # web/mail.py
-from postmarker.core import PostmarkClient
-import os
 import logging
+import os
 import sys
 from pathlib import Path
+
+from postmarker.core import PostmarkClient
 from tenacity import retry, stop_after_attempt
 
 # 프로젝트 루트를 sys.path에 추가
@@ -16,14 +17,14 @@ def _get_email_config():
     """이메일 설정을 동적으로 가져옵니다 (테스트 호환성 고려)"""
     try:
         # 1차 시도: Centralized Settings
-        from newsletter.centralized_settings import get_settings
+        from newsletter_core.public.settings import get_settings
 
         settings = get_settings()
         return settings.postmark_server_token.get_secret_value(), settings.email_sender
     except Exception:
         try:
             # 2차 시도: Config Manager
-            from newsletter.config_manager import config_manager
+            from newsletter_core.public.settings import config_manager
 
             return config_manager.POSTMARK_SERVER_TOKEN, config_manager.EMAIL_SENDER
         except (ImportError, AttributeError):
@@ -49,10 +50,7 @@ def send_email(to: str, subject: str, html: str, **kwargs):
         raise RuntimeError(error_msg)
 
     if not from_email:
-        error_msg = (
-            "EMAIL_SENDER 환경변수가 설정되지 않았습니다. "
-            "발신자 이메일 주소를 설정해주세요."
-        )
+        error_msg = "EMAIL_SENDER 환경변수가 설정되지 않았습니다. " "발신자 이메일 주소를 설정해주세요."
         logging.error(error_msg)
         raise RuntimeError(error_msg)
 
@@ -80,7 +78,7 @@ def send_email(to: str, subject: str, html: str, **kwargs):
 def check_email_configuration():
     """이메일 설정 상태를 확인합니다."""
     try:
-        from newsletter.config_manager import config_manager
+        from newsletter_core.public.settings import config_manager
 
         return config_manager.validate_email_config()
     except (ImportError, AttributeError):
@@ -138,6 +136,4 @@ def send_test_email(to: str):
         token_masked=("***" + (token or "")[-4:] if token else "Not Set"),
     )
 
-    return send_email(
-        to=to, subject="Newsletter Generator 테스트 이메일", html=test_html
-    )
+    return send_email(to=to, subject="Newsletter Generator 테스트 이메일", html=test_html)

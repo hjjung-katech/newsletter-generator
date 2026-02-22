@@ -9,7 +9,7 @@ import traceback
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-from newsletter.api import (
+from newsletter_core.public.generation import (
     GenerateNewsletterRequest,
     NewsletterGenerationError,
     generate_newsletter,

@@ -38,6 +38,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Keep a stable datetime parser even when tests patch module-level `datetime`.
+REAL_DATETIME = datetime
+
 
 class ScheduleRunner:
     """RRULE 기반 스케줄 실행기"""
@@ -61,9 +64,11 @@ class ScheduleRunner:
         """Parse ISO datetime string, handling Z suffix properly"""
         if iso_string.endswith("Z"):
             # Remove Z and add UTC timezone
-            return datetime.fromisoformat(iso_string[:-1]).replace(tzinfo=timezone.utc)
+            return REAL_DATETIME.fromisoformat(iso_string[:-1]).replace(
+                tzinfo=timezone.utc
+            )
         else:
-            return datetime.fromisoformat(iso_string)
+            return REAL_DATETIME.fromisoformat(iso_string)
 
     def get_pending_schedules(self) -> List[Dict]:
         """실행 대기 중인 스케줄 목록을 가져옵니다."""
@@ -177,8 +182,9 @@ class ScheduleRunner:
                     )
                     continue
 
-            if updated_count > 0:
+            if expired_count > 0 or updated_count > 0:
                 conn.commit()
+            if updated_count > 0:
                 logger.info(
                     f"[DEBUG] Updated {updated_count} expired schedules to next occurrence"
                 )
@@ -186,6 +192,11 @@ class ScheduleRunner:
             # 실행 준비 완료된 스케줄들을 반환 형식으로 변환
             logger.info(
                 f"[DEBUG] Found {len(ready_for_execution)} schedules ready for immediate execution"
+            )
+
+            # Ensure deterministic execution order (oldest next_run first).
+            ready_for_execution.sort(
+                key=lambda schedule_data: self._parse_iso_datetime(schedule_data[3])
             )
 
             schedules = []

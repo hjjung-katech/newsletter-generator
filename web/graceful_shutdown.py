@@ -20,7 +20,7 @@ from flask import Flask, g, request
 
 # Import shutdown manager
 try:
-    from newsletter.utils.shutdown_manager import (
+    from newsletter_core.public.lifecycle import (
         ShutdownPhase,
         get_shutdown_manager,
         is_shutdown_requested,
