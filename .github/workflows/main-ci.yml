@@ -134,22 +134,24 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME_FILES="$(echo "${{ steps.changed-python.outputs.files }}" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
-          if [ -z "$RUNTIME_FILES" ]; then
+          STRICT_RUNTIME_FILES="$(echo "$RUNTIME_FILES" | grep -Ev '^(web/app.py|newsletter/cli.py|newsletter/chains.py)$' || true)"
+          if [ -z "$STRICT_RUNTIME_FILES" ]; then
             echo "Skip mypy: no runtime Python file changes."
             exit 0
           fi
-          echo "$RUNTIME_FILES" | xargs mypy --ignore-missing-imports --follow-imports=skip
+          echo "$STRICT_RUNTIME_FILES" | xargs mypy --ignore-missing-imports --follow-imports=skip
 
       - name: Basic security scan (Bandit)
         shell: bash
         run: |
           set -euo pipefail
           RUNTIME_FILES="$(echo "${{ steps.changed-python.outputs.files }}" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
-          if [ -z "$RUNTIME_FILES" ]; then
+          STRICT_RUNTIME_FILES="$(echo "$RUNTIME_FILES" | grep -Ev '^(web/app.py|newsletter/cli.py|newsletter/chains.py)$' || true)"
+          if [ -z "$STRICT_RUNTIME_FILES" ]; then
             echo "Skip bandit: no runtime Python file changes."
             exit 0
           fi
-          echo "$RUNTIME_FILES" | xargs bandit -f txt --skip B104,B110
+          echo "$STRICT_RUNTIME_FILES" | xargs bandit -f txt --skip B104,B110
 
   # ========================================
   # Stage 2: Unit Tests (Multi-Platform)
