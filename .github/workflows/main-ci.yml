@@ -130,12 +130,26 @@ jobs:
           python scripts/architecture/check_import_cycles.py
 
       - name: Type checking (mypy)
+        shell: bash
         run: |
-          mypy newsletter --ignore-missing-imports || true
+          set -euo pipefail
+          RUNTIME_FILES="$(echo "${{ steps.changed-python.outputs.files }}" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
+          if [ -z "$RUNTIME_FILES" ]; then
+            echo "Skip mypy: no runtime Python file changes."
+            exit 0
+          fi
+          echo "$RUNTIME_FILES" | xargs mypy --ignore-missing-imports --follow-imports=skip
 
       - name: Basic security scan (Bandit)
+        shell: bash
         run: |
-          bandit -r newsletter web -f txt --skip B104,B110 || true
+          set -euo pipefail
+          RUNTIME_FILES="$(echo "${{ steps.changed-python.outputs.files }}" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
+          if [ -z "$RUNTIME_FILES" ]; then
+            echo "Skip bandit: no runtime Python file changes."
+            exit 0
+          fi
+          echo "$RUNTIME_FILES" | xargs bandit -f txt --skip B104,B110
 
   # ========================================
   # Stage 2: Unit Tests (Multi-Platform)
@@ -310,7 +324,7 @@ jobs:
         run: |
           if [ "$OPENAI_API_KEY" = "skip" ]; then
             echo "Skipping integration tests - API keys not configured"
-            pytest -m "integration and not real_api" --tb=short || true
+            exit 0
           else
             echo "Running integration tests with real APIs"
             pytest -m integration --tb=short --junitxml=test-results-integration.xml
