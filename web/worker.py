@@ -24,7 +24,7 @@ except Exception:
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import task functions
-from tasks import generate_newsletter_task
+from tasks import generate_newsletter_task  # noqa: E402,F401
 
 if __name__ == "__main__":
     # Get Redis connection from centralized settings

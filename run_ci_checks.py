@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 # Windows 한글 인코딩 설정
 if sys.platform.startswith("win"):
@@ -556,7 +556,7 @@ def main():
         print(f"{Colors.FAIL}❌ 필요한 패키지가 설치되지 않았습니다:{Colors.ENDC}")
         for pkg in missing_packages:
             print(f"   - {pkg}")
-        print(f"\n다음 명령어로 설치하세요:")
+        print("\n다음 명령어로 설치하세요:")
         print(f"   pip install {' '.join(missing_packages)}")
         return 1
 

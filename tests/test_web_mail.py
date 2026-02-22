@@ -50,6 +50,7 @@ class TestWebMail:
         modules_to_clear = [
             "web.mail",
             "mail",
+            "newsletter_core.public.settings",
             "newsletter.config_manager",
             "newsletter.centralized_settings",
         ]
@@ -103,7 +104,7 @@ class TestWebMail:
         with pytest.raises((RuntimeError, RetryError)):
             send_email(to="test@example.com", subject="Test", html="<h1>Test</h1>")
 
-    @patch("newsletter.config_manager.config_manager")
+    @patch("newsletter_core.public.settings.config_manager")
     def test_check_email_configuration_complete(self, mock_config_manager):
         """Test email configuration check with complete setup"""
         from web.mail import check_email_configuration
@@ -121,7 +122,7 @@ class TestWebMail:
         assert config["from_email_configured"] is True
         assert config["ready"] is True
 
-    @patch("newsletter.config_manager.config_manager")
+    @patch("newsletter_core.public.settings.config_manager")
     def test_check_email_configuration_incomplete(self, mock_config_manager):
         """Test email configuration check with incomplete setup"""
         from web.mail import check_email_configuration
@@ -140,7 +141,7 @@ class TestWebMail:
         assert config["from_email_configured"] is False
         assert config["ready"] is False
 
-    @patch("newsletter.config_manager.config_manager")
+    @patch("newsletter_core.public.settings.config_manager")
     @patch("web.mail._get_email_config")
     def test_check_email_configuration_fallback(
         self, mock_get_email_config, mock_config_manager
