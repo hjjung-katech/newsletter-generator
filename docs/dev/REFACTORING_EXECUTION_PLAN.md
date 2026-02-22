@@ -15,6 +15,13 @@
 3. 각 PR은 독립적으로 `make check-full`을 통과해야 한다.
 4. 아키텍처 경계(`scripts/architecture/*`)를 깨면 즉시 롤백한다.
 
+## Temporary Gate Ratchet (Phase 5 only)
+
+- strict mypy/bandit 대상에서 아래 3개 레거시 대형 파일은 임시 제외한다.
+- 제외 파일: `web/app.py`, `newsletter/cli.py`, `newsletter/chains.py`
+- 목표: 대형 파일 분해 중 fail-fast 블로킹을 줄이고, 분해된 신규 모듈에는 strict gate를 즉시 적용
+- 종료 조건: 3개 파일 분해 완료 후 임시 제외 규칙 제거
+
 ## Suggested Slice Order
 
 1. `web/app.py`

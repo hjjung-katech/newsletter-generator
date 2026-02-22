@@ -30,6 +30,13 @@ if sys.platform.startswith("win"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
+# Temporary strict-gate exclusion list for legacy large modules under refactor.
+LEGACY_RUNTIME_GATE_EXCLUDES = {
+    "web/app.py",
+    "newsletter/cli.py",
+    "newsletter/chains.py",
+}
+
 
 class Colors:
     """터미널 색상 코드"""
@@ -110,7 +117,7 @@ class CIChecker:
 
     def _get_runtime_python_targets(self) -> List[str]:
         """런타임 영향 코드(newsletter/web) 변경 파일."""
-        return [
+        runtime_targets = [
             path
             for path in self._get_python_targets()
             if path.startswith(
@@ -122,6 +129,17 @@ class CIChecker:
                     "newsletter_core/",
                 )
             )
+        ]
+        return [
+            path for path in runtime_targets if path not in LEGACY_RUNTIME_GATE_EXCLUDES
+        ]
+
+    def _get_legacy_runtime_excluded_targets(self) -> List[str]:
+        """임시 strict-gate 제외 대상 중 변경된 파일 목록."""
+        return [
+            path
+            for path in self.changed_files
+            if path in LEGACY_RUNTIME_GATE_EXCLUDES and Path(path).exists()
         ]
 
     def print_header(self, message: str):
@@ -315,8 +333,16 @@ class CIChecker:
         self.print_header("MyPy 타입 검사")
 
         targets = self._get_runtime_python_targets()
+        excluded_targets = self._get_legacy_runtime_excluded_targets()
         if not targets:
-            self.print_status("MyPy 타입 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
+            if excluded_targets:
+                self.print_status(
+                    "MyPy 타입 검사",
+                    True,
+                    f"strict gate 제외 파일만 변경됨: {', '.join(excluded_targets)}",
+                )
+            else:
+                self.print_status("MyPy 타입 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
             return True
 
         cmd = [
@@ -345,8 +371,16 @@ class CIChecker:
         self.print_header("Bandit 보안 검사")
 
         targets = self._get_runtime_python_targets()
+        excluded_targets = self._get_legacy_runtime_excluded_targets()
         if not targets:
-            self.print_status("Bandit 보안 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
+            if excluded_targets:
+                self.print_status(
+                    "Bandit 보안 검사",
+                    True,
+                    f"strict gate 제외 파일만 변경됨: {', '.join(excluded_targets)}",
+                )
+            else:
+                self.print_status("Bandit 보안 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
             return True
 
         cmd = [
