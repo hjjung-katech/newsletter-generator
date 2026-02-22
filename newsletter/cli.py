@@ -167,8 +167,16 @@ def run(
     """
     import time
 
+    from newsletter_core.public.generation import (
+        GenerateNewsletterRequest,
+        NewsletterGenerationError,
+    )
+    from newsletter_core.public.generation import (
+        generate_newsletter as generate_newsletter_public,
+    )
+
     from . import deliver as news_deliver
-    from . import graph, tools
+    from . import tools
 
     # 로깅 레벨 설정
     set_log_level(log_level)
@@ -196,9 +204,7 @@ def run(
             console.print("[cyan].env 파일에 다음을 추가하세요:[/cyan]")
             console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
             console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_token[/cyan]")
-            console.print(
-                "\n[yellow]참고: Postmark에서 발송자 이메일 주소가 인증되어야 합니다.[/yellow]"
-            )
+            console.print("\n[yellow]참고: Postmark에서 발송자 이메일 주소가 인증되어야 합니다.[/yellow]")
             raise typer.Exit(code=1)
 
         # POSTMARK_SERVER_TOKEN 설정 상태 확인
@@ -206,12 +212,8 @@ def run(
             console.print("[green]✅ Postmark 토큰 설정 완료[/green]")
         else:
             console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
-            console.print(
-                "[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]"
-            )
-            console.print(
-                "[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]"
-            )
+            console.print("[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]")
+            console.print("[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]")
             raise typer.Exit(code=1)
 
         # 이메일 호환 모드 권장
@@ -219,17 +221,13 @@ def run(
             console.print(
                 "[yellow]💡 이메일 발송 시 --email-compatible 옵션 사용을 권장합니다.[/yellow]"
             )
-            console.print(
-                "[yellow]   이 옵션은 이메일 클라이언트 호환성을 개선합니다.[/yellow]"
-            )
+            console.print("[yellow]   이 옵션은 이메일 클라이언트 호환성을 개선합니다.[/yellow]")
 
     elif email_compatible:
         console.print(
             "[yellow]💡 --email-compatible 옵션이 활성화되었지만 이메일 수신자가 지정되지 않았습니다.[/yellow]"
         )
-        console.print(
-            "[yellow]   이메일 발송을 원하시면 --to 옵션을 추가하세요.[/yellow]"
-        )
+        console.print("[yellow]   이메일 발송을 원하시면 --to 옵션을 추가하세요.[/yellow]")
 
     # 출력 형식 표시
     if output_format:
@@ -419,25 +417,29 @@ def run(
     # LangGraph를 사용하는 것이 이제 기본이자 유일한 방식입니다.
     logger.info("🔄 LangGraph 워크플로우 시작")
 
-    # graph.generate_newsletter는 내부적으로 chains.get_newsletter_chain()을 호출하고,
-    # chains.py의 변경으로 인해 render_data_langgraph...json 파일이 저장됩니다.
-    # generate_newsletter는 (html_content, status)를 반환합니다.
-    html_content, status = graph.generate_newsletter(
-        keyword_list,
-        news_period_days,
-        domain=domain,
-        template_style=template_style,  # 템플릿 스타일 추가
-        email_compatible=email_compatible,  # 이메일 호환성 옵션 추가
-    )
-
-    if status == "error":
-        logger.error(f"Error in newsletter generation: {html_content}")
+    try:
+        generation_result = generate_newsletter_public(
+            GenerateNewsletterRequest(
+                keywords=keyword_list,
+                domain=domain,
+                template_style=template_style,
+                email_compatible=email_compatible,
+                period=news_period_days,
+                suggest_count=suggest_count,
+            )
+        )
+    except NewsletterGenerationError as exc:
+        logger.error(f"Error in newsletter generation: {exc}")
+        return
+    except Exception as exc:
+        logger.error(f"Unexpected newsletter generation error: {exc}")
         return
 
-    info = graph.get_last_generation_info()
-    step_times = info.get("step_times", {})
-    total_time = info.get("total_time")
-    cost_summary = info.get("cost_summary")
+    html_content = generation_result["html_content"]
+    generation_stats = generation_result.get("generation_stats", {})
+    step_times = generation_stats.get("step_times", {})
+    total_time = generation_stats.get("total_time")
+    cost_summary = generation_stats.get("cost_summary")
 
     # LangGraph의 세부 단계들을 logger에 추가하여 세분화된 시간 표시
     if step_times:
@@ -526,9 +528,7 @@ def run(
 
     # 뉴스레터 파일 저장
     if output_format:
-        with logger.step_context(
-            "local_save", f"뉴스레터를 {output_format.upper()}로 로컬 저장"
-        ):
+        with logger.step_context("local_save", f"뉴스레터를 {output_format.upper()}로 로컬 저장"):
             save_path = os.path.join(
                 output_directory, f"{filename_base}.{output_format}"
             )
@@ -564,9 +564,7 @@ def run(
     # 이메일 전송 로직 (LangGraph 경로에도 추가)
     if to:
         with logger.step_context("email_send", f"이메일 전송 to {to}"):
-            email_subject = (
-                f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
-            )
+            email_subject = f"주간 산업 동향 뉴스 클리핑: {newsletter_topic} ({current_date_str})"
 
             # 이메일 발송 시 발송자 정보 다시 확인 및 표시
             console.print(f"\n[cyan]📤 이메일 발송 중...[/cyan]")
@@ -697,9 +695,7 @@ def suggest(
         logger.info("Please set it to use the keyword suggestion feature.")
         raise typer.Exit(code=1)
 
-    with logger.step_context(
-        "keyword_suggestion", f"도메인 '{domain}'에 대한 키워드 제안"
-    ):
+    with logger.step_context("keyword_suggestion", f"도메인 '{domain}'에 대한 키워드 제안"):
         suggested_keywords = tools.generate_keywords_with_gemini(domain, count=count)
 
     if suggested_keywords:
@@ -1117,9 +1113,7 @@ def test(
                 "search_keywords": keywords,
                 "sections": final_state.get("sections", []),
                 # 추가 필드들...
-                "recipient_greeting": final_state.get(
-                    "recipient_greeting", "안녕하세요,"
-                ),
+                "recipient_greeting": final_state.get("recipient_greeting", "안녕하세요,"),
                 "introduction_message": final_state.get(
                     "introduction_message",
                     "지난 한 주간의 주요 산업 동향을 정리해 드립니다.",
@@ -1349,9 +1343,7 @@ def check_llm():
             if info["available"]:
                 console.print(f"  • [green]{provider_name}[/green] - 사용 가능")
             else:
-                console.print(
-                    f"  • [red]{provider_name}[/red] - 사용 불가 (API 키 없음)"
-                )
+                console.print(f"  • [red]{provider_name}[/red] - 사용 불가 (API 키 없음)")
 
         # 현재 LLM 설정 표시
         console.print(f"\n[bold blue]📋 현재 LLM 설정[/bold blue]")
@@ -1382,9 +1374,7 @@ def check_llm():
 
         # 권장사항 표시
         if len(available_providers) == 0:
-            console.print(
-                f"\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]"
-            )
+            console.print(f"\n[bold red]⚠️  경고: 사용 가능한 LLM 제공자가 없습니다![/bold red]")
             console.print("다음 중 하나 이상의 API 키를 .env 파일에 설정해주세요:")
             console.print("  • GEMINI_API_KEY")
             console.print("  • OPENAI_API_KEY")
@@ -1495,9 +1485,7 @@ def list_providers():
                 api_key_name = config.LLM_CONFIG.get("api_keys", {}).get(
                     provider_name, f"{provider_name.upper()}_API_KEY"
                 )
-                console.print(
-                    f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]"
-                )
+                console.print(f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]")
 
         # 기능별 모델 설정 표시
         console.print(f"\n[bold cyan]기능별 모델 설정[/bold cyan]")
@@ -1576,9 +1564,7 @@ def test_email(
         console.print(f"[cyan]Postmark 토큰:[/cyan] {masked_token}")
     else:
         console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
-        console.print(
-            "[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]"
-        )
+        console.print("[yellow]이메일 발송을 위해 Postmark 토큰 설정이 필요합니다.[/yellow]")
         console.print("[cyan].env 파일에 POSTMARK_SERVER_TOKEN을 추가하세요.[/cyan]")
         if not dry_run:
             raise typer.Exit(code=1)
@@ -1660,13 +1646,13 @@ def test_email(
         <div class="header">
             <h1>📧 Newsletter Generator 이메일 테스트</h1>
         </div>
-        
+
         <div class="content">
             <div class="success">
                 <h2>✅ 이메일 발송 테스트 성공!</h2>
                 <p>이 이메일을 받으셨다면 Newsletter Generator의 Postmark 이메일 발송 기능이 정상적으로 작동하고 있습니다.</p>
             </div>
-            
+
             <h3>📋 테스트 정보</h3>
             <ul>
                 <li><strong>발송 시간:</strong> {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분 %S초')}</li>
@@ -1674,14 +1660,14 @@ def test_email(
                 <li><strong>이메일 서비스:</strong> Postmark API</li>
                 <li><strong>발송자:</strong> {config.EMAIL_SENDER}</li>
             </ul>
-            
+
             <h3>🔧 다음 단계</h3>
             <p>이메일 테스트가 성공했다면 이제 실제 뉴스레터를 생성하고 발송할 수 있습니다:</p>
             <pre style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;">
 newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
             </pre>
         </div>
-        
+
         <div class="footer">
             <p>이 메시지는 Newsletter Generator의 이메일 테스트 기능에 의해 자동으로 생성되었습니다.</p>
             <p>문의사항이 있으시면 개발팀에 연락해 주세요.</p>
@@ -1692,9 +1678,7 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         """
 
     if dry_run:
-        console.print(
-            "\n[yellow]🔍 DRY RUN MODE - 실제 이메일은 발송되지 않습니다[/yellow]"
-        )
+        console.print("\n[yellow]🔍 DRY RUN MODE - 실제 이메일은 발송되지 않습니다[/yellow]")
         console.print(f"[cyan]수신자:[/cyan] {to}")
         console.print(f"[cyan]제목:[/cyan] {subject}")
         console.print(f"[cyan]내용 길이:[/cyan] {len(html_content)} 문자")
@@ -1704,24 +1688,16 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         console.print(f"[cyan]발송자 이메일:[/cyan] {config.EMAIL_SENDER}")
 
         if not config.POSTMARK_SERVER_TOKEN:
-            console.print(
-                "\n[red]⚠️  POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]"
-            )
-            console.print(
-                "[yellow].env 파일에 POSTMARK_SERVER_TOKEN을 설정해주세요.[/yellow]"
-            )
+            console.print("\n[red]⚠️  POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
+            console.print("[yellow].env 파일에 POSTMARK_SERVER_TOKEN을 설정해주세요.[/yellow]")
 
-        console.print(
-            "\n[green]Dry run 완료. 실제 발송하려면 --dry-run 옵션을 제거하세요.[/green]"
-        )
+        console.print("\n[green]Dry run 완료. 실제 발송하려면 --dry-run 옵션을 제거하세요.[/green]")
         return
 
     # Check Postmark configuration
     if not config.POSTMARK_SERVER_TOKEN:
         console.print("\n[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
-        console.print(
-            "[yellow]이메일 발송을 위해 .env 파일에 다음을 설정해주세요:[/yellow]"
-        )
+        console.print("[yellow]이메일 발송을 위해 .env 파일에 다음을 설정해주세요:[/yellow]")
         console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_server_token[/cyan]")
         console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
         raise typer.Exit(code=1)
@@ -1744,9 +1720,7 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
         )
 
         if success:
-            console.print(
-                f"\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]"
-            )
+            console.print(f"\n[bold green]✅ 이메일이 성공적으로 발송되었습니다![/bold green]")
             console.print(f"[green]수신자 {to}의 받은편지함을 확인해주세요.[/green]")
 
             # Save test email content for reference
@@ -1758,23 +1732,17 @@ newsletter run --keywords "AI,머신러닝" --to {to} --output-format html
             try:
                 with open(test_file_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
-                console.print(
-                    f"[info]테스트 이메일 내용이 저장되었습니다: {test_file_path}[/info]"
-                )
+                console.print(f"[info]테스트 이메일 내용이 저장되었습니다: {test_file_path}[/info]")
             except Exception as e:
                 console.print(f"[yellow]테스트 파일 저장 실패: {e}[/yellow]")
 
         else:
             console.print(f"\n[bold red]❌ 이메일 발송에 실패했습니다.[/bold red]")
-            console.print(
-                "[yellow]Postmark 설정과 네트워크 연결을 확인해주세요.[/yellow]"
-            )
+            console.print("[yellow]Postmark 설정과 네트워크 연결을 확인해주세요.[/yellow]")
             raise typer.Exit(code=1)
 
     except Exception as e:
-        console.print(
-            f"\n[bold red]❌ 이메일 발송 중 오류가 발생했습니다: {e}[/bold red]"
-        )
+        console.print(f"\n[bold red]❌ 이메일 발송 중 오류가 발생했습니다: {e}[/bold red]")
         console.print("[yellow]설정을 확인하고 다시 시도해주세요.[/yellow]")
         raise typer.Exit(code=1)
 
