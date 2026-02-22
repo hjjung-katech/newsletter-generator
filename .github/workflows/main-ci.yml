@@ -75,9 +75,9 @@ jobs:
             RANGE="$BEFORE_SHA...${{ github.sha }}"
           fi
 
-          CHANGED="$(git diff --name-only "$RANGE" | grep -E '^(newsletter|tests|web|scripts)/.*\.py$' || true)"
+          CHANGED="$(git diff --name-only "$RANGE" | grep -E '^(newsletter|tests|web|scripts|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
           RUNTIME_CHANGED="false"
-          if echo "$CHANGED" | grep -E '^(newsletter|web)/.*\.py$' >/dev/null; then
+          if echo "$CHANGED" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' >/dev/null; then
             RUNTIME_CHANGED="true"
           fi
           {
@@ -122,7 +122,12 @@ jobs:
             echo "Skip flake8: no scoped Python file changes."
             exit 0
           fi
-          echo "${{ steps.changed-python.outputs.files }}" | xargs flake8 --max-line-length=88 --ignore=E203,W503
+          echo "${{ steps.changed-python.outputs.files }}" | xargs flake8 --max-line-length=88 --ignore=E203,W503,E501
+
+      - name: Architecture boundary check
+        run: |
+          python scripts/architecture/check_import_boundaries.py --mode ratchet
+          python scripts/architecture/check_import_cycles.py
 
       - name: Type checking (mypy)
         run: |

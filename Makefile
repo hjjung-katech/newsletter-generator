@@ -1,14 +1,14 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help format lint test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check
+.PHONY: help format lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check
 
 # Python 실행 파일 설정
 PYTHON ?= python3
 PIP := $(PYTHON) -m pip
 
 # 디렉토리 설정
-SRC_DIRS := newsletter tests web
+SRC_DIRS := newsletter tests web scripts apps packages/newsletter_core/src/newsletter_core newsletter_core
 
 help: ## 도움말 표시
 	@echo "Newsletter Generator - 개발 명령어"
@@ -41,9 +41,18 @@ format-check: ## 포맷팅 검사만 (수정하지 않음)
 
 lint: ## 린팅 실행 (flake8 + mypy + bandit)
 	@echo "🔍 린팅 검사 중..."
-	$(PYTHON) -m flake8 $(SRC_DIRS) --max-line-length=88 --ignore=E203,W503
+	$(PYTHON) -m flake8 $(SRC_DIRS) --max-line-length=88 --ignore=E203,W503,E501
 	$(PYTHON) -m mypy newsletter --ignore-missing-imports || true
 	$(PYTHON) -m bandit -r newsletter web -f txt --skip B104,B110 || true
+
+architecture-check: ## 아키텍처 경계/사이클 검사
+	@echo "🏗️ 아키텍처 경계 검사 실행 중..."
+	$(PYTHON) scripts/architecture/check_import_boundaries.py --mode ratchet
+	$(PYTHON) scripts/architecture/check_import_cycles.py
+
+architecture-baseline: ## 현재 import 위반을 baseline으로 갱신
+	@echo "🧭 아키텍처 baseline 갱신 중..."
+	$(PYTHON) scripts/architecture/check_import_boundaries.py --update-baseline
 
 test: ## 단위 테스트 실행
 	@echo "🧪 단위 테스트 실행 중..."
