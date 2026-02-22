@@ -1,0 +1,48 @@
+{
+  "module_roots": [
+    {"path": "newsletter", "module_prefix": "newsletter"},
+    {"path": "web", "module_prefix": "web"},
+    {"path": "apps", "module_prefix": "apps"},
+    {
+      "path": "packages/newsletter_core/src/newsletter_core",
+      "module_prefix": "newsletter_core"
+    }
+  ],
+  "rules": [
+    {
+      "id": "newsletter_to_web_forbidden",
+      "type": "forbid_prefix",
+      "source_prefix": "newsletter",
+      "target_prefix": "web",
+      "message": "newsletter 계층은 web 계층을 import 하면 안 됩니다."
+    },
+    {
+      "id": "web_to_newsletter_allowlist",
+      "type": "allowlist_target_modules",
+      "source_prefix": "web",
+      "target_root": "newsletter",
+      "allowed_targets": [
+        "newsletter.api",
+        "newsletter.centralized_settings",
+        "newsletter.config_manager",
+        "newsletter.cli",
+        "newsletter.utils.shutdown_manager"
+      ],
+      "message": "web 계층은 허용된 newsletter 공개/호환 진입점만 import 해야 합니다."
+    },
+    {
+      "id": "domain_no_infrastructure",
+      "type": "forbid_prefix",
+      "source_prefix": "newsletter_core.domain",
+      "target_prefix": "newsletter_core.infrastructure",
+      "message": "domain 계층은 infrastructure 계층에 의존하면 안 됩니다."
+    },
+    {
+      "id": "internal_visibility",
+      "type": "target_prefix_allow_source_prefixes",
+      "target_prefix": "newsletter_core.internal",
+      "allowed_source_prefixes": ["newsletter_core"],
+      "message": "newsletter_core.internal은 패키지 외부에서 import 하면 안 됩니다."
+    }
+  ]
+}

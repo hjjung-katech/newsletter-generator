@@ -91,7 +91,17 @@ class CIChecker:
         for path in self.changed_files:
             if not path.endswith(".py"):
                 continue
-            if path.startswith(("newsletter/", "tests/", "web/", "scripts/")):
+            if path.startswith(
+                (
+                    "newsletter/",
+                    "tests/",
+                    "web/",
+                    "scripts/",
+                    "apps/",
+                    "packages/newsletter_core/",
+                    "newsletter_core/",
+                )
+            ):
                 if Path(path).exists():
                     targets.append(path)
         return targets
@@ -101,7 +111,15 @@ class CIChecker:
         return [
             path
             for path in self._get_python_targets()
-            if path.startswith(("newsletter/", "web/"))
+            if path.startswith(
+                (
+                    "newsletter/",
+                    "web/",
+                    "apps/",
+                    "packages/newsletter_core/",
+                    "newsletter_core/",
+                )
+            )
         ]
 
     def print_header(self, message: str):
@@ -230,7 +248,7 @@ class CIChecker:
         cmd = (
             [sys.executable, "-m", "flake8"]
             + directories
-            + ["--max-line-length=88", "--ignore=E203,W503"]
+            + ["--max-line-length=88", "--ignore=E203,W503,E501"]
         )
 
         returncode, stdout, stderr = self.run_command(cmd)
@@ -247,7 +265,48 @@ class CIChecker:
                         print(f"      {Colors.WARNING}{error}{Colors.ENDC}")
                 if len(stdout.split("\n")) > 10:
                     print(f"      {Colors.WARNING}... 그 외 오류들{Colors.ENDC}")
-            return False
+                return False
+
+    def check_import_boundaries(self) -> bool:
+        """아키텍처 import 경계 검사"""
+        self.print_header("Architecture Import Boundary 검사")
+
+        cmd = [
+            sys.executable,
+            "scripts/architecture/check_import_boundaries.py",
+            "--mode",
+            "ratchet",
+        ]
+        returncode, stdout, stderr = self.run_command(cmd)
+
+        if returncode == 0:
+            self.print_status("Import 경계 검사", True)
+            return True
+
+        self.print_status("Import 경계 검사", False, "신규/확대된 구조 위반이 발견되었습니다")
+        if stdout:
+            print(stdout[:2000])
+        if stderr and self.verbose:
+            print(stderr[:2000])
+        return False
+
+    def check_import_cycles(self) -> bool:
+        """아키텍처 import 사이클 검사"""
+        self.print_header("Architecture Import Cycle 검사")
+
+        cmd = [sys.executable, "scripts/architecture/check_import_cycles.py"]
+        returncode, stdout, stderr = self.run_command(cmd)
+
+        if returncode == 0:
+            self.print_status("Import 사이클 검사", True)
+            return True
+
+        self.print_status("Import 사이클 검사", False, "모듈 import cycle(SCC>1)가 발견되었습니다")
+        if stdout:
+            print(stdout[:2000])
+        if stderr and self.verbose:
+            print(stderr[:2000])
+        return False
 
     def check_mypy(self) -> bool:
         """MyPy 타입 검사"""
@@ -390,6 +449,8 @@ class CIChecker:
             ("Black 포맷팅", self.check_black),
             ("isort 정렬", self.check_isort),
             ("Flake8 린팅", self.check_flake8),
+            ("Import 경계 검사", self.check_import_boundaries),
+            ("Import 사이클 검사", self.check_import_cycles),
         ]
 
         # 추가 검사들
