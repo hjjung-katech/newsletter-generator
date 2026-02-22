@@ -234,8 +234,7 @@ def init_db():
     cursor = conn.cursor()
 
     # History table
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS history (
             id TEXT PRIMARY KEY,
             params JSON NOT NULL,
@@ -243,12 +242,10 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             status TEXT DEFAULT 'pending'
         )
-    """
-    )
+    """)
 
     # Schedules table for recurring newsletters
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS schedules (
             id TEXT PRIMARY KEY,
             params JSON NOT NULL,
@@ -257,8 +254,7 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             enabled INTEGER DEFAULT 1
         )
-    """
-    )
+    """)
 
     conn.commit()
     conn.close()
@@ -295,6 +291,7 @@ register_generation_routes(
     in_memory_tasks=in_memory_tasks,
     task_queue=task_queue,
     redis_conn=redis_conn,
+    get_newsletter_cli=lambda: newsletter_cli,
 )
 
 

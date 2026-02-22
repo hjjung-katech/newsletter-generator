@@ -7,7 +7,7 @@ import logging
 import sqlite3
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Callable
 
 from flask import Flask, jsonify, request
 from tasks import generate_newsletter_task
@@ -30,12 +30,19 @@ def register_generation_routes(
     redis_conn: Any,
     real_cli_class: type = RealNewsletterCLI,
     mock_cli_class: type = MockNewsletterCLI,
+    get_newsletter_cli: Callable[[], Any] | None = None,
 ) -> None:
     """Register generation, status, history, and scheduling routes."""
 
     DATABASE_PATH = database_path
     RealNewsletterCLI = real_cli_class
     MockNewsletterCLI = mock_cli_class
+
+    def resolve_newsletter_cli() -> Any:
+        if get_newsletter_cli is None:
+            return newsletter_cli
+        resolved = get_newsletter_cli()
+        return resolved if resolved is not None else newsletter_cli
 
     @app.route("/api/generate", methods=["POST"])
     def generate_newsletter():
@@ -115,7 +122,9 @@ def register_generation_routes(
                         print(f"⚙️  Current time: {datetime.now().isoformat()}")
 
                         # 환경 체크
-                        print(f"⚙️  Using CLI type: {type(newsletter_cli).__name__}")
+                        print(
+                            f"⚙️  Using CLI type: {type(resolve_newsletter_cli()).__name__}"
+                        )
 
                         process_newsletter_in_memory(data, job_id)
 
@@ -183,7 +192,9 @@ def register_generation_routes(
 
                             conn.commit()
                             conn.close()
-                            print(f"✅ Completed background processing for job {job_id}")
+                            print(
+                                f"✅ Completed background processing for job {job_id}"
+                            )
                         else:
                             print(f"❌ Job {job_id} not found in in_memory_tasks")
                             # 데이터베이스에 실패 상태 업데이트
@@ -201,7 +212,9 @@ def register_generation_routes(
                             conn.close()
 
                     except Exception as e:
-                        print(f"❌ Error in background processing for job {job_id}: {e}")
+                        print(
+                            f"❌ Error in background processing for job {job_id}: {e}"
+                        )
                         import traceback
 
                         print(f"❌ Traceback: {traceback.format_exc()}")
@@ -260,7 +273,8 @@ def register_generation_routes(
             print(f"🔍 Newsletter request - Keywords: {keywords}, Period: {period}")
 
             # 뉴스레터 생성
-            result = newsletter_cli.generate_newsletter(
+            active_newsletter_cli = resolve_newsletter_cli()
+            result = active_newsletter_cli.generate_newsletter(
                 keywords=keywords,
                 template_style=template_style,
                 email_compatible=False,
@@ -292,7 +306,10 @@ def register_generation_routes(
         """Process newsletter synchronously (fallback when Redis is not available)"""
         try:
             print(f"🔄 Starting synchronous newsletter processing")
-            print(f"📊 Current newsletter_cli type: {type(newsletter_cli).__name__}")
+            active_newsletter_cli = resolve_newsletter_cli()
+            print(
+                f"📊 Current newsletter_cli type: {type(active_newsletter_cli).__name__}"
+            )
 
             # Extract parameters
             keywords = data.get("keywords", "")
@@ -314,9 +331,9 @@ def register_generation_routes(
             try:
                 if keywords:
                     print(
-                        f"🔧 Generating newsletter with keywords using {type(newsletter_cli).__name__}"
+                        f"🔧 Generating newsletter with keywords using {type(active_newsletter_cli).__name__}"
                     )
-                    result = newsletter_cli.generate_newsletter(
+                    result = active_newsletter_cli.generate_newsletter(
                         keywords=keywords,
                         template_style=template_style,
                         email_compatible=email_compatible,
@@ -324,9 +341,9 @@ def register_generation_routes(
                     )
                 elif domain:
                     print(
-                        f"🔧 Generating newsletter with domain using {type(newsletter_cli).__name__}"
+                        f"🔧 Generating newsletter with domain using {type(active_newsletter_cli).__name__}"
                     )
-                    result = newsletter_cli.generate_newsletter(
+                    result = active_newsletter_cli.generate_newsletter(
                         domain=domain,
                         template_style=template_style,
                         email_compatible=email_compatible,
@@ -353,7 +370,7 @@ def register_generation_routes(
             # Handle different result formats
             if result["status"] == "error":
                 # If CLI failed and returned error, try mock as fallback
-                if isinstance(newsletter_cli, RealNewsletterCLI):
+                if isinstance(active_newsletter_cli, RealNewsletterCLI):
                     print("⚠️  Real CLI failed, trying mock fallback...")
                     mock_cli = MockNewsletterCLI()
                     if keywords:
@@ -390,7 +407,9 @@ def register_generation_routes(
                         except ImportError:
                             return (
                                 jsonify(
-                                    {"error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."}
+                                    {
+                                        "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
+                                    }
                                 ),
                                 500,
                             )
@@ -422,7 +441,9 @@ def register_generation_routes(
                 "subject": result.get("title", "Newsletter"),  # compatibility alias
                 "html_size": len(result.get("content", "")),
                 "processing_info": {
-                    "using_real_cli": isinstance(newsletter_cli, RealNewsletterCLI),
+                    "using_real_cli": isinstance(
+                        active_newsletter_cli, RealNewsletterCLI
+                    ),
                     "template_style": template_style,
                     "email_compatible": email_compatible,
                     "period_days": period,
@@ -527,16 +548,14 @@ def register_generation_routes(
             cursor = conn.cursor()
 
             # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT id, params, result, created_at, status
                 FROM history
                 ORDER BY
                     CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
                     created_at DESC
                 LIMIT 20
-            """
-            )
+            """)
             rows = cursor.fetchall()
             conn.close()
 
