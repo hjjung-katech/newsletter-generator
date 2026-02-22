@@ -3,7 +3,7 @@
 ## High-risk rules
 - Do not use subprocess-based newsletter generation in `web` runtime paths.
 - Do not hardcode virtualenv interpreter paths (for example `.venv/Scripts/python.exe`).
-- Use the shared `newsletter.api.generate_newsletter` interface for generation.
+- Use `newsletter_core.public.generation.generate_newsletter` for generation.
 - Keep response schema stable across sync/async execution paths:
   - `status`, `html_content`, `title`, `generation_stats`, `input_params`, `error`
 
