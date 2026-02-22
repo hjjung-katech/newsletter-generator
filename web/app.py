@@ -234,7 +234,8 @@ def init_db():
     cursor = conn.cursor()
 
     # History table
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS history (
             id TEXT PRIMARY KEY,
             params JSON NOT NULL,
@@ -242,10 +243,12 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             status TEXT DEFAULT 'pending'
         )
-    """)
+    """
+    )
 
     # Schedules table for recurring newsletters
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS schedules (
             id TEXT PRIMARY KEY,
             params JSON NOT NULL,
@@ -254,7 +257,8 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             enabled INTEGER DEFAULT 1
         )
-    """)
+    """
+    )
 
     conn.commit()
     conn.close()

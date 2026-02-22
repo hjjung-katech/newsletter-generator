@@ -192,9 +192,7 @@ def register_generation_routes(
 
                             conn.commit()
                             conn.close()
-                            print(
-                                f"✅ Completed background processing for job {job_id}"
-                            )
+                            print(f"✅ Completed background processing for job {job_id}")
                         else:
                             print(f"❌ Job {job_id} not found in in_memory_tasks")
                             # 데이터베이스에 실패 상태 업데이트
@@ -212,9 +210,7 @@ def register_generation_routes(
                             conn.close()
 
                     except Exception as e:
-                        print(
-                            f"❌ Error in background processing for job {job_id}: {e}"
-                        )
+                        print(f"❌ Error in background processing for job {job_id}: {e}")
                         import traceback
 
                         print(f"❌ Traceback: {traceback.format_exc()}")
@@ -407,9 +403,7 @@ def register_generation_routes(
                         except ImportError:
                             return (
                                 jsonify(
-                                    {
-                                        "error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."
-                                    }
+                                    {"error": "이메일 모듈을 찾을 수 없습니다. mail.py 파일을 확인해주세요."}
                                 ),
                                 500,
                             )
@@ -548,14 +542,16 @@ def register_generation_routes(
             cursor = conn.cursor()
 
             # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, params, result, created_at, status
                 FROM history
                 ORDER BY
                     CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
                     created_at DESC
                 LIMIT 20
-            """)
+            """
+            )
             rows = cursor.fetchall()
             conn.close()
 
