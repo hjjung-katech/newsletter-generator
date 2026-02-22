@@ -247,11 +247,11 @@ def check_llm():
             console.print("  • ANTHROPIC_API_KEY")
         elif len(available_providers) == 1:
             console.print(
-                f"\n[yellow]💡 권장사항: 더 나은 fallback을 위해 추가 LLM 제공자를 설정하는 것을 권장합니다.[/yellow]"
+                "\n[yellow]💡 권장사항: 더 나은 fallback을 위해 추가 LLM 제공자를 설정하는 것을 권장합니다.[/yellow]"
             )
         else:
             console.print(
-                f"\n[green]🎉 좋습니다! 여러 LLM 제공자가 설정되어 있어 안정적인 서비스가 가능합니다.[/green]"
+                "\n[green]🎉 좋습니다! 여러 LLM 제공자가 설정되어 있어 안정적인 서비스가 가능합니다.[/green]"
             )
 
     except Exception as e:
@@ -306,11 +306,9 @@ def test_llm(
 
         # 429 에러인 경우 특별한 안내
         if "429" in str(e) or "quota" in str(e).lower():
+            console.print("[yellow]💡 API 할당량이 초과된 것 같습니다. 다른 LLM 제공자를 사용해보세요.[/yellow]")
             console.print(
-                f"[yellow]💡 API 할당량이 초과된 것 같습니다. 다른 LLM 제공자를 사용해보세요.[/yellow]"
-            )
-            console.print(
-                f"[yellow]   'newsletter check-llm' 명령어로 사용 가능한 제공자를 확인하세요.[/yellow]"
+                "[yellow]   'newsletter check-llm' 명령어로 사용 가능한 제공자를 확인하세요.[/yellow]"
             )
 
 
