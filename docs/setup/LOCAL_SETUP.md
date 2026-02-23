@@ -39,7 +39,7 @@ pip install -r web/requirements.txt
 ### 자동 설정 (권장)
 ```bash
 # 자동 환경 설정 스크립트 실행
-python setup_env.py
+python scripts/devtools/setup_env.py
 ```
 
 ### 수동 설정
