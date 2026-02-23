@@ -67,7 +67,11 @@
       "build_web_exe.py",
       "build_web_exe_enhanced.py",
       "cleanup_debug_files.py",
+      "check_quality.py",
       "fix_env_setup.py",
+      "newsletter-test.bat",
+      "newsletter-test.sh",
+      "setup_env.py",
       "run_tests.py"
     ],
     "ignore_file_globs": [

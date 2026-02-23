@@ -9,6 +9,10 @@
 - `cleanup_debug_files.py`
 - `fix_env_setup.py`
 - `run_tests.py`
+- `check_quality.py`
+- `setup_env.py`
+- `newsletter-test.sh`
+- `newsletter-test.bat`
 
 ## Process Helpers
 

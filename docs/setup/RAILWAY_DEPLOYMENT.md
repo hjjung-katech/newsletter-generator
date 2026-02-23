@@ -106,7 +106,7 @@ services:
 ```bash
 # 1. 환경 설정
 cd newsletter-generator
-python setup_env.py
+python scripts/devtools/setup_env.py
 
 # 2. 데이터베이스 초기화
 cd web
