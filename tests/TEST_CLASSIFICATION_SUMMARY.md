@@ -152,4 +152,4 @@ python tests/api_tests/test_email_integration.py --to your-email@example.com
 
 ---
 
-**🎉 결론**: Newsletter Generator는 이제 GitHub Actions에서 안전하게 실행되면서도 로컬에서는 완전한 검증이 가능한 체계적인 테스트 구조를 갖추었습니다. 
+**🎉 결론**: Newsletter Generator는 이제 GitHub Actions에서 안전하게 실행되면서도 로컬에서는 완전한 검증이 가능한 체계적인 테스트 구조를 갖추었습니다.

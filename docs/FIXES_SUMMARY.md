@@ -31,7 +31,7 @@
 # Before
 self.SERPER_API_KEY = settings.serper_api_key.get_secret_value()
 
-# After  
+# After
 self.SERPER_API_KEY = (
     settings.serper_api_key.get_secret_value()
     if settings.serper_api_key
@@ -120,7 +120,7 @@ def setup_method(self):
     # Set test environment variables
     os.environ["TESTING"] = "1"
     os.environ["MOCK_MODE"] = "true"
-    
+
     # Clear module cache
     modules_to_clear = ["newsletter.config_manager", "newsletter.centralized_settings"]
     for module in modules_to_clear:
@@ -204,9 +204,9 @@ python -m pytest tests/test_web_mail.py -v
 
 ---
 
-**작성일**: 2025-01-13  
-**작성자**: AI Assistant  
-**버전**: 1.0.0 
+**작성일**: 2025-01-13
+**작성자**: AI Assistant
+**버전**: 1.0.0
 
 # Fixes Summary
 
@@ -240,7 +240,7 @@ def setup_method(self):
     # Clear email-related environment variables to ensure clean test state
     email_env_vars = [
         "POSTMARK_SERVER_TOKEN",
-        "EMAIL_SENDER", 
+        "EMAIL_SENDER",
         "POSTMARK_FROM_EMAIL"
     ]
     for var in email_env_vars:
@@ -255,7 +255,7 @@ def setup_method(self):
 def test_check_email_configuration_fallback(self, mock_get_email_config, mock_config_manager):
     # Mock config_manager to raise an exception, forcing fallback
     mock_config_manager.validate_email_config.side_effect = ImportError("Test import error")
-    
+
     # Mock _get_email_config to return None values for fallback
     mock_get_email_config.return_value = (None, None)
 ```
@@ -282,4 +282,4 @@ def test_check_email_configuration_fallback(self, mock_get_email_config, mock_co
 
 ---
 
-## Previous Fixes 
+## Previous Fixes

@@ -70,4 +70,4 @@ We successfully tested the following functionalities:
 
 The implemented article filtering system successfully addresses the issue of duplicate content and improves content organization by keywords. It ensures that newsletter content is diverse, relevant, and prioritizes reliable news sources.
 
-These improvements have significantly enhanced the quality of generated newsletters by providing better organization and removing redundant content. Future work should focus on refining the semantic understanding of content and further optimizing performance. 
+These improvements have significantly enhanced the quality of generated newsletters by providing better organization and removing redundant content. Future work should focus on refining the semantic understanding of content and further optimizing performance.
