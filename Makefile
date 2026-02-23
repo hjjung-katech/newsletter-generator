@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check
+.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check ops-safety-check ops-safety-report
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -181,9 +181,24 @@ skill-release-integration: ## Skill: release-integration
 	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged
 	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-scheduler-reliability.txt --source staged
 	$(PYTHON) scripts/validate_release_manifest.py --manifest .release/manifests/release-runtime-binary-bootstrap.txt --source staged
+	$(PYTHON) scripts/generate_ops_safety_report.py
 
 skills-check: skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug ## Run core skills verification
 	@echo "✅ skills-check 완료"
+
+ops-safety-check: ## Run operational-safety required tests
+	@echo "🛡️ Ops-safety 게이트 실행 중..."
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/unit_tests/test_config_import_side_effects.py -q
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/test_web_api.py -q
+	RUN_INTEGRATION_TESTS=1 MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/integration/test_schedule_execution.py -q
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/unit_tests/test_schedule_time_sync.py -q
+	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/contract/test_web_email_routes_contract.py -q
+	@echo "✅ ops-safety-check 완료"
+
+ops-safety-report: ## Generate operational safety release report
+	@echo "📝 Ops-safety 리포트 생성 중..."
+	$(PYTHON) scripts/generate_ops_safety_report.py
+	@echo "✅ ops-safety-report 완료"
 
 docs-check: ## Markdown 링크/스타일 무결성 검사
 	@echo "🧾 문서 품질 검사 중..."

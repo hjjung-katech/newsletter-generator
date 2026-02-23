@@ -1,7 +1,7 @@
 interface:
   display_name: "Scheduler Debug"
-  short_description: "Debug schedule execution logic"
-  default_prompt: "Use $scheduler-debug to analyze schedule windows, duplicate prevention, and fallback execution behavior."
+  short_description: "Debug scheduler idempotency"
+  default_prompt: "Use $scheduler-debug to analyze schedule windows, deterministic idempotency keys, duplicate prevention, and fallback behavior."
 
 policy:
   allow_implicit_invocation: false

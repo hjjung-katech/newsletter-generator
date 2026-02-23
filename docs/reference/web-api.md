@@ -15,6 +15,9 @@ Base URL (local): `http://localhost:5000`
 ### `POST /api/generate`
 비동기 뉴스레터 생성 작업을 등록합니다.
 
+요청 헤더:
+- `Idempotency-Key`: `string` (선택, 같은 논리 요청 재시도 시 동일 키 사용 권장)
+
 요청(JSON):
 - `keywords`: `string | string[]` (keywords/domain 중 하나 필수)
 - `domain`: `string`
@@ -24,14 +27,20 @@ Base URL (local): `http://localhost:5000`
 - `email`: `string` (선택, 있으면 즉시 발송 시도)
 
 응답:
-- `202`: `{ "job_id": "...", "status": "queued|processing" }`
+- `202`:
+  - 신규 enqueue: `{ "job_id": "...", "status": "queued|processing", "deduplicated": false, "idempotency_key": "..." }`
+  - 중복 요청: `{ "job_id": "...", "status": "queued|processing", "deduplicated": true, "idempotency_key": "..." }`
 - `400`: 입력 검증 오류
+
+중복 요청 정책:
+- 동일한 `Idempotency-Key`(또는 서버가 계산한 canonical payload 키) 재요청은 항상 `202`를 반환합니다.
+- 중복 요청 시 기존 `job_id`를 재사용하고 `deduplicated=true`를 반환합니다.
 
 ### `GET /api/status/<job_id>`
 작업 상태 조회.
 
 응답(JSON):
-- `job_id`, `status`, `sent`
+- `job_id`, `status`, `sent`, `idempotency_key`
 - 완료 시 `result`
 - 실패 시 `error`
 
@@ -80,6 +89,11 @@ Base URL (local): `http://localhost:5000`
 요청(JSON):
 - `job_id`: `string`
 - `email`: `string`
+
+응답(JSON):
+- `status`: `success|error`
+- `deduplicated`: `boolean` (이미 발송된 동일 요청이면 `true`)
+- `send_key`: `string`
 
 ### `POST /api/test-email`
 테스트 이메일 발송.

@@ -119,6 +119,7 @@ EMAIL_SENDER=noreply@yourdomain.com
 ```bash
 # 이메일과 함께 뉴스레터 생성
 curl -X POST http://localhost:5000/api/generate \
+  -H "Idempotency-Key: email-flow-001" \
   -H "Content-Type: application/json" \
   -d '{
     "keywords": "AI, machine learning",
@@ -130,7 +131,9 @@ curl -X POST http://localhost:5000/api/generate \
 # 응답
 {
   "job_id": "uuid-here",
-  "status": "queued"
+  "status": "queued",
+  "deduplicated": false,
+  "idempotency_key": "email-flow-001"
 }
 
 # 상태 확인 (sent 필드 포함)

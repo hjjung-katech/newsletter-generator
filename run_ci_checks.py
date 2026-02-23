@@ -138,21 +138,21 @@ class CIChecker:
             if path in LEGACY_RUNTIME_GATE_EXCLUDES and Path(path).exists()
         ]
 
-    def _build_mypy_target_args(self, targets: List[str]) -> List[str]:
-        """mypy 대상 인자를 생성합니다.
+    def _split_mypy_targets(self, targets: List[str]) -> Tuple[List[str], List[str]]:
+        """mypy 대상을 파일 모드와 모듈 모드로 분리합니다.
 
         NOTE:
-        - web/*.py 는 web/types.py 이름 충돌을 피하기 위해 module mode(-m)로 전달합니다.
-        - 그 외 경로는 파일 경로 그대로 전달합니다.
+        - web/*.py 는 web/types.py 이름 충돌을 피하기 위해 module mode(-m)로 실행합니다.
+        - mypy는 파일 인자와 -m 인자를 한 번에 혼합할 수 없으므로 분리 실행이 필요합니다.
         """
-        args: List[str] = []
+        file_targets: List[str] = []
+        module_targets: List[str] = []
         for target in targets:
             if target.startswith("web/") and target.endswith(".py"):
-                module_name = target[:-3].replace("/", ".")
-                args.extend(["-m", module_name])
+                module_targets.append(target[:-3].replace("/", "."))
             else:
-                args.append(target)
-        return args
+                file_targets.append(target)
+        return file_targets, module_targets
 
     def print_header(self, message: str):
         """헤더 출력"""
@@ -357,26 +357,53 @@ class CIChecker:
                 self.print_status("MyPy 타입 검사", True, "검사 대상 런타임 Python 변경 파일 없음")
             return True
 
-        cmd = [
+        file_targets, module_targets = self._split_mypy_targets(targets)
+        base_cmd = [
             sys.executable,
             "-m",
             "mypy",
             "--ignore-missing-imports",
             "--follow-imports=skip",
-        ] + self._build_mypy_target_args(targets)
-        returncode, stdout, stderr = self.run_command(cmd)
+        ]
 
-        if returncode == 0:
+        outputs: List[str] = []
+        failed = False
+
+        if file_targets:
+            returncode, stdout, stderr = self.run_command(base_cmd + file_targets)
+            if returncode != 0:
+                failed = True
+                if stdout:
+                    outputs.append(stdout)
+                if stderr:
+                    outputs.append(stderr)
+
+        if module_targets:
+            module_args: List[str] = []
+            for module_name in module_targets:
+                module_args.extend(["-m", module_name])
+            returncode, stdout, stderr = self.run_command(base_cmd + module_args)
+            if returncode != 0:
+                failed = True
+                if stdout:
+                    outputs.append(stdout)
+                if stderr:
+                    outputs.append(stderr)
+
+        if not failed:
             self.print_status("MyPy 타입 검사", True)
             return True
-        else:
-            self.print_status("MyPy 타입 검사", False, "타입 오류가 발견되었습니다")
-            if stdout:
-                errors = stdout.split("\n")[:10]
-                for error in errors:
-                    if error.strip():
-                        print(f"      {Colors.WARNING}{error}{Colors.ENDC}")
-            return False
+
+        self.print_status("MyPy 타입 검사", False, "타입 오류가 발견되었습니다")
+        combined_output = "\n".join(
+            output.strip() for output in outputs if output.strip()
+        )
+        if combined_output:
+            errors = combined_output.split("\n")[:10]
+            for error in errors:
+                if error.strip():
+                    print(f"      {Colors.WARNING}{error}{Colors.ENDC}")
+        return False
 
     def check_bandit(self) -> bool:
         """Bandit 보안 검사"""

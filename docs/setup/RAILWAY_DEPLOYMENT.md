@@ -244,11 +244,16 @@ python app.py        # 터미널 3
 ### 뉴스레터 생성
 ```bash
 POST /api/generate
+Headers:
+  Idempotency-Key: <stable-request-key>
+
 {
   "keywords": ["AI", "tech"],
   "email": "user@example.com"
 }
 ```
+
+중복 요청은 항상 `202`로 응답하며 기존 `job_id`와 `deduplicated=true`를 반환합니다.
 
 ### 스케줄 생성
 ```bash
@@ -272,6 +277,7 @@ curl -sS https://your-app.railway.app/health
 2. Generation enqueue
 ```bash
 curl -sS -X POST https://your-app.railway.app/api/generate \
+  -H 'Idempotency-Key: railway-smoke-001' \
   -H 'Content-Type: application/json' \
   -d '{"keywords":"AI,tech","template_style":"compact","period":7}'
 ```

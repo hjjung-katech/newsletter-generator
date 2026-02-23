@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.8.0] - 2026-02-23 - Ops Safety Lock (PR-1 ~ PR-3)
+
+### 🚀 주요 기능
+
+#### PR-1: 설정/스키마 운영 안전성 잠금
+- import-time side effect 제거:
+  - `newsletter/config_manager.py`의 `load_dotenv()` 지연 로딩 전환
+  - `newsletter/centralized_settings.py`의 import 시 dotenv 로딩 제거
+- `CentralizedSettings.test_mode` 기본값을 production-safe(`False`)로 정렬
+- `schedules` 스키마 자동 보강(`is_test`, `expires_at`) 및 앱 시작 시 additive auto-migration 적용
+- import side-effect 검증 테스트 추가: `tests/unit_tests/test_config_import_side_effects.py`
+
+#### PR-2: 멱등성/중복발송 잠금
+- `POST /api/generate`에 `Idempotency-Key` 지원 추가
+- 동일 요청 재시도 시 `202` 유지 + 기존 `job_id` 재사용 + `deduplicated=true` 계약 적용
+- scheduler 실행 키를 `schedule_id + intended_run_at` 기반으로 통일
+- `history.idempotency_key` + `email_outbox(send_key UNIQUE)` 기반 중복 방지 경로 추가
+- Redis/Thread/Sync fallback 경로의 상태 반영을 공통 상태전이 함수로 수렴
+
+#### PR-3: 운영 자동화/게이트 고도화
+- `AGENTS.md`, `web/AGENTS.md`에 ops-safety 필수 체크리스트/게이트 규칙 강화
+- `.agents/skills/*` 4종(`docs-and-config-consistency`, `scheduler-debug`, `release-integration`, `ci-gate`)에 운영 안전성 검증 항목 확장
+- `Makefile`에 ops-safety 전용 타깃 추가 및 릴리즈 리포트 자동화 스크립트 추가
+- Web API 문서에 멱등성 계약(`Idempotency-Key`, `deduplicated`, `idempotency_key`) 반영
+- CI에서 API secrets 유무와 무관하게 스케줄 통합 계약 테스트를 항상 수행하도록 보강
+
+### 🔧 롤백 정책
+- `WEB_IDEMPOTENCY_ENABLED=0`, `WEB_OUTBOX_ENABLED=0`으로 기능 경로 즉시 비활성화 가능
+- DB 변경은 additive migration만 수행(컬럼/테이블 삭제 없음)
+
 ## [0.7.0] - 2026-02-22 - Architecture Refactoring Stack (PR-0 ~ PR-5)
 
 ### 🚀 주요 기능

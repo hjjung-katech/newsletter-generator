@@ -361,6 +361,9 @@ LOG_LEVEL=DEBUG python app.py
 ```bash
 # 간단한 API 테스트
 curl -X POST http://localhost:5000/api/generate \
+  -H "Idempotency-Key: local-smoke-001" \
   -H "Content-Type: application/json" \
   -d '{"keywords": ["AI", "기술"], "period": 7}'
 ```
+
+중복 요청을 같은 `Idempotency-Key`로 다시 보내면 `202`와 함께 `deduplicated=true`가 반환됩니다.
