@@ -45,11 +45,11 @@ tests/
 ### 3. E2E 테스트 (End-to-End Tests) 🌐
 - **목적**: 전체 사용자 워크플로우 검증
 - **특징**: **웹 서버 실행 필수**, 실제 API 호출 가능
-- **실행**: 
+- **실행**:
   ```bash
   # 1. 웹 서버 실행 (별도 터미널)
   cd web && python app.py
-  
+
   # 2. E2E 테스트 실행
   python -m pytest tests/e2e/ -v
   ```
@@ -58,7 +58,7 @@ tests/
 ### 4. 배포 테스트 (Deployment Tests) 🚀
 - **목적**: 배포 환경 검증
 - **특징**: 실제 배포된 서비스에 대한 검증
-- **실행**: 
+- **실행**:
   ```bash
   # Railway 배포 후
   python tests/deployment/smoke_test.py --railway
@@ -110,7 +110,7 @@ python tests/deployment/smoke_test.py --railway
 프로젝트에서 사용하는 pytest 마커:
 
 - `@pytest.mark.unit`: 단위 테스트
-- `@pytest.mark.integration`: 통합 테스트  
+- `@pytest.mark.integration`: 통합 테스트
 - `@pytest.mark.e2e`: E2E 테스트 (웹 서버 필요)
 - `@pytest.mark.real_api`: 실제 API 호출 필요
 - `@pytest.mark.mock_api`: Mock API 사용
@@ -167,7 +167,7 @@ def reset_config():
 
 ### 성능 기준
 - 단위 테스트: < 10초
-- 통합 테스트: < 30초  
+- 통합 테스트: < 30초
 - E2E 테스트: < 2분
 - 전체 테스트: < 5분
 
@@ -213,7 +213,7 @@ def web_server():
 
 ### 1. 적절한 카테고리 선택
 - 외부 의존성 없음 → `unit_tests/`
-- 컴포넌트 간 상호작용 → `integration/`  
+- 컴포넌트 간 상호작용 → `integration/`
 - 웹 UI/API 워크플로우 → `e2e/`
 - 배포 환경 검증 → `deployment/`
 

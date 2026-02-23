@@ -3,6 +3,8 @@ name: release-integration
 description: Enforce release preflight and manifest-scoped changes for integration work.
 ---
 
+# Release Integration
+
 1. Run release preflight checks.
 2. Validate staged changes against the intended release manifest.
 3. Execute mapped Makefile gates.

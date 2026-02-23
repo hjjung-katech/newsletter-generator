@@ -3,6 +3,8 @@ name: docs-and-config-consistency
 description: Reconcile docs, env samples, and runtime config to a single source of truth. Use when email provider/env names/framework/runtime docs drift apart.
 ---
 
+# Docs And Config Consistency
+
 1. Scan README, setup docs, env examples, and runtime code for config drift.
 2. Enforce canonical env contract:
    - `POSTMARK_SERVER_TOKEN`, `EMAIL_SENDER`

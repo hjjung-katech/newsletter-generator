@@ -15,7 +15,7 @@
 ### **1. F-14 인코딩 설정의 부작용 문제** ✅ **완전 해결**
 **문제**: F-14 Windows 한글 인코딩 해결을 위한 `locale.setlocale(locale.LC_ALL, ".65001")`이 영어 월 이름 파싱(`%b` 형식)을 방해함
 
-**해결책**: 
+**해결책**:
 - **Locale-safe 영어 월 이름 파싱** 구현
 - 수동 영어 월 매핑으로 `Oct 15, 2023` 형식 처리
 - `date_utils.py`에서 locale 독립적 파싱 로직 추가
@@ -116,7 +116,7 @@ F-14 중앙집중식 설정 시스템은 **모든 근본적인 문제를 해결*
 
 ### **핵심 성과**
 1. **🎯 100% 테스트 통과**: 255 passed, 23 skipped, 0 failed
-2. **🌐 플랫폼 호환성**: Windows 한글 환경 완전 지원  
+2. **🌐 플랫폼 호환성**: Windows 한글 환경 완전 지원
 3. **⚡ 성능 최적화**: 중앙화된 성능 관리 구현
 4. **🔒 보안 강화**: 민감 정보 완전 보호
 5. **🧪 테스트 친화적**: 자동 Mock 모드 및 검증 시스템
@@ -133,8 +133,8 @@ F-14 시스템은 이제 **완전히 안정적이고 효율적인 중앙집중�
 
 ---
 
-**📅 최종 완료 일시**: 2025년 6월 12일  
-**📊 최종 상태**: **🎉 완전 성공 - 모든 문제 해결 완료**  
+**📅 최종 완료 일시**: 2025년 6월 12일
+**📊 최종 상태**: **🎉 완전 성공 - 모든 문제 해결 완료**
 **🔄 지속적 개선**: 설정된 기반 위에서 지속적인 향상 가능
 
 ---
@@ -286,7 +286,7 @@ F-14 시스템은 이제 **완전히 안정적이고 효율적인 중앙집중�
 
 ### 📊 **완료율 현황**
 - **1-A. Settings Core**: 7/7 (100%) ✅
-- **1-B. 환경별 분기 & DevOps**: 3/3 (100%) ✅  
+- **1-B. 환경별 분기 & DevOps**: 3/3 (100%) ✅
 - **1-C. 테스트 & 보안**: 4/4 (100%) ✅
 - **1-D. 문서화**: 5/5 (100%) ✅
 - **전체 진행률**: 19/19 (100%) 🎉
@@ -299,7 +299,7 @@ F-14 시스템은 이제 **완전히 안정적이고 효율적인 중앙집중�
 
 ### 🏆 **검증된 기능들**
 - ✅ `newsletter/centralized_settings.py`: Pydantic 기반 중앙집중식 설정
-- ✅ `newsletter/compat_env.py`: 레거시 호환 레이어 
+- ✅ `newsletter/compat_env.py`: 레거시 호환 레이어
 - ✅ 핵심 모듈 마이그레이션: config_manager, app, worker, mail
 - ✅ 환경변수 우선순위: OS ENV → .env → defaults
 - ✅ Secret 마스킹: `_SecretFilter` 클래스로 로그 보안
@@ -336,7 +336,7 @@ model = genai.GenerativeModel("gemini-1.5-pro")
 response = model.generate_content(prompt)
 ```
 
-#### **새로운 구조** 
+#### **새로운 구조**
 ```python
 # LLM 팩토리를 통한 통합 관리
 from .llm_factory import get_llm_for_task
@@ -366,7 +366,7 @@ response = llm.invoke([HumanMessage(content=prompt)])
 #### **tests/test_tools.py**
 - ✅ 변경: `from newsletter.html_utils import clean_html_markers`
 
-#### **tests/dependencies.py** 
+#### **tests/dependencies.py**
 - ❌ 제거: `google.generativeai` mock 설정
 - ✅ 유지: `langchain_google_genai` mock만 유지
 
@@ -384,7 +384,7 @@ response = llm.invoke([HumanMessage(content=prompt)])
 
 #### **현재 지원 제공자**
 - **Gemini**: `ChatGoogleGenerativeAI` (langchain-google-genai)
-- **OpenAI**: `ChatOpenAI` (langchain-openai)  
+- **OpenAI**: `ChatOpenAI` (langchain-openai)
 - **Anthropic**: `ChatAnthropic` (langchain-anthropic)
 
 #### **자동 Fallback 기능**
@@ -404,7 +404,7 @@ python -m pytest tests/test_tools.py -v
 ```bash
 # ✅ 성공
 from newsletter.html_utils import clean_html_markers
-from newsletter.tools import search_news_articles  
+from newsletter.tools import search_news_articles
 from newsletter.summarize import summarize_articles
 ```
 
@@ -416,13 +416,13 @@ from newsletter.summarize import summarize_articles
 
 ## 🎉 **마이그레이션 완료**
 
-**결과**: 
+**결과**:
 - **근본적 문제 해결**: GitHub Actions에서 `ModuleNotFoundError` 해결
 - **아키텍처 개선**: 통합된 LLM 팩토리를 통한 관리
 - **미래 지향적**: 최신 SDK 활용으로 지속적인 업데이트 보장
 - **확장성**: 다중 LLM 제공자 지원으로 안정성 향상
 
-**"내가 google.generativeai쓰니??"** → **"아니, 이제 langchain-google-genai 쓴다! 🚀"** 
+**"내가 google.generativeai쓰니??"** → **"아니, 이제 langchain-google-genai 쓴다! 🚀"**
 
 ---
 
