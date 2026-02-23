@@ -3,6 +3,8 @@ Newsletter Generator - LangChain Chains
 이 모듈은 뉴스레터 생성을 위한 LangChain 체인을 정의합니다.
 """
 
+from typing import Any, cast
+
 from langchain_core.runnables import RunnableLambda
 
 from . import chains_prompts
@@ -27,7 +29,7 @@ load_html_template = chains_prompts.load_html_template
 get_llm = _get_llm
 
 
-def create_categorization_chain(is_compact=False):
+def create_categorization_chain(is_compact: bool = False) -> Any:
     return build_categorization_chain(
         categorization_prompt=CATEGORIZATION_PROMPT,
         is_compact=is_compact,
@@ -38,7 +40,7 @@ def create_categorization_chain(is_compact=False):
 
 
 # 2. 카테고리별 요약 체인 생성 함수 (compact 옵션 추가)
-def create_summarization_chain(is_compact=False):
+def create_summarization_chain(is_compact: bool = False) -> Any:
     return build_summarization_chain(
         summarization_prompt=SUMMARIZATION_PROMPT,
         is_compact=is_compact,
@@ -46,7 +48,7 @@ def create_summarization_chain(is_compact=False):
 
 
 # 전체 파이프라인 구성 (compact 옵션 추가)
-def get_newsletter_chain(is_compact=False):
+def get_newsletter_chain(is_compact: bool = False) -> RunnableLambda:
     # 1. 분류 체인
     categorization_chain = create_categorization_chain(is_compact=is_compact)
 
@@ -60,7 +62,7 @@ def get_newsletter_chain(is_compact=False):
     rendering_chain = create_rendering_chain() if not is_compact else None
 
     # 데이터 흐름 관리 함수
-    def manage_data_flow(data):
+    def manage_data_flow(data: dict[str, Any]) -> dict[str, Any]:
         logger.debug(f"manage_data_flow 호출됨. is_compact={is_compact}")
         try:
             # 데이터 유효성 검증
@@ -72,7 +74,10 @@ def get_newsletter_chain(is_compact=False):
             # 빈 기사 배열 처리 - 유용한 뉴스레터를 생성하도록 개선
             if not articles or len(articles) == 0:
                 logger.info("뉴스 기사가 수집되지 않았지만, 키워드 기반 유용한 뉴스레터를 생성합니다.")
-                return handle_no_articles_scenario(data, is_compact)
+                return cast(
+                    dict[str, Any],
+                    handle_no_articles_scenario(data, is_compact),
+                )
 
             # 1. 분류 단계 실행
             if is_compact:
@@ -91,43 +96,42 @@ def get_newsletter_chain(is_compact=False):
             )
 
             if is_compact:
-                return build_compact_newsletter_result(data, sections_data)
-
-            else:
-                # Detailed 모드 처리
-                # 3. 종합 구성 단계 실행
-                logger.step("종합 구성", "composition")
-                composition_data = composition_chain.invoke(
-                    {"sections_data": sections_data, "articles_data": data}
+                return cast(
+                    dict[str, Any],
+                    build_compact_newsletter_result(data, sections_data),
                 )
 
-                # 4. 렌더링 단계 실행
-                logger.step("HTML 템플릿 렌더링", "rendering")
+            # Detailed 모드 처리
+            if composition_chain is None or rendering_chain is None:
+                raise RuntimeError(
+                    "Detailed mode requires composition/rendering chains to be initialized."
+                )
 
-                # 템플릿 렌더링을 위한 데이터 준비
-                rendering_data = {
-                    "composition": composition_data,
-                    "sections_data": sections_data,
-                    "keywords": data.get("keywords", ""),
-                    "domain": data.get("domain", ""),
-                    "ranked_articles": data.get("ranked_articles", []),
-                    "processed_articles": data.get("processed_articles", []),
-                    "email_compatible": data.get("email_compatible", False),
-                    "template_style": data.get("template_style", "detailed"),
-                }
+            logger.step("종합 구성", "composition")
+            composition_data = composition_chain.invoke(
+                {"sections_data": sections_data, "articles_data": data}
+            )
 
-                # 렌더링 체인 호출
-                html_content, structured_data = rendering_chain.invoke(rendering_data)
+            logger.step("HTML 템플릿 렌더링", "rendering")
+            rendering_data = {
+                "composition": composition_data,
+                "sections_data": sections_data,
+                "keywords": data.get("keywords", ""),
+                "domain": data.get("domain", ""),
+                "ranked_articles": data.get("ranked_articles", []),
+                "processed_articles": data.get("processed_articles", []),
+                "email_compatible": data.get("email_compatible", False),
+                "template_style": data.get("template_style", "detailed"),
+            }
 
-                logger.success("Detailed 뉴스레터 생성 완료!")
-
-                # Detailed 모드에서 HTML과 구조화된 데이터를 함께 반환
-                return {
-                    "html": html_content,
-                    "structured_data": structured_data,
-                    "sections": sections_data.get("sections", []),
-                    "mode": "detailed",
-                }
+            html_content, structured_data = rendering_chain.invoke(rendering_data)
+            logger.success("Detailed 뉴스레터 생성 완료!")
+            return {
+                "html": html_content,
+                "structured_data": structured_data,
+                "sections": sections_data.get("sections", []),
+                "mode": "detailed",
+            }
 
         except Exception as e:
             logger.error(f"데이터 흐름 처리 중 오류 발생: {e}")
@@ -141,8 +145,9 @@ def get_newsletter_chain(is_compact=False):
 
 
 # 기존 summarization_chain 유지 (하위 호환성)
-def get_summarization_chain(callbacks=None):
+def get_summarization_chain(callbacks: Any = None) -> RunnableLambda:
     """callbacks 매개변수를 지원하는 요약 체인 반환 함수"""
+    del callbacks
 
     # get_newsletter_chain()은 RunnableLambda(manage_data_flow)를 반환하고,
     # manage_data_flow는 이제 final_html만 반환합니다.

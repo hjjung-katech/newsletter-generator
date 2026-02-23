@@ -7,7 +7,7 @@ import os
 import sys
 import traceback
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, cast
 
 # F-14: Windows 한글 인코딩 문제 해결 (강화된 버전)
 if sys.platform.startswith("win"):
@@ -87,7 +87,7 @@ console = Console()
 
 
 # The 'collect' command can remain if it's used for other purposes or direct testing.
-@app.command()
+@app.command()  # type: ignore[untyped-decorator]
 def collect(
     keywords: str,
     max_per_source: int = typer.Option(
@@ -107,7 +107,7 @@ def collect(
         "--log-level",
         help="Logging level: DEBUG, INFO, WARNING, ERROR",
     ),
-):
+) -> None:
     """
     Collect articles based on keywords with improved filtering and grouping.
     """
@@ -163,7 +163,7 @@ def collect(
     logger.success(f"Results saved to {output_path}")
 
 
-@app.command()
+@app.command()  # type: ignore[untyped-decorator]
 def suggest(
     domain: str = typer.Option(..., "--domain", help="Domain to suggest keywords for."),
     count: int = typer.Option(
@@ -174,7 +174,7 @@ def suggest(
         "--log-level",
         help="Logging level: DEBUG, INFO, WARNING, ERROR",
     ),
-):
+) -> None:
     """
     Suggests trend keywords for a given domain using Google Gemini.
     """
@@ -238,7 +238,7 @@ def suggest_keywords(domain: str, count: int = 10) -> list[str]:
     from . import tools
 
     # 기존 검증된 키워드 생성 함수 사용
-    return tools.generate_keywords_with_gemini(domain, count=count)
+    return cast(list[str], tools.generate_keywords_with_gemini(domain, count=count))
 
 
 if __name__ == "__main__":
