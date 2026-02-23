@@ -34,7 +34,10 @@ def _get_common_theme_from_keywords(keywords: Any) -> str:
 
     from . import tools
 
-    return tools.extract_common_theme_from_keywords(keywords, callbacks=callbacks)
+    theme = tools.extract_common_theme_from_keywords(keywords, callbacks=callbacks)
+    if isinstance(theme, str):
+        return theme
+    return str(theme)
 
 
 def _render_with_template(
