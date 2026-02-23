@@ -3,22 +3,17 @@ Newsletter Generator - LangChain Chains
 이 모듈은 뉴스레터 생성을 위한 LangChain 체인을 정의합니다.
 """
 
-import datetime
-import os
-
-from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableLambda
 
 from . import chains_prompts
 from .chains_categorization import build_categorization_chain
+from .chains_compact_flow import build_compact_newsletter_result
 from .chains_composition import create_composition_chain
-from .chains_llm_utils import get_llm
+from .chains_llm_utils import get_llm as _get_llm
 from .chains_no_articles import handle_no_articles_scenario
 from .chains_prompts import CATEGORIZATION_PROMPT, SUMMARIZATION_PROMPT
 from .chains_rendering import create_rendering_chain
 from .chains_summarization import build_summarization_chain
-from .compose import NewsletterConfig, compose_newsletter, create_grouped_sections
-from .template_manager import TemplateManager
 from .utils.logger import get_logger
 
 # 로거 초기화
@@ -29,6 +24,7 @@ COMPOSITION_PROMPT = chains_prompts.COMPOSITION_PROMPT
 HTML_TEMPLATE = chains_prompts.HTML_TEMPLATE
 SYSTEM_PROMPT = chains_prompts.SYSTEM_PROMPT
 load_html_template = chains_prompts.load_html_template
+get_llm = _get_llm
 
 
 def create_categorization_chain(is_compact=False):
@@ -72,7 +68,6 @@ def get_newsletter_chain(is_compact=False):
                 raise ValueError("입력 데이터에 'articles' 필드가 없습니다.")
 
             articles = data.get("articles", [])
-            keywords = data.get("keywords", [])
 
             # 빈 기사 배열 처리 - 유용한 뉴스레터를 생성하도록 개선
             if not articles or len(articles) == 0:
@@ -96,285 +91,7 @@ def get_newsletter_chain(is_compact=False):
             )
 
             if is_compact:
-                # Compact 모드 처리
-                # compose.py의 extract_and_prepare_top_articles를 사용해 top_articles 추출
-                config = NewsletterConfig.get_config("compact")
-
-                # 원본 기사 데이터에서 직접 상위 3개 추출 (점수순 정렬 후)
-                articles = data.get("articles", [])
-                if articles:
-                    # 점수가 있으면 점수순으로 정렬, 없으면 그대로 사용
-                    sorted_articles = sorted(
-                        articles, key=lambda x: x.get("score", 0), reverse=True
-                    )
-                    top_3_articles = sorted_articles[:3]
-
-                    # 템플릿용 포맷팅
-                    top_articles = []
-                    for article in top_3_articles:
-                        top_article = {
-                            "title": article.get("title", ""),
-                            "url": article.get("url", "#"),
-                            "snippet": (
-                                article.get("snippet", article.get("content", ""))[:200]
-                                + "..."
-                                if len(
-                                    article.get("snippet", article.get("content", ""))
-                                )
-                                > 200
-                                else article.get("snippet", article.get("content", ""))
-                            ),
-                            "source_and_date": (
-                                f"{article.get('source', 'Unknown')} · "
-                                f"{article.get('date', 'Unknown date')}"
-                            ),
-                        }
-                        top_articles.append(top_article)
-                else:
-                    top_articles = []
-
-                grouped_sections = create_grouped_sections(
-                    sections_data,
-                    top_articles,
-                    max_groups=config["max_groups"],
-                    max_articles=config["max_articles"],
-                )
-
-                # email_compatible 모드인지 확인
-                is_email_compatible = data.get("email_compatible", False)
-
-                if is_email_compatible:
-                    # email_compatible 모드에서는 grouped_sections에서 definitions 추출
-                    definitions = []
-                    for group in grouped_sections:
-                        group_definitions = group.get("definitions", [])
-                        for definition in group_definitions:
-                            # 중복 제거
-                            if definition not in definitions:
-                                definitions.append(definition)
-                    # 최대 3개로 제한
-                    definitions = definitions[:3]
-                    logger.debug(
-                        f"이메일 호환 모드: grouped_sections에서 {len(definitions)}개의 정의를 추출했습니다"
-                    )
-                else:
-                    # 일반 compact 모드에서는 전체 definitions를 빈 배열로 설정 (그룹별 definitions만 사용)
-                    definitions = []
-
-                # 템플릿 매니저로부터 메타데이터 가져오기
-                template_manager = TemplateManager()
-
-                # 키워드 및 주제 처리
-                keywords = data.get("keywords", [])
-                domain = data.get("domain", "")
-
-                if isinstance(keywords, str):
-                    keywords = [kw.strip() for kw in keywords.split(",") if kw.strip()]
-
-                # 주제 결정
-                if domain:
-                    newsletter_topic = domain
-                elif len(keywords) == 1:
-                    newsletter_topic = keywords[0]
-                else:
-                    from .tools import extract_common_theme_from_keywords
-
-                    newsletter_topic = extract_common_theme_from_keywords(keywords)
-
-                # 현재 날짜 및 시간 정보
-                current_date = datetime.date.today().strftime("%Y년 %m월 %d일")
-                current_time = datetime.datetime.now().strftime("%H:%M")
-
-                # 주제별 동적 "생각해 볼 거리" 생성 (compact용 - LLM 기반)
-                def create_food_for_thought_compact(topic, keywords=None):
-                    """주제에 따른 동적 생각해 볼 거리 생성 (LLM 기반)"""
-                    try:
-                        # LLM을 사용하여 동적으로 생성
-                        llm = get_llm(temperature=0.4)
-
-                        keywords_str = ", ".join(keywords) if keywords else topic
-                        prompt = f"""다음 주제에 대한 "생각해 볼 거리" 메시지를 생성해주세요:
-
-주제: {topic}
-키워드: {keywords_str}
-
-R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 빠른 변화에 대응하기 위한 전략적 관점의 생각해볼 거리를 1-2문장으로 작성해주세요.
-
-- 구체적이고 실용적인 내용
-- 전략적 사고를 유도하는 질문이나 제안
-- 정중한 존댓말 사용
-
-메시지만 반환해주세요 (다른 설명 없이):"""
-
-                        messages = [HumanMessage(content=prompt)]
-                        response = llm.invoke(messages)
-
-                        # 안전한 응답 처리
-                        if hasattr(response, "content") and response.content:
-                            message = str(response.content).strip()
-                            if message:
-                                return message
-
-                        # content가 없거나 빈 경우 기본값 사용
-                        logger.warning(f"LLM 응답에서 유효한 content를 찾을 수 없음: {response}")
-                        return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다."
-
-                    except Exception as e:
-                        logger.warning(f"LLM 기반 생각해 볼 거리 생성 실패: {e}")
-                        # 실패 시에만 기본 메시지 사용
-                        return f"{topic} 분야의 빠른 변화에 대응하기 위해서는 지속적인 학습과 혁신이 필요합니다. 이번 주 뉴스들을 통해 업계 동향을 파악하고, 우리 조직의 전략과 방향성을 점검해보시기 바랍니다."
-
-                # 최종 데이터 구조 생성
-                result_data = {
-                    "top_articles": top_articles[:3],
-                    "grouped_sections": grouped_sections,
-                    "definitions": definitions,
-                    "newsletter_topic": newsletter_topic,
-                    "generation_date": current_date,
-                    "generation_time": current_time,
-                    "search_keywords": (
-                        ", ".join(keywords)
-                        if isinstance(keywords, list)
-                        else str(keywords)
-                    ),
-                    "food_for_thought": {
-                        "message": create_food_for_thought_compact(
-                            newsletter_topic, keywords
-                        )
-                    },
-                    # 이메일 템플릿용 기본 메시지들 - 기본값만 설정, LLM 생성 시 덮어쓰기 가능
-                    "recipient_greeting": "안녕하세요,",
-                    # introduction_message는 LLM이 생성하도록 함
-                    "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다.",
-                    "editor_signature": "편집자 드림",
-                    "company_name": template_manager.get(
-                        "company.name", "산업통상자원 R&D 전략기획단"
-                    ),
-                    "company_logo_url": template_manager.get(
-                        "company.logo_url", "/static/logo.png"
-                    ),
-                    "company_website": template_manager.get(
-                        "company.website", "https://example.com"
-                    ),
-                    "copyright_year": template_manager.get(
-                        "company.copyright_year", datetime.date.today().strftime("%Y")
-                    ),
-                    "company_tagline": template_manager.get(
-                        "company.tagline", "최신 기술 동향을 한눈에"
-                    ),
-                    "footer_contact": template_manager.get(
-                        "footer.contact_info", "문의사항: hjjung2@osp.re.kr"
-                    ),
-                    "editor_name": template_manager.get("editor.name", "Google Gemini"),
-                    "editor_email": template_manager.get(
-                        "editor.email", "hjjung2@osp.re.kr"
-                    ),
-                    "editor_title": template_manager.get("editor.title", "편집자"),
-                    "footer_disclaimer": template_manager.get(
-                        "footer.disclaimer",
-                        "이 뉴스레터는 정보 제공을 목적으로 하며, 내용의 정확성을 보장하지 않습니다.",
-                    ),
-                }
-
-                # LLM을 사용하여 introduction_message 생성 (compact 모드에서도)
-                try:
-                    llm = get_llm(temperature=0.3)
-                    intro_prompt = f"""다음 정보를 바탕으로 뉴스레터 소개 문구를 작성해주세요:
-
-주제: {newsletter_topic}
-키워드: {", ".join(keywords) if isinstance(keywords, list) else keywords}
-그룹 수: {len(grouped_sections)}
-
-R&D 전략기획단 전문위원들을 대상으로, 이번 주 뉴스레터의 내용을 간략히 소개하는 문구를 1-2문장으로 작성해주세요.
-
-- 실제 주제와 내용을 반영할 것
-- 정중한 존댓말 사용
-- 구체적이고 유익한 느낌
-
-소개 문구만 반환해주세요 (다른 설명 없이):"""
-
-                    messages = [HumanMessage(content=intro_prompt)]
-                    response = llm.invoke(messages)
-
-                    # 안전한 응답 처리
-                    if hasattr(response, "content") and response.content:
-                        intro_message = str(response.content).strip()
-                        if intro_message:
-                            result_data["introduction_message"] = intro_message
-                            logger.info(
-                                f"[green]LLM이 생성한 introduction_message: {intro_message}[/green]"
-                            )
-                        else:
-                            # 빈 응답인 경우 기본값 사용
-                            result_data[
-                                "introduction_message"
-                            ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                    else:
-                        logger.warning(
-                            f"LLM 소개문구 응답에서 유효한 content를 찾을 수 없음: {response}"
-                        )
-                        result_data[
-                            "introduction_message"
-                        ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-
-                except Exception as e:
-                    logger.warning(f"LLM 기반 introduction_message 생성 실패: {e}")
-                    result_data[
-                        "introduction_message"
-                    ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-
-                logger.debug("Compact 최종 데이터 구조:")
-                logger.debug(f"  - top_articles: {len(result_data['top_articles'])}개")
-                logger.debug(
-                    f"  - grouped_sections: {len(result_data['grouped_sections'])}개"
-                )
-                logger.debug(f"  - definitions: {len(result_data['definitions'])}개")
-
-                # 템플릿 렌더링
-                logger.step("HTML 템플릿 렌더링", "rendering")
-
-                # 템플릿 렌더링
-                logger.info(
-                    f"Composing compact newsletter for topic: {newsletter_topic}"
-                )
-                template_dir = os.path.join(
-                    os.path.dirname(__file__), "..", "templates"
-                )
-
-                # email_compatible 정보를 데이터에 추가
-                logger.debug(
-                    f"원본 데이터 email_compatible: {data.get('email_compatible', 'NOT_FOUND')}"
-                )
-                result_data["email_compatible"] = data.get("email_compatible", False)
-                result_data["template_style"] = data.get("template_style", "compact")
-                logger.debug(
-                    f"결과 데이터 email_compatible 설정: {result_data['email_compatible']}"
-                )
-
-                # email_compatible 처리를 위해 통합된 compose_newsletter 함수 사용
-                is_email_compatible = result_data.get("email_compatible", False)
-                logger.debug(f"최종 email_compatible: {is_email_compatible}")
-
-                if is_email_compatible:
-                    logger.debug("이메일 호환 템플릿을 사용합니다")
-                    html_content = compose_newsletter(
-                        result_data, template_dir, "email_compatible"
-                    )
-                else:
-                    logger.debug("간결한 템플릿을 사용합니다")
-                    html_content = compose_newsletter(
-                        result_data, template_dir, "compact"
-                    )
-
-                logger.success("Compact 뉴스레터 생성 완료!")
-
-                # Compact 모드에서 HTML과 구조화된 데이터를 함께 반환
-                return {
-                    "html": html_content,
-                    "structured_data": result_data,
-                    "sections": sections_data.get("sections", []),
-                    "mode": "compact",
-                }
+                return build_compact_newsletter_result(data, sections_data)
 
             else:
                 # Detailed 모드 처리
