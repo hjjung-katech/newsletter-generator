@@ -3,6 +3,7 @@
   "policy_name": "repo-hygiene-week1-baseline",
   "root_policy": {
     "allowed_file_names": [
+      ".coveragerc",
       ".dockerignore",
       ".env.example",
       ".gitignore",
@@ -18,6 +19,7 @@
       "LOCAL_CI_GUIDE.md",
       "Makefile",
       "README.md",
+      "config.yml",
       "config.example.yml",
       "env.example",
       "nixpacks.toml",
