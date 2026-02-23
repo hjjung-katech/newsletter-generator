@@ -5,12 +5,32 @@
 import json
 import logging
 import sqlite3
+import threading
 import uuid
 from datetime import datetime
 from typing import Any, Callable
 
 from flask import Flask, jsonify, request
 from tasks import generate_newsletter_task
+
+try:
+    from db_state import (
+        build_idempotency_key,
+        build_schedule_idempotency_key,
+        create_or_get_history_job,
+        derive_job_id,
+        ensure_database_schema,
+        is_feature_enabled,
+    )
+except ImportError:
+    from web.db_state import (  # pragma: no cover
+        build_idempotency_key,
+        build_schedule_idempotency_key,
+        create_or_get_history_job,
+        derive_job_id,
+        ensure_database_schema,
+        is_feature_enabled,
+    )
 
 try:
     from newsletter_clients import MockNewsletterCLI, RealNewsletterCLI
@@ -37,12 +57,39 @@ def register_generation_routes(
     DATABASE_PATH = database_path
     RealNewsletterCLI = real_cli_class
     MockNewsletterCLI = mock_cli_class
+    ensure_database_schema(DATABASE_PATH)
 
     def resolve_newsletter_cli() -> Any:
         if get_newsletter_cli is None:
             return newsletter_cli
         resolved = get_newsletter_cli()
         return resolved if resolved is not None else newsletter_cli
+
+    def run_in_memory_job(
+        job_id: str,
+        data: dict[str, Any],
+        send_email: bool,
+        idempotency_key: str | None,
+    ) -> None:
+        try:
+            result = generate_newsletter_task(
+                data,
+                job_id,
+                send_email,
+                idempotency_key,
+                DATABASE_PATH,
+            )
+            in_memory_tasks[job_id] = {
+                "status": "completed",
+                "result": result,
+                "updated_at": datetime.now().isoformat(),
+            }
+        except Exception as exc:
+            in_memory_tasks[job_id] = {
+                "status": "failed",
+                "error": str(exc),
+                "updated_at": datetime.now().isoformat(),
+            }
 
     @app.route("/api/generate", methods=["POST"])
     def generate_newsletter():
@@ -81,160 +128,101 @@ def register_generation_routes(
             print(f"📋 Request data: {data}")
             print(f"📧 Send email: {send_email} to {email}")
 
-            # Create unique job ID
-            job_id = str(uuid.uuid4())
-            print(f"🆔 Generated job ID: {job_id}")
-
-            # Store request in history
-            conn = sqlite3.connect(DATABASE_PATH)
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO history (id, params, status) VALUES (?, ?, ?)",
-                (job_id, json.dumps(data), "pending"),
+            idempotency_enabled = is_feature_enabled(
+                "WEB_IDEMPOTENCY_ENABLED", default=True
             )
-            conn.commit()
-            conn.close()
-            print(f"💾 Stored request in database")
+            provided_idempotency_key = request.headers.get("Idempotency-Key")
+            idempotency_key = build_idempotency_key(
+                payload=data,
+                provided_key=provided_idempotency_key,
+                namespace="generate",
+            )
+            if not idempotency_enabled:
+                idempotency_key = f"generate:{uuid.uuid4()}"
 
-            # If Redis is available, queue the task
-            if task_queue:
-                print(f"📤 Queueing task with Redis")
-                job = task_queue.enqueue(
-                    generate_newsletter_task, data, job_id, send_email
+            proposed_job_id = (
+                derive_job_id(idempotency_key, prefix="job")
+                if idempotency_enabled
+                else str(uuid.uuid4())
+            )
+            job_id, deduplicated, stored_status = create_or_get_history_job(
+                db_path=DATABASE_PATH,
+                job_id=proposed_job_id,
+                params=data,
+                idempotency_key=idempotency_key if idempotency_enabled else None,
+                status="pending",
+            )
+            print(f"🆔 Resolved job ID: {job_id} (deduplicated={deduplicated})")
+
+            if deduplicated:
+                return (
+                    jsonify(
+                        {
+                            "job_id": job_id,
+                            "status": stored_status,
+                            "deduplicated": True,
+                            "idempotency_key": idempotency_key,
+                        }
+                    ),
+                    202,
                 )
-                return jsonify({"job_id": job_id, "status": "queued"}), 202
-            else:
-                print(f"🔄 Processing in-memory (Redis not available)")
-                # Fallback: process in background using in-memory tracking
-                import threading
 
-                # Store initial task status
-                in_memory_tasks[job_id] = {
-                    "status": "processing",
-                    "started_at": datetime.now().isoformat(),
-                }
+            if task_queue:
+                print("📤 Queueing task with Redis")
+                task_queue.enqueue(
+                    generate_newsletter_task,
+                    data,
+                    job_id,
+                    send_email,
+                    idempotency_key if idempotency_enabled else None,
+                    DATABASE_PATH,
+                    job_id=job_id,
+                )
+                return (
+                    jsonify(
+                        {
+                            "job_id": job_id,
+                            "status": "queued",
+                            "deduplicated": False,
+                            "idempotency_key": idempotency_key,
+                        }
+                    ),
+                    202,
+                )
 
-                # Process in background thread
-                def background_task():
-                    try:
-                        print(f"⚙️  Starting background processing for job {job_id}")
-                        print(f"⚙️  Data: {data}")
-                        print(f"⚙️  Current time: {datetime.now().isoformat()}")
+            print("🔄 Processing in-memory (Redis not available)")
+            in_memory_tasks[job_id] = {
+                "status": "processing",
+                "started_at": datetime.now().isoformat(),
+                "idempotency_key": idempotency_key,
+            }
 
-                        # 환경 체크
-                        print(
-                            f"⚙️  Using CLI type: {type(resolve_newsletter_cli()).__name__}"
-                        )
-
-                        process_newsletter_in_memory(data, job_id)
-
-                        # 메모리에서 결과 가져오기
-                        if job_id in in_memory_tasks:
-                            task_result = in_memory_tasks[job_id]
-                            print(f"💾 Updating database for job {job_id}")
-                            print(
-                                f"💾 Task status: {task_result.get('status', 'unknown')}"
-                            )
-
-                            # Update database with final result
-                            conn = sqlite3.connect(DATABASE_PATH)
-                            cursor = conn.cursor()
-
-                            if (
-                                task_result.get("status") == "completed"
-                                and "result" in task_result
-                            ):
-                                # 성공한 경우
-                                try:
-                                    result_json = json.dumps(task_result["result"])
-                                    cursor.execute(
-                                        "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                                        (result_json, "completed", job_id),
-                                    )
-                                    print(
-                                        f"💾 Successfully updated database for job {job_id}"
-                                    )
-                                except (TypeError, ValueError) as json_error:
-                                    print(
-                                        f"❌ JSON serialization error for job {job_id}: {json_error}"
-                                    )
-                                    # JSON 직렬화 실패 시 기본 응답 저장
-                                    fallback_result = {
-                                        "status": "completed",
-                                        "title": "Newsletter Generated",
-                                        "html_content": task_result["result"].get(
-                                            "html_content",
-                                            task_result["result"].get(
-                                                "content",
-                                                "Newsletter content available",
-                                            ),
-                                        ),
-                                        "error": f"JSON serialization failed: {str(json_error)}",
-                                    }
-                                    cursor.execute(
-                                        "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                                        (
-                                            json.dumps(fallback_result),
-                                            "completed",
-                                            job_id,
-                                        ),
-                                    )
-                            else:
-                                # 실패한 경우
-                                error_result = {
-                                    "error": task_result.get("error", "Unknown error"),
-                                    "status": "failed",
-                                }
-                                cursor.execute(
-                                    "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                                    (json.dumps(error_result), "failed", job_id),
-                                )
-
-                            conn.commit()
-                            conn.close()
-                            print(f"✅ Completed background processing for job {job_id}")
-                        else:
-                            print(f"❌ Job {job_id} not found in in_memory_tasks")
-                            # 데이터베이스에 실패 상태 업데이트
-                            conn = sqlite3.connect(DATABASE_PATH)
-                            cursor = conn.cursor()
-                            cursor.execute(
-                                "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                                (
-                                    json.dumps({"error": "Job not found in memory"}),
-                                    "failed",
-                                    job_id,
-                                ),
-                            )
-                            conn.commit()
-                            conn.close()
-
-                    except Exception as e:
-                        print(f"❌ Error in background processing for job {job_id}: {e}")
-                        import traceback
-
-                        print(f"❌ Traceback: {traceback.format_exc()}")
-
-                        # Update database with error
-                        try:
-                            conn = sqlite3.connect(DATABASE_PATH)
-                            cursor = conn.cursor()
-                            cursor.execute(
-                                "UPDATE history SET result = ?, status = ? WHERE id = ?",
-                                (json.dumps({"error": str(e)}), "failed", job_id),
-                            )
-                            conn.commit()
-                            conn.close()
-                        except Exception as db_error:
-                            print(
-                                f"❌ Failed to update database with error for job {job_id}: {db_error}"
-                            )
-
-                thread = threading.Thread(target=background_task)
-                thread.daemon = True
+            if not app.config.get("TESTING", False):
+                thread = threading.Thread(
+                    target=run_in_memory_job,
+                    kwargs={
+                        "job_id": job_id,
+                        "data": data,
+                        "send_email": send_email,
+                        "idempotency_key": (
+                            idempotency_key if idempotency_enabled else None
+                        ),
+                    },
+                    daemon=True,
+                )
                 thread.start()
 
-                return jsonify({"job_id": job_id, "status": "processing"}), 202
+            return (
+                jsonify(
+                    {
+                        "job_id": job_id,
+                        "status": "processing",
+                        "deduplicated": False,
+                        "idempotency_key": idempotency_key,
+                    }
+                ),
+                202,
+            )
 
         except Exception as e:
             print(f"❌ Error in generate_newsletter endpoint: {e}")
@@ -491,6 +479,7 @@ def register_generation_routes(
                 "job_id": job_id,
                 "status": task["status"],
                 "sent": task.get("sent", False),
+                "idempotency_key": task.get("idempotency_key"),
             }
 
             if "result" in task:
@@ -507,7 +496,8 @@ def register_generation_routes(
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT params, result, status FROM history WHERE id = ?", (job_id,)
+            "SELECT params, result, status, idempotency_key FROM history WHERE id = ?",
+            (job_id,),
         )
         row = cursor.fetchone()
         conn.close()
@@ -515,12 +505,13 @@ def register_generation_routes(
         if not row:
             return jsonify({"error": "Job not found"}), 404
 
-        params, result, status = row
+        params, result, status, idempotency_key = row
         response = {
             "job_id": job_id,
             "status": status,
             "params": json.loads(params) if params else None,
             "sent": False,
+            "idempotency_key": idempotency_key,
         }
 
         if result:
@@ -544,7 +535,7 @@ def register_generation_routes(
             # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
             cursor.execute(
                 """
-                SELECT id, params, result, created_at, status
+                SELECT id, params, result, created_at, status, idempotency_key
                 FROM history
                 ORDER BY
                     CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
@@ -563,7 +554,7 @@ def register_generation_routes(
 
         history = []
         for row in rows:
-            job_id, params, result, created_at, status = row
+            job_id, params, result, created_at, status, idempotency_key = row
             print(f"📚 Processing history record: {job_id} (status: {status})")
 
             try:
@@ -585,6 +576,7 @@ def register_generation_routes(
                     "result": parsed_result,
                     "created_at": created_at,
                     "status": status,
+                    "idempotency_key": idempotency_key,
                 }
             )
 
@@ -627,13 +619,26 @@ def register_generation_routes(
             "template_style": data.get("template_style", "compact"),
             "email_compatible": data.get("email_compatible", True),
             "period": data.get("period", 14),
+            "send_email": True,
         }
+        is_test = bool(data.get("is_test", False))
+        expires_at = data.get("expires_at")
 
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO schedules (id, params, rrule, next_run) VALUES (?, ?, ?, ?)",
-            (schedule_id, json.dumps(schedule_params), rrule_str, next_run.isoformat()),
+            """
+            INSERT INTO schedules (id, params, rrule, next_run, is_test, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                schedule_id,
+                json.dumps(schedule_params),
+                rrule_str,
+                next_run.isoformat(),
+                int(is_test),
+                expires_at,
+            ),
         )
         conn.commit()
         conn.close()
@@ -712,34 +717,59 @@ def register_generation_routes(
                 return jsonify({"error": "Schedule is disabled"}), 400
 
             params = json.loads(params_json)
+            intended_run_at = datetime.now()
+            idempotency_enabled = is_feature_enabled(
+                "WEB_IDEMPOTENCY_ENABLED", default=True
+            )
+            idempotency_key = build_schedule_idempotency_key(
+                schedule_id=schedule_id,
+                intended_run_at=intended_run_at,
+            )
+            if not idempotency_enabled:
+                idempotency_key = (
+                    f"schedule:{schedule_id}:{intended_run_at.isoformat()}"
+                )
+            job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
+            immediate_job_id = f"schedule_{schedule_id}_{job_suffix}"
 
             # 즉시 뉴스레터 생성 작업 큐에 추가
             if redis_conn and task_queue:
-                immediate_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
                 job = task_queue.enqueue(
                     generate_newsletter_task,
                     params,
                     immediate_job_id,
                     params.get("send_email", False),
+                    idempotency_key if idempotency_enabled else None,
+                    DATABASE_PATH,
+                    job_id=immediate_job_id,
                     job_timeout="10m",
                 )
 
                 return jsonify(
                     {
                         "status": "queued",
-                        "job_id": job.id,
+                        "job_id": immediate_job_id,
                         "message": "Newsletter generation started",
+                        "idempotency_key": idempotency_key,
                     }
                 )
             else:
                 # Redis가 없는 경우 직접 실행
-                immediate_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
                 result = generate_newsletter_task(
                     params,
                     immediate_job_id,
                     params.get("send_email", False),
+                    idempotency_key if idempotency_enabled else None,
+                    DATABASE_PATH,
                 )
-                return jsonify({"status": "completed", "result": result})
+                return jsonify(
+                    {
+                        "status": "completed",
+                        "result": result,
+                        "job_id": immediate_job_id,
+                        "idempotency_key": idempotency_key,
+                    }
+                )
 
         except Exception as e:
             logging.error(f"Failed to run schedule {schedule_id}: {e}")

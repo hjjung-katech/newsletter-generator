@@ -7,7 +7,7 @@ import os
 import sqlite3
 import traceback
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, cast
 
 from newsletter_core.public.generation import (
     GenerateNewsletterRequest,
@@ -15,47 +15,85 @@ from newsletter_core.public.generation import (
     generate_newsletter,
 )
 
+try:
+    from db_state import (
+        get_or_create_outbox_record,
+        hash_subject,
+        is_feature_enabled,
+        mark_outbox_failed,
+        mark_outbox_sent,
+        update_history_status,
+    )
+except ImportError:
+    from web.db_state import (  # pragma: no cover
+        get_or_create_outbox_record,
+        hash_subject,
+        is_feature_enabled,
+        mark_outbox_failed,
+        mark_outbox_sent,
+        update_history_status,
+    )
+
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
 
 
-def _ensure_history_row(job_id: str, params: Optional[Dict[str, Any]] = None) -> None:
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT id FROM history WHERE id = ?", (job_id,))
-    exists = cursor.fetchone() is not None
-
-    if not exists:
-        cursor.execute(
-            "INSERT INTO history (id, params, status) VALUES (?, ?, ?)",
-            (job_id, json.dumps(params or {}), "pending"),
-        )
-
-    conn.commit()
-    conn.close()
+def _resolve_database_path(database_path: str | None) -> str:
+    return database_path or DATABASE_PATH
 
 
-def update_job_status(
+def _resolve_mail_send_callable() -> Callable[..., Any]:
+    try:
+        from mail import send_email as send_email_fn
+
+        return cast(Callable[..., Any], send_email_fn)
+    except ImportError:
+        from .mail import send_email as send_email_fn  # pragma: no cover
+
+        return cast(Callable[..., Any], send_email_fn)
+
+
+def _send_email_with_outbox(
+    db_path: str,
     job_id: str,
-    status: str,
-    result: Optional[Dict[str, Any]] = None,
-    params: Optional[Dict[str, Any]] = None,
-) -> None:
-    """Update job status in database, creating the row if needed."""
-    _ensure_history_row(job_id, params)
+    to: str,
+    subject: str,
+    html: str,
+) -> Dict[str, Any]:
+    send_email_fn = _resolve_mail_send_callable()
+    outbox_enabled = is_feature_enabled("WEB_OUTBOX_ENABLED", default=True)
+    send_key = f"{job_id}:{to}:{hash_subject(subject)}"
 
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-
-    if result is not None:
-        cursor.execute(
-            "UPDATE history SET status = ?, result = ? WHERE id = ?",
-            (status, json.dumps(result), job_id),
+    if outbox_enabled:
+        outbox_status = get_or_create_outbox_record(
+            db_path=db_path,
+            send_key=send_key,
+            job_id=job_id,
+            recipient=to,
+            subject_hash=hash_subject(subject),
         )
-    else:
-        cursor.execute("UPDATE history SET status = ? WHERE id = ?", (status, job_id))
+        if outbox_status == "sent":
+            return {"sent": True, "skipped": True, "send_key": send_key}
 
-    conn.commit()
-    conn.close()
+    try:
+        provider_response = send_email_fn(to=to, subject=subject, html=html)
+        provider_message_id = (
+            provider_response.get("MessageID")
+            if isinstance(provider_response, dict)
+            else None
+        )
+        if outbox_enabled:
+            mark_outbox_sent(
+                db_path=db_path,
+                send_key=send_key,
+                provider_message_id=provider_message_id,
+            )
+        return {"sent": True, "skipped": False, "send_key": send_key}
+    except Exception as exc:
+        if outbox_enabled:
+            mark_outbox_failed(
+                db_path=db_path, send_key=send_key, error_message=str(exc)
+            )
+        raise
 
 
 def _build_request(data: Dict[str, Any]) -> GenerateNewsletterRequest:
@@ -73,10 +111,19 @@ def generate_newsletter_task(
     data: Dict[str, Any],
     job_id: str,
     send_email: bool = False,
+    idempotency_key: str | None = None,
+    database_path: str | None = None,
 ) -> Dict[str, Any]:
     """Generate newsletter in worker context with stable response schema."""
+    db_path = _resolve_database_path(database_path)
     print(f"🔄 Worker: starting newsletter generation for job {job_id}")
-    update_job_status(job_id, "processing", params=data)
+    update_history_status(
+        db_path=db_path,
+        job_id=job_id,
+        status="processing",
+        params=data,
+        idempotency_key=idempotency_key,
+    )
 
     email = data.get("email", "")
 
@@ -97,9 +144,9 @@ def generate_newsletter_task(
 
         if send_email and email:
             try:
-                from mail import send_email as mail_send_email
-
-                mail_send_email(
+                send_result = _send_email_with_outbox(
+                    db_path=db_path,
+                    job_id=job_id,
                     to=email,
                     subject=result["title"],
                     html=result["html_content"],
@@ -107,11 +154,20 @@ def generate_newsletter_task(
                 response["sent"] = True
                 response["email_sent"] = True
                 response["email_to"] = email
+                response["email_deduplicated"] = bool(send_result.get("skipped", False))
+                response["send_key"] = send_result.get("send_key")
             except Exception as exc:
                 response["email_sent"] = False
                 response["email_error"] = str(exc)
 
-        update_job_status(job_id, "completed", response)
+        update_history_status(
+            db_path=db_path,
+            job_id=job_id,
+            status="completed",
+            result=response,
+            params=data,
+            idempotency_key=idempotency_key,
+        )
         return response
 
     except NewsletterGenerationError as exc:
@@ -125,7 +181,14 @@ def generate_newsletter_task(
             "sent": False,
             "email_sent": False,
         }
-        update_job_status(job_id, "failed", error_response)
+        update_history_status(
+            db_path=db_path,
+            job_id=job_id,
+            status="failed",
+            result=error_response,
+            params=data,
+            idempotency_key=idempotency_key,
+        )
         raise
     except Exception as exc:
         error_response = {
@@ -139,7 +202,14 @@ def generate_newsletter_task(
             "sent": False,
             "email_sent": False,
         }
-        update_job_status(job_id, "failed", error_response)
+        update_history_status(
+            db_path=db_path,
+            job_id=job_id,
+            status="failed",
+            result=error_response,
+            params=data,
+            idempotency_key=idempotency_key,
+        )
         raise
 
 

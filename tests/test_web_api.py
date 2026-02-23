@@ -6,14 +6,14 @@ Tests the Flask app with email functionality
 import json
 import os
 import sys
-from unittest.mock import MagicMock, patch
+import uuid
 
 import pytest
 
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from web.app import app
+from web.app import app  # noqa: E402
 
 pytestmark = [pytest.mark.api, pytest.mark.email]
 
@@ -30,8 +30,9 @@ class TestWebAPI:
 
     def test_generate_newsletter_without_email(self, client):
         """Test newsletter generation without email"""
+        unique_topic = f"AI-{uuid.uuid4()}"
         data = {
-            "keywords": "AI, machine learning",
+            "keywords": f"{unique_topic}, machine learning",
             "template_style": "compact",
             "period": 14,
         }
@@ -47,8 +48,9 @@ class TestWebAPI:
 
     def test_generate_newsletter_with_email(self, client):
         """Test newsletter generation with email"""
+        unique_topic = f"AI-{uuid.uuid4()}"
         data = {
-            "keywords": "AI, machine learning",
+            "keywords": f"{unique_topic}, machine learning",
             "template_style": "compact",
             "period": 14,
             "email": "test@example.com",
@@ -62,6 +64,39 @@ class TestWebAPI:
         result = json.loads(response.data)
         assert "job_id" in result
         assert result["status"] in ["queued", "processing"]
+
+    def test_generate_newsletter_idempotency_reuses_job(self, client):
+        """Same Idempotency-Key should return same job_id with deduplicated flag."""
+        data = {
+            "keywords": "AI, machine learning",
+            "template_style": "compact",
+            "period": 14,
+        }
+        unique_key = f"web-api-idempotency-{uuid.uuid4()}"
+        headers = {"Idempotency-Key": unique_key}
+
+        first = client.post(
+            "/api/generate",
+            data=json.dumps(data),
+            content_type="application/json",
+            headers=headers,
+        )
+        second = client.post(
+            "/api/generate",
+            data=json.dumps(data),
+            content_type="application/json",
+            headers=headers,
+        )
+
+        assert first.status_code == 202
+        assert second.status_code == 202
+
+        first_payload = json.loads(first.data)
+        second_payload = json.loads(second.data)
+        assert first_payload["job_id"] == second_payload["job_id"]
+        assert first_payload["deduplicated"] is False
+        assert second_payload["deduplicated"] is True
+        assert second_payload["idempotency_key"] == unique_key
 
     def test_generate_newsletter_invalid_email(self, client):
         """Test newsletter generation with invalid email"""

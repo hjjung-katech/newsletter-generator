@@ -12,11 +12,11 @@ import sqlite3
 import sys
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
 import redis
-from dateutil import tz
-from dateutil.rrule import rrulestr
+from dateutil import tz  # type: ignore[import-untyped]
+from dateutil.rrule import rrulestr  # type: ignore[import-untyped]
 from rq import Queue
 
 # Add current directory to path
@@ -25,6 +25,23 @@ sys.path.insert(0, current_dir)
 
 # Import task functions
 from tasks import generate_newsletter_task
+
+try:
+    from db_state import (
+        build_schedule_idempotency_key,
+        derive_job_id,
+        ensure_database_schema,
+        ensure_history_row,
+        is_feature_enabled,
+    )
+except ImportError:
+    from web.db_state import (  # pragma: no cover
+        build_schedule_idempotency_key,
+        derive_job_id,
+        ensure_database_schema,
+        ensure_history_row,
+        is_feature_enabled,
+    )
 
 # Import time utilities
 try:
@@ -45,8 +62,9 @@ REAL_DATETIME = datetime
 class ScheduleRunner:
     """RRULE 기반 스케줄 실행기"""
 
-    def __init__(self, db_path: str = "storage.db", redis_url: str = None):
+    def __init__(self, db_path: str = "storage.db", redis_url: str | None = None):
         self.db_path = db_path
+        ensure_database_schema(self.db_path)
         self.redis_url = redis_url or os.environ.get(
             "REDIS_URL", "redis://localhost:6379/0"
         )
@@ -107,7 +125,6 @@ class ScheduleRunner:
 
             # 스케줄 실행 대기열과 만료된 스케줄 분리 처리
             ready_for_execution = []
-            expired_schedules = []
             updated_count = 0
 
             # 정규 스케줄: 30분 윈도우, 테스트 스케줄: 10분 윈도우
@@ -234,12 +251,12 @@ class ScheduleRunner:
             return []
 
     def calculate_next_run(
-        self, rrule_str: str, after: datetime = None
+        self, rrule_str: str, after: datetime | None = None
     ) -> Optional[datetime]:
         """RRULE을 기반으로 다음 실행 시간을 계산합니다."""
         try:
             if after is None:
-                after = datetime.now(timezone.utc)
+                after = REAL_DATETIME.now(timezone.utc)
 
             # after가 timezone-aware인 경우 naive로 변환
             if after.tzinfo is not None:
@@ -254,8 +271,10 @@ class ScheduleRunner:
             next_occurrence_naive = rrule.after(after_naive)
 
             # UTC timezone을 추가하여 aware datetime으로 변환
-            if next_occurrence_naive:
-                next_occurrence = next_occurrence_naive.replace(tzinfo=timezone.utc)
+            if next_occurrence_naive is not None:
+                next_occurrence = cast(datetime, next_occurrence_naive).replace(
+                    tzinfo=timezone.utc
+                )
                 return next_occurrence
             else:
                 return None
@@ -355,6 +374,28 @@ class ScheduleRunner:
                 f"[EXECUTE] Starting execution for schedule {schedule_id} - {params.get('keywords', 'No keywords')}"
             )
 
+            intended_run_at = schedule.get("next_run", datetime.now(timezone.utc))
+            idempotency_enabled = is_feature_enabled(
+                "WEB_IDEMPOTENCY_ENABLED", default=True
+            )
+            if idempotency_enabled:
+                idempotency_key = build_schedule_idempotency_key(
+                    schedule_id=schedule_id,
+                    intended_run_at=intended_run_at,
+                )
+            else:
+                idempotency_key = f"schedule:{schedule_id}:{uuid.uuid4()}"
+
+            job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
+            schedule_job_id = f"schedule_{schedule_id}_{job_suffix}"
+            ensure_history_row(
+                db_path=self.db_path,
+                job_id=schedule_job_id,
+                params=params,
+                status="pending",
+                idempotency_key=idempotency_key,
+            )
+
             # 뉴스레터 생성 작업을 큐에 추가
             redis_success = False
             if self.queue:
@@ -363,8 +404,11 @@ class ScheduleRunner:
                     job = self.queue.enqueue(
                         generate_newsletter_task,
                         params,
-                        f"schedule_{schedule_id}",  # job_id 매개변수 추가
+                        schedule_job_id,
                         params.get("send_email", False),  # send_email 매개변수 추가
+                        idempotency_key,
+                        self.db_path,
+                        job_id=schedule_job_id,
                         job_timeout="10m",
                         result_ttl=86400,  # 24시간 동안 결과 보관
                     )
@@ -384,9 +428,12 @@ class ScheduleRunner:
             if not redis_success:
                 # Redis가 없거나 연결에 실패한 경우 동기 실행 (fallback)
                 logger.info(f"Executing schedule {schedule_id} synchronously")
-                fallback_job_id = f"schedule_{schedule_id}_{uuid.uuid4().hex[:8]}"
                 result = generate_newsletter_task(
-                    params, fallback_job_id, params.get("send_email", False)
+                    params,
+                    schedule_job_id,
+                    params.get("send_email", False),
+                    idempotency_key,
+                    self.db_path,
                 )
                 logger.info(
                     f"Synchronous execution completed for schedule {schedule_id}: {result.get('status', 'unknown') if result else 'no result'}"
@@ -432,7 +479,7 @@ class ScheduleRunner:
         logger.info(f"Executed {executed_count} schedules")
         return executed_count
 
-    def run_continuous(self, check_interval: int = 60):
+    def run_continuous(self, check_interval: int = 60) -> None:
         """연속적으로 스케줄을 체크하고 실행합니다."""
         logger.info(
             f"Starting continuous schedule runner (check interval: {check_interval}s)"
@@ -453,7 +500,7 @@ class ScheduleRunner:
                 time.sleep(check_interval)
 
 
-def main():
+def main() -> None:
     """CLI 진입점"""
     import argparse
 

@@ -2,9 +2,10 @@
 Web application common types
 """
 
-from typing import NewType, Optional, Dict, Any, Literal, Union, List
-from pydantic import BaseModel, Field, field_validator, model_validator
 import re
+from typing import Any, Dict, List, Literal, NewType, Optional, Union
+
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # 이메일 주소 타입
 EmailAddress = NewType("EmailAddress", str)
@@ -27,7 +28,7 @@ class GenerateNewsletterRequest(BaseModel):
     period: int = Field(default=14)
     email: Optional[str] = None  # 즉시 발송용 이메일 주소
 
-    @field_validator("keywords")
+    @field_validator("keywords")  # type: ignore[untyped-decorator]
     @classmethod
     def validate_keywords(cls, v: Optional[Union[str, List[str]]]) -> Optional[str]:
         if v is None:
@@ -40,22 +41,22 @@ class GenerateNewsletterRequest(BaseModel):
         else:
             raise ValueError("Keywords must be a string or list of strings")
 
-    @field_validator("period")
+    @field_validator("period")  # type: ignore[untyped-decorator]
     @classmethod
     def validate_period(cls, v: int) -> int:
         if v not in [1, 7, 14, 30]:
             raise ValueError("Invalid period. Must be one of: 1, 7, 14, 30 days")
         return v
 
-    @field_validator("email")
+    @field_validator("email")  # type: ignore[untyped-decorator]
     @classmethod
     def validate_email(cls, v: Optional[str]) -> Optional[str]:
         if v is not None and not EMAIL_PATTERN.match(v):
             raise ValueError("Invalid email format")
         return v
 
-    @model_validator(mode="after")
-    def validate_keywords_or_domain(self):
+    @model_validator(mode="after")  # type: ignore[untyped-decorator]
+    def validate_keywords_or_domain(self) -> "GenerateNewsletterRequest":
         # keywords와 domain 중 하나는 반드시 있어야 함
         if not self.keywords and not self.domain:
             raise ValueError("Either keywords or domain must be provided")
@@ -71,6 +72,8 @@ class JobResponse(BaseModel):
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
     sent: Optional[bool] = None  # 이메일 발송 여부
+    deduplicated: Optional[bool] = None
+    idempotency_key: Optional[str] = None
 
 
 # API 응답 기본 스키마

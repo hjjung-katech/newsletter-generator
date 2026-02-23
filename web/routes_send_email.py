@@ -9,6 +9,23 @@ from typing import cast
 from flask import Flask, jsonify, request
 from flask.typing import ResponseReturnValue
 
+try:
+    from db_state import (
+        get_or_create_outbox_record,
+        hash_subject,
+        is_feature_enabled,
+        mark_outbox_failed,
+        mark_outbox_sent,
+    )
+except ImportError:
+    from web.db_state import (  # pragma: no cover
+        get_or_create_outbox_record,
+        hash_subject,
+        is_feature_enabled,
+        mark_outbox_failed,
+        mark_outbox_sent,
+    )
+
 
 def _resolve_mail_module() -> ModuleType:
     """Resolve mail module in both script and package execution modes."""
@@ -68,9 +85,59 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
                 f"Newsletter: {', '.join(keywords) if keywords else 'Your Newsletter'}"
             )
 
-            mail_module.send_email(to=email, subject=subject, html=html_content)
+            outbox_enabled = is_feature_enabled("WEB_OUTBOX_ENABLED", default=True)
+            send_key = f"{job_id}:{email}:{hash_subject(subject)}"
 
-            return jsonify({"success": True, "message": "이메일이 성공적으로 발송되었습니다"})
+            if outbox_enabled:
+                outbox_status = get_or_create_outbox_record(
+                    db_path=database_path,
+                    send_key=send_key,
+                    job_id=job_id,
+                    recipient=email,
+                    subject_hash=hash_subject(subject),
+                )
+                if outbox_status == "sent":
+                    return jsonify(
+                        {
+                            "success": True,
+                            "message": "이미 발송된 이메일입니다",
+                            "deduplicated": True,
+                            "send_key": send_key,
+                        }
+                    )
+
+            try:
+                provider_response = mail_module.send_email(
+                    to=email, subject=subject, html=html_content
+                )
+                provider_message_id = (
+                    provider_response.get("MessageID")
+                    if isinstance(provider_response, dict)
+                    else None
+                )
+                if outbox_enabled:
+                    mark_outbox_sent(
+                        db_path=database_path,
+                        send_key=send_key,
+                        provider_message_id=provider_message_id,
+                    )
+            except Exception as send_exc:
+                if outbox_enabled:
+                    mark_outbox_failed(
+                        db_path=database_path,
+                        send_key=send_key,
+                        error_message=str(send_exc),
+                    )
+                raise
+
+            return jsonify(
+                {
+                    "success": True,
+                    "message": "이메일이 성공적으로 발송되었습니다",
+                    "deduplicated": False,
+                    "send_key": send_key,
+                }
+            )
 
         except Exception as e:
             logging.error(f"Email sending failed: {e}")
