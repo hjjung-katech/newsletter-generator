@@ -68,6 +68,9 @@
 - 위치: `.github/workflows/main-ci.yml`의 `quality-checks` stage
 - 실행 명령:
   - `python scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir artifacts/repo-audit --check-policy`
+- strict 전환 준비 토글:
+  - `REPO_HYGIENE_STRICT=false`(기본): warning-only soft gate
+  - `REPO_HYGIENE_STRICT=true`: `--strict`가 활성화되어 warning 발견 시 CI 실패
 - 산출물(artifact):
   - `artifacts/repo-audit/repo_audit_report.md`
   - `artifacts/repo-audit/repo_audit_report.json`
@@ -108,6 +111,13 @@ python scripts/repo_audit.py \
   --output-dir artifacts/repo-audit \
   --check-policy \
   --strict
+```
+
+Makefile 단축 명령:
+
+```bash
+make repo-audit
+make repo-audit-strict
 ```
 
 ## Governance Notes
