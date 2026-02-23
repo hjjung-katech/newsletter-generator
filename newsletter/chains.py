@@ -9,13 +9,12 @@ import os
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableLambda
 
-from newsletter.article_filter import select_top_articles
-
 from . import chains_prompts
 from .chains_categorization import build_categorization_chain
 from .chains_composition import create_composition_chain
 from .chains_llm_utils import get_llm
-from .chains_prompts import CATEGORIZATION_PROMPT, HTML_TEMPLATE, SUMMARIZATION_PROMPT
+from .chains_prompts import CATEGORIZATION_PROMPT, SUMMARIZATION_PROMPT
+from .chains_rendering import create_rendering_chain
 from .chains_summarization import build_summarization_chain
 from .compose import NewsletterConfig, compose_newsletter, create_grouped_sections
 from .template_manager import TemplateManager
@@ -26,6 +25,7 @@ logger = get_logger(__name__)
 
 # 하위 호환성 re-export
 COMPOSITION_PROMPT = chains_prompts.COMPOSITION_PROMPT
+HTML_TEMPLATE = chains_prompts.HTML_TEMPLATE
 SYSTEM_PROMPT = chains_prompts.SYSTEM_PROMPT
 load_html_template = chains_prompts.load_html_template
 
@@ -46,210 +46,6 @@ def create_summarization_chain(is_compact=False):
         summarization_prompt=SUMMARIZATION_PROMPT,
         is_compact=is_compact,
     )
-
-
-# 4. 템플릿 렌더링 체인 생성 함수
-def create_rendering_chain():
-    # 템플릿 매니저 초기화
-    template_manager = TemplateManager()
-
-    def render_with_template(data):
-        # 뉴스레터 데이터와 섹션 데이터 병합
-        combined_data = {**data["composition"], **data["sections_data"]}
-
-        # 날짜 설정 (이미 composition에서 설정되어 있을 수 있음)
-        if "generation_date" not in combined_data:
-            combined_data["generation_date"] = datetime.date.today().strftime(
-                "%Y-%m-%d"
-            )
-
-        # 키워드 처리 및 뉴스레터 주제 설정
-        if "keywords" in data and data["keywords"]:
-            # 키워드를 문자열로 변환 (템플릿 표시용)
-            keywords = data["keywords"]
-            domain = data.get("domain", "")
-
-            # 검색 키워드 설정
-            if isinstance(keywords, list):
-                combined_data["search_keywords"] = ", ".join(keywords)
-            else:
-                combined_data["search_keywords"] = keywords
-
-            # newsletter_topic 설정 로직
-            if domain:
-                # 1. 도메인이 있으면 도메인 사용
-                combined_data["newsletter_topic"] = domain
-            elif isinstance(keywords, list) and len(keywords) == 1:
-                # 2. 단일 키워드는 그대로 사용
-                combined_data["newsletter_topic"] = keywords[0]
-            elif isinstance(keywords, list) and len(keywords) > 1:
-                # 3. 여러 키워드의 공통 주제 추출
-                cb = []
-                if os.environ.get("ENABLE_COST_TRACKING") or os.environ.get(
-                    "LANGCHAIN_TRACING_V2"
-                ):
-                    try:
-                        from .cost_tracking import (
-                            get_tracking_callbacks,
-                            register_recent_callbacks,
-                        )
-
-                        cb = get_tracking_callbacks()
-                        register_recent_callbacks(cb)
-                    except Exception as e:
-                        logger.warning(
-                            "Cost tracking setup error: %s. "
-                            "Continuing without tracking.",
-                            e,
-                        )
-                from . import tools
-
-                common_theme = tools.extract_common_theme_from_keywords(
-                    keywords, callbacks=cb
-                )
-                combined_data["newsletter_topic"] = common_theme
-            elif isinstance(keywords, str) and "," in keywords:
-                # 4. 콤마로 구분된 여러 키워드
-                cb = []
-                if os.environ.get("ENABLE_COST_TRACKING") or os.environ.get(
-                    "LANGCHAIN_TRACING_V2"
-                ):
-                    try:
-                        from .cost_tracking import (
-                            get_tracking_callbacks,
-                            register_recent_callbacks,
-                        )
-
-                        cb = get_tracking_callbacks()
-                        register_recent_callbacks(cb)
-                    except Exception as e:
-                        logger.warning(
-                            "Cost tracking setup error: %s. "
-                            "Continuing without tracking.",
-                            e,
-                        )
-                from . import tools
-
-                common_theme = tools.extract_common_theme_from_keywords(
-                    keywords, callbacks=cb
-                )
-                combined_data["newsletter_topic"] = common_theme
-            else:
-                # 5. 기본값 - 단일 문자열 키워드
-                combined_data["newsletter_topic"] = keywords
-
-        # 기본 템플릿 설정 추가
-        combined_data["company_name"] = template_manager.get("company.name", "R&D 기획단")
-        combined_data["footer_disclaimer"] = template_manager.get(
-            "footer.disclaimer",
-            "이 뉴스레터는 정보 제공용으로만 사용되며, " "투자 권유를 목적으로 하지 않습니다.",
-        )
-        combined_data["editor_signature"] = template_manager.get(
-            "editor.signature", "편집자 드림"
-        )
-
-        # 새로 추가된 필드들 적용
-        combined_data["copyright_year"] = template_manager.get(
-            "company.copyright_year", datetime.date.today().strftime("%Y")
-        )
-        combined_data["company_tagline"] = template_manager.get("company.tagline", "")
-        combined_data["footer_contact"] = template_manager.get(
-            "footer.contact_info", ""
-        )
-        combined_data["editor_name"] = template_manager.get("editor.name", "")
-        combined_data["editor_title"] = template_manager.get("editor.title", "")
-        combined_data["editor_email"] = template_manager.get("editor.email", "")
-        combined_data["title_prefix"] = template_manager.get(
-            "header.title_prefix", "주간 산업 동향 뉴스 클리핑"
-        )
-        combined_data["greeting_prefix"] = template_manager.get(
-            "header.greeting_prefix", "안녕하십니까, "
-        )
-        combined_data["audience_organization"] = template_manager.get(
-            "audience.organization", ""
-        )
-
-        # 스타일 설정 적용
-        combined_data["primary_color"] = template_manager.get(
-            "style.primary_color", "#3498db"
-        )
-        combined_data["secondary_color"] = template_manager.get(
-            "style.secondary_color", "#2c3e50"
-        )
-        combined_data["font_family"] = template_manager.get(
-            "style.font_family", "Malgun Gothic, sans-serif"
-        )
-
-        # 인사말이 없는 경우 기본 인사말 설정
-        if "recipient_greeting" not in combined_data or not combined_data.get(
-            "recipient_greeting"
-        ):
-            audience_desc = template_manager.get(
-                "audience.description", "귀하께서 여기 계시다니 영광입니다"
-            )
-            combined_data["recipient_greeting"] = (
-                f"{combined_data.get('greeting_prefix', '안녕하십니까, ')} "
-                f"{combined_data.get('company_name')} {audience_desc}."
-            )
-
-        # 템플릿 렌더링 직전 상위 3개 주요 기사 추출
-        if "top_articles" not in combined_data:
-            articles_for_top = (
-                data.get("ranked_articles") or data.get("processed_articles") or []
-            )
-            combined_data["top_articles"] = select_top_articles(
-                articles_for_top, top_n=3
-            )
-
-        # email_compatible 처리 확인
-        is_email_compatible = data.get("email_compatible", False)
-        template_style = data.get("template_style", "detailed")
-
-        if is_email_compatible:
-            # email_compatible인 경우 compose_newsletter 함수 사용
-            from .compose import compose_newsletter
-
-            # template_style 정보를 combined_data에 추가 (email_compatible 템플릿에서 필요)
-            combined_data["template_style"] = template_style
-            combined_data["email_compatible"] = True
-
-            # email_compatible용 추가 필드들
-            combined_data["recipient_greeting"] = combined_data.get(
-                "recipient_greeting", "안녕하세요,"
-            )
-            # introduction_message는 이미 LLM이 생성했으면 그대로 사용, 없으면 주제 기반 기본값
-            if "introduction_message" not in combined_data:
-                newsletter_topic = combined_data.get("newsletter_topic", "")
-                if newsletter_topic:
-                    combined_data[
-                        "introduction_message"
-                    ] = f"이번 주 {newsletter_topic} 분야의 주요 동향과 기술 발전 현황을 정리하여 보내드립니다."
-                else:
-                    combined_data[
-                        "introduction_message"
-                    ] = "이번 주 주요 산업 동향과 기술 발전 현황을 정리하여 보내드립니다."
-            combined_data["closing_message"] = combined_data.get(
-                "closing_message",
-                "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
-            )
-            combined_data["editor_signature"] = combined_data.get(
-                "editor_signature", "편집자 드림"
-            )
-
-            template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
-            rendered_html = compose_newsletter(
-                combined_data, template_dir, "email_compatible"
-            )
-        else:
-            # 기존 방식: Jinja2 템플릿 렌더링
-            from jinja2 import Template
-
-            template = Template(HTML_TEMPLATE)
-            rendered_html = template.render(**combined_data)
-
-        return rendered_html, combined_data
-
-    return RunnableLambda(render_with_template)
 
 
 # 뉴스가 없을 때의 특별 처리 함수
