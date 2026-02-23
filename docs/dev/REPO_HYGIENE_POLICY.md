@@ -5,7 +5,7 @@
 - 기준일: 2026-02-23
 - 정책 파일: `scripts/repo_hygiene_policy.json`
 - 인벤토리 도구: `scripts/repo_audit.py`
-- Week 2-3 이관 완료: `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py`, `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat`
+- Week 2-4 반영: 루트 유틸 이관 + 루트 shim 9종 제거 완료
 
 ## Scope
 
@@ -24,8 +24,8 @@
 | `run_ci_checks.py` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 |
 | `.github/`, `.release/`, `docs/`, `scripts/`, `newsletter/`, `newsletter_core/`, `web/`, `tests/` | 유지 | 루트 유지 | 핵심 운영/도메인 디렉터리 |
 | `apps/`, `config/`, `packages/`, `pyinstaller_hooks/`, `templates/` | 유지(과도기) | 루트 유지 | 현 구조 호환 유지 |
-| `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py` | 이관 완료(Shim 유지) | `scripts/devtools/` + 루트 shim | 하위 호환 유지 + 점진 제거 |
-| `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 이관 완료(Shim 유지) | `scripts/devtools/` + 루트 shim | 하위 호환 유지 + 점진 제거 |
+| `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
+| `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
 | `.coverage`, `coverage.xml`, `coverage_html_report/` | ignore | 로컬 산출물 | 재생성 가능 산출물 |
 | `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 개인/런타임 캐시 |
 | `output/`, `debug_files/` | 유지(가드 포함) | `.gitkeep`만 추적 + 생성물 ignore | 실행 중 생성 경로 필요 |
@@ -79,20 +79,11 @@
   - Week 1~2: warning-only(실패로 승격하지 않음)
   - Phase 3: hard gate 전환 검토
 
-### Shim Policy (Week 2-3)
+### Shim Policy (Week 4)
 
-- 아래 파일은 루트 shim으로 임시 유지합니다.
-  - `build_web_exe.py`
-  - `build_web_exe_enhanced.py`
-  - `check_quality.py`
-  - `cleanup_debug_files.py`
-  - `fix_env_setup.py`
-  - `newsletter-test.bat`
-  - `newsletter-test.sh`
-  - `run_tests.py`
-  - `setup_env.py`
-- shim은 deprecation 메시지를 출력하고 `scripts/devtools/*`로 위임합니다.
-- soft gate는 위 shim 파일을 `keep_shim_temporary`로 분류합니다.
+- 루트 shim은 더 이상 유지하지 않습니다.
+- 실행/유틸 스크립트 경로는 `scripts/devtools/*`로 단일화합니다.
+- soft/strict gate 모두 루트 shim 파일 생성을 허용하지 않습니다.
 
 ## Local Runbook
 
