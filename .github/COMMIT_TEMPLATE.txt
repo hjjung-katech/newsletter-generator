@@ -1,0 +1,15 @@
+<type>(<scope>): <summary>
+
+Why:
+-
+
+What:
+-
+
+Validation:
+- [ ] make check
+- [ ] make check-full
+
+Risk / Rollback:
+- Risk:
+- Rollback:

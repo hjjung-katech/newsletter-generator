@@ -15,6 +15,8 @@
 | 리포 구조/운영 전략 | `dev/LONG_TERM_REPO_STRATEGY.md` | 장기 구조 개편/운영 플레이북 |
 | Repo hygiene 정책 | `dev/REPO_HYGIENE_POLICY.md` | 루트 분류/soft gate/dot 추적 범위 |
 | Agent/Skill 요청 표준 | `dev/AGENT_SKILL_REQUEST_PLAYBOOK.md` | commit/PR/CI 중심 실행 요청 템플릿 |
+| RR 요청 템플릿 | `dev/RR_REQUEST_TEMPLATE.md` | 작업 요청 문장 표준 |
+| PR/Commit/Branch 프로세스 | `dev/CI_CD_GUIDE.md` | 템플릿 경로 + PR process contract gate |
 
 ## Audience Paths
 
@@ -31,6 +33,7 @@
   - `dev/LONG_TERM_REPO_STRATEGY.md`
   - `dev/REPO_HYGIENE_POLICY.md`
   - `dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`
+  - `dev/RR_REQUEST_TEMPLATE.md`
   - `dev/REFACTORING_EXECUTION_PLAN.md`
   - `developer/CENTRALIZED_SETTINGS_GUIDE.md`
   - `technical/LLM_CONFIGURATION.md`
