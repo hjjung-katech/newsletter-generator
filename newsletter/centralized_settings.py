@@ -9,10 +9,10 @@ F-14 중앙집중식 설정 관리 모듈
 import logging
 import os
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Literal, Optional, Tuple, Type, Union
+from typing import Any, Dict, Literal, Tuple, Type
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import (
@@ -20,11 +20,12 @@ from pydantic_settings import (
     PydanticBaseSettingsSource,
     SettingsConfigDict,
 )
+
 from .utils.error_handling import handle_exception
 
 # 테스트 모드 플래그
 _test_mode = "pytest" in sys.modules or os.getenv("TESTING") == "1"
-_test_env_vars = {}
+_test_env_vars: Dict[str, str] = {}
 
 
 def is_running_in_pytest() -> bool:
@@ -32,19 +33,7 @@ def is_running_in_pytest() -> bool:
     return "pytest" in sys.modules or os.getenv("PYTEST_RUNNING") == "1" or _test_mode
 
 
-def clear_settings_cache():
-    """F-14: 설정 캐시를 클리어하여 테스트 격리 지원"""
-    global _cached_settings
-    _cached_settings = None
-
-
-def disable_test_mode():
-    """F-14: 테스트 모드를 비활성화하여 실제 검증 수행"""
-    global _test_mode
-    _test_mode = False
-
-
-def enable_test_mode(test_env_vars: dict = None):
+def enable_test_mode(test_env_vars: Dict[str, str] | None = None) -> None:
     """테스트 모드 활성화 - 환경변수 오버라이드 허용"""
     global _test_mode, _test_env_vars
     _test_mode = True
@@ -52,7 +41,7 @@ def enable_test_mode(test_env_vars: dict = None):
     clear_settings_cache()
 
 
-def disable_test_mode():
+def disable_test_mode() -> None:
     """테스트 모드 비활성화"""
     global _test_mode, _test_env_vars
     _test_mode = False
@@ -60,7 +49,7 @@ def disable_test_mode():
     clear_settings_cache()
 
 
-def _get_env(key: str, default=None):
+def _get_env(key: str, default: str | None = None) -> str | None:
     """테스트 모드에서는 테스트 환경변수 우선, 아니면 OS 환경변수"""
     if _test_mode and key in _test_env_vars:
         return _test_env_vars[key]
@@ -74,7 +63,7 @@ def _should_load_dotenv() -> bool:
     return app_env == "development"
 
 
-def _load_dotenv_if_needed():
+def _load_dotenv_if_needed() -> None:
     """필요한 경우에만 .env 파일 로드"""
     if _should_load_dotenv() and not _test_mode:
         try:
@@ -85,14 +74,12 @@ def _load_dotenv_if_needed():
             pass
 
 
-# 초기 로드
-_load_dotenv_if_needed()
-
-
 class TestModeEnvSource(PydanticBaseSettingsSource):
     """테스트 모드에서 환경변수 오버라이드를 위한 소스"""
 
-    def get_field_value(self, field_info, field_name: str) -> Tuple[Any, str, bool]:
+    def get_field_value(
+        self, field_info: Any, field_name: str
+    ) -> Tuple[Any, str, bool]:
         # 테스트 모드에서 환경변수 오버라이드
         if _test_mode and field_name in _test_env_vars:
             return _test_env_vars[field_name], field_name, False
@@ -117,19 +104,12 @@ class TestModeEnvSource(PydanticBaseSettingsSource):
     def __call__(self) -> Dict[str, Any]:
         d: Dict[str, Any] = {}
 
-        if self.settings_cls.model_config.get("case_sensitive"):
-            prepare_field_value = self.prepare_field_value
-        else:
-            prepare_field_value = lambda field_name, field, value, value_is_complex: self.prepare_field_value(
-                field_name, field, value, value_is_complex
-            )
-
         for field_name, field in self.settings_cls.model_fields.items():
             field_value, field_key, value_is_complex = self.get_field_value(
                 field, field_name
             )
             if field_value is not None:
-                d[field_name] = prepare_field_value(
+                d[field_name] = self.prepare_field_value(
                     field_name, field, field_value, value_is_complex
                 )
 
@@ -141,9 +121,7 @@ class CentralizedSettings(BaseSettings):
 
     # 필수 설정 (F-14: SERPER_API_KEY를 Optional로 변경)
     serper_api_key: SecretStr | None = None
-    postmark_server_token: SecretStr | None = Field(
-        None, description="Postmark 서버 토큰"
-    )
+    postmark_server_token: SecretStr | None = Field(None, description="Postmark 서버 토큰")
     email_sender: str | None = Field(None, description="발송자 이메일")
 
     # LLM API 키 (하나 이상 필수)
@@ -163,10 +141,10 @@ class CentralizedSettings(BaseSettings):
     concurrent_requests: int = Field(5, description="동시 요청 수")
 
     # F-14: 테스트 모드 설정
-    test_mode: bool = Field(True, description="테스트 모드 활성화")
-    mock_api_responses: bool = Field(True, description="API 응답 모킹 활성화")
-    skip_real_api_calls: bool = Field(True, description="실제 API 호출 건너뛰기")
-    test_api_key_override: bool = Field(True, description="테스트용 API 키 오버라이드")
+    test_mode: bool = Field(False, description="테스트 모드 활성화")
+    mock_api_responses: bool = Field(False, description="API 응답 모킹 활성화")
+    skip_real_api_calls: bool = Field(False, description="실제 API 호출 건너뛰기")
+    test_api_key_override: bool = Field(False, description="테스트용 API 키 오버라이드")
 
     # 공통 설정
     secret_key: str = Field("dev-secret-key-change-in-production", min_length=16)
@@ -246,14 +224,12 @@ class CentralizedSettings(BaseSettings):
         return (
             init_settings,  # 명시적으로 전달된 값이 최우선
             test_env_source,  # 테스트 모드 또는 일반 환경변수
-            (
-                dotenv_settings if not _test_mode else init_settings
-            ),  # 테스트 모드에서는 .env 무시
+            (dotenv_settings if not _test_mode else init_settings),  # 테스트 모드에서는 .env 무시
             file_secret_settings,
         )
 
     # 검증
-    @field_validator("postmark_server_token")
+    @field_validator("postmark_server_token")  # type: ignore[untyped-decorator]
     @classmethod
     def validate_api_keys(cls, v: SecretStr | None) -> SecretStr | None:
         # None인 경우는 허용
@@ -266,7 +242,7 @@ class CentralizedSettings(BaseSettings):
             raise ValueError("API key must be >= 16 characters")
         return v
 
-    @field_validator("serper_api_key")
+    @field_validator("serper_api_key")  # type: ignore[untyped-decorator]
     @classmethod
     def validate_optional_serper_key(cls, v: SecretStr | None) -> SecretStr | None:
         # None인 경우는 허용
@@ -279,7 +255,7 @@ class CentralizedSettings(BaseSettings):
             raise ValueError("API key must be >= 16 characters")
         return v
 
-    def model_post_init(self, __context) -> None:
+    def model_post_init(self, __context: Any) -> None:
         """LLM 키 검증 및 디렉토리 생성"""
         # F-14: 테스트 모드 자동 감지 및 설정
         import os
@@ -330,7 +306,7 @@ class CentralizedSettings(BaseSettings):
 
 
 # 테스트를 위한 캐시 클리어 함수
-def clear_settings_cache():
+def clear_settings_cache() -> None:
     """테스트용으로 설정 캐시를 클리어합니다."""
     get_settings.cache_clear()
 
@@ -339,6 +315,7 @@ def clear_settings_cache():
 def get_settings() -> CentralizedSettings:
     """설정 싱글톤 반환"""
     try:
+        _load_dotenv_if_needed()
         return CentralizedSettings()
     except Exception as e:
         logging.critical(f"Settings validation failed: {e}")
@@ -378,7 +355,7 @@ class _SecretFilter(logging.Filter):
         return True
 
 
-def setup_secret_logging():
+def setup_secret_logging() -> None:
     """시크릿 마스킹 로거 설정"""
     root_logger = logging.getLogger()
     secret_filter = _SecretFilter()
@@ -399,7 +376,7 @@ class F14PerformanceSettings:
     concurrent_requests: int = 5  # 동시 요청 수 제한
 
     # F-14: 테스트 모드 설정 추가
-    test_mode: bool = True  # 테스트 모드 (기본값: True)
-    mock_api_responses: bool = True  # API 응답 모킹 활성화
-    skip_real_api_calls: bool = True  # 실제 API 호출 건너뛰기
-    test_api_key_override: bool = True  # 테스트용 API 키 오버라이드 활성화
+    test_mode: bool = False  # 테스트 모드 (기본값: False)
+    mock_api_responses: bool = False  # API 응답 모킹 활성화
+    skip_real_api_calls: bool = False  # 실제 API 호출 건너뛰기
+    test_api_key_override: bool = False  # 테스트용 API 키 오버라이드 활성화

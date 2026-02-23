@@ -79,10 +79,18 @@ class TestScheduleIntegration:
     def mock_newsletter_generation(self):
         """뉴스레터 생성 Mock"""
 
-        def mock_task(params, job_id, send_email=False):
+        def mock_task(
+            params,
+            job_id,
+            send_email=False,
+            idempotency_key=None,
+            database_path=None,
+        ):
             return {
                 "status": "completed",
                 "job_id": job_id,
+                "idempotency_key": idempotency_key,
+                "database_path": database_path,
                 "execution_time": 1.5,
                 "articles_count": 5,
             }
@@ -192,6 +200,10 @@ class TestScheduleIntegration:
                 "schedule_test_flow_schedule" in call_args[1]
             ), "Job ID should include schedule ID"
             assert call_args[2] is False, "send_email should be False for test"
+            assert (
+                "schedule:" in call_args[3]
+            ), "Idempotency key should be deterministic"
+            assert call_args[4] == temp_db, "Task should receive runner DB path"
 
     def test_multiple_schedules_execution_order(
         self, temp_db, schedule_runner_with_db, mock_newsletter_generation

@@ -43,6 +43,14 @@ def _delete_history_row(job_id: str) -> None:
     conn.close()
 
 
+def _delete_outbox_rows(job_id: str) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM email_outbox WHERE job_id = ?", (job_id,))
+    conn.commit()
+    conn.close()
+
+
 def test_newsletter_html_returns_not_found_for_missing_job(client):
     response = client.get("/api/newsletter-html/non-existent-contract-job")
 
@@ -139,12 +147,58 @@ def test_send_email_sends_completed_newsletter(client, monkeypatch):
         payload = response.get_json()
 
         assert response.status_code == 200
-        assert payload == {
-            "success": True,
-            "message": "이메일이 성공적으로 발송되었습니다",
-        }
+        assert payload["success"] is True
+        assert payload["message"] == "이메일이 성공적으로 발송되었습니다"
+        assert payload["deduplicated"] is False
+        assert "send_key" in payload
         assert sent["to"] == "contract@example.com"
         assert sent["subject"] == "Newsletter: AI, ML"
         assert sent["html"] == expected_html
     finally:
         _delete_history_row(job_id)
+        _delete_outbox_rows(job_id)
+
+
+def test_send_email_deduplicates_with_outbox(client, monkeypatch):
+    try:
+        import mail as mail_module
+    except ImportError:
+        from web import mail as mail_module
+
+    send_calls: list[dict[str, str]] = []
+
+    def _fake_send_email(*, to: str, subject: str, html: str) -> None:
+        send_calls.append({"to": to, "subject": subject, "html": html})
+
+    monkeypatch.setitem(sys.modules, "mail", mail_module)
+    monkeypatch.setattr(mail_module, "send_email", _fake_send_email)
+
+    job_id = f"contract-send-dedup-{uuid.uuid4()}"
+    expected_html = "<html><body><h1>contract-send-dedup</h1></body></html>"
+    _insert_history_row(
+        job_id=job_id,
+        status="completed",
+        result={"html_content": expected_html},
+        params={"keywords": ["AI", "Reliability"]},
+    )
+
+    try:
+        first = client.post(
+            "/api/send-email",
+            json={"job_id": job_id, "email": "contract@example.com"},
+        )
+        second = client.post(
+            "/api/send-email",
+            json={"job_id": job_id, "email": "contract@example.com"},
+        )
+
+        first_payload = first.get_json()
+        second_payload = second.get_json()
+        assert first.status_code == 200
+        assert second.status_code == 200
+        assert first_payload["deduplicated"] is False
+        assert second_payload["deduplicated"] is True
+        assert len(send_calls) == 1
+    finally:
+        _delete_history_row(job_id)
+        _delete_outbox_rows(job_id)

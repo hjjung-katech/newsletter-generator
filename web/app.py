@@ -39,6 +39,11 @@ except ImportError:
         resolve_template_dir,
     )
 
+try:
+    from db_state import ensure_database_schema
+except ImportError:
+    from web.db_state import ensure_database_schema  # pragma: no cover
+
 # Import web types module - will be loaded later to avoid conflicts
 
 
@@ -128,38 +133,7 @@ DATABASE_PATH = resolve_database_path()
 
 def init_db() -> None:
     """Initialize SQLite database with required tables"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    cursor = conn.cursor()
-
-    # History table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS history (
-            id TEXT PRIMARY KEY,
-            params JSON NOT NULL,
-            result JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status TEXT DEFAULT 'pending'
-        )
-    """
-    )
-
-    # Schedules table for recurring newsletters
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS schedules (
-            id TEXT PRIMARY KEY,
-            params JSON NOT NULL,
-            rrule TEXT NOT NULL,
-            next_run TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            enabled INTEGER DEFAULT 1
-        )
-    """
-    )
-
-    conn.commit()
-    conn.close()
+    ensure_database_schema(DATABASE_PATH)
 
 
 # Initialize database on startup

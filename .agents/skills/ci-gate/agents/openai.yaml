@@ -1,7 +1,7 @@
 interface:
   display_name: "CI Gate"
-  short_description: "Run local CI parity checks"
-  default_prompt: "Use $ci-gate to run local CI checks and summarize any failures with fixes."
+  short_description: "Run CI + ops-safety gates"
+  default_prompt: "Use $ci-gate to run local CI checks, ops-safety tests, and summarize failures with minimal fixes."
 
 policy:
   allow_implicit_invocation: true

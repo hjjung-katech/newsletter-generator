@@ -33,3 +33,42 @@
 - `web/app.py`, `web/tasks.py`, `web/schedule_runner.py`
 - `newsletter/centralized_settings.py`, `newsletter/config_manager.py`
 - Release gate scripts and Makefile targets
+
+## Operational Safety First (Priority Override)
+- 운영 안전성 잠금이 경계 리팩토링보다 우선입니다.
+- 아래 두 축이 잠기기 전까지 구조 리팩토링은 제한적으로 수행합니다:
+  - 설정 단일화 (`newsletter/centralized_settings.py` 중심)
+  - 스케줄/워커 idempotency + 이메일 중복 방지(outbox)
+
+## Config Unification Policy (Mandatory)
+- 설정 읽기/검증/기본값 책임은 `newsletter/centralized_settings.py`를 단일 소스로 유지합니다.
+- `newsletter/config_manager.py`는 호환용 thin adapter 역할만 유지합니다.
+- import-time side effect를 금지합니다 (`load_dotenv()`를 모듈 import 시 실행 금지).
+- 프로덕션 경로 기본값은 production-safe여야 합니다 (`test_mode=False` 기본).
+- canonical env는 `POSTMARK_SERVER_TOKEN`, `EMAIL_SENDER`이며,
+  `POSTMARK_FROM_EMAIL`은 read-only compatibility alias만 허용합니다.
+
+## Idempotency Policy (Mandatory)
+- 생성 요청은 `Idempotency-Key` 헤더 우선 정책을 따릅니다.
+- 헤더가 없으면 canonical payload hash로 idempotency key를 생성합니다.
+- 동일 logical request는 동일 idempotency key를 사용하고 기존 job을 재사용합니다.
+- 중복 요청 응답은 항상 `202`이며 `deduplicated=true`를 포함해야 합니다.
+- 이메일 발송은 outbox/send_key 기반으로 중복 발송을 차단해야 합니다.
+- sync/async/fallback 경로는 공통 DB 상태전이 함수를 사용해야 합니다.
+
+## Required Gate For Ops-Safety Changes
+- 대상 파일:
+  - `newsletter/centralized_settings.py`, `newsletter/config_manager.py`
+  - `web/app.py`, `web/tasks.py`, `web/schedule_runner.py`, `web/routes_generation.py`, `web/routes_send_email.py`
+- 필수 실행:
+  - `make check`
+  - `make check-full`
+  - `pytest tests/test_web_api.py -q`
+  - `pytest tests/integration/test_schedule_execution.py -q`
+  - `pytest tests/unit_tests/test_schedule_time_sync.py -q`
+
+## PR Report Addendum (Ops-Safety)
+- idempotency key 생성/적용 범위를 명시합니다.
+- outbox/send_key 기반 이메일 중복 방지 결과를 명시합니다.
+- import-time side effect 제거 여부를 명시합니다.
+- 미실행 테스트와 사유를 반드시 기록합니다.
