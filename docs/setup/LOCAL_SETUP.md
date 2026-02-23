@@ -367,3 +367,8 @@ curl -X POST http://localhost:5000/api/generate \
 ```
 
 중복 요청을 같은 `Idempotency-Key`로 다시 보내면 `202`와 함께 `deduplicated=true`가 반환됩니다.
+
+운영 안전성 스모크(멱등성/아웃박스)는 자동 스크립트로 점검할 수 있습니다.
+```bash
+BASE_URL=http://localhost:5000 make ops-safety-smoke
+```
