@@ -44,11 +44,13 @@ make doctor
 make check
 make check-full
 make repo-audit
+make repo-audit-strict
 ```
 
 - `make check`: 빠른 로컬 게이트
 - `make check-full`: PR 전 전체 게이트
 - `make repo-audit`: 루트 인벤토리 + repo hygiene soft gate 리포트 생성
+- `make repo-audit-strict`: hard gate 전환 전 strict 리허설
 - dev 유틸 실행 스크립트는 `scripts/devtools/`를 기본 경로로 사용합니다.
 
 ## Repo Hygiene Soft Gate
@@ -63,6 +65,7 @@ python scripts/repo_audit.py \
 ```
 
 - Week 1~2 운영: warning-only
+- 전환 준비: `REPO_HYGIENE_STRICT=true`일 때 `--strict` 모드로 실행되어 warning이 CI 실패로 승격
 - CI artifact:
   - `artifacts/repo-audit/repo_audit_report.md`
   - `artifacts/repo-audit/repo_audit_report.json`

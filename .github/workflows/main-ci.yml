@@ -19,6 +19,8 @@ env:
   # Default interpreter for non-matrix jobs (quality/mock/integration/report)
   PYTHON_VERSION: '3.12'
   CACHE_VERSION: v1
+  # Prepared toggle for Phase 3 hard-gate transition.
+  REPO_HYGIENE_STRICT: 'false'
 
 jobs:
   # ========================================
@@ -133,10 +135,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          STRICT_ARGS=()
+          if [ "${REPO_HYGIENE_STRICT}" = "true" ]; then
+            STRICT_ARGS+=(--strict)
+            echo "Repo hygiene strict mode: ENABLED" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Repo hygiene strict mode: DISABLED (soft gate)" >> "$GITHUB_STEP_SUMMARY"
+          fi
           python scripts/repo_audit.py \
             --policy scripts/repo_hygiene_policy.json \
             --output-dir artifacts/repo-audit \
-            --check-policy
+            --check-policy \
+            "${STRICT_ARGS[@]}"
           cat artifacts/repo-audit/policy_warnings.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload repo audit artifact

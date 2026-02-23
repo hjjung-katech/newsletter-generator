@@ -235,6 +235,8 @@ Delivery KPI:
   - 루트 호환 shim 도입(점진 제거 전략)
   - CI 빌드 경로 일부를 신규 위치로 전환
   - 루트 `README.md`를 개요/링크 중심 진입 문서로 슬림화
+- Week 3 준비 반영:
+  - `REPO_HYGIENE_STRICT` 토글 기반 hard gate 전환 경로를 CI/Makefile에 추가
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
