@@ -139,18 +139,33 @@ jobs:
             echo "Skip mypy: no runtime Python file changes."
             exit 0
           fi
-          MYPY_ARGS=()
+
+          FILE_TARGETS=()
+          MODULE_TARGETS=()
           while IFS= read -r file; do
             [ -z "$file" ] && continue
             if [[ "$file" == web/*.py ]]; then
               module="${file%.py}"
               module="${module//\//.}"
-              MYPY_ARGS+=("-m" "$module")
+              MODULE_TARGETS+=("$module")
             else
-              MYPY_ARGS+=("$file")
+              FILE_TARGETS+=("$file")
             fi
           done <<< "$STRICT_RUNTIME_FILES"
-          mypy --ignore-missing-imports --follow-imports=skip "${MYPY_ARGS[@]}"
+
+          BASE_MYPY_ARGS=(--ignore-missing-imports --follow-imports=skip)
+
+          if [ "${#FILE_TARGETS[@]}" -gt 0 ]; then
+            mypy "${BASE_MYPY_ARGS[@]}" "${FILE_TARGETS[@]}"
+          fi
+
+          if [ "${#MODULE_TARGETS[@]}" -gt 0 ]; then
+            MODULE_MYPY_ARGS=()
+            for module in "${MODULE_TARGETS[@]}"; do
+              MODULE_MYPY_ARGS+=("-m" "$module")
+            done
+            mypy "${BASE_MYPY_ARGS[@]}" "${MODULE_MYPY_ARGS[@]}"
+          fi
 
       - name: Basic security scan (Bandit)
         shell: bash
