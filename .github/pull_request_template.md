@@ -1,4 +1,4 @@
-# Repo Hygiene / CI-managed PR
+# PR Process Template (CI Unit)
 
 ## Summary
 - What changed and why.
@@ -12,14 +12,13 @@
 
 ## Branch / Commit
 - Branch: `codex/<topic>`
-- Commit template: `.github/COMMIT_TEMPLATE.txt`
 - Commits in this PR:
   - `<hash> <summary>`
 
 ## Test Evidence
 - [ ] `make check` passed
 - [ ] `make check-full` passed
-- [ ] `make repo-audit` executed (for structure/policy changes)
+- [ ] `make repo-audit` executed (for structure/policy/docs changes)
 
 ### Commands run
 ```bash
@@ -29,20 +28,24 @@ make repo-audit
 ```
 
 ## CI Status (GitHub Actions)
-- Main CI: `<url or pass/fail>`
+- Main CI Pipeline: `<url or pass/fail>`
 - Docs Quality: `<url or pass/fail>`
 - Other relevant workflows: `<url or pass/fail>`
-- Merge after all required checks pass.
 
 ## Risk / Rollback
 - Primary risk:
 - Rollback plan:
-  - Revert commit(s):
-  - Recovery verification command:
+  1. Revert commit(s) from this PR.
+  2. Re-run verification gates.
+- Recovery verification:
+  - `make check`
+  - `make check-full`
 
-## Agent/Skill Used
-- [ ] Repo Hygiene Agent(A)
-- [ ] Docs SSOT Agent(C)
+## Agent / Skill Used
+- [ ] Repo Hygiene Agent (A)
+- [ ] Ops Safety Agent (B)
+- [ ] Docs SSOT Agent (C)
+- [ ] Release Guard Agent (D)
 - [ ] `$gh-fix-ci`
 - [ ] `$gh-address-comments`
 - [ ] Not used (reason):

@@ -11,6 +11,7 @@
 1. `main-ci.yml`
 - 코드 품질, 테스트, 빌드 검증
 - 주요 브랜치 push/PR에서 실행
+- PR 이벤트에서는 프로세스 계약(브랜치명 규칙 + PR 템플릿 섹션)도 검사
 
 2. `deployment.yml`
 - 배포 파이프라인 (Railway + Pages 병행)
@@ -63,6 +64,18 @@ python scripts/repo_audit.py \
   - `artifacts/repo-audit/repo_audit_report.json`
   - `artifacts/repo-audit/policy_warnings.md`
 
+## PR Process Contract Gate
+
+`main-ci.yml`의 `quality-checks` 단계에서 PR일 때 아래를 검사합니다.
+
+1. 브랜치명 정책
+- 형식: `<type>/<kebab-case-topic>`
+- 허용 타입: `codex|feature|fix|bugfix|hotfix|chore|docs|refactor|test|release`
+
+2. PR 본문 템플릿 섹션
+- 기본 템플릿: `.github/pull_request_template.md`
+- 특화 템플릿: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
+
 ## Strict Gate Policy
 
 - `mypy` 실패 시 CI 실패
@@ -86,5 +99,9 @@ make check-full
 
 ## PR 운영 템플릿
 
+- RR 요청 템플릿: `docs/dev/RR_REQUEST_TEMPLATE.md`
+- 기본 PR 템플릿: `.github/pull_request_template.md`
 - Repo hygiene/구조 정리 PR: `.github/PULL_REQUEST_TEMPLATE/repo_hygiene.md`
 - 릴리즈 통합 PR: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
+- Commit 템플릿: `.github/COMMIT_TEMPLATE.txt`
+- 로컬 템플릿 설정: `./scripts/devtools/setup_git_message_template.sh`

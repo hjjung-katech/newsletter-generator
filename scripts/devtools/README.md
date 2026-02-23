@@ -10,6 +10,12 @@
 - `fix_env_setup.py`
 - `run_tests.py`
 
+## Process Helpers
+
+- `setup_git_message_template.sh`
+  - 로컬 Git commit 템플릿을 `.github/COMMIT_TEMPLATE.txt`로 설정합니다.
+  - 실행: `./scripts/devtools/setup_git_message_template.sh`
+
 ## Backward Compatibility
 
 - 루트 동일 파일명은 현재 shim으로 유지됩니다.

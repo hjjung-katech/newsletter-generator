@@ -6,6 +6,7 @@
 ## Base
 - Base branch/tag: (e.g. `main` or `baseline/main-equivalent`)
 - Base commit SHA:
+- Commit template: `.github/COMMIT_TEMPLATE.txt`
 
 ## Scope (in/out)
 ### In scope
@@ -59,3 +60,4 @@ make test-nightly
 - [ ] CHANGELOG updated
 - [ ] Related docs updated
 - [ ] No docs change needed (reason):
+- [ ] All required CI checks passed before merge

@@ -7,6 +7,7 @@
 1. `main-ci.yml`
 - 목적: 코드 품질, 테스트, 빌드 검증의 메인 CI 파이프라인
 - 트리거: `push`(main/develop/feature/fix), `pull_request`(main/develop)
+- 추가 게이트: PR 브랜치명 정책 + PR 템플릿 섹션 계약 검증
 
 2. `deployment.yml`
 - 목적: 배포 파이프라인 (Railway + Pages 병행)
