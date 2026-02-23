@@ -11,8 +11,13 @@ import sqlite3
 import sys
 from datetime import datetime
 
+try:
+    from db_state import ensure_database_schema
+except ImportError:
+    from web.db_state import ensure_database_schema  # pragma: no cover
 
-def create_database(db_path="storage.db"):
+
+def create_database(db_path: str = "storage.db") -> bool:
     """
     SQLite 데이터베이스와 필요한 테이블들을 생성합니다.
 
@@ -27,62 +32,15 @@ def create_database(db_path="storage.db"):
         os.rename(db_path, backup_path)
         print(f"📦 기존 데이터베이스를 백업했습니다: {backup_path}")
 
-    # 새 데이터베이스 생성
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    print("📝 테이블 생성 중...")
-
-    # History table - 뉴스레터 생성 히스토리
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS history (
-            id TEXT PRIMARY KEY,
-            params JSON NOT NULL,
-            result JSON,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            status TEXT DEFAULT 'pending'
-        )
-    """
-    )
-    print("  ✅ history 테이블 생성됨")
-
-    # Schedules table - 정기 발송 예약
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS schedules (
-            id TEXT PRIMARY KEY,
-            params JSON NOT NULL,
-            rrule TEXT NOT NULL,
-            next_run TIMESTAMP NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            enabled INTEGER DEFAULT 1
-        )
-    """
-    )
-    print("  ✅ schedules 테이블 생성됨")
-
-    # 인덱스 생성
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)"
-    )
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_status ON history(status)")
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_schedules_enabled ON schedules(enabled)"
-    )
-    print("  ✅ 인덱스 생성됨")
-
-    conn.commit()
-    conn.close()
+    print("📝 테이블/인덱스/마이그레이션 적용 중...")
+    ensure_database_schema(db_path)
+    print("  ✅ history/schedules/email_outbox 스키마 보장 완료")
 
     print(f"🎉 데이터베이스 초기화 완료: {db_path}")
     return True
 
 
-def verify_database(db_path="storage.db"):
+def verify_database(db_path: str = "storage.db") -> bool:
     """
     데이터베이스가 올바르게 생성되었는지 확인합니다.
 
@@ -100,7 +58,7 @@ def verify_database(db_path="storage.db"):
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [row[0] for row in cursor.fetchall()]
 
-        required_tables = ["history", "schedules"]
+        required_tables = ["history", "schedules", "email_outbox"]
         missing_tables = [table for table in required_tables if table not in tables]
 
         if missing_tables:
@@ -123,20 +81,14 @@ def verify_database(db_path="storage.db"):
         return False
 
 
-def main():
+def main() -> None:
     """메인 실행 함수"""
     import argparse
 
     parser = argparse.ArgumentParser(description="웹 애플리케이션 데이터베이스 초기화")
-    parser.add_argument(
-        "--db-path", default="storage.db", help="데이터베이스 파일 경로"
-    )
-    parser.add_argument(
-        "--verify-only", action="store_true", help="검증만 수행 (생성하지 않음)"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="기존 데이터베이스 강제 재생성"
-    )
+    parser.add_argument("--db-path", default="storage.db", help="데이터베이스 파일 경로")
+    parser.add_argument("--verify-only", action="store_true", help="검증만 수행 (생성하지 않음)")
+    parser.add_argument("--force", action="store_true", help="기존 데이터베이스 강제 재생성")
 
     args = parser.parse_args()
 
@@ -155,9 +107,7 @@ def main():
     # 데이터베이스 존재 확인
     if os.path.exists(args.db_path) and not args.force:
         print(f"📁 데이터베이스 파일이 이미 존재합니다: {args.db_path}")
-        choice = (
-            input("기존 데이터베이스를 재생성하시겠습니까? (y/N): ").strip().lower()
-        )
+        choice = input("기존 데이터베이스를 재생성하시겠습니까? (y/N): ").strip().lower()
         if choice not in ["y", "yes"]:
             print("❌ 초기화를 취소했습니다.")
             sys.exit(0)

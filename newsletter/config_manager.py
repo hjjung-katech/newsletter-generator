@@ -1,32 +1,39 @@
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
-# 환경 변수 로드
-load_dotenv()
+
+def _load_dotenv_if_needed() -> None:
+    """Load .env lazily to avoid import-time side effects."""
+    app_env = os.getenv("APP_ENV", "production")
+    testing = os.getenv("TESTING") == "1" or "pytest" in os.getenv(
+        "PYTEST_CURRENT_TEST", ""
+    )
+    if app_env == "development" and not testing:
+        load_dotenv(override=False)
 
 
 class ConfigManager:
     """중앙 집중식 설정 관리자"""
 
-    _instance = None
-    _config_cache = {}
+    _instance: "ConfigManager | None" = None
+    _config_cache: Dict[str, Dict[str, Any]] = {}
 
-    def __new__(cls):
+    def __new__(cls) -> "ConfigManager":
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         if not hasattr(self, "_initialized"):
             self._initialized = True
             self._load_environment_variables()
 
     @classmethod
-    def reset_for_testing(cls, test_env_vars: dict = None):
+    def reset_for_testing(cls, test_env_vars: Dict[str, str] | None = None) -> None:
         """테스트용으로 싱글톤 인스턴스와 캐시를 리셋합니다."""
         cls._instance = None
         cls._config_cache = {}
@@ -40,9 +47,10 @@ class ConfigManager:
         except ImportError:
             pass
 
-    def _load_environment_variables(self):
+    def _load_environment_variables(self) -> None:
         """환경 변수 로딩 - Centralized Settings 사용"""
         try:
+            _load_dotenv_if_needed()
             from newsletter.centralized_settings import get_settings
 
             settings = get_settings()
@@ -108,9 +116,7 @@ class ConfigManager:
                 raise e
 
             # Centralized settings 실패 시 fallback to legacy
-            self._log_warning(
-                f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}"
-            )
+            self._log_warning(f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}")
 
             # 레거시 fallback (호환성을 위해 유지)
             from newsletter.compat_env import getenv_compat
@@ -158,7 +164,7 @@ class ConfigManager:
         config_data = self.load_config_file()
         llm_settings = config_data.get("llm_settings", {})
 
-        if not llm_settings:
+        if not isinstance(llm_settings, dict) or not llm_settings:
             return self._get_default_llm_config()
 
         return llm_settings
@@ -208,9 +214,7 @@ class ConfigManager:
 
         if not required_keys.issubset(config_keys):
             missing_keys = required_keys - config_keys
-            self._log_warning(
-                f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
-            )
+            self._log_warning(f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다.")
             return default_weights
 
         try:
@@ -220,15 +224,11 @@ class ConfigManager:
             if abs(total - 1.0) < 0.01:  # 허용 오차
                 return weights
             else:
-                self._log_warning(
-                    f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다."
-                )
+                self._log_warning(f"스코어링 가중치의 합이 {total:.3f}이며 1.0이 아닙니다. 기본값을 사용합니다.")
                 return default_weights
 
         except (ValueError, TypeError) as e:
-            self._log_warning(
-                f"스코어링 가중치 값이 올바르지 않습니다: {e}. 기본값을 사용합니다."
-            )
+            self._log_warning(f"스코어링 가중치 값이 올바르지 않습니다: {e}. 기본값을 사용합니다.")
             return default_weights
 
     def _get_default_llm_config(self) -> Dict[str, Any]:
@@ -384,7 +384,7 @@ class ConfigManager:
             "ready": token_valid and email_valid,
         }
 
-    def _log_warning(self, message: str):
+    def _log_warning(self, message: str) -> None:
         """경고 메시지 출력"""
         try:
             from .utils.logger import get_logger
@@ -396,7 +396,7 @@ class ConfigManager:
 
 
 # 싱글톤 인스턴스 (지연 초기화)
-_config_manager_instance = None
+_config_manager_instance: ConfigManager | None = None
 
 
 def get_config_manager() -> ConfigManager:
@@ -408,4 +408,14 @@ def get_config_manager() -> ConfigManager:
 
 
 # 하위 호환성을 위한 별칭
-config_manager = get_config_manager()
+class _LazyConfigManager:
+    """Lazy proxy to prevent eager settings initialization at import time."""
+
+    def __getattr__(self, item: str) -> Any:
+        return getattr(get_config_manager(), item)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return "<LazyConfigManager proxy>"
+
+
+config_manager = _LazyConfigManager()
