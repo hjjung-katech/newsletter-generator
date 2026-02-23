@@ -11,7 +11,7 @@ import sqlite3
 import sys
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 import redis
 from flask import Flask, jsonify, render_template, request, send_file
@@ -166,7 +166,7 @@ def init_db() -> None:
 init_db()
 
 
-@app.route("/")
+@app.route("/")  # type: ignore[untyped-decorator]
 def index() -> str | tuple[str, int]:
     """Main dashboard page"""
     try:
@@ -175,7 +175,7 @@ def index() -> str | tuple[str, int]:
         template_path = os.path.join(app.template_folder, "index.html")
         print(f"Template path: {template_path}")
         print(f"Template exists: {os.path.exists(template_path)}")
-        return render_template("index.html")
+        return cast(str, render_template("index.html"))
     except Exception as e:
         print(f"Template rendering error: {e}")
         return f"Template error: {str(e)}", 500
@@ -254,4 +254,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
     print(f"Starting Flask app on port {port}, debug={debug}")
-    app.run(host="0.0.0.0", port=port, debug=True)
+    app.run(host="0.0.0.0", port=port, debug=debug)
