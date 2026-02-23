@@ -4,24 +4,18 @@ Newsletter Generator - LangChain Chains
 """
 
 import datetime
-import json
 import os
 
 from langchain_core.messages import HumanMessage
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableLambda
 
 from newsletter.article_filter import select_top_articles
 
 from . import chains_prompts
 from .chains_categorization import build_categorization_chain
+from .chains_composition import create_composition_chain
 from .chains_llm_utils import get_llm
-from .chains_prompts import (
-    CATEGORIZATION_PROMPT,
-    COMPOSITION_PROMPT,
-    HTML_TEMPLATE,
-    SUMMARIZATION_PROMPT,
-)
+from .chains_prompts import CATEGORIZATION_PROMPT, HTML_TEMPLATE, SUMMARIZATION_PROMPT
 from .chains_summarization import build_summarization_chain
 from .compose import NewsletterConfig, compose_newsletter, create_grouped_sections
 from .template_manager import TemplateManager
@@ -31,6 +25,7 @@ from .utils.logger import get_logger
 logger = get_logger(__name__)
 
 # 하위 호환성 re-export
+COMPOSITION_PROMPT = chains_prompts.COMPOSITION_PROMPT
 SYSTEM_PROMPT = chains_prompts.SYSTEM_PROMPT
 load_html_template = chains_prompts.load_html_template
 
@@ -51,68 +46,6 @@ def create_summarization_chain(is_compact=False):
         summarization_prompt=SUMMARIZATION_PROMPT,
         is_compact=is_compact,
     )
-
-
-def create_composition_chain():
-    llm = get_llm(temperature=0.4)
-
-    def create_composition_prompt(data):
-        current_date = datetime.date.today().strftime("%Y-%m-%d")
-        sections_data = json.dumps(
-            data.get("sections", []), ensure_ascii=False, indent=2
-        )
-
-        # JSON 데이터의 중괄호 이스케이프 처리
-        sections_data = sections_data.replace("{", "{{").replace("}", "}}")
-
-        keywords = data.get("keywords", "")
-
-        prompt_content = COMPOSITION_PROMPT.format(
-            keywords=keywords,
-            category_summaries=sections_data,
-            current_date=current_date,
-        )
-
-        return [HumanMessage(content=prompt_content)]
-
-    # JSON 파싱 함수
-    def parse_json_response(text):
-        try:
-            # JSON 부분만 추출
-            import re
-
-            json_match = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(1).strip()
-            else:
-                json_str = text.strip()
-
-            # JSON 파싱
-            return json.loads(json_str)
-        except Exception as e:
-            logger.error(f"종합 구성 JSON 파싱 오류: {e}")
-            logger.error(f"원본 텍스트: {text}")
-            # 기본 구조 반환
-            return {
-                "newsletter_topic": "최신 산업 동향",
-                "generation_date": datetime.date.today().strftime("%Y-%m-%d"),
-                "recipient_greeting": "안녕하세요, 독자 여러분",
-                "introduction_message": "이번 뉴스레터에서는 주요 산업 동향을 살펴봅니다.",
-                "food_for_thought": {"message": "산업의 변화에 어떻게 대응해 나갈지 생각해 보시기 바랍니다."},
-                "closing_message": "다음 뉴스레터에서 다시 만나뵙겠습니다.",
-                "editor_signature": "편집자 드림",
-                "company_name": "Tech Insights",
-            }
-
-    # 체인 구성
-    chain = (
-        RunnableLambda(create_composition_prompt)
-        | llm
-        | StrOutputParser()
-        | RunnableLambda(parse_json_response)
-    )
-
-    return chain
 
 
 # 4. 템플릿 렌더링 체인 생성 함수
