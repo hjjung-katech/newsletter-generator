@@ -129,6 +129,23 @@ jobs:
           python scripts/architecture/check_import_boundaries.py --mode ratchet
           python scripts/architecture/check_import_cycles.py
 
+      - name: Repo hygiene audit (soft gate)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/repo_audit.py \
+            --policy scripts/repo_hygiene_policy.json \
+            --output-dir artifacts/repo-audit \
+            --check-policy
+          cat artifacts/repo-audit/policy_warnings.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload repo audit artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: repo-audit-${{ github.run_id }}
+          path: artifacts/repo-audit/
+
       - name: Type checking (mypy)
         shell: bash
         run: |

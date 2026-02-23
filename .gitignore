@@ -271,6 +271,9 @@ temp_*.json
 debug_*.txt
 trace_*.txt
 
+# Repo audit artifacts
+artifacts/repo-audit/
+
 # Cursor
 .cursor
 *.cursorrules
@@ -287,7 +290,7 @@ web/__pycache__/
 
 # Additional runtime files
 *.pid
-*.log.* 
+*.log.*
 temp_*.json
 *.tmp
 debug_*.json

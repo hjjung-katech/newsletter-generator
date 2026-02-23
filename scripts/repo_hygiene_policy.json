@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "policy_name": "repo-hygiene-week1-baseline",
+  "root_policy": {
+    "allowed_file_names": [
+      ".dockerignore",
+      ".env.example",
+      ".gitignore",
+      ".pre-commit-config.yaml",
+      ".python-version",
+      ".secrets.baseline",
+      "AGENTS.md",
+      "CHANGELOG.md",
+      "CODEOWNERS",
+      "Dockerfile",
+      "LICENSE",
+      "LOCAL_CI_GUIDE.md",
+      "Makefile",
+      "README.md",
+      "config.example.yml",
+      "env.example",
+      "nixpacks.toml",
+      "pyproject.toml",
+      "railway.yml",
+      "requirements-dev.txt",
+      "requirements-minimal.txt",
+      "requirements.txt",
+      "run_ci_checks.py",
+      "setup.cfg",
+      "setup.py"
+    ],
+    "allowed_file_globs": [
+      "requirements*.txt"
+    ],
+    "allowed_directory_names": [
+      ".agents",
+      ".githooks",
+      ".github",
+      ".release",
+      ".vscode",
+      "apps",
+      "config",
+      "debug_files",
+      "docs",
+      "newsletter",
+      "newsletter_core",
+      "output",
+      "packages",
+      "pyinstaller_hooks",
+      "scripts",
+      "templates",
+      "tests",
+      "web"
+    ],
+    "move_to_scripts_file_globs": [
+      "build_*.py",
+      "check_quality.py",
+      "cleanup_*.py",
+      "fix_*.py",
+      "newsletter-test.bat",
+      "newsletter-test.sh",
+      "run_tests.py",
+      "setup_env.py"
+    ],
+    "ignore_file_globs": [
+      ".coverage",
+      "coverage.xml",
+      "*.zip"
+    ],
+    "ignore_directory_names": [
+      ".mypy_cache",
+      ".pytest_cache",
+      ".venv",
+      "__pycache__",
+      "artifacts",
+      "coverage_html_report"
+    ]
+  },
+  "dot_directory_policy": {
+    ".vscode": {
+      "mode": "conditional",
+      "purpose": "팀 공통 에디터 설정만 추적",
+      "allowed_tracked_file_globs": [
+        ".vscode/README.md",
+        ".vscode/extensions.json",
+        ".vscode/launch.json",
+        ".vscode/settings.json",
+        ".vscode/tasks.json"
+      ]
+    },
+    ".agents": {
+      "mode": "conditional",
+      "purpose": "장기 에이전트 실행에 필요한 스킬 정의만 추적",
+      "allowed_tracked_file_globs": [
+        ".agents/skills/*/SKILL.md",
+        ".agents/skills/*/agents/openai.yaml"
+      ]
+    },
+    ".githooks": {
+      "mode": "conditional",
+      "purpose": "팀 공통 pre-push 훅만 추적",
+      "allowed_tracked_file_globs": [
+        ".githooks/pre-push"
+      ]
+    },
+    ".release": {
+      "mode": "required",
+      "purpose": "release manifest 및 검증 정책",
+      "allowed_tracked_file_globs": [
+        ".release/**"
+      ]
+    },
+    ".github": {
+      "mode": "required",
+      "purpose": "CI/CD workflows",
+      "allowed_tracked_file_globs": [
+        ".github/**"
+      ]
+    }
+  }
+}
