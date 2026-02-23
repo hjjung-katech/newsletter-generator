@@ -137,7 +137,7 @@ apply-pr-metadata: ## PR 라벨/리뷰어 적용 (PR=<number>, REVIEWERS=<a,b> o
 
 test-all: ## 모든 테스트 실행
 	@echo "🧪 전체 테스트 실행 중..."
-	$(PYTHON) run_tests.py ci
+	$(PYTHON) scripts/devtools/run_tests.py ci
 
 test-coverage: ## 커버리지 포함 테스트
 	@echo "📊 커버리지 측정 중..."
@@ -251,8 +251,8 @@ push-ready: ci-fix ci-check ## 푸시 준비 (자동 수정 + CI 검사)
 # Windows 전용 명령어
 ifeq ($(OS),Windows_NT)
 win-format: ## Windows용 포맷팅
-	$(PYTHON) run_tests.py --format
+	$(PYTHON) scripts/devtools/run_tests.py --format
 
 win-test: ## Windows용 테스트
-	$(PYTHON) run_tests.py dev
+	$(PYTHON) scripts/devtools/run_tests.py dev
 endif

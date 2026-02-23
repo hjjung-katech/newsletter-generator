@@ -1,10 +1,11 @@
-# Repo Hygiene Policy (Week 1 Baseline)
+# Repo Hygiene Policy (Week 1-2 Baseline)
 
 이 문서는 루트 구조 정리 정책의 실행 정본(SSOT)입니다.
 
 - 기준일: 2026-02-23
 - 정책 파일: `scripts/repo_hygiene_policy.json`
 - 인벤토리 도구: `scripts/repo_audit.py`
+- Week 2 이관 완료: `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py`
 
 ## Scope
 
@@ -14,7 +15,7 @@
 
 ## Root Classification Table
 
-다음 분류표는 Week 1 실행 기준입니다.
+다음 분류표는 Week 1~2 실행 기준입니다.
 
 | Entry or Pattern | 결정 | 목표 위치/상태 | 근거 |
 |---|---|---|---|
@@ -23,8 +24,8 @@
 | `run_ci_checks.py` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 |
 | `.github/`, `.release/`, `docs/`, `scripts/`, `newsletter/`, `newsletter_core/`, `web/`, `tests/` | 유지 | 루트 유지 | 핵심 운영/도메인 디렉터리 |
 | `apps/`, `config/`, `packages/`, `pyinstaller_hooks/`, `templates/` | 유지(과도기) | 루트 유지 | 현 구조 호환 유지 |
-| `build_*.py`, `fix_*.py`, `cleanup_*.py`, `check_quality.py`, `run_tests.py`, `setup_env.py` | 이관 | `scripts/devtools/` | 루트 실행 스크립트 슬림화 |
-| `newsletter-test.sh`, `newsletter-test.bat` | 이관 | `scripts/devtools/` | 테스트 유틸 경로 정규화 |
+| `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py` | 이관 완료(Shim 유지) | `scripts/devtools/` + 루트 shim | 하위 호환 유지 + 점진 제거 |
+| `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 이관 예정 | `scripts/devtools/` | Week 2 후속 배치 |
 | `.coverage`, `coverage.xml`, `coverage_html_report/` | ignore | 로컬 산출물 | 재생성 가능 산출물 |
 | `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 개인/런타임 캐시 |
 | `output/`, `debug_files/` | 유지(가드 포함) | `.gitkeep`만 추적 + 생성물 ignore | 실행 중 생성 경로 필요 |
@@ -73,6 +74,17 @@
   - Week 1~2: warning-only(실패로 승격하지 않음)
   - Phase 3: hard gate 전환 검토
 
+### Shim Policy (Week 2)
+
+- 아래 파일은 루트 shim으로 임시 유지합니다.
+  - `build_web_exe.py`
+  - `build_web_exe_enhanced.py`
+  - `cleanup_debug_files.py`
+  - `fix_env_setup.py`
+  - `run_tests.py`
+- shim은 deprecation 메시지를 출력하고 `scripts/devtools/*`로 위임합니다.
+- soft gate는 위 shim 파일을 `keep_shim_temporary`로 분류합니다.
+
 ## Local Runbook
 
 ```bash
@@ -94,6 +106,6 @@ python scripts/repo_audit.py \
 
 ## Governance Notes
 
-- 본 문서는 Week 1 기준선입니다.
+- 본 문서는 Week 1~2 기준선입니다.
 - 정책 변경은 반드시 PR로 수행하고, `scripts/repo_hygiene_policy.json`과 함께 변경합니다.
 - root 예외 추가 시 사유와 제거 목표 시점을 PR 설명에 명시합니다.

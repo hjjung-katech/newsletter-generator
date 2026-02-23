@@ -464,7 +464,7 @@ jobs:
       - name: Test PyInstaller build (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          python build_web_exe_enhanced.py
+          python scripts/devtools/build_web_exe_enhanced.py
         continue-on-error: true
 
       - name: Upload build artifacts

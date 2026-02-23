@@ -63,18 +63,6 @@ cd ..
 python -m newsletter.cli run --keywords "AI,반도체" --period 7 --template-style compact
 ```
 
-## 문서 허브
-
-- 전체 문서 안내: `docs/README.md`
-
-정본(SSOT):
-- 설치: `docs/setup/INSTALLATION.md`
-- 로컬 개발: `docs/setup/LOCAL_SETUP.md`
-- Railway 배포: `docs/setup/RAILWAY_DEPLOYMENT.md`
-- CLI 참조: `docs/user/CLI_REFERENCE.md`
-- 환경변수 계약: `docs/reference/environment-variables.md`
-- Web API 계약: `docs/reference/web-api.md`
-
 ## 품질 게이트
 
 ```bash

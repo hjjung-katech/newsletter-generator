@@ -28,7 +28,7 @@ pip install pyinstaller
 
 ```powershell
 # PyInstaller 스크립트 실행
-python build_web_exe.py
+python scripts/devtools/build_web_exe.py
 ```
 
 완료되면 `dist\newsletter_web.exe` 파일이 생성됩니다. 이 파일은 Python 환경 없이 바로 실행할 수 있습니다.
