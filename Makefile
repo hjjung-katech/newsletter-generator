@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check ops-safety-check ops-safety-report
+.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check ops-safety-check ops-safety-smoke ops-safety-report
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -194,6 +194,15 @@ ops-safety-check: ## Run operational-safety required tests
 	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/unit_tests/test_schedule_time_sync.py -q
 	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/contract/test_web_email_routes_contract.py -q
 	@echo "✅ ops-safety-check 완료"
+
+ops-safety-smoke: ## Run deployed idempotency/outbox smoke checks (BASE_URL required)
+	@echo "🧪 Ops-safety smoke 실행 중..."
+	@if [ -z "$${BASE_URL}" ]; then \
+		echo "❌ BASE_URL 환경변수가 필요합니다. 예: BASE_URL=https://your-app.railway.app make ops-safety-smoke"; \
+		exit 1; \
+	fi
+	$(PYTHON) scripts/ops_safety_smoke.py --base-url "$${BASE_URL}" $${SMOKE_ARGS:-}
+	@echo "✅ ops-safety-smoke 완료"
 
 ops-safety-report: ## Generate operational safety release report
 	@echo "📝 Ops-safety 리포트 생성 중..."

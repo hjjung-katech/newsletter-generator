@@ -291,6 +291,17 @@ curl -sS https://your-app.railway.app/api/status/<job_id>
 - Railway web, worker, scheduler 서비스 로그에서 `failed` 여부 확인
 - scheduler는 `next_run` 선업데이트(중복 실행 방지) 로그 확인
 
+5. Ops-safety smoke automation (idempotency/outbox)
+```bash
+BASE_URL=https://your-app.railway.app make ops-safety-smoke
+```
+
+이메일 outbox 중복방지까지 확인하려면:
+```bash
+BASE_URL=https://your-app.railway.app \
+make ops-safety-smoke SMOKE_ARGS="--check-email-dedupe --email test@example.com"
+```
+
 ### 스케줄 조회
 ```bash
 GET /api/schedules
