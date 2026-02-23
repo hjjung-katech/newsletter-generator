@@ -237,6 +237,8 @@ Delivery KPI:
   - 루트 `README.md`를 개요/링크 중심 진입 문서로 슬림화
 - Week 3 준비 반영:
   - `REPO_HYGIENE_STRICT` 토글 기반 hard gate 전환 경로를 CI/Makefile에 추가
+- Week 4 실행 반영:
+  - 루트 shim 9종 제거 완료 (`scripts/devtools/*` 단일 경로로 전환)
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
