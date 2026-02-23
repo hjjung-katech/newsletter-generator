@@ -13,7 +13,7 @@
 ## Process Helpers
 
 - `setup_git_message_template.sh`
-  - 로컬 Git commit 템플릿을 `.github/COMMIT_TEMPLATE.txt`로 설정합니다.
+  - 로컬 Git commit 템플릿을 `.gitmessage.txt`로 설정합니다.
   - 실행: `./scripts/devtools/setup_git_message_template.sh`
 
 ## Backward Compatibility

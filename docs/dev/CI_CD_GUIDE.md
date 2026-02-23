@@ -6,12 +6,12 @@
 
 ## Active GitHub Actions Workflows
 
-현재 운영 워크플로우는 아래 5개입니다.
+현재 운영 워크플로우는 아래 6개입니다.
 
 1. `main-ci.yml`
 - 코드 품질, 테스트, 빌드 검증
 - 주요 브랜치 push/PR에서 실행
-- PR 이벤트에서는 프로세스 계약(브랜치명 규칙 + PR 템플릿 섹션)도 검사
+- PR 정책 검증은 별도 `pr-policy-check.yml`에서 수행
 
 2. `deployment.yml`
 - 배포 파이프라인 (Railway + Pages 병행)
@@ -28,6 +28,10 @@
 5. `ops-safety-monitor.yml`
 - 운영 안전성 모니터링(정기/수동)
 - 스케줄/수동 실행
+
+6. `pr-policy-check.yml`
+- PR 정책 검증(브랜치명/템플릿/커밋 메시지)
+- PR 이벤트(opened/edited/synchronize/reopened)에서 실행
 
 ## Local Gate Commands
 
@@ -64,17 +68,25 @@ python scripts/repo_audit.py \
   - `artifacts/repo-audit/repo_audit_report.json`
   - `artifacts/repo-audit/policy_warnings.md`
 
-## PR Process Contract Gate
+## PR Policy Check Gate
 
-`main-ci.yml`의 `quality-checks` 단계에서 PR일 때 아래를 검사합니다.
+`.github/workflows/pr-policy-check.yml`에서 아래를 검사합니다.
 
 1. 브랜치명 정책
-- 형식: `<type>/<kebab-case-topic>`
-- 허용 타입: `codex|feature|fix|bugfix|hotfix|chore|docs|refactor|test|release`
+- 형식: `<type>/<scope>-<topic>`
+- 허용 타입: `feat|fix|chore|docs|refactor|release|codex`
 
-2. PR 본문 템플릿 섹션
-- 기본 템플릿: `.github/pull_request_template.md`
-- 특화 템플릿: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
+2. PR 본문 필수 섹션
+- `## Summary (what / why)`
+- `## Scope`
+- `## Test & Evidence`
+- `## Risk & Rollback`
+- `## Ops-Safety Addendum (if touching protected paths)`
+- `## Not Run (with reason)`
+
+3. 커밋 메시지 첫 줄 규칙
+- 형식: `<type>(<scope>): <summary>`
+- summary 최대 72자
 
 ## Strict Gate Policy
 
@@ -99,9 +111,10 @@ make check-full
 
 ## PR 운영 템플릿
 
-- RR 요청 템플릿: `docs/dev/RR_REQUEST_TEMPLATE.md`
+- RR 이슈 템플릿: `.github/ISSUE_TEMPLATE/review-request.yml`
 - 기본 PR 템플릿: `.github/pull_request_template.md`
 - Repo hygiene/구조 정리 PR: `.github/PULL_REQUEST_TEMPLATE/repo_hygiene.md`
 - 릴리즈 통합 PR: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
-- Commit 템플릿: `.github/COMMIT_TEMPLATE.txt`
+- Commit 템플릿: `.gitmessage.txt`
+- 워크플로 템플릿 가이드: `docs/dev/WORKFLOW_TEMPLATES.md`
 - 로컬 템플릿 설정: `./scripts/devtools/setup_git_message_template.sh`

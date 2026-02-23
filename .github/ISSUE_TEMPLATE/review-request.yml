@@ -1,0 +1,67 @@
+name: Review Request (RR)
+description: 작업 착수 전 범위/리스크/검증계획 잠금용 RR 템플릿
+title: "RR: <short-topic>"
+labels:
+  - review-request
+body:
+  - type: markdown
+    attributes:
+      value: |
+        RR은 구현 전에 Goal/Scope/Risk/Validation을 고정해 PR 품질 편차를 줄이기 위한 요청서입니다.
+
+  - type: input
+    id: goal
+    attributes:
+      label: Goal
+      description: 이번 작업이 필요한 이유를 한 줄로 작성하세요.
+      placeholder: 운영 안정성을 위해 PR/커밋 프로세스를 템플릿으로 표준화
+    validations:
+      required: true
+
+  - type: textarea
+    id: in_scope
+    attributes:
+      label: In Scope
+      placeholder: |
+        - 포함 범위 1
+        - 포함 범위 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_scope
+    attributes:
+      label: Out of Scope
+      placeholder: |
+        - 제외 범위 1
+
+  - type: textarea
+    id: risk_rollback
+    attributes:
+      label: Impact / Risk / Rollback
+      placeholder: |
+        영향 모듈:
+        리스크:
+        롤백:
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: validation
+    attributes:
+      label: Validation Plan
+      options:
+        - label: make check
+          required: true
+        - label: make check-full
+          required: true
+        - label: 필요 시 ops-safety 추가 테스트 실행
+
+  - type: input
+    id: branch
+    attributes:
+      label: Branch Name
+      description: "형식: <type>/<scope>-<topic>"
+      placeholder: docs/workflow-template-standard
+    validations:
+      required: true

@@ -1,13 +1,13 @@
 # GitHub Actions Workflows
 
-이 디렉터리의 canonical 워크플로우는 아래 5개입니다.
+이 디렉터리의 canonical 워크플로우는 아래 6개입니다.
 
 ## Active Workflows (Canonical)
 
 1. `main-ci.yml`
 - 목적: 코드 품질, 테스트, 빌드 검증의 메인 CI 파이프라인
-- 트리거: `push`(main/develop/feature/fix), `pull_request`(main/develop)
-- 추가 게이트: PR 브랜치명 정책 + PR 템플릿 섹션 계약 검증
+- 트리거: `push`(main/develop/feature/feat/fix/chore/docs/refactor/release/codex), `pull_request`(main/develop)
+- 참고: PR 정책 검증은 `pr-policy-check.yml`에서 수행
 
 2. `deployment.yml`
 - 목적: 배포 파이프라인 (Railway + Pages 병행)
@@ -25,9 +25,13 @@
 - 목적: 운영 안전성 점검 모니터링
 - 트리거: `schedule`, `workflow_dispatch`
 
+6. `pr-policy-check.yml`
+- 목적: PR 브랜치명/템플릿/커밋 메시지 정책 검증
+- 트리거: `pull_request` (`opened`, `edited`, `synchronize`, `reopened`)
+
 ## Policy
 
-- 위 5개만 운영 워크플로우로 유지합니다.
+- 위 6개만 운영 워크플로우로 유지합니다.
 - 중복/레거시 워크플로우 파일은 저장소에 두지 않습니다.
 - 변경 시 이 문서와 실제 파일 목록을 항상 1:1로 맞춥니다.
 
@@ -45,3 +49,4 @@ ls .github/workflows
 - `security-scan.yml`
 - `docs-quality.yml`
 - `ops-safety-monitor.yml`
+- `pr-policy-check.yml`
