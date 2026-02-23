@@ -13,7 +13,7 @@ from . import deliver as news_deliver
 console = Console()
 
 
-def check_config():
+def check_config() -> None:
     """현재 설정 상태를 확인합니다 (이메일, LLM, 기타 설정)."""
     console.print("\n[bold blue]🔧 Newsletter Generator 설정 상태 확인[/bold blue]")
     console.print("=" * 60)
@@ -190,7 +190,7 @@ def check_config():
         )
 
 
-def check_llm():
+def check_llm() -> None:
     """현재 사용 가능한 LLM 제공자와 설정을 확인합니다."""
     console.print("\n[bold blue]🤖 LLM 제공자 상태 확인[/bold blue]")
 
@@ -269,7 +269,7 @@ def test_llm(
         "--prompt",
         help="테스트에 사용할 프롬프트",
     ),
-):
+) -> None:
     """특정 작업에 대한 LLM 응답을 테스트합니다."""
     console.print(f"\n[bold blue]🧪 LLM 테스트: {task}[/bold blue]")
 
@@ -312,7 +312,7 @@ def test_llm(
             )
 
 
-def list_providers():
+def list_providers() -> None:
     """사용 가능한 LLM 제공자와 모델 정보를 표시합니다."""
     try:
         from .llm_factory import get_available_providers, get_provider_info
@@ -384,7 +384,7 @@ def test_email(
         "--dry-run",
         help="Perform a dry run without actually sending the email. Shows what would be sent.",
     ),
-):
+) -> None:
     """
     Test email sending functionality using Postmark.
 
