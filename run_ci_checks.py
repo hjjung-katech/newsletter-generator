@@ -30,12 +30,8 @@ if sys.platform.startswith("win"):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
-# Temporary strict-gate exclusion list for legacy large modules under refactor.
-LEGACY_RUNTIME_GATE_EXCLUDES = {
-    "web/app.py",
-    "newsletter/cli.py",
-    "newsletter/chains.py",
-}
+# Legacy strict-gate exclusions removed: all runtime modules are now enforced.
+LEGACY_RUNTIME_GATE_EXCLUDES: set[str] = set()
 
 
 class Colors:

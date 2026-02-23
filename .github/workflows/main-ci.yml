@@ -134,7 +134,7 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME_FILES="$(echo "${{ steps.changed-python.outputs.files }}" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
-          STRICT_RUNTIME_FILES="$(echo "$RUNTIME_FILES" | grep -Ev '^(web/app.py|newsletter/cli.py|newsletter/chains.py)$' || true)"
+          STRICT_RUNTIME_FILES="$RUNTIME_FILES"
           if [ -z "$STRICT_RUNTIME_FILES" ]; then
             echo "Skip mypy: no runtime Python file changes."
             exit 0
@@ -157,7 +157,7 @@ jobs:
         run: |
           set -euo pipefail
           RUNTIME_FILES="$(echo "${{ steps.changed-python.outputs.files }}" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
-          STRICT_RUNTIME_FILES="$(echo "$RUNTIME_FILES" | grep -Ev '^(web/app.py|newsletter/cli.py|newsletter/chains.py)$' || true)"
+          STRICT_RUNTIME_FILES="$RUNTIME_FILES"
           if [ -z "$STRICT_RUNTIME_FILES" ]; then
             echo "Skip bandit: no runtime Python file changes."
             exit 0
