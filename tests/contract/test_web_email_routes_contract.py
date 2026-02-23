@@ -9,6 +9,8 @@ import pytest
 
 from web.app import DATABASE_PATH, app
 
+pytestmark = [pytest.mark.unit, pytest.mark.mock_api]
+
 
 @pytest.fixture
 def client():
