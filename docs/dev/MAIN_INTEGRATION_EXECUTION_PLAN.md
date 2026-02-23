@@ -68,7 +68,7 @@ git restore --source=work -- \
   .pre-commit-config.yaml \
   .githooks/pre-push \
   run_ci_checks.py \
-  check_quality.py \
+  scripts/devtools/check_quality.py \
   Makefile \
   LOCAL_CI_GUIDE.md
 

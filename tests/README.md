@@ -80,13 +80,13 @@ python -m pytest tests/unit_tests/ -v
 python tests/run_essential_tests.py
 
 # 3. Mock API 포함 전체 테스트 (E2E 제외)
-python run_tests.py dev
+python scripts/devtools/run_tests.py dev
 ```
 
 ### 기능 완성 후 (통합 검증)
 ```bash
 # 1. 통합 테스트 포함
-RUN_INTEGRATION_TESTS=1 python run_tests.py dev
+python scripts/devtools/run_tests.py integration
 
 # 2. 웹 서버 실행 후 E2E 테스트
 # Terminal 1: cd web && python app.py
@@ -96,7 +96,7 @@ RUN_INTEGRATION_TESTS=1 python run_tests.py dev
 ### 배포 전 (전체 검증)
 ```bash
 # 실제 API 사용 전체 테스트
-python run_tests.py full
+python scripts/devtools/run_tests.py integration
 ```
 
 ### 배포 후 (운영 검증)

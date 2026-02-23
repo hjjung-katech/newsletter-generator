@@ -81,7 +81,7 @@ export RUN_INTEGRATION_TESTS=1
 
 ### ✅ GitHub Actions 호환 테스트
 ```bash
-python run_tests.py ci
+python scripts/devtools/run_tests.py ci
 # 결과: 128 passed, 15 skipped (Real API 제외)
 # 시간: ~7분 (대부분 LLM 모킹 시간)
 ```
@@ -95,7 +95,7 @@ python -m pytest tests/test_email_delivery.py -v
 
 ### ✅ 단위 테스트만 실행
 ```bash
-python run_tests.py unit
+python scripts/devtools/run_tests.py unit
 # 결과: 117 passed, 5 skipped
 # 시간: ~6분
 ```
@@ -105,19 +105,19 @@ python run_tests.py unit
 ### 개발 중
 ```bash
 # 빠른 검증 (Mock API + 단위 테스트)
-python run_tests.py dev
+python scripts/devtools/run_tests.py dev
 ```
 
 ### PR 생성 시
 ```bash
 # GitHub Actions에서 자동 실행
-python run_tests.py ci
+python scripts/devtools/run_tests.py ci
 ```
 
 ### 배포 전
 ```bash
 # 실제 API 포함 완전 검증
-python run_tests.py integration
+python scripts/devtools/run_tests.py integration
 ```
 
 ### 이메일 기능 개발 시

@@ -111,7 +111,7 @@ newsletter-generator/
 ├── pyproject.toml             # 프로젝트 설정
 ├── setup.py                   # 패키지 설정
 ├── .pre-commit-config.yaml    # pre-commit 설정
-└── run_tests.py               # 테스트 실행 스크립트
+└── scripts/devtools/run_tests.py               # 테스트 실행 스크립트
 ```
 
 ### 핵심 모듈 설명
@@ -199,7 +199,7 @@ refactor(graph): simplify workflow state management
 
 ```bash
 # 모든 품질 검사 실행
-python run_tests.py quality
+python run_ci_checks.py --quick
 
 # 개별 도구 실행
 black newsletter tests                    # 포맷팅
@@ -276,12 +276,12 @@ tests/
 
 ```bash
 # 모든 테스트 실행
-python run_tests.py all
+python scripts/devtools/run_tests.py ci
 
 # 환경별 테스트
-python run_tests.py dev      # 개발 환경
-python run_tests.py ci       # CI 환경
-python run_tests.py prod     # 프로덕션 환경
+python scripts/devtools/run_tests.py dev      # 개발 환경
+python scripts/devtools/run_tests.py ci       # CI 환경
+python scripts/devtools/run_tests.py integration  # 통합/프로덕션 검증
 
 # 특정 테스트 파일
 pytest tests/unit_tests/test_compose.py
@@ -555,7 +555,7 @@ if [ -z "$VERSION" ]; then
 fi
 
 # 테스트 실행
-python run_tests.py ci
+python scripts/devtools/run_tests.py ci
 if [ $? -ne 0 ]; then
     echo "Tests failed"
     exit 1
@@ -593,10 +593,10 @@ echo "Release $VERSION completed"
 source .venv/bin/activate
 
 # 코드 품질 검사
-python run_tests.py quality
+python run_ci_checks.py --quick
 
 # 테스트 실행
-python run_tests.py dev
+python scripts/devtools/run_tests.py dev
 
 # 패키지 재설치
 pip install -e . --force-reinstall

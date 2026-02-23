@@ -3,7 +3,7 @@
 ## 🎯 현재 발생한 문제와 해결 방안
 
 ### ❌ 문제점
-- `python run_tests.py dev` 실행 시 E2E 테스트가 포함되어 웹 서버 연결 오류 발생
+- `python scripts/devtools/run_tests.py dev` 실행 시 E2E 테스트가 포함되어 웹 서버 연결 오류 발생
 - 7개 E2E 테스트가 실패하여 전체 테스트 결과가 왜곡됨
 - 테스트 분류가 불명확하여 의존성 문제 발생
 
@@ -17,7 +17,7 @@
 ### 1. 일반 개발 시 (권장)
 ```bash
 # 단위 테스트 + Mock API 테스트 (가장 빠름)
-python run_tests.py dev
+python scripts/devtools/run_tests.py dev
 
 # 또는 필수 테스트만
 python tests/run_essential_tests.py
@@ -26,7 +26,7 @@ python tests/run_essential_tests.py
 ### 2. 기능 개발 완료 후
 ```bash
 # 통합 테스트 포함 (실제 API 키 필요)
-RUN_INTEGRATION_TESTS=1 python run_tests.py integration
+RUN_INTEGRATION_TESTS=1 python scripts/devtools/run_tests.py integration
 ```
 
 ### 3. E2E 테스트 실행 (웹 서버 필요)
@@ -156,9 +156,9 @@ External API dependency failed: API key error
 **해결**: `.env` 파일에 API 키 설정 또는 Mock 테스트로 전환
 
 ### 테스트 실행 시간 최적화
-- 개발 중: `python run_tests.py dev` (< 30초)
+- 개발 중: `python scripts/devtools/run_tests.py dev` (< 30초)
 - 기능 검증: `python tests/run_essential_tests.py` (< 20초)
-- 전체 검증: `RUN_INTEGRATION_TESTS=1 python run_tests.py integration` (< 2분)
+- 전체 검증: `RUN_INTEGRATION_TESTS=1 python scripts/devtools/run_tests.py integration` (< 2분)
 
 ## 📊 테스트 성능 목표
 
@@ -173,7 +173,7 @@ External API dependency failed: API key error
 ## 🚨 주의사항
 
 1. **E2E 테스트는 웹 서버 실행 필수**
-   - `run_tests.py dev`에서 자동 제외됨
+   - `scripts/devtools/run_tests.py dev`에서 자동 제외됨
    - 수동으로 웹 서버 시작 후 실행
 
 2. **실제 API 테스트는 할당량 소모**

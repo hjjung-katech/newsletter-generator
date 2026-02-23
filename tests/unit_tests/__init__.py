@@ -10,6 +10,6 @@
 - 날짜 스크래핑 (test_scrape_dates.py)
 - 실제 뉴스레터 시나리오 (test_real_newsletter.py)
 
-전체 테스트 실행:
-python run_tests.py --unit
+단위 테스트 실행:
+python scripts/devtools/run_tests.py --unit-tests
 """

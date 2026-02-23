@@ -79,7 +79,7 @@ newsletter-generator/
 ├── 📄 requirements.txt          # Production dependencies
 ├── 📄 requirements-dev.txt      # Development dependencies
 ├── 📄 requirements-minimal.txt  # Minimal CI dependencies
-├── 📄 run_tests.py              # Test runner script
+├── 📄 scripts/devtools/run_tests.py              # Test runner script
 └── 📄 config.yml                # Application configuration (updated with Multi-LLM)
 ```
 
