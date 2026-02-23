@@ -9,7 +9,7 @@ from .utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def load_html_template():
+def load_html_template() -> str:
     """HTML 템플릿 파일을 로드합니다."""
     template_path = os.path.join(
         os.path.dirname(__file__), "..", "templates", "newsletter_template.html"
