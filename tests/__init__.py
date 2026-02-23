@@ -8,11 +8,11 @@ Newsletter Generator Tests
 - _backup/: 사용되지 않는 이전 테스트 (참고용)
 
 테스트 실행:
-- 모든 테스트 실행: python run_tests.py --all
-- API 테스트만 실행: python run_tests.py --api
-- 단위 테스트만 실행: python run_tests.py --unit
-- 테스트 목록 확인: python run_tests.py --list
-- 특정 테스트 실행: python run_tests.py --test [test_name]
+- 모든 테스트 실행: python scripts/devtools/run_tests.py ci
+- API 테스트만 실행: python scripts/devtools/run_tests.py --api
+- 단위 테스트만 실행: python scripts/devtools/run_tests.py --unit-tests
+- 테스트 목록 확인: python scripts/devtools/run_tests.py --list --all
+- 특정 테스트 실행: python scripts/devtools/run_tests.py --test [test_name]
 
 자세한 내용은 tests/README.md 파일을 참조하세요.
 """

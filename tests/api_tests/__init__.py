@@ -19,5 +19,5 @@
 - test_improved_search.py, test_search_improved.py: 향상된 검색 기능 테스트
 
 전체 API 테스트 실행:
-python run_tests.py --api
+python scripts/devtools/run_tests.py --api
 """
