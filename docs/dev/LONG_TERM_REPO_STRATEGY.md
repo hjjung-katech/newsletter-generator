@@ -234,6 +234,7 @@ Delivery KPI:
   - 루트 유틸 5개를 `scripts/devtools/`로 이관
   - 루트 호환 shim 도입(점진 제거 전략)
   - CI 빌드 경로 일부를 신규 위치로 전환
+  - 루트 `README.md`를 개요/링크 중심 진입 문서로 슬림화
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 

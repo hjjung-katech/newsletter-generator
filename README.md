@@ -7,73 +7,46 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy Guide (Railway)](https://img.shields.io/badge/deploy-Railway-0B0D0E?logo=railway)](docs/setup/RAILWAY_DEPLOYMENT.md)
 
-키워드/도메인 기반으로 최신 뉴스를 수집하고, AI로 요약된 HTML 뉴스레터를 생성·발송하는 프로젝트입니다.
+키워드/도메인 기반으로 최신 뉴스를 수집하고 AI 요약 HTML 뉴스레터를 생성·발송하는 프로젝트입니다.
 
-## 핵심 포인트
+## Start Here (5분)
 
-- Canonical runtime: `Flask + Postmark`
-- Experimental FastAPI path: `apps/experimental/main.py` (`api_experimental` extra required)
-- 문서 정본(SSOT) 기반 운영: `docs/README.md`
-- 로컬/배포 모두 동일한 품질 게이트 사용: `make check`, `make check-full`
+1. 빠른 시작: `docs/setup/QUICK_START_GUIDE.md`
+2. 환경변수 계약(SSOT): `docs/reference/environment-variables.md`
+3. 로컬 개발 가이드: `docs/setup/LOCAL_SETUP.md`
+4. 품질 게이트: `make check`, `make check-full`
 
-## 빠른 링크
+루트는 개요와 진입 링크만 유지하고, 상세 설명은 `docs/` 정본 문서로 관리합니다.
 
-- 문서 허브: `docs/README.md`
-- 환경변수 계약: `docs/reference/environment-variables.md`
-- Web API 계약: `docs/reference/web-api.md`
-- Railway 배포: `docs/setup/RAILWAY_DEPLOYMENT.md`
-- 개발 가이드: `docs/dev/DEVELOPMENT_GUIDE.md`
+## Minimal Commands
 
-## Quickstart (5분)
-
-1. 저장소 준비
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
-```
-
-2. 가상환경/의존성 설치
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-```
-
-3. 환경변수 설정
-```bash
+make bootstrap
 cp env.example .env
+make check
 ```
 
-필수/선택 변수는 정본 문서를 참고하세요:
-- `docs/reference/environment-variables.md`
+웹 실행/CLI/배포 절차는 아래 정본 문서를 사용하세요.
 
-4. 웹 실행
-```bash
-cd web
-python init_database.py
-python app.py
-```
+## Docs Hub
 
-접속: `http://localhost:5000`
-
-5. CLI 예시
-```bash
-cd ..
-python -m newsletter.cli run --keywords "AI,반도체" --period 7 --template-style compact
-```
-
-## 품질 게이트
-
-```bash
-make check       # 빠른/일상 게이트
-make check-full  # PR 전 전체 게이트
-```
+| 목적 | 문서 |
+|---|---|
+| 문서 허브(SSOT) | `docs/README.md` |
+| 설치/온보딩 | `docs/setup/INSTALLATION.md`, `docs/setup/QUICK_START_GUIDE.md` |
+| 로컬 개발 | `docs/setup/LOCAL_SETUP.md`, `docs/dev/DEVELOPMENT_GUIDE.md` |
+| API/환경변수 계약 | `docs/reference/web-api.md`, `docs/reference/environment-variables.md` |
+| 배포 | `docs/setup/RAILWAY_DEPLOYMENT.md` |
+| 구조/운영 전략 | `docs/dev/LONG_TERM_REPO_STRATEGY.md`, `docs/dev/REPO_HYGIENE_POLICY.md` |
 
 ## 기여
 
-- 개발 가이드: `docs/dev/DEVELOPMENT_GUIDE.md`
-- AGENTS 규칙: `AGENTS.md`
+- RR 템플릿: `.github/ISSUE_TEMPLATE/review-request.yml`
+- PR 템플릿: `.github/pull_request_template.md`
+- 커밋 템플릿: `.gitmessage.txt`
+- 운영 규칙: `AGENTS.md`
 
 ## 라이선스
 
