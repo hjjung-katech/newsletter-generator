@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-이 디렉터리의 canonical 워크플로우는 아래 4개입니다.
+이 디렉터리의 canonical 워크플로우는 아래 5개입니다.
 
 ## Active Workflows (Canonical)
 
@@ -20,9 +20,13 @@
 - 목적: 문서 링크/스타일 품질 검증
 - 트리거: markdown 변경 `pull_request`/`push`
 
+5. `ops-safety-monitor.yml`
+- 목적: 운영 안전성 점검 모니터링
+- 트리거: `schedule`, `workflow_dispatch`
+
 ## Policy
 
-- 위 4개만 운영 워크플로우로 유지합니다.
+- 위 5개만 운영 워크플로우로 유지합니다.
 - 중복/레거시 워크플로우 파일은 저장소에 두지 않습니다.
 - 변경 시 이 문서와 실제 파일 목록을 항상 1:1로 맞춥니다.
 
@@ -39,3 +43,4 @@ ls .github/workflows
 - `deployment.yml`
 - `security-scan.yml`
 - `docs-quality.yml`
+- `ops-safety-monitor.yml`

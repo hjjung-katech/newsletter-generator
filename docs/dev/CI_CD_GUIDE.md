@@ -6,7 +6,7 @@
 
 ## Active GitHub Actions Workflows
 
-현재 운영 워크플로우는 아래 4개입니다.
+현재 운영 워크플로우는 아래 5개입니다.
 
 1. `main-ci.yml`
 - 코드 품질, 테스트, 빌드 검증
@@ -24,6 +24,10 @@
 - Markdown 링크/스타일 품질 검증
 - 문서 변경 push/PR에서 실행
 
+5. `ops-safety-monitor.yml`
+- 운영 안전성 모니터링(정기/수동)
+- 스케줄/수동 실행
+
 ## Local Gate Commands
 
 표준 로컬 게이트는 Makefile 엔트리로 고정합니다.
@@ -34,10 +38,29 @@ make bootstrap
 make doctor
 make check
 make check-full
+make repo-audit
 ```
 
 - `make check`: 빠른 로컬 게이트
 - `make check-full`: PR 전 전체 게이트
+- `make repo-audit`: 루트 인벤토리 + repo hygiene soft gate 리포트 생성
+
+## Repo Hygiene Soft Gate
+
+`main-ci.yml`의 `quality-checks` 단계에서 아래 soft gate를 실행합니다.
+
+```bash
+python scripts/repo_audit.py \
+  --policy scripts/repo_hygiene_policy.json \
+  --output-dir artifacts/repo-audit \
+  --check-policy
+```
+
+- Week 1~2 운영: warning-only
+- CI artifact:
+  - `artifacts/repo-audit/repo_audit_report.md`
+  - `artifacts/repo-audit/repo_audit_report.json`
+  - `artifacts/repo-audit/policy_warnings.md`
 
 ## Strict Gate Policy
 
@@ -59,3 +82,8 @@ make check-full
 ## Workflow Directory Contract
 
 `.github/workflows/README.md`와 실제 파일 목록은 항상 1:1로 유지합니다.
+
+## PR 운영 템플릿
+
+- Repo hygiene/구조 정리 PR: `.github/PULL_REQUEST_TEMPLATE/repo_hygiene.md`
+- 릴리즈 통합 PR: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`

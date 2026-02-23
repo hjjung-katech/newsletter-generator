@@ -1,5 +1,10 @@
 # Project Structure
 
+> Note: 이 문서는 구조 이력/스냅샷 성격의 문서입니다.
+> 최신 구조 정책과 실행 기준은 아래 SSOT를 우선합니다.
+> - `docs/dev/LONG_TERM_REPO_STRATEGY.md`
+> - `docs/dev/REPO_HYGIENE_POLICY.md`
+
 This document outlines the organized file structure of the Newsletter Generator project.
 
 ## Root Directory
