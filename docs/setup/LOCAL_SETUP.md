@@ -263,10 +263,10 @@ sqlite3 storage.db "DELETE FROM history WHERE created_at < datetime('now', '-30 
 
 ```bash
 # 디버그 파일을 아카이브로 이동
-python cleanup_debug_files.py --action move
+python scripts/devtools/cleanup_debug_files.py --action move
 
 # 디버그 파일 완전 삭제
-python cleanup_debug_files.py --action delete
+python scripts/devtools/cleanup_debug_files.py --action delete
 ```
 
 ## 문제 해결

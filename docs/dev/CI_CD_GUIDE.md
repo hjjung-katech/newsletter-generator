@@ -44,6 +44,7 @@ make repo-audit
 - `make check`: 빠른 로컬 게이트
 - `make check-full`: PR 전 전체 게이트
 - `make repo-audit`: 루트 인벤토리 + repo hygiene soft gate 리포트 생성
+- dev 유틸 실행 스크립트는 `scripts/devtools/`를 기본 경로로 사용합니다.
 
 ## Repo Hygiene Soft Gate
 

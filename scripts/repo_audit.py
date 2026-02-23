@@ -64,11 +64,18 @@ def classify_action(
     root_policy: dict[str, Any],
 ) -> tuple[str, str]:
     move_globs = root_policy.get("move_to_scripts_file_globs", [])
+    shim_files = root_policy.get("shim_file_names", [])
     ignore_files = root_policy.get("ignore_file_globs", [])
     ignore_dirs = root_policy.get("ignore_directory_names", [])
     allow_files = root_policy.get("allowed_file_names", [])
     allow_file_globs = root_policy.get("allowed_file_globs", [])
     allow_dirs = root_policy.get("allowed_directory_names", [])
+
+    if entry_type == "file" and name in shim_files:
+        return (
+            "keep_shim_temporary",
+            "호환 shim 유지(실제 구현은 scripts/devtools로 이관)",
+        )
 
     if entry_type == "file" and match_any(name, move_globs):
         return (
@@ -202,6 +209,8 @@ def policy_warnings(
             continue
         if entry.action == "move_to_scripts_devtools":
             warnings.append(f"[move] {entry.name} should move to scripts/devtools/")
+            continue
+        if entry.action == "keep_shim_temporary":
             continue
         if entry.action == "review_for_relocation":
             warnings.append(
