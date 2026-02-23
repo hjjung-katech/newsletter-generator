@@ -1,6 +1,7 @@
 # RR (Request/Review) Template
 
 이 문서는 에이전트 작업 요청(RR)을 표준화하기 위한 템플릿입니다.
+GitHub 이슈 기반 RR의 정본은 `.github/ISSUE_TEMPLATE/review-request.yml`입니다.
 
 ## Standard RR
 
@@ -8,7 +9,7 @@
 이번 작업은 PR 단위로 끝까지 진행해줘.
 - 목표: <목표>
 - 범위: <in-scope / out-of-scope>
-- 브랜치: codex/<topic>
+- 브랜치: <type>/<scope>-<topic> (예: codex/workflow-template-standard)
 - 필수 게이트: make check, make check-full
 - 선택 게이트: make repo-audit (구조/정책 변경 시)
 - 산출물: 커밋 해시, PR 링크, CI 상태, merge 결과, 롤백 메모

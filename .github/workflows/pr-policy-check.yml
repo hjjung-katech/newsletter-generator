@@ -1,0 +1,73 @@
+name: PR Policy Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  policy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch naming, PR template sections, and commit messages
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title || "";
+            const body = pr.body || "";
+            const headRef = pr.head.ref || "";
+            const branchRegex = /^(feat|fix|chore|docs|refactor|release|codex)\/[a-z0-9._-]+$/;
+            const requiredSections = [
+              "## Summary (what / why)",
+              "## Scope",
+              "## Test & Evidence",
+              "## Risk & Rollback",
+              "## Ops-Safety Addendum (if touching protected paths)",
+              "## Not Run (with reason)",
+            ];
+            const errors = [];
+
+            if (!branchRegex.test(headRef)) {
+              errors.push(`Invalid branch name: \`${headRef}\`. Expected \`<type>/<scope>-<topic>\` and allowed types: feat|fix|chore|docs|refactor|release|codex.`);
+            }
+
+            for (const section of requiredSections) {
+              if (!body.includes(section)) {
+                errors.push(`Missing PR section: \`${section}\`.`);
+              }
+            }
+
+            if (!title || title.length < 8) {
+              errors.push("PR title is too short; provide a descriptive title.");
+            }
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = pr.number;
+            const commitRegex = /^(feat|fix|chore|docs|refactor|release|codex)(\([a-z0-9._-]+\))?: [^\s].{0,71}$/;
+            const commitData = await github.paginate(
+              github.rest.pulls.listCommits,
+              { owner, repo, pull_number, per_page: 100 }
+            );
+
+            for (const c of commitData) {
+              const firstLine = (c.commit.message || "").split("\n")[0].trim();
+              const isMerge = firstLine.startsWith("Merge ");
+              if (isMerge) continue;
+
+              if (!commitRegex.test(firstLine)) {
+                errors.push(
+                  `Invalid commit message: \`${firstLine}\`. Expected \`<type>(<scope>): <summary>\` (<=72 chars summary, allowed types: feat|fix|chore|docs|refactor|release|codex).`
+                );
+              }
+            }
+
+            if (errors.length > 0) {
+              core.setFailed(errors.join("\n"));
+            } else {
+              core.info("PR policy check passed.");
+            }

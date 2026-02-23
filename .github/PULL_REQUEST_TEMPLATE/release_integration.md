@@ -1,63 +1,45 @@
-# Release Integration PR Template
+# Release Integration Pull Request
 
-## Summary
-- What changed in this release branch and why.
+## Summary (what / why)
+-
 
 ## Base
 - Base branch/tag: (e.g. `main` or `baseline/main-equivalent`)
 - Base commit SHA:
-- Commit template: `.github/COMMIT_TEMPLATE.txt`
 
-## Scope (in/out)
-### In scope
+## Scope
+### In Scope
 -
 
-### Out of scope
+### Out of Scope
 -
 
-## Risk
-- Primary runtime/operational risks.
-- Affected high-risk files (if any):
-  - [ ] `web/app.py`
-  - [ ] `web/schedule_runner.py`
-  - [ ] `web/graceful_shutdown.py`
-  - [ ] `newsletter/utils/shutdown_manager.py`
+## Test & Evidence
+- [ ] `make check`
+- [ ] `make check-full`
+- [ ] `make preflight-release`
+- [ ] release manifest validation completed
 
-## Test Evidence
-- [ ] preflight passed
-- [ ] format/lint passed
-- [ ] core unit tests passed
-- [ ] schedule/shutdown integration tests passed
-- [ ] security scan completed (new high issues = 0)
-
-### Commands run
+### Commands and Results
 ```bash
 make preflight-release
-make test-quick
-make test-full
-# release/ci-platform 범위 검증
+make check-full
 make validate-ci-manifest
-# PR 메타데이터 실제 적용
-# 권장: 역할 파일 사용
-make apply-pr-metadata PR=<number>
-# 또는 핸들 직접 지정
-make apply-pr-metadata PR=<number> REVIEWERS=<owner1,ops1>
-# For scheduler/runtime-risk changes only
-make test-nightly
 ```
 
-## PR Metadata Applied
-- [ ] Labels applied in GitHub UI/API (`release`, `risk:*`, `area:*`)
-- [ ] Reviewers assigned in GitHub UI/API (code owner + ops owner)
-- [ ] Solo/virtual mode used (if reviewer assign is impossible); evidence captured in PR body/comments
+## Risk & Rollback
+- Risk:
+- Rollback:
 
-## Rollback Plan
-- Tag to rollback to:
-- Rollback command / process:
-- Data migration impact (if any):
+## Ops-Safety Addendum (if touching protected paths)
+- Idempotency key 생성/적용 범위:
+- Outbox/send_key 중복 방지 결과:
+- import-time side effect 제거 여부:
 
-## Docs Updated
+## Not Run (with reason)
+-
+
+## Release Notes Checklist
 - [ ] CHANGELOG updated
-- [ ] Related docs updated
-- [ ] No docs change needed (reason):
-- [ ] All required CI checks passed before merge
+- [ ] Docs updated (or reason documented)
+- [ ] Required CI checks passed before merge

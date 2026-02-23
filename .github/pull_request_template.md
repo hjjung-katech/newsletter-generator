@@ -1,51 +1,33 @@
-# PR Process Template (CI Unit)
+# Pull Request
 
-## Summary
-- What changed and why.
-
-## Scope (in/out)
-### In scope
+## Summary (what / why)
 -
 
-### Out of scope
+## Scope
+### In Scope
 -
 
-## Branch / Commit
-- Branch: `codex/<topic>`
-- Commits in this PR:
-  - `<hash> <summary>`
+### Out of Scope
+-
 
-## Test Evidence
-- [ ] `make check` passed
-- [ ] `make check-full` passed
-- [ ] `make repo-audit` executed (for structure/policy/docs changes)
+## Test & Evidence
+- [ ] `make check`
+- [ ] `make check-full`
+- [ ] Additional tests (if needed):
 
-### Commands run
+### Commands and Results
 ```bash
-make check
-make check-full
-make repo-audit
+# paste exact commands executed
 ```
 
-## CI Status (GitHub Actions)
-- Main CI Pipeline: `<url or pass/fail>`
-- Docs Quality: `<url or pass/fail>`
-- Other relevant workflows: `<url or pass/fail>`
+## Risk & Rollback
+- Risk:
+- Rollback:
 
-## Risk / Rollback
-- Primary risk:
-- Rollback plan:
-  1. Revert commit(s) from this PR.
-  2. Re-run verification gates.
-- Recovery verification:
-  - `make check`
-  - `make check-full`
+## Ops-Safety Addendum (if touching protected paths)
+- Idempotency key 생성/적용 범위:
+- Outbox/send_key 중복 방지 결과:
+- import-time side effect 제거 여부:
 
-## Agent / Skill Used
-- [ ] Repo Hygiene Agent (A)
-- [ ] Ops Safety Agent (B)
-- [ ] Docs SSOT Agent (C)
-- [ ] Release Guard Agent (D)
-- [ ] `$gh-fix-ci`
-- [ ] `$gh-address-comments`
-- [ ] Not used (reason):
+## Not Run (with reason)
+-

@@ -2,7 +2,7 @@ name: Main CI Pipeline
 
 on:
   push:
-    branches: [main, develop, 'feature/**', 'fix/**']
+    branches: [main, develop, 'feature/**', 'feat/**', 'fix/**', 'chore/**', 'docs/**', 'refactor/**', 'release/**', 'codex/**']
   pull_request:
     branches: [main, develop]
 
@@ -33,70 +33,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: PR process contract (branch + template)
-        if: github.event_name == 'pull_request'
-        shell: bash
-        env:
-          HEAD_BRANCH: ${{ github.head_ref }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          set -euo pipefail
-
-          BRANCH_REGEX='^(codex|feature|fix|bugfix|hotfix|chore|docs|refactor|test|release)/[a-z0-9][a-z0-9-]*$'
-          if [[ ! "$HEAD_BRANCH" =~ $BRANCH_REGEX ]]; then
-            echo "❌ Invalid branch name: $HEAD_BRANCH"
-            echo "Expected format: <type>/<kebab-case-topic>"
-            echo "Allowed type: codex|feature|fix|bugfix|hotfix|chore|docs|refactor|test|release"
-            exit 1
-          fi
-          echo "✅ Branch name policy passed: $HEAD_BRANCH"
-
-          if [ -z "${PR_BODY//[[:space:]]/}" ]; then
-            echo "❌ PR body is empty. Use the PR template."
-            exit 1
-          fi
-
-          PROCESS_HEADERS=(
-            "## Summary"
-            "## Scope (in/out)"
-            "## Branch / Commit"
-            "## Test Evidence"
-            "## CI Status (GitHub Actions)"
-            "## Risk / Rollback"
-          )
-
-          RELEASE_HEADERS=(
-            "## Summary"
-            "## Base"
-            "## Scope (in/out)"
-            "## Risk"
-            "## Test Evidence"
-            "## Rollback Plan"
-          )
-
-          MATCH_PROCESS=true
-          for header in "${PROCESS_HEADERS[@]}"; do
-            if ! grep -Fq "$header" <<< "$PR_BODY"; then
-              MATCH_PROCESS=false
-            fi
-          done
-
-          MATCH_RELEASE=true
-          for header in "${RELEASE_HEADERS[@]}"; do
-            if ! grep -Fq "$header" <<< "$PR_BODY"; then
-              MATCH_RELEASE=false
-            fi
-          done
-
-          if [ "$MATCH_PROCESS" != "true" ] && [ "$MATCH_RELEASE" != "true" ]; then
-            echo "❌ PR body does not match required template sections."
-            echo "Use one of:"
-            echo "- .github/pull_request_template.md (default CI unit template)"
-            echo "- .github/PULL_REQUEST_TEMPLATE/release_integration.md"
-            exit 1
-          fi
-          echo "✅ PR template policy passed."
 
       - name: Set up Python
         uses: actions/setup-python@v5

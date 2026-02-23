@@ -3,13 +3,13 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-git -C "$ROOT_DIR" config --local commit.template .github/COMMIT_TEMPLATE.txt
+git -C "$ROOT_DIR" config --local commit.template .gitmessage.txt
 
 echo "Configured local commit template:"
-echo "  .github/COMMIT_TEMPLATE.txt"
+echo "  .gitmessage.txt"
 echo
 echo "Branch naming template:"
-echo "  codex/<kebab-case-topic>"
+echo "  <type>/<scope>-<topic>"
 echo "Examples:"
-echo "  codex/repo-hygiene-week3"
-echo "  codex/fix-ci-process-guard"
+echo "  codex/workflow-template-standard"
+echo "  fix/scheduler-duplicate-send"

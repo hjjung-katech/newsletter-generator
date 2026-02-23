@@ -1,6 +1,3 @@
-# Deprecated: use .gitmessage.txt as the canonical commit template.
-# This file remains for backward compatibility with existing local configs.
-#
 # <type>(<scope>): <summary <= 72 chars>
 #
 # Why:

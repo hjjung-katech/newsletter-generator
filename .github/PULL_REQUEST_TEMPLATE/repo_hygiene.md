@@ -1,48 +1,47 @@
-# Repo Hygiene / CI-managed PR
+# Repo Hygiene Pull Request
 
-## Summary
-- What changed and why.
-
-## Scope (in/out)
-### In scope
+## Summary (what / why)
 -
 
-### Out of scope
+## Scope
+### In Scope
+-
+
+### Out of Scope
 -
 
 ## Branch / Commit
-- Branch: `codex/<topic>`
-- Commit template: `.github/COMMIT_TEMPLATE.txt`
+- Branch: `<type>/<scope>-<topic>`
+- Commit template: `.gitmessage.txt`
 - Commits in this PR:
   - `<hash> <summary>`
 
-## Test Evidence
-- [ ] `make check` passed
-- [ ] `make check-full` passed
-- [ ] `make repo-audit` executed (for structure/policy changes)
+## Test & Evidence
+- [ ] `make check`
+- [ ] `make check-full`
+- [ ] `make repo-audit` (for structure/policy changes)
 
-### Commands run
+### Commands and Results
 ```bash
 make check
 make check-full
 make repo-audit
 ```
 
-## CI Status (GitHub Actions)
-- Main CI: `<url or pass/fail>`
-- Docs Quality: `<url or pass/fail>`
-- Other relevant workflows: `<url or pass/fail>`
-- Merge after all required checks pass.
+## Risk & Rollback
+- Risk:
+- Rollback:
 
-## Risk / Rollback
-- Primary risk:
-- Rollback plan:
-  - Revert commit(s):
-  - Recovery verification command:
+## Ops-Safety Addendum (if touching protected paths)
+- Idempotency key 생성/적용 범위:
+- Outbox/send_key 중복 방지 결과:
+- import-time side effect 제거 여부:
 
-## Agent/Skill Used
-- [ ] Repo Hygiene Agent(A)
-- [ ] Docs SSOT Agent(C)
+## Not Run (with reason)
+-
+
+## Agent / Skill Used
+- [ ] Repo Hygiene Agent (A)
+- [ ] Docs SSOT Agent (C)
 - [ ] `$gh-fix-ci`
 - [ ] `$gh-address-comments`
-- [ ] Not used (reason):

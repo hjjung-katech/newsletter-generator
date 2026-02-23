@@ -72,3 +72,12 @@
 - outbox/send_key 기반 이메일 중복 방지 결과를 명시합니다.
 - import-time side effect 제거 여부를 명시합니다.
 - 미실행 테스트와 사유를 반드시 기록합니다.
+
+## Workflow Standardization (RR/Branch/Commit/PR)
+- 모든 작업은 RR(Review Request) -> Branch -> Commit -> PR -> Merge 순서를 기본 프로세스로 따릅니다.
+- RR은 `.github/ISSUE_TEMPLATE/review-request.yml` 템플릿을 사용합니다.
+- 브랜치명은 `<type>/<scope>-<topic>` 패턴을 사용합니다.
+- 커밋 메시지는 `.gitmessage.txt` 템플릿을 기준으로 작성합니다.
+- PR 본문은 `.github/pull_request_template.md` 섹션을 누락 없이 채웁니다.
+- 기본 머지 전략은 squash merge이며, 증빙 없는 예외 머지는 금지합니다.
+- CI에서 `.github/workflows/pr-policy-check.yml`로 브랜치/PR 템플릿 + 커밋 메시지 규칙을 검증합니다.
