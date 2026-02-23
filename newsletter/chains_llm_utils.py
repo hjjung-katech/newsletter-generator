@@ -2,6 +2,7 @@
 
 import logging
 import os
+from typing import Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
@@ -12,7 +13,11 @@ from .utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
+def get_llm(
+    temperature: float = 0.3,
+    callbacks: list[Any] | None = None,
+    task: str = "html_generation",
+) -> Any:
     """
     지정된 작업에 최적화된 LLM 모델 인스턴스를 생성합니다.
 
@@ -130,7 +135,7 @@ def get_llm(temperature=0.3, callbacks=None, task="html_generation"):
 
 
 # 기사 목록을 텍스트로 변환하는 함수
-def format_articles(data):
+def format_articles(data: dict[str, Any]) -> str:
     """
     기사 목록을 텍스트 형식으로 변환합니다.
 
@@ -153,7 +158,7 @@ def format_articles(data):
         date = article.get("date", "날짜 없음")
 
         formatted_articles.append(
-            f"기사 #{i+1}:\n제목: {title}\nURL: {url}\n출처: {source}\n"
+            f"기사 #{i + 1}:\n제목: {title}\nURL: {url}\n출처: {source}\n"
             f"날짜: {date}\n내용:\n{content}\n"
         )
 
