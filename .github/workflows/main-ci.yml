@@ -150,6 +150,12 @@ jobs:
           fi
           echo "No legacy web_types references detected."
 
+      - name: Guard runtime output literals (ASCII-safe)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/devtools/check_runtime_ascii_output.py
+
       - name: Repo hygiene audit (gate)
         shell: bash
         run: |
