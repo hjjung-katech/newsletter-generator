@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report
+.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -260,6 +260,11 @@ repo-audit-strict: ## 루트 인벤토리/Repo hygiene strict gate 리허설
 	@echo "🧱 Repo audit strict 실행 중..."
 	$(PYTHON) scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir artifacts/repo-audit --check-policy --strict
 	@echo "✅ repo-audit-strict 완료 (artifacts/repo-audit)"
+
+runtime-ascii-guard: ## Ensure runtime print/logger literals stay ASCII-safe
+	@echo "🔡 Runtime ASCII 출력 가드 실행 중..."
+	$(PYTHON) scripts/devtools/check_runtime_ascii_output.py
+	@echo "✅ runtime-ascii-guard 완료"
 
 pre-commit: ## Pre-commit hooks 설치
 	@echo "🔗 Pre-commit hooks 설치 중..."

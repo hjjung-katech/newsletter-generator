@@ -58,7 +58,7 @@ def setup_binary_environment() -> Dict[str, Any]:
     }
 
     if is_frozen():
-        logger.info("PyInstaller 바이너리 환경 감지됨")
+        logger.info("PyInstaller binary environment detected")
         logger.info(f"   Base path: {env_info['base_path']}")
         logger.info(f"   Executable: {env_info['executable_path']}")
 
@@ -76,7 +76,7 @@ def setup_binary_environment() -> Dict[str, Any]:
 
         env_info["paths_configured"] = True
     else:
-        logger.info("Python 개발 환경에서 실행 중")
+        logger.info("Running in Python development environment")
         logger.info(f"   Working directory: {env_info['working_directory']}")
 
     return env_info
@@ -160,7 +160,7 @@ def verify_critical_modules() -> Dict[str, bool]:
         "postmarker": False,
     }
 
-    logger.info("핵심 모듈 가용성 검증 중...")
+    logger.info("Verifying critical module availability...")
 
     for module_name in critical_modules.keys():
         try:
@@ -182,14 +182,16 @@ def verify_critical_modules() -> Dict[str, bool]:
     total_count = len(critical_modules)
     success_rate = (available_count / total_count) * 100
 
-    logger.info(f"모듈 가용성: {available_count}/{total_count} ({success_rate:.1f}%)")
+    logger.info(
+        f"Module availability: {available_count}/{total_count} ({success_rate:.1f}%)"
+    )
 
     # 필수 모듈 체크
     essential_modules = ["flask", "requests", "newsletter"]
     missing_essential = [m for m in essential_modules if not critical_modules.get(m)]
 
     if missing_essential:
-        logger.warning(f"필수 모듈 누락: {missing_essential}")
+        logger.warning(f"Missing essential modules: {missing_essential}")
         return False
 
     return critical_modules
@@ -242,7 +244,7 @@ def setup_logging_for_binary():
 
 def run_comprehensive_diagnostics() -> Dict[str, Any]:
     """종합 진단 실행"""
-    logger.info("=== 바이너리 호환성 종합 진단 시작 ===")
+    logger.info("=== Binary compatibility diagnostics started ===")
 
     # 1. 환경 설정
     env_info = setup_binary_environment()
@@ -274,8 +276,8 @@ def run_comprehensive_diagnostics() -> Dict[str, Any]:
         ),
     }
 
-    logger.info("=== 바이너리 호환성 진단 완료 ===")
-    logger.info(f"전체 상태: {diagnostics_result['overall_status'].upper()}")
+    logger.info("=== Binary compatibility diagnostics completed ===")
+    logger.info(f"Overall status: {diagnostics_result['overall_status'].upper()}")
 
     return diagnostics_result
 
