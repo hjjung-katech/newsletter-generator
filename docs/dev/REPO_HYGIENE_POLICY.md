@@ -13,7 +13,7 @@
 ## Scope
 
 - 루트 엔트리 분류(유지/이관/삭제/ignore)
-- dot 디렉터리(`.vscode`, `.agents`, `.githooks`) 추적 범위 고정
+- dot 디렉터리(`.agents`, `.githooks`) 추적 범위 고정 + `.vscode` local-only 정책 고정
 - CI repo hygiene gate 운영 기준
 
 ## Root Classification Table
@@ -45,14 +45,9 @@
 
 ### `.vscode`
 
-- 목적: 팀 공통 개발 경험 공유
-- 허용 추적 파일:
-  - `.vscode/README.md`
-  - `.vscode/settings.json`
-  - `.vscode/tasks.json`
-  - `.vscode/extensions.json`
-  - `.vscode/launch.json`
-- 금지: 개인 편의/로컬 경로 의존 설정
+- 목적: 개인 로컬 IDE 설정
+- 정책: tracked 제외(local-only), 필요 시 각자 생성
+- CI 처리: repo hygiene에서 ignore 대상
 
 ### `.agents`
 
