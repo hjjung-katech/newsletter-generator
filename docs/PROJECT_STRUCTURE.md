@@ -17,7 +17,7 @@ newsletter-generator/
 │   ├── test-tools.yml           # Tools testing
 │   └── newsletter.yml           # Newsletter generation & deployment
 ├── 📁 .vscode/                  # VS Code configuration
-├── 📁 config/                   # Configuration files
+├── 📁 config/                   # Configuration files (`config/config.yml` 포함)
 ├── 📁 debug_files/              # 🆕 Debug files (moved from root)
 ├── 📁 docs/                     # 📚 All Documentation
 │   ├── 📁 dev/                  # Development documentation
@@ -78,8 +78,7 @@ newsletter-generator/
 ├── 📄 requirements.txt          # Production dependencies
 ├── 📄 requirements-dev.txt      # Development dependencies
 ├── 📄 requirements-minimal.txt  # Minimal CI dependencies
-├── 📄 scripts/devtools/run_tests.py              # Test runner script
-└── 📄 config.yml                # Application configuration (updated with Multi-LLM)
+└── 📄 scripts/devtools/run_tests.py              # Test runner script
 ```
 
 ## Key Directories
@@ -189,7 +188,7 @@ Comprehensive testing structure:
    - Added `llm_factory.py` for Multi-LLM provider management
    - Enhanced `cost_tracking.py` for multiple provider cost monitoring
    - Added `scoring.py` for AI-based article scoring
-   - Updated `config.yml` with comprehensive LLM settings
+   - Updated `config/config.yml` with comprehensive LLM settings
 
 2. **📚 Documentation Enhancements**
    - Added `MULTI_LLM_GUIDE.md` for user guidance on multi-provider setup
@@ -209,7 +208,7 @@ Comprehensive testing structure:
    - Enhanced project structure documentation
 
 5. **⚙️ Configuration Management**
-   - Updated `config.yml` with provider-specific LLM settings
+   - Updated `config/config.yml` with provider-specific LLM settings
    - Added function-specific LLM optimization configurations
    - Enhanced fallback system configuration
 
