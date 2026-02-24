@@ -251,6 +251,8 @@ Delivery KPI:
   - RR/Delivery Unit/Commit 범위(2~6) 거버넌스를 `pr-policy-check`에서 자동 검증
 - Week 9 실행 반영:
   - 루트 `setup.cfg`, `setup.py` 제거 및 `pyproject.toml` 단일 패키징 경로 확정
+- Week 10 실행 반영:
+  - 루트 `.coveragerc`, `.python-version` 제거로 dot-file 표면 축소
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
