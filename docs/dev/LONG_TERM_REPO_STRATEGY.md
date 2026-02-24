@@ -267,6 +267,8 @@ Delivery KPI:
   - `.githooks/pre-push`를 `scripts/devtools/hooks/pre-push`로 이관하고 설치 스크립트 기반으로 전환
 - Week 16 실행 반영:
   - `rr-lifecycle-close.yml` 추가로 머지 후 RR 이슈 자동 종료(Delivery Unit 수명주기 자동화)
+- Week 17 실행 반영:
+  - 작업 마감/재시작용 상태 스냅샷 문서 추가 (`docs/dev/REPO_HYGIENE_STATUS_2026-02-24.md`)
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
