@@ -1,6 +1,7 @@
 .github/workflows/README.md
 .github/workflows/deployment.yml
 .github/workflows/main-ci.yml
+.github/workflows/rr-lifecycle-close.yml
 .github/workflows/security-scan.yml
 .pre-commit-config.yaml
 LOCAL_CI_GUIDE.md
