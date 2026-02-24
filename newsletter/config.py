@@ -1,9 +1,10 @@
 import os
+from typing import Any
 
 from .config_manager import config_manager
 
 
-def _cfg(name, default=None):
+def _cfg(name: str, default: Any = None) -> Any:
     """Safely read lazy ConfigManager attributes during partial initialization."""
     try:
         return getattr(config_manager, name)
@@ -40,7 +41,7 @@ ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2
 
 
 # 경고 메시지 출력 (ConfigManager에서 처리하므로 간소화)
-def log_message(level, message):
+def log_message(level: str, message: str) -> None:
     """로거가 없는 경우를 위한 fallback 함수"""
     try:
         from .utils.logger import get_logger
