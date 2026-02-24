@@ -243,6 +243,10 @@ Delivery KPI:
 - Week 5 실행 반영:
   - main CI의 repo hygiene gate 기본 모드를 `REPO_HYGIENE_STRICT=true`로 승격
   - hard gate 운영 기준을 정책/CI 가이드 문서에 동기화
+- Week 6 실행 반영:
+  - 루트 `env.example` 제거, `.env.example` 단일 정본으로 통합
+- Week 7 실행 반영:
+  - 루트 `config.example.yml`을 `config/config.example.yml`로 이관
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
