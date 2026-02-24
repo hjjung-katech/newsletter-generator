@@ -84,3 +84,4 @@
 - 기본 커밋 수는 PR당 2~6개를 권장/강제합니다 (예외 라벨: `docs-only`, `trivial`, `hotfix`).
 - 기본 머지 전략은 squash merge이며, 증빙 없는 예외 머지는 금지합니다.
 - CI에서 `.github/workflows/pr-policy-check.yml`로 브랜치/PR 템플릿 + 커밋 메시지 규칙을 검증합니다.
+- 머지 완료 후 `.github/workflows/rr-lifecycle-close.yml`가 PR 본문의 `RR: #<n>`을 기준으로 RR 이슈를 자동 종료합니다.

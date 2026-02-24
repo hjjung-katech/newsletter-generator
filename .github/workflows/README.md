@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-이 디렉터리의 canonical 워크플로우는 아래 6개입니다.
+이 디렉터리의 canonical 워크플로우는 아래 7개입니다.
 
 ## Active Workflows (Canonical)
 
@@ -29,9 +29,13 @@
 - 목적: PR 브랜치명/템플릿/커밋 메시지 정책 검증
 - 트리거: `pull_request` (`opened`, `edited`, `synchronize`, `reopened`)
 
+7. `rr-lifecycle-close.yml`
+- 목적: 머지된 PR 본문의 `RR: #<n>`를 기준으로 RR 이슈 자동 종료
+- 트리거: `pull_request` (`closed`, merged only)
+
 ## Policy
 
-- 위 6개만 운영 워크플로우로 유지합니다.
+- 위 7개만 운영 워크플로우로 유지합니다.
 - 중복/레거시 워크플로우 파일은 저장소에 두지 않습니다.
 - 변경 시 이 문서와 실제 파일 목록을 항상 1:1로 맞춥니다.
 
@@ -50,3 +54,4 @@ ls .github/workflows
 - `docs-quality.yml`
 - `ops-safety-monitor.yml`
 - `pr-policy-check.yml`
+- `rr-lifecycle-close.yml`

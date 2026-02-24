@@ -1,0 +1,83 @@
+name: RR Lifecycle Close
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+jobs:
+  close-linked-rr:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close linked RR issue from PR body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const body = pr.body || "";
+            const rrMatch = body.match(/RR\s*:\s*#(\d+)/i);
+
+            if (!rrMatch) {
+              core.info("No `RR: #<number>` reference found in PR body. Skipping.");
+              return;
+            }
+
+            const rrNumber = Number(rrMatch[1]);
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            let issue;
+            try {
+              const resp = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: rrNumber,
+              });
+              issue = resp.data;
+            } catch (error) {
+              core.warning(`Unable to fetch RR issue #${rrNumber}: ${error.message}`);
+              return;
+            }
+
+            if (issue.pull_request) {
+              core.warning(`Referenced RR #${rrNumber} is a pull request, not an issue. Skipping.`);
+              return;
+            }
+
+            const labels = (issue.labels || []).map((label) => {
+              if (typeof label === "string") return label;
+              return label.name || "";
+            });
+
+            if (!labels.includes("review-request")) {
+              core.warning(
+                `Referenced issue #${rrNumber} is not labeled 'review-request'. Skipping close.`
+              );
+              return;
+            }
+
+            if (issue.state === "closed") {
+              core.info(`RR #${rrNumber} is already closed.`);
+              return;
+            }
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: rrNumber,
+              body: `Closed automatically by merged PR #${pr.number}.`,
+            });
+
+            await github.rest.issues.update({
+              owner,
+              repo,
+              issue_number: rrNumber,
+              state: "closed",
+            });
+
+            core.info(`RR #${rrNumber} closed by PR #${pr.number}.`);

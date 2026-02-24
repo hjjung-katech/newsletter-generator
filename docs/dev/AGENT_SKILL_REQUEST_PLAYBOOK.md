@@ -28,6 +28,7 @@
 - 사람 기여자까지 동일 정책을 적용하기 위해 CI 정책 체크를 함께 사용합니다.
 - CI 강제 체크: `.github/workflows/pr-policy-check.yml`
 - Delivery Unit 검증 스크립트: `scripts/ci/validate_delivery_unit.py`
+- 머지 후 RR 자동 종료: `.github/workflows/rr-lifecycle-close.yml` (`RR: #<n>` 파싱)
 
 ## 표준 템플릿 위치
 
