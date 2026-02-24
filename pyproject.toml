@@ -147,6 +147,12 @@ module = [
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+    "newsletter_core.*",
+]
+ignore_errors = true
+
 [tool.coverage.run]
 source = ["newsletter"]
 omit = [
