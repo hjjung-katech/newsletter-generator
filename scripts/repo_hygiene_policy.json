@@ -3,13 +3,11 @@
   "policy_name": "repo-hygiene-week1-baseline",
   "root_policy": {
     "allowed_file_names": [
-      ".coveragerc",
       ".dockerignore",
       ".env.example",
       ".gitignore",
       ".gitmessage.txt",
       ".pre-commit-config.yaml",
-      ".python-version",
       ".secrets.baseline",
       "AGENTS.md",
       "CHANGELOG.md",
