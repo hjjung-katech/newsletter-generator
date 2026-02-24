@@ -132,6 +132,24 @@ jobs:
           python scripts/architecture/check_import_boundaries.py --mode ratchet
           python scripts/architecture/check_import_cycles.py
 
+      - name: Guard legacy web_types paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v rg >/dev/null 2>&1; then
+            FORBIDDEN_REFS="$(rg -n 'web/web_types\.py|web\.web_types' web scripts tests \
+              --glob '!web/runtime_hook.py' || true)"
+          else
+            FORBIDDEN_REFS="$(grep -RInE 'web/web_types\.py|web\.web_types' web scripts tests \
+              --exclude='runtime_hook.py' || true)"
+          fi
+          if [ -n "$FORBIDDEN_REFS" ]; then
+            echo "Legacy web_types references are not allowed outside runtime compatibility alias:"
+            echo "$FORBIDDEN_REFS"
+            exit 1
+          fi
+          echo "No legacy web_types references detected."
+
       - name: Repo hygiene audit (gate)
         shell: bash
         run: |
@@ -446,10 +464,11 @@ jobs:
   # Stage 6: Build Check
   # ========================================
   build-check:
-    name: Build Check
+    name: Build Check (${{ matrix.os }})
     needs: [mock-api-tests]
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
 
@@ -463,10 +482,45 @@ jobs:
           cache: 'pip'
 
       - name: Install dependencies
+        shell: bash
         run: |
+          set -euo pipefail
+          # Retry is allowed only for transient network failures.
+          retry_pip_install() {
+            local attempt=1
+            local max_attempts=3
+            local wait_seconds=5
+            local log_file
+            log_file="$(mktemp)"
+            while true; do
+              if python -m pip install "$@" 2>"$log_file"; then
+                rm -f "$log_file"
+                return 0
+              fi
+
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                cat "$log_file"
+                rm -f "$log_file"
+                return 1
+              fi
+
+              if grep -Eiq "ReadTimeout|timed out|Connection broken|Temporary failure|Could not fetch URL|Connection reset|503 Service Unavailable|Name or service not known" "$log_file"; then
+                echo "Transient network failure detected. Retrying pip install ($attempt/$max_attempts)..."
+                attempt=$((attempt + 1))
+                sleep "$wait_seconds"
+                wait_seconds=$((wait_seconds * 2))
+                continue
+              fi
+
+              cat "$log_file"
+              rm -f "$log_file"
+              return 1
+            done
+          }
+
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller build
+          retry_pip_install -r requirements.txt
+          retry_pip_install pyinstaller build requests
 
       - name: Test package build
         run: |
@@ -476,10 +530,78 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           python scripts/devtools/build_web_exe_enhanced.py
-        continue-on-error: true
+
+      - name: Sign Windows artifact (OV pilot)
+        id: sign-windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          WINDOWS_OV_CERT_SHA1: ${{ secrets.WINDOWS_OV_CERT_SHA1 || '' }}
+          WINDOWS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+        run: |
+          $required = "$env:WINDOWS_SIGNING_REQUIRED" -eq "true"
+          ./scripts/devtools/sign_windows_exe.ps1 -ExePath "dist\newsletter_web.exe" -CertSha1 "$env:WINDOWS_OV_CERT_SHA1" -RequireSignature:$required
+          if ($required -or -not [string]::IsNullOrWhiteSpace("$env:WINDOWS_OV_CERT_SHA1")) {
+            "signing_status=signed" >> $env:GITHUB_OUTPUT
+          } else {
+            "signing_status=unsigned" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Windows EXE health smoke
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          ./scripts/devtools/windows_exe_smoke.ps1 -ExePath "dist\newsletter_web.exe" -BaseUrl "http://127.0.0.1:58080" -TimeoutSeconds 120
+
+      - name: Generate Windows release metadata
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          python scripts/devtools/generate_windows_release_artifacts.py \
+            --artifact dist/newsletter_web.exe \
+            --output-dir dist \
+            --smoke-result pass \
+            --signing-status "${{ steps.sign-windows.outputs.signing_status }}" \
+            --target-os windows-x64
+
+      - name: Verify Windows artifact checksum
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          python scripts/devtools/verify_windows_artifact_checksum.py \
+            --artifact dist/newsletter_web.exe \
+            --checksum-file dist/SHA256SUMS.txt
+
+      - name: Build Windows support bundle
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          python scripts/devtools/create_support_bundle.py \
+            --artifact dist/newsletter_web.exe \
+            --dist-dir dist \
+            --output dist/support-bundle.zip
+
+      - name: Validate Windows release artifacts
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/heads/release/* ]]; then
+            python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist --require-signing
+          else
+            python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist
+          fi
+
+      - name: Generate Windows update manifest
+        if: matrix.os == 'windows-latest' && vars.WINDOWS_UPDATE_BASE_URL != ''
+        shell: bash
+        run: |
+          python scripts/devtools/generate_windows_update_manifest.py \
+            --metadata dist/release-metadata.json \
+            --output dist/update-manifest.json \
+            --base-url "${{ vars.WINDOWS_UPDATE_BASE_URL }}"
 
       - name: Upload build artifacts
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && always()
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts-${{ matrix.os }}
@@ -487,3 +609,4 @@ jobs:
             dist/
             *.exe
             *.spec
+          if-no-files-found: warn

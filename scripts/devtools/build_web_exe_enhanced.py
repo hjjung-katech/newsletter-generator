@@ -27,11 +27,13 @@ def build():
 
     # PyInstaller 인수 구성
     args = [
-        os.path.join("web", "app.py"),
+        os.path.join("scripts", "devtools", "web_exe_entrypoint.py"),
         "--onefile",
         "--name",
         "newsletter_web",
         "--console",  # 디버깅을 위해 콘솔 창 표시
+        "--paths",
+        ".",
         # Use PyInstaller hooks directory
         "--additional-hooks-dir",
         os.path.join("scripts", "devtools", "pyinstaller_hooks"),
@@ -51,9 +53,9 @@ def build():
         "dist",  # 출력 디렉토리
         "--workpath",
         "build",  # 작업 디렉토리
-        # 메모리 및 성능 최적화
+        # Keep function docstrings for runtime tool introspection (LangChain @tool).
         "--optimize",
-        "2",  # Python 최적화 레벨
+        "1",  # Avoid -OO behavior that strips docstrings
         # Debug options (controlled by PYI_DEBUG environment variable)
         # Note: --debug imports can cause excessive console output during runtime
         # UPX 압축 비활성화 (안정성을 위해)

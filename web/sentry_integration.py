@@ -54,7 +54,7 @@ def _init_sentry(
         from sentry_sdk.integrations.flask import FlaskIntegration
         from sentry_sdk.integrations.logging import LoggingIntegration
     except ImportError:
-        print("⚠️  Sentry SDK not installed, skipping Sentry integration")
+        print("[WARN] Sentry SDK not installed, skipping Sentry integration")
         return callbacks
 
     try:
@@ -80,7 +80,7 @@ def _init_sentry(
         print(success_label)
         return _build_callbacks(sentry_sdk)
     except Exception as exc:
-        print(f"⚠️  Sentry initialization failed: {exc}")
+        print(f"[WARN] Sentry initialization failed: {exc}")
         return callbacks
 
 
@@ -101,19 +101,19 @@ def setup_sentry() -> SentryCallbacks:
                 environment=settings.environment,
                 release=settings.app_version,
                 profiles_sample_rate=settings.sentry_profiles_sample_rate,
-                success_label="✅ Sentry initialized successfully",
+                success_label="[OK] Sentry initialized successfully",
             )
 
-        print("ℹ️  Sentry DSN not configured, skipping Sentry integration")
+        print("[INFO] Sentry DSN not configured, skipping Sentry integration")
         return callbacks
     except Exception as exc:
         print(
-            f"⚠️  Centralized settings unavailable, checking legacy SENTRY_DSN: {exc}"
+            f"[WARN] Centralized settings unavailable, checking legacy SENTRY_DSN: {exc}"
         )
 
     legacy_dsn = os.getenv("SENTRY_DSN")
     if not legacy_dsn:
-        print("ℹ️  Legacy SENTRY_DSN not configured, skipping Sentry integration")
+        print("[INFO] Legacy SENTRY_DSN not configured, skipping Sentry integration")
         return callbacks
 
     return _init_sentry(
@@ -122,5 +122,5 @@ def setup_sentry() -> SentryCallbacks:
         environment=os.getenv("ENVIRONMENT", "production"),
         release=os.getenv("APP_VERSION", "1.0.0"),
         profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
-        success_label="✅ Sentry initialized successfully (legacy mode)",
+        success_label="[OK] Sentry initialized successfully (legacy mode)",
     )

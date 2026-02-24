@@ -31,9 +31,9 @@ try:
     from .utils.file_naming import save_debug_file
 
     debug_file_path = save_debug_file(HTML_TEMPLATE, "template_debug", "txt")
-    logger.info(f"HTML 템플릿 디버그 파일 저장됨: {debug_file_path}")
+    logger.info(f"HTML template debug file saved: {debug_file_path}")
 except Exception as e:
-    logger.error(f"디버그 파일 작성 중 오류: {e}")
+    logger.error(f"Error writing debug file: {e}")
 
 
 CATEGORIZATION_PROMPT = """

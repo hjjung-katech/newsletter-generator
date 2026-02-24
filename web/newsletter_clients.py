@@ -45,9 +45,19 @@ class RealNewsletterCLI:
 
         module_path = next((p for p in module_candidates if os.path.exists(p)), None)
         if not module_path:
-            raise Exception(f"Newsletter module not found in {self.project_root}")
+            if getattr(sys, "frozen", False):
+                logging.warning(
+                    "Newsletter module path not found on disk in frozen mode; "
+                    "continuing with import-based resolution"
+                )
+                module_path = self.project_root
+            else:
+                raise Exception(f"Newsletter module not found in {self.project_root}")
 
-        self.module_root = os.path.dirname(module_path)
+        if os.path.basename(module_path) == "newsletter":
+            self.module_root = os.path.dirname(module_path)
+        else:
+            self.module_root = module_path
 
         # .env 파일 확인
         env_candidates = [
@@ -58,13 +68,15 @@ class RealNewsletterCLI:
             (p for p in env_candidates if os.path.exists(p)), env_candidates[0]
         )
         if not os.path.exists(env_file):
-            print(f"⚠️  Warning: .env file not found at {env_file}")
-            print("⚠️  This may cause longer processing times or fallback to mock mode")
+            print(f"[WARN] .env file not found at {env_file}")
+            print(
+                "[WARN] This may cause longer processing times or fallback to mock mode"
+            )
 
         # API 키 확인
         api_keys_status = self._check_api_keys()
 
-        print("✅ Environment check passed")
+        print("[OK] Environment check passed")
         print(f"   Project root: {self.project_root}")
         print(f"   Runtime work dir: {self.runtime_work_dir}")
         print(f"   Newsletter module exists: {os.path.exists(module_path)}")
@@ -84,12 +96,12 @@ class RealNewsletterCLI:
 
         for key, description in required_keys.items():
             if os.getenv(key):
-                configured.append(f"{description} ✅")
+                configured.append(description)
             else:
-                missing.append(f"{description} ❌")
+                missing.append(description)
 
         if missing:
-            print(f"⚠️  Missing API keys: {', '.join(missing)}")
+            print(f"[WARN] Missing API keys: {', '.join(missing)}")
             print("   This may cause slower performance or feature limitations")
 
         return f"{len(configured)}/{len(required_keys)} configured"
@@ -436,14 +448,14 @@ def create_newsletter_cli():
     """Create real CLI adapter, falling back to mock adapter on failure."""
     try:
         cli = RealNewsletterCLI()
-        print("✅ Using RealNewsletterCLI for actual newsletter generation")
+        print("[OK] Using RealNewsletterCLI for actual newsletter generation")
         print(f"   Project root: {cli.project_root}")
         print(f"   Timeout: {cli.timeout} seconds")
         return cli
     except Exception as e:
-        print(f"❌ Failed to initialize RealNewsletterCLI: {e}")
+        print(f"[ERROR] Failed to initialize RealNewsletterCLI: {e}")
         import traceback
 
         traceback.print_exc()
-        print("⚠️  Falling back to MockNewsletterCLI")
+        print("[WARN] Falling back to MockNewsletterCLI")
         return MockNewsletterCLI()

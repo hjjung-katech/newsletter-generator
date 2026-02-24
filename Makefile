@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict ops-safety-check ops-safety-smoke ops-safety-report
+.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -100,6 +100,42 @@ test: ## 단위 테스트 실행
 preflight-release: ## 릴리즈 사전 점검 (기준선/필수 파일/도구)
 	@echo "🛫 Release preflight 실행 중..."
 	$(PYTHON) scripts/release_preflight.py
+
+build-web-exe: ## Windows EXE canonical build entrypoint
+	@echo "🪟 Windows EXE 빌드 실행 중..."
+	$(PYTHON) scripts/devtools/build_web_exe_enhanced.py
+
+windows-release-artifacts: ## Generate release metadata + SHA256 for Windows artifact
+	@echo "📦 Windows 릴리즈 메타데이터/체크섬 생성 중..."
+	$(PYTHON) scripts/devtools/generate_windows_release_artifacts.py --artifact dist/newsletter_web.exe --output-dir dist --target-os windows-x64
+
+verify-windows-artifact-checksum: ## Verify SHA256 for dist/newsletter_web.exe
+	@echo "🔐 Windows 아티팩트 체크섬 검증 중..."
+	$(PYTHON) scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --checksum-file dist/SHA256SUMS.txt
+
+support-bundle: ## Create sanitized support bundle for customer troubleshooting
+	@echo "🧰 지원용 진단 번들 생성 중..."
+	$(PYTHON) scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --output dist/support-bundle.zip
+
+windows-sign-exe: ## Sign Windows exe using OV certificate thumbprint
+	@echo "✍️ Windows EXE 코드서명 실행 중..."
+	pwsh ./scripts/devtools/sign_windows_exe.ps1 -ExePath "dist\\newsletter_web.exe" -CertSha1 "$(WINDOWS_OV_CERT_SHA1)" $(if $(REQUIRE_SIGNATURE),-RequireSignature,)
+
+validate-windows-release-artifacts: ## Validate release metadata/checksum/support bundle package
+	@echo "🧪 Windows 릴리즈 아티팩트 검증 중..."
+	$(PYTHON) scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist $(if $(REQUIRE_SIGNING),--require-signing,)
+
+windows-update-manifest: ## Generate update-manifest.json (WINDOWS_UPDATE_BASE_URL required)
+	@echo "🔄 업데이트 매니페스트 생성 중..."
+	@if [ -z "$(WINDOWS_UPDATE_BASE_URL)" ]; then \
+		echo "❌ WINDOWS_UPDATE_BASE_URL 환경변수가 필요합니다."; \
+		exit 1; \
+	fi
+	$(PYTHON) scripts/devtools/generate_windows_update_manifest.py --metadata dist/release-metadata.json --output dist/update-manifest.json --base-url "$(WINDOWS_UPDATE_BASE_URL)"
+
+windows-ci-burnin-report: ## Measure latest Windows CI burn-in success rate
+	@echo "📈 Windows CI burn-in 리포트 생성 중..."
+	$(PYTHON) scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95 --output artifacts/windows-ci-burnin.json
 
 test-quick: preflight-release ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
 	@echo "⚡ Quick 게이트 실행 중..."
