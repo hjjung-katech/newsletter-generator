@@ -31,6 +31,7 @@
 - 개발자
   - `dev/DEVELOPMENT_GUIDE.md`
   - `dev/CI_CD_GUIDE.md`
+  - `dev/LOCAL_CI_GUIDE.md`
   - `dev/LONG_TERM_REPO_STRATEGY.md`
   - `dev/REPO_HYGIENE_POLICY.md`
   - `dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`
