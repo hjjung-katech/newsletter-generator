@@ -20,10 +20,10 @@ def build():
     debug_enabled = os.getenv("PYI_DEBUG", "").lower() in ["true", "1", "yes"]
 
     # Note: Data files are now managed by PyInstaller hooks
-    # See pyinstaller_hooks/hook-newsletter.py for all data file configurations
+    # See scripts/devtools/pyinstaller_hooks/hook-newsletter.py for configurations
 
     # Note: Hidden imports are now managed by PyInstaller hooks
-    # See pyinstaller_hooks/hook-newsletter.py for all hidden import configurations
+    # See scripts/devtools/pyinstaller_hooks/hook-newsletter.py for imports
 
     # PyInstaller 인수 구성
     args = [
@@ -34,7 +34,7 @@ def build():
         "--console",  # 디버깅을 위해 콘솔 창 표시
         # Use PyInstaller hooks directory
         "--additional-hooks-dir",
-        "pyinstaller_hooks",
+        os.path.join("scripts", "devtools", "pyinstaller_hooks"),
         # Runtime hooks
         "--runtime-hook",
         "web/runtime_hook.py",
@@ -73,7 +73,7 @@ def build():
     args.extend(additional_args)
 
     print("[INFO] Starting PyInstaller build with hooks...")
-    print("[INFO] Using hooks directory: pyinstaller_hooks/")
+    print("[INFO] Using hooks directory: scripts/devtools/pyinstaller_hooks/")
     print(f"[INFO] Build arguments: {len(args)} total")
 
     # 빌드 실행
