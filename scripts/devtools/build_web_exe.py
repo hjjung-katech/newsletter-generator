@@ -87,13 +87,18 @@ def copy_external_files_to_dist():
     """빌드 후 필요한 외부 파일들을 dist 디렉토리에 복사합니다."""
     project_root = str(Path(__file__).resolve().parents[2])
     dist_dir = os.path.join(project_root, "dist")
+    config_source = (
+        "config/config.yml"
+        if os.path.exists(os.path.join(project_root, "config", "config.yml"))
+        else "config.yml"
+    )
 
     # 복사할 파일 및 디렉토리 목록
     files_to_copy = [
         # 환경 설정 파일들
         (".env", ".env"),  # (소스, 대상)
         (".env.example", ".env.example"),
-        ("config.yml", "config.yml"),
+        (config_source, "config.yml"),
         # config 디렉토리 전체
         ("config", "config"),
         # 템플릿 파일들 (외부 수정 가능하도록)

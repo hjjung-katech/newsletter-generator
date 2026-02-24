@@ -95,6 +95,11 @@ def copy_external_files_to_dist():
     """
     project_root = str(Path(__file__).resolve().parents[2])
     dist_dir = os.path.join(project_root, "dist")
+    config_source = (
+        "config/config.yml"
+        if os.path.exists(os.path.join(project_root, "config", "config.yml"))
+        else "config.yml"
+    )
 
     print("[INFO] Setting up deployment environment with full compatibility...")
 
@@ -108,7 +113,7 @@ def copy_external_files_to_dist():
         # Environment and configuration files
         (".env.example", ".env.example"),
         (".env", ".env"),  # Copy actual .env file if exists
-        ("config.yml", "config.yml"),
+        (config_source, "config.yml"),
         # CLI compatibility - templates and configs (essential for CLI mode)
         ("templates", "templates"),  # Newsletter templates (CLI 호환성)
         ("config", "config"),  # Config directory (CLI 호환성)
