@@ -15,7 +15,7 @@
 - 실행/빌드/유틸 스크립트가 루트에 산재되어 있습니다.
   - 예: `build_web_exe.py`, `fix_env_setup.py`, `cleanup_debug_files.py`, `run_tests.py`
 - 루트 문서와 `docs/` 문서의 역할이 일부 중복되어 진입점이 분산됩니다.
-- 숨김 폴더(`.vscode`, `.agents`, `.release`, `.githooks`) 중 일부는 유지 가치가 있으나, 유지 근거가 기여자 관점에서 충분히 드러나지 않습니다.
+- 숨김 폴더(`.agents`, `.release`, `.githooks`) 중 일부는 유지 가치가 있으나, 유지 근거가 기여자 관점에서 충분히 드러나지 않습니다.
 - `docs/PROJECT_STRUCTURE.md` 일부 서술과 현재 체감 상태 간 괴리가 있어 구조 문서의 신뢰도가 떨어질 수 있습니다.
 
 ### 이미 잘 되어 있는 기반
@@ -132,9 +132,11 @@
 - `.release/` (manifest 검증 체계)
 
 조건부 유지 (팀 규칙 필요):
-- `.vscode/` (팀 공통 task/settings만 추적)
 - `.githooks/` (hook bootstrap 실제 사용 시)
 - `.agents/` (에이전트 운영에 실질 사용 시)
+
+local-only(추적 제외):
+- `.vscode/` (개인 IDE 설정은 ignore 기본)
 
 기본 ignore/제거 대상:
 - 개인 로컬 캐시/툴 상태 디렉터리
@@ -186,7 +188,7 @@ Delivery KPI:
 1. `scripts/repo_audit.py` 추가 및 CI artifact 생성
 2. `docs/dev/` 구조 정책 SSOT 문서 확정
 3. 루트 파일 분류표 작성 (유지/이관/삭제/ignore)
-4. `.vscode`, `.agents`, `.githooks` 추적 범위 팀 합의
+4. `.agents`, `.githooks` 추적 범위 팀 합의 + `.vscode` local-only 정책 고정
 
 ### Week 2
 
@@ -259,6 +261,8 @@ Delivery KPI:
   - `packages/newsletter_core/src/newsletter_core`를 `newsletter_core/`로 평탄화
 - Week 13 실행 반영:
   - `output/`, `debug_files/`를 local-only 생성 디렉터리로 전환(`.gitkeep` 추적 제거)
+- Week 14 실행 반영:
+  - `.vscode/`를 local-only(추적 제외)로 전환
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
