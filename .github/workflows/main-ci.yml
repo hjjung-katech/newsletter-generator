@@ -7,6 +7,7 @@ on:
     branches: [main, develop]
 
 permissions:
+  actions: read
   contents: read
   checks: write
   pull-requests: write
@@ -618,3 +619,38 @@ jobs:
             *.exe
             *.spec
           if-no-files-found: warn
+
+  # ========================================
+  # Stage 7: Main Branch Burn-in Gate
+  # ========================================
+  windows-burnin-gate:
+    name: Windows Burn-in Gate (main)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Evaluate Windows CI burn-in success rate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/devtools/windows_ci_burnin_report.py \
+            --workflow "Main CI Pipeline" \
+            --branch main \
+            --limit 10 \
+            --min-success-rate 95 \
+            --output artifacts/windows-ci-burnin.json
+
+      - name: Upload windows burn-in artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ci-burnin-${{ github.run_id }}
+          path: artifacts/windows-ci-burnin.json
+          if-no-files-found: error
