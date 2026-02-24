@@ -70,7 +70,7 @@ git restore --source=work -- \
   run_ci_checks.py \
   scripts/devtools/check_quality.py \
   Makefile \
-  LOCAL_CI_GUIDE.md
+  docs/dev/LOCAL_CI_GUIDE.md
 
 # 범위 검증 (manifest 외 파일 유입 방지)
 make validate-ci-manifest

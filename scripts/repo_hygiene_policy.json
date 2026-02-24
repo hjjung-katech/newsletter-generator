@@ -16,7 +16,6 @@
       "CODEOWNERS",
       "Dockerfile",
       "LICENSE",
-      "LOCAL_CI_GUIDE.md",
       "Makefile",
       "README.md",
       "config.yml",
