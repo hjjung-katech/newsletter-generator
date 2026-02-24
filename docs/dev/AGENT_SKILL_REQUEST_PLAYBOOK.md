@@ -10,21 +10,24 @@
 
 ## 기본 실행 계약
 
-아래 7가지는 기본 요구사항으로 요청에 포함합니다.
+아래 9가지는 기본 요구사항으로 요청에 포함합니다.
 
 1. RR(Review Request) 먼저 작성: `.github/ISSUE_TEMPLATE/review-request.yml`
-2. 브랜치: `<type>/<scope>-<topic>` (예: `codex/workflow-template-standard`)
-3. 커밋: `.gitmessage.txt` 템플릿 기반으로 의미 단위 분리
-4. 로컬 게이트: `make check`, `make check-full`, 필요 시 `make repo-audit`
-5. PR: `.github/pull_request_template.md` 6개 섹션 필수 기입
-6. CI: GitHub Actions 결과 확인 후 상태 보고
-7. 실패 처리: 원인 분류 후 수정 커밋 추가, force-push 지양
+2. RR에는 `Delivery Unit ID`를 필수 기입하고, RR당 PR은 1개만 연동
+3. 브랜치: `<type>/<scope>-<topic>` (예: `codex/workflow-template-standard`)
+4. 커밋: `.gitmessage.txt` 템플릿 기반으로 의미 단위 분리
+5. 커밋 수: 기본 2~6개(예외 라벨: `docs-only`, `trivial`, `hotfix`)
+6. 로컬 게이트: `make check`, `make check-full`, 필요 시 `make repo-audit`
+7. PR: `.github/pull_request_template.md`에 `## Delivery Unit` 섹션 포함 필수
+8. CI: GitHub Actions 결과 확인 후 상태 보고
+9. 실패 처리: 원인 분류 후 수정 커밋 추가, force-push 지양
 
 ## 자동 적용/강제 원칙
 
 - Codex/Agent는 저장소 루트 `AGENTS.md` 지시를 우선 준수합니다.
 - 사람 기여자까지 동일 정책을 적용하기 위해 CI 정책 체크를 함께 사용합니다.
 - CI 강제 체크: `.github/workflows/pr-policy-check.yml`
+- Delivery Unit 검증 스크립트: `scripts/ci/validate_delivery_unit.py`
 
 ## 표준 템플릿 위치
 
@@ -32,6 +35,7 @@
 - 커밋 템플릿: `.gitmessage.txt`
 - PR 템플릿: `.github/pull_request_template.md`
 - 종합 문서: `docs/dev/WORKFLOW_TEMPLATES.md`
+- Delivery Unit check: `scripts/ci/validate_delivery_unit.py`
 
 로컬 커밋 템플릿 1회 설정:
 

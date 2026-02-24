@@ -31,6 +31,7 @@
 
 ## Delivery Unit
 - Branch: <type>/<scope>-<topic>
+- Delivery Unit ID: DU-YYYYMMDD-<topic>
 - Expected PR size: <= 300 LOC, <= 8 files
 ```
 
@@ -49,6 +50,8 @@
 
 - 기본 패턴: `<type>(<scope>): <summary>`
 - summary는 72자 이내, 명령형, why 중심.
+- 기본 커밋 수: PR당 2~6개
+- 예외 라벨: `docs-only`, `trivial`, `hotfix`
 
 예시:
 - `docs(workflow): add RR/branch/commit/PR standard templates`
@@ -61,14 +64,15 @@
 
 ## 4) PR 템플릿 운영 규칙
 
-PR 본문은 아래 6개 섹션을 고정합니다.
+PR 본문은 아래 7개 섹션을 고정합니다.
 
 1. Summary (what/why)
 2. Scope (in/out)
-3. Test & Evidence (명령어 + 결과)
-4. Risk & Rollback
-5. Ops-Safety Addendum (해당 시)
-6. Not Run (미실행 항목 + 사유)
+3. Delivery Unit (`RR: #<n>`, `Delivery Unit ID`, Merge/Rollback Boundary)
+4. Test & Evidence (명령어 + 결과)
+5. Risk & Rollback
+6. Ops-Safety Addendum (해당 시)
+7. Not Run (미실행 항목 + 사유)
 
 ## 5) 머지 정책(권장 기본값)
 
@@ -108,6 +112,7 @@ git config commit.template .gitmessage.txt
   - 브랜치명 패턴 검사
   - PR 본문 필수 섹션 존재 검사
   - 커밋 메시지 패턴 검사
+  - Delivery Unit 정책 검사(`scripts/ci/validate_delivery_unit.py`)
 - 추가 권장(GitHub 설정):
   - Branch protection에서 `PR Policy Check`를 required check로 지정
   - Squash merge만 허용

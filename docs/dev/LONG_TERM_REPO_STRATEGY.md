@@ -247,6 +247,8 @@ Delivery KPI:
   - 루트 `env.example` 제거, `.env.example` 단일 정본으로 통합
 - Week 7 실행 반영:
   - 루트 `config.example.yml`을 `config/config.example.yml`로 이관
+- Week 8 실행 반영:
+  - RR/Delivery Unit/Commit 범위(2~6) 거버넌스를 `pr-policy-check`에서 자동 검증
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 

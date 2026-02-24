@@ -5,10 +5,16 @@
 
 ## Scope
 ### In Scope
--
+- <item>
 
 ### Out of Scope
--
+- <item>
+
+## Delivery Unit
+- RR: #<issue-number>
+- Delivery Unit ID: DU-YYYYMMDD-<topic>
+- Merge Boundary:
+- Rollback Boundary:
 
 ## Test & Evidence
 - [ ] `make check`
