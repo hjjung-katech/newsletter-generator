@@ -64,8 +64,21 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=10)
     parser.add_argument("--scan-limit", type=int, default=60)
     parser.add_argument("--min-success-rate", type=float, default=95.0)
+    parser.add_argument(
+        "--ignore-conclusions",
+        default="cancelled,skipped,neutral,unknown",
+        help=(
+            "Comma-separated window-job conclusions to exclude from burn-in "
+            "sample collection (default: cancelled,skipped,neutral,unknown)."
+        ),
+    )
     parser.add_argument("--output", default="")
     args = parser.parse_args()
+    ignored_conclusions = {
+        item.strip().lower()
+        for item in args.ignore_conclusions.split(",")
+        if item.strip()
+    }
 
     runs = _gh_json(
         [
@@ -83,6 +96,7 @@ def main() -> int:
     )
 
     candidate_results: list[RunResult] = []
+    ignored_runs = 0
     for run in runs:
         run_id = int(run["databaseId"])
         detail = _gh_json(
@@ -98,7 +112,11 @@ def main() -> int:
         windows_job, windows_conclusion = _resolve_windows_job(jobs)
         if windows_job == "missing":
             continue
-        passed = windows_conclusion == "success"
+        normalized_conclusion = windows_conclusion.lower()
+        if normalized_conclusion in ignored_conclusions:
+            ignored_runs += 1
+            continue
+        passed = normalized_conclusion == "success"
         candidate_results.append(
             RunResult(
                 run_id=run_id,
@@ -116,7 +134,7 @@ def main() -> int:
         raise SystemExit(
             "insufficient windows build-check history: "
             f"requested={args.limit}, found={len(candidate_results)} "
-            f"(scan_limit={args.scan_limit})"
+            f"(scan_limit={args.scan_limit}, ignored={ignored_runs})"
         )
 
     results = candidate_results
@@ -127,6 +145,8 @@ def main() -> int:
         "workflow": args.workflow,
         "branch": args.branch,
         "scan_limit": args.scan_limit,
+        "ignored_conclusions": sorted(ignored_conclusions),
+        "ignored_runs": ignored_runs,
         "sample_size": len(results),
         "minimum_success_rate": args.min_success_rate,
         "success_rate": success_rate,

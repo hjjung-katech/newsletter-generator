@@ -70,8 +70,9 @@ python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.
   - `Build Check (windows-latest)`
 - burn-in 기준:
   - 최근 10회 `Build Check (windows-latest)` 성공률 95% 이상
+  - `cancelled/skipped/neutral/unknown` 결론은 burn-in 샘플에서 제외(중복 런 취소/진행중 런 노이즈 제거)
 - 측정 명령:
 
 ```bash
-python scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95
+python scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95 --ignore-conclusions cancelled,skipped,neutral,unknown
 ```
