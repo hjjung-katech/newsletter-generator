@@ -19,7 +19,6 @@
       "Makefile",
       "README.md",
       "config.yml",
-      "config.example.yml",
       "nixpacks.toml",
       "pyproject.toml",
       "railway.yml",

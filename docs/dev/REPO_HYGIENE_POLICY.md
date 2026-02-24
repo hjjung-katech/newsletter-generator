@@ -32,6 +32,7 @@
 | `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 개인/런타임 캐시 |
 | `output/`, `debug_files/` | 유지(가드 포함) | `.gitkeep`만 추적 + 생성물 ignore | 실행 중 생성 경로 필요 |
 | `.coveragerc`, `config.yml` | 유지 | 루트 allowlist | 런타임/테스트 기본 설정 경로 호환 |
+| `config.example.yml` | 이관 완료 | `config/config.example.yml` | 템플릿 파일 위치 정규화 + 루트 엔트리 축소 |
 | `TODOs.md` | 이관 완료 | `docs/dev/TODOs.md` | 루트 문서 혼잡도 완화 |
 | 정책 미정 루트 엔트리 | 검토 | 정책 PR에서 결정 | allowlist/denylist 합의 대상 |
 
