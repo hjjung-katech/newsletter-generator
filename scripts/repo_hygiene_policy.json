@@ -32,7 +32,6 @@
       ".githooks",
       ".github",
       ".release",
-      ".vscode",
       "apps",
       "config",
       "docs",
@@ -63,6 +62,7 @@
       ".mypy_cache",
       ".pytest_cache",
       ".venv",
+      ".vscode",
       "__pycache__",
       "artifacts",
       "coverage_html_report",
@@ -71,17 +71,6 @@
     ]
   },
   "dot_directory_policy": {
-    ".vscode": {
-      "mode": "conditional",
-      "purpose": "팀 공통 에디터 설정만 추적",
-      "allowed_tracked_file_globs": [
-        ".vscode/README.md",
-        ".vscode/extensions.json",
-        ".vscode/launch.json",
-        ".vscode/settings.json",
-        ".vscode/tasks.json"
-      ]
-    },
     ".agents": {
       "mode": "conditional",
       "purpose": "장기 에이전트 실행에 필요한 스킬 정의만 추적",
