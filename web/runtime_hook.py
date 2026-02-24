@@ -19,12 +19,12 @@ logging.basicConfig(
 logger = logging.getLogger("runtime_hook")
 
 
-def _setup_comprehensive_environment():
+def _setup_comprehensive_environment() -> None:
     """Comprehensive environment setup for PyInstaller binary."""
     try:
         # Binary compatibility module 로드
         if getattr(sys, "frozen", False):
-            base_path = sys._MEIPASS
+            base_path = str(getattr(sys, "_MEIPASS", ""))
 
             # binary_compatibility 모듈 경로 추가
             web_path = os.path.join(base_path, "web")
@@ -54,7 +54,7 @@ def _setup_comprehensive_environment():
         _fallback_basic_setup()
 
 
-def _fallback_basic_setup():
+def _fallback_basic_setup() -> None:
     """Fallback basic setup when comprehensive setup fails."""
     logger.info("Running fallback basic setup...")
     _setup_newsletter_module()
@@ -62,79 +62,67 @@ def _fallback_basic_setup():
     _setup_basic_paths()
 
 
-def _setup_web_types():
-    """Setup web_types module to avoid conflicts with Python's built-in types module."""
+def _setup_web_types() -> None:
+    """Load ``web.types`` and keep ``web.web_types`` as temporary compatibility alias."""
     try:
-        # PyInstaller 실행 파일에서 실행될 때의 경로 처리
+        import importlib.util
+        import types as py_types
+
         if getattr(sys, "frozen", False):
-            # PyInstaller로 빌드된 실행 파일에서 실행 중
-            base_path = sys._MEIPASS
+            base_path = str(getattr(sys, "_MEIPASS", ""))
         else:
-            # 일반 Python 스크립트로 실행 중
             base_path = os.path.dirname(os.path.abspath(__file__))
 
-        # web_types.py 파일 경로 찾기
-        web_types_path = os.path.join(base_path, "web", "web_types.py")
+        candidate_paths = [
+            os.path.join(base_path, "web", "types.py"),
+            os.path.join(base_path, "types.py"),
+        ]
+        types_path = next(
+            (path for path in candidate_paths if os.path.exists(path)), ""
+        )
 
-        if os.path.exists(web_types_path):
-            # web_types.py 파일이 존재하면 직접 임포트
-            import importlib.util
+        if not types_path:
+            logger.warning(
+                "types.py not found in expected locations: "
+                + ", ".join(candidate_paths)
+            )
+            return
 
-            spec = importlib.util.spec_from_file_location("web_types", web_types_path)
-            web_types = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(web_types)
+        spec = importlib.util.spec_from_file_location("web.types", types_path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"failed to create import spec for {types_path}")
 
-            # web 모듈 생성 및 web_types 할당
-            if "web" not in sys.modules:
-                import types
+        web_types_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(web_types_module)
 
-                web_module = types.ModuleType("web")
-                sys.modules["web"] = web_module
+        if "web" not in sys.modules:
+            web_module = py_types.ModuleType("web")
+            web_module.__path__ = [os.path.dirname(types_path)]
+            sys.modules["web"] = web_module
 
-            sys.modules["web"].web_types = web_types
-            sys.modules["web.web_types"] = web_types
+        web_module = sys.modules["web"]
+        setattr(web_module, "types", web_types_module)
+        setattr(web_module, "web_types", web_types_module)
 
-            logger.info(f"web_types module loaded successfully from {web_types_path}")
-        else:
-            # 파일이 없으면 현재 디렉토리에서 찾기
-            current_web_types = os.path.join(os.path.dirname(__file__), "web_types.py")
-            if os.path.exists(current_web_types):
-                import importlib.util
+        sys.modules["web.types"] = web_types_module
+        sys.modules["web.web_types"] = web_types_module
+        sys.modules["web_types"] = web_types_module
 
-                spec = importlib.util.spec_from_file_location(
-                    "web_types", current_web_types
-                )
-                web_types = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(web_types)
-
-                if "web" not in sys.modules:
-                    import types
-
-                    web_module = types.ModuleType("web")
-                    sys.modules["web"] = web_module
-
-                sys.modules["web"].web_types = web_types
-                sys.modules["web.web_types"] = web_types
-
-                logger.info(
-                    "web_types module loaded from current directory: "
-                    f"{current_web_types}"
-                )
-            else:
-                logger.warning(
-                    f"web_types.py not found in {web_types_path} or {current_web_types}"
-                )
+        logger.info(
+            f"web.types loaded from {types_path} "
+            "(legacy alias web.web_types enabled for compatibility)"
+        )
 
     except Exception as e:
-        logger.error(f"Error setting up web_types module: {e}")
+        logger.error(f"Error setting up web.types module: {e}")
 
 
-def _setup_newsletter_module():
+def _setup_newsletter_module() -> None:
     """Setup newsletter module path for PyInstaller."""
     try:
         if getattr(sys, "frozen", False):
             # PyInstaller 실행 파일에서 실행 중
-            base_path = sys._MEIPASS
+            base_path = str(getattr(sys, "_MEIPASS", ""))
             newsletter_path = os.path.join(base_path, "newsletter")
 
             if os.path.exists(newsletter_path):
@@ -149,11 +137,11 @@ def _setup_newsletter_module():
         logger.error(f"Error setting up newsletter module: {e}")
 
 
-def _setup_basic_paths():
+def _setup_basic_paths() -> None:
     """Setup basic paths for PyInstaller environment."""
     try:
         if getattr(sys, "frozen", False):
-            base_path = sys._MEIPASS
+            base_path = str(getattr(sys, "_MEIPASS", ""))
 
             # 중요한 경로들을 sys.path에 추가
             important_paths = [
@@ -172,7 +160,7 @@ def _setup_basic_paths():
         logger.error(f"Error setting up basic paths: {e}")
 
 
-def _setup_environment_variables():
+def _setup_environment_variables() -> None:
     """Setup environment variables for binary execution."""
     try:
         # Google Cloud 인증 비활성화 (binary에서 문제 발생 방지)
@@ -236,7 +224,7 @@ def _setup_environment_variables():
         logger.error(f"Error setting up environment variables: {e}")
 
 
-def _manual_env_parsing(env_file):
+def _manual_env_parsing(env_file: str) -> None:
     """Manual .env file parsing as fallback."""
     try:
         logger.debug(f"Manual parsing of .env file: {env_file}")
@@ -259,7 +247,7 @@ def _manual_env_parsing(env_file):
         logger.error(f"Manual .env parsing failed: {e}")
 
 
-def _setup_logging_early():
+def _setup_logging_early() -> None:
     """Early logging setup for runtime hook debugging."""
     try:
         # 기본 로깅 설정 (파일이 아직 준비되지 않았을 수 있으므로 콘솔만)
@@ -270,7 +258,7 @@ def _setup_logging_early():
         logger.error(f"Error setting up early logging: {e}")
 
 
-def _setup_graceful_shutdown():
+def _setup_graceful_shutdown() -> None:
     """Setup graceful shutdown system for exe environment."""
     try:
         # Only setup in PyInstaller environment
@@ -282,7 +270,7 @@ def _setup_graceful_shutdown():
             logger.info("Graceful shutdown manager initialized for exe environment")
 
             # Register runtime hook cleanup
-            def runtime_cleanup():
+            def runtime_cleanup() -> None:
                 logger.info("Runtime hook cleanup called")
 
             from newsletter_core.public.lifecycle import ShutdownPhase
@@ -324,5 +312,5 @@ logger.info("===== PyInstaller Runtime Hook Completed =====")
 logger.info(f"Python executable: {sys.executable}")
 logger.info(f"Frozen: {getattr(sys, 'frozen', False)}")
 if hasattr(sys, "_MEIPASS"):
-    logger.info(f"MEIPASS: {sys._MEIPASS}")
+    logger.info(f"MEIPASS: {getattr(sys, '_MEIPASS')}")
 logger.info(f"sys.path entries: {len(sys.path)}")

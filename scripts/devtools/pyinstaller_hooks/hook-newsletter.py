@@ -10,7 +10,9 @@ import os
 from PyInstaller.utils.hooks import collect_all, collect_dynamic_libs
 
 # Get project root directory
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+project_root = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..")
+)
 
 # =============================================================================
 # HIDDEN IMPORTS
@@ -230,7 +232,7 @@ web_modules = [
     "web.suggest",
     "web.worker",
     "web.schedule_runner",
-    "web.web_types",
+    "web.types",
     "web.graceful_shutdown",
     "web.time_utils",
     # Binary compatibility modules (important!)
@@ -279,7 +281,7 @@ datas = [
     # Environment template (not actual .env for security)
     (os.path.join(project_root, ".env.example"), "."),
     # Essential Python modules only (not development artifacts)
-    (os.path.join(project_root, "web", "web_types.py"), "web"),
+    (os.path.join(project_root, "web", "types.py"), "web"),
     (os.path.join(project_root, "web", "path_manager.py"), "web"),
     (os.path.join(project_root, "web", "binary_compatibility.py"), "web"),
     (os.path.join(project_root, "web", "graceful_shutdown.py"), "web"),
@@ -299,7 +301,7 @@ datas = [(src, dst) for src, dst in datas if os.path.exists(src)]
 
 # Define binary files
 binaries = [
-    (os.path.join(project_root, "web", "web_types.py"), "web"),
+    (os.path.join(project_root, "web", "types.py"), "web"),
     (os.path.join(project_root, "web", "binary_compatibility.py"), "web"),
 ]
 
