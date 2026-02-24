@@ -12,6 +12,8 @@ jobs:
   policy-check:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Validate branch naming, PR template sections, and commit messages
         uses: actions/github-script@v7
         with:
@@ -24,6 +26,7 @@ jobs:
             const requiredSections = [
               "## Summary (what / why)",
               "## Scope",
+              "## Delivery Unit",
               "## Test & Evidence",
               "## Risk & Rollback",
               "## Ops-Safety Addendum (if touching protected paths)",
@@ -71,3 +74,9 @@ jobs:
             } else {
               core.info("PR policy check passed.");
             }
+
+      - name: Validate delivery unit governance
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/ci/validate_delivery_unit.py
