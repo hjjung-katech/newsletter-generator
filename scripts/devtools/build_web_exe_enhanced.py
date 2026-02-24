@@ -27,7 +27,7 @@ def build():
 
     # PyInstaller 인수 구성
     args = [
-        "web_exe_entrypoint.py",
+        os.path.join("scripts", "devtools", "web_exe_entrypoint.py"),
         "--onefile",
         "--name",
         "newsletter_web",
