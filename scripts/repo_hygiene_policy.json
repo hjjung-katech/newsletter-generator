@@ -35,11 +35,9 @@
       ".vscode",
       "apps",
       "config",
-      "debug_files",
       "docs",
       "newsletter",
       "newsletter_core",
-      "output",
       "scripts",
       "templates",
       "tests",
@@ -67,7 +65,9 @@
       ".venv",
       "__pycache__",
       "artifacts",
-      "coverage_html_report"
+      "coverage_html_report",
+      "debug_files",
+      "output"
     ]
   },
   "dot_directory_policy": {

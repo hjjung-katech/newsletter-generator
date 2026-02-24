@@ -33,7 +33,7 @@
 | `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
 | `.coverage`, `coverage.xml`, `coverage_html_report/` | ignore | 로컬 산출물 | 재생성 가능 산출물 |
 | `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 개인/런타임 캐시 |
-| `output/`, `debug_files/` | 유지(가드 포함) | `.gitkeep`만 추적 + 생성물 ignore | 실행 중 생성 경로 필요 |
+| `output/`, `debug_files/` | ignore | 로컬 생성 디렉터리 (tracked 제외) | 실행 시 자동 생성, 루트 tracked 엔트리 축소 |
 | `config/config.yml` | 유지 | `config/` 내부 정본 | 런타임 설정 파일 위치 정규화 |
 | `config.example.yml` | 이관 완료 | `config/config.example.yml` | 템플릿 파일 위치 정규화 + 루트 엔트리 축소 |
 | `TODOs.md` | 이관 완료 | `docs/dev/TODOs.md` | 루트 문서 혼잡도 완화 |
