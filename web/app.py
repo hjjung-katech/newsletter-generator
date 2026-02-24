@@ -95,7 +95,7 @@ CORS(app)  # Enable CORS for frontend-backend communication
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
-print("🔧 Flask app initialized with detailed logging")
+print("[INFO] Flask app initialized with detailed logging")
 
 # Configuration
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
