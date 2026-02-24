@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import re
@@ -29,6 +30,8 @@ SENSITIVE_LINE_RE = re.compile(
 SENSITIVE_JSON_RE = re.compile(
     r'(?i)("?[A-Za-z0-9_\-]*(?:key|token|secret|password|auth)[A-Za-z0-9_\-]*"?\s*:\s*)(".*?"|\S+)'
 )
+ERROR_LINE_RE = re.compile(r"(?i)\b(error|exception|traceback|fatal|critical)\b")
+MAX_ERROR_LINES = 200
 
 
 def _run_git(args: list[str]) -> str:
@@ -71,9 +74,9 @@ def _copy_sanitized(src: Path, dst: Path) -> None:
     shutil.copy2(src, dst)
 
 
-def _collect_logs(log_dir: Path, bundle_dir: Path) -> None:
+def _collect_logs(log_dir: Path, bundle_dir: Path) -> int:
     if not log_dir.exists():
-        return
+        return 0
 
     selected = sorted(
         (
@@ -88,6 +91,106 @@ def _collect_logs(log_dir: Path, bundle_dir: Path) -> None:
     for path in selected:
         rel = path.relative_to(log_dir)
         _copy_sanitized(path, bundle_dir / "logs" / rel)
+    return len(selected)
+
+
+def _write_recent_errors(bundle_dir: Path) -> None:
+    hits: list[str] = []
+    logs_dir = bundle_dir / "logs"
+    if logs_dir.exists():
+        for log_file in sorted(logs_dir.rglob("*")):
+            if not log_file.is_file():
+                continue
+            if log_file.suffix.lower() not in {".log", ".txt", ".json"}:
+                continue
+            lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+            for line_num, line in enumerate(lines, start=1):
+                if not ERROR_LINE_RE.search(line):
+                    continue
+                rel = log_file.relative_to(bundle_dir)
+                hits.append(f"{rel}:{line_num}: {line.strip()}")
+                if len(hits) >= MAX_ERROR_LINES:
+                    break
+            if len(hits) >= MAX_ERROR_LINES:
+                break
+
+    if not hits:
+        hits.append("No error/exception lines found in collected logs.")
+
+    (bundle_dir / "recent-errors.txt").write_text(
+        "\n".join(hits) + "\n", encoding="utf-8"
+    )
+
+
+def _write_bundle_manifest(
+    bundle_dir: Path, artifact: Path, logs_collected: int
+) -> None:
+    manifest_path = bundle_dir / "bundle-manifest.json"
+    manifest = {
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "artifact_name": artifact.name,
+        "artifact_exists": artifact.exists(),
+        "logs_collected": logs_collected,
+        "max_recent_error_lines": MAX_ERROR_LINES,
+        "redaction_rules": [
+            "*KEY*=<redacted>",
+            "*TOKEN*=<redacted>",
+            "*SECRET*=<redacted>",
+            "*PASSWORD*=<redacted>",
+            "Bearer <redacted>",
+        ],
+        "included_files": [],
+    }
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
+
+    manifest["included_files"] = sorted(
+        str(path.relative_to(bundle_dir))
+        for path in bundle_dir.rglob("*")
+        if path.is_file()
+    )
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file_obj:
+        for chunk in iter(lambda: file_obj.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_checksums(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    checksums: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        checksums[parts[1].lstrip("*")] = parts[0]
+    return checksums
+
+
+def _write_checksums(path: Path, checksums: dict[str, str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [f"{digest} *{name}" for name, digest in sorted(checksums.items())]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _upsert_checksums(checksum_file: Path, files: list[Path]) -> None:
+    checksums = _load_checksums(checksum_file)
+    for file_path in files:
+        if file_path.exists() and file_path.is_file():
+            checksums[file_path.name] = _sha256(file_path)
+    if checksums:
+        _write_checksums(checksum_file, checksums)
 
 
 def _write_system_info(bundle_dir: Path, artifact: Path) -> None:
@@ -120,11 +223,13 @@ def main() -> int:
     parser.add_argument("--artifact", default="dist/newsletter_web.exe")
     parser.add_argument("--dist-dir", default="dist")
     parser.add_argument("--output", default="dist/support-bundle.zip")
+    parser.add_argument("--checksum-file", default="dist/SHA256SUMS.txt")
     args = parser.parse_args()
 
     artifact_path = Path(args.artifact)
     dist_dir = Path(args.dist_dir)
     output_path = Path(args.output)
+    checksum_path = Path(args.checksum_file)
 
     with tempfile.TemporaryDirectory(prefix="support-bundle-") as temp_dir:
         bundle_dir = Path(temp_dir)
@@ -138,10 +243,22 @@ def main() -> int:
             if candidate.exists() and candidate.is_file():
                 _copy_sanitized(candidate, bundle_dir / candidate.name)
 
-        _collect_logs(dist_dir / "logs", bundle_dir)
+        logs_collected = _collect_logs(dist_dir / "logs", bundle_dir)
+        _write_recent_errors(bundle_dir)
+        _write_bundle_manifest(bundle_dir, artifact_path, logs_collected)
         _create_zip(bundle_dir, output_path)
 
+    _upsert_checksums(
+        checksum_path,
+        [
+            artifact_path,
+            dist_dir / "release-metadata.json",
+            output_path,
+        ],
+    )
+
     print(f"support bundle: {output_path}")
+    print(f"checksums updated: {checksum_path}")
     return 0
 
 

@@ -109,13 +109,13 @@ windows-release-artifacts: ## Generate release metadata + SHA256 for Windows art
 	@echo "📦 Windows 릴리즈 메타데이터/체크섬 생성 중..."
 	$(PYTHON) scripts/devtools/generate_windows_release_artifacts.py --artifact dist/newsletter_web.exe --output-dir dist --target-os windows-x64
 
-verify-windows-artifact-checksum: ## Verify SHA256 for dist/newsletter_web.exe
+verify-windows-artifact-checksum: ## Verify SHA256 for EXE/metadata/support bundle artifacts
 	@echo "🔐 Windows 아티팩트 체크섬 검증 중..."
-	$(PYTHON) scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --checksum-file dist/SHA256SUMS.txt
+	$(PYTHON) scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --artifact dist/release-metadata.json --artifact dist/support-bundle.zip --checksum-file dist/SHA256SUMS.txt
 
 support-bundle: ## Create sanitized support bundle for customer troubleshooting
 	@echo "🧰 지원용 진단 번들 생성 중..."
-	$(PYTHON) scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --output dist/support-bundle.zip
+	$(PYTHON) scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --checksum-file dist/SHA256SUMS.txt --output dist/support-bundle.zip
 
 windows-sign-exe: ## Sign Windows exe using OV certificate thumbprint
 	@echo "✍️ Windows EXE 코드서명 실행 중..."

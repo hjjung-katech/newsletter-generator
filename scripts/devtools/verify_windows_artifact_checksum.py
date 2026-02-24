@@ -16,10 +16,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _expected_hash(checksum_file: Path, artifact_name: str) -> str:
+def _load_checksums(checksum_file: Path) -> dict[str, str]:
     if not checksum_file.exists():
         raise SystemExit(f"missing checksum file: {checksum_file}")
 
+    checksums: dict[str, str] = {}
     for raw_line in checksum_file.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
@@ -28,32 +29,43 @@ def _expected_hash(checksum_file: Path, artifact_name: str) -> str:
         if len(parts) < 2:
             continue
         hash_value, file_token = parts[0], parts[1].lstrip("*")
-        if file_token == artifact_name:
-            return hash_value
-    raise SystemExit(f"artifact {artifact_name} not found in {checksum_file}")
+        checksums[file_token] = hash_value
+    return checksums
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--artifact", default="dist/newsletter_web.exe")
+    parser.add_argument(
+        "--artifact",
+        dest="artifacts",
+        action="append",
+        help="Artifact path to verify. Repeat this flag to verify multiple files.",
+    )
     parser.add_argument("--checksum-file", default="dist/SHA256SUMS.txt")
     args = parser.parse_args()
 
-    artifact_path = Path(args.artifact)
-    if not artifact_path.exists():
-        raise SystemExit(f"missing artifact: {artifact_path}")
+    artifact_args = args.artifacts or ["dist/newsletter_web.exe"]
+    artifact_paths = [Path(item) for item in artifact_args]
+    checksums = _load_checksums(Path(args.checksum_file))
 
-    checksum_path = Path(args.checksum_file)
-    expected = _expected_hash(checksum_path, artifact_path.name)
-    actual = _sha256(artifact_path)
+    for artifact_path in artifact_paths:
+        if not artifact_path.exists():
+            raise SystemExit(f"missing artifact: {artifact_path}")
 
-    if actual != expected:
-        raise SystemExit(
-            "checksum mismatch: "
-            f"expected={expected} actual={actual} artifact={artifact_path.name}"
-        )
+        expected = checksums.get(artifact_path.name)
+        if expected is None:
+            raise SystemExit(
+                f"artifact {artifact_path.name} not found in {args.checksum_file}"
+            )
 
-    print(f"checksum verified: {artifact_path.name}")
+        actual = _sha256(artifact_path)
+        if actual != expected:
+            raise SystemExit(
+                "checksum mismatch: "
+                f"expected={expected} actual={actual} artifact={artifact_path.name}"
+            )
+
+        print(f"checksum verified: {artifact_path.name}")
     return 0
 
 

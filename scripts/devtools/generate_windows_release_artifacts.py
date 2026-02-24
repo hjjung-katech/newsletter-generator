@@ -53,6 +53,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _write_checksum_file(path: Path, entries: list[tuple[str, str]]) -> None:
+    lines = [f"{digest} *{name}" for name, digest in entries]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact", default="dist/newsletter_web.exe")
@@ -91,11 +96,15 @@ def main() -> int:
         json.dumps(metadata, indent=2, ensure_ascii=True) + "\n",
         encoding="utf-8",
     )
+    metadata_hash = _sha256(metadata_path)
 
     checksum_path = output_dir / "SHA256SUMS.txt"
-    checksum_path.write_text(
-        f"{artifact_hash} *{artifact_path.name}\n",
-        encoding="utf-8",
+    _write_checksum_file(
+        checksum_path,
+        [
+            (artifact_path.name, artifact_hash),
+            (metadata_path.name, metadata_hash),
+        ],
     )
 
     print(f"metadata: {metadata_path}")
