@@ -42,8 +42,9 @@ def _safe_console_print(*args: Any, **kwargs: Any) -> None:
     try:
         console.print(*args, **kwargs)
     except UnicodeEncodeError:
-        fallback_args = tuple(_to_console_safe(arg) for arg in args)
-        console.print(*fallback_args, **kwargs)
+        # Rich can re-trigger the same encoding error on legacy Windows consoles.
+        fallback_text = " ".join(str(_to_console_safe(arg)) for arg in args)
+        print(fallback_text)
 
 
 class NewsletterLogger:
