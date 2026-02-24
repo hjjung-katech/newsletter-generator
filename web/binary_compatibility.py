@@ -263,7 +263,7 @@ def run_comprehensive_diagnostics() -> Dict[str, Any]:
     module_status = verify_critical_modules()
 
     # 6. 결과 종합
-    diagnostics_result = {
+    diagnostics_result: Dict[str, Any] = {
         "environment_info": env_info,
         "log_file": log_file,
         "environment_files_loaded": env_loaded,
