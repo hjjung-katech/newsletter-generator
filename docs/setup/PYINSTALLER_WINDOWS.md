@@ -34,6 +34,7 @@ python scripts/devtools/build_web_exe_enhanced.py
 완료되면 `dist\newsletter_web.exe` 파일이 생성됩니다. 이 파일은 Python 환경 없이 바로 실행할 수 있습니다.
 
 > 참고: `python scripts/devtools/build_web_exe.py`는 호환용 shim이며 내부적으로 `build_web_exe_enhanced.py`를 호출합니다.
+> 타입 로딩 기준은 `web.types`가 canonical이며, `web.web_types`/`web_types`는 런타임 호환 alias로만 유지됩니다.
 
 ## 4. 실행 및 데이터베이스 초기화
 
@@ -51,6 +52,7 @@ python scripts/devtools/generate_windows_release_artifacts.py --artifact dist/ne
 python scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --checksum-file dist/SHA256SUMS.txt
 python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --output dist/support-bundle.zip
 python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist
+python scripts/devtools/check_legacy_web_types_paths.py
 ```
 
 - `dist\release-metadata.json`: 버전/빌드시각/Git SHA/Smoke 결과 등 릴리즈 메타데이터

@@ -138,19 +138,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if command -v rg >/dev/null 2>&1; then
-            FORBIDDEN_REFS="$(rg -n 'web/web_types\.py|web\.web_types' web scripts tests \
-              --glob '!web/runtime_hook.py' || true)"
-          else
-            FORBIDDEN_REFS="$(grep -RInE 'web/web_types\.py|web\.web_types' web scripts tests \
-              --exclude='runtime_hook.py' || true)"
-          fi
-          if [ -n "$FORBIDDEN_REFS" ]; then
-            echo "Legacy web_types references are not allowed outside runtime compatibility alias:"
-            echo "$FORBIDDEN_REFS"
-            exit 1
-          fi
-          echo "No legacy web_types references detected."
+          python scripts/devtools/check_legacy_web_types_paths.py
 
       - name: Guard runtime output literals (ASCII-safe)
         shell: bash

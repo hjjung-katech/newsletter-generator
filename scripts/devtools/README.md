@@ -19,6 +19,7 @@
 - `validate_windows_release_artifacts.py`
 - `generate_windows_update_manifest.py`
 - `windows_ci_burnin_report.py`
+- `check_legacy_web_types_paths.py`
 - `newsletter-test.sh`
 - `newsletter-test.bat`
 
