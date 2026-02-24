@@ -14,7 +14,7 @@
   - `Makefile` (`architecture-check`, `architecture-baseline`)
 - Introduced runtime/package skeleton:
   - `apps/cli`, `apps/web`, `apps/worker`, `apps/scheduler`
-  - `packages/newsletter_core/src/newsletter_core/{public,application,domain,infrastructure,internal}`
+  - `newsletter_core/{public,application,domain,infrastructure,internal}`
 - Migrated first generation slice to new location:
   - `collect.py`, `summarize.py`, `compose.py`, `deliver.py`
   - legacy shims left under `newsletter/`
