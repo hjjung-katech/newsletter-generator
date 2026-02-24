@@ -2,7 +2,7 @@ name: Main CI Pipeline
 
 on:
   push:
-    branches: [main, develop, 'feature/**', 'feat/**', 'fix/**', 'chore/**', 'docs/**', 'refactor/**', 'release/**', 'codex/**']
+    branches: [main, develop, 'release/**']
   pull_request:
     branches: [main, develop]
 
@@ -12,7 +12,8 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Use PR number when present to cancel superseded reruns on the same PR.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref_name }}
   cancel-in-progress: true
 
 env:
