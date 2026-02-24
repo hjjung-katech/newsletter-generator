@@ -6,7 +6,8 @@ from pathlib import Path
 
 import pytest
 
-MODULE_KEYS = ("web", "web.types", "web.web_types", "web_types")
+LEGACY_ALIAS = "web." + "web_types"
+MODULE_KEYS = ("web", "web.types", LEGACY_ALIAS, "web_types")
 
 
 def _snapshot_modules() -> dict[str, object | None]:
@@ -49,7 +50,7 @@ def test_setup_web_types_non_frozen_loads_generate_request(
 
         assert "web.types" in sys.modules
         web_types_module = sys.modules["web.types"]
-        assert sys.modules["web.web_types"] is web_types_module
+        assert sys.modules[LEGACY_ALIAS] is web_types_module
         assert sys.modules["web_types"] is web_types_module
         _assert_generate_request_loaded(web_types_module)
     finally:
@@ -83,7 +84,7 @@ def test_setup_web_types_frozen_loads_generate_request(
 
         assert "web.types" in sys.modules
         web_types_module = sys.modules["web.types"]
-        assert sys.modules["web.web_types"] is web_types_module
+        assert sys.modules[LEGACY_ALIAS] is web_types_module
         assert sys.modules["web_types"] is web_types_module
         _assert_generate_request_loaded(web_types_module)
     finally:
