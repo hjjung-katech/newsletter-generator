@@ -48,7 +48,6 @@
       "newsletter_core",
       "output",
       "packages",
-      "pyinstaller_hooks",
       "scripts",
       "templates",
       "tests",

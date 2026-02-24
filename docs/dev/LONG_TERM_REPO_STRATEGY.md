@@ -239,6 +239,7 @@ Delivery KPI:
   - `REPO_HYGIENE_STRICT` 토글 기반 hard gate 전환 경로를 CI/Makefile에 추가
 - Week 4 실행 반영:
   - 루트 shim 9종 제거 완료 (`scripts/devtools/*` 단일 경로로 전환)
+  - `pyinstaller_hooks/`를 `scripts/devtools/pyinstaller_hooks/`로 이관
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
