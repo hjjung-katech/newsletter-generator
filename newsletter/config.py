@@ -42,14 +42,8 @@ ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2
 
 # 경고 메시지 출력 (ConfigManager에서 처리하므로 간소화)
 def log_message(level: str, message: str) -> None:
-    """로거가 없는 경우를 위한 fallback 함수"""
-    try:
-        from .utils.logger import get_logger
-
-        logger = get_logger()
-        getattr(logger, level)(message)
-    except ImportError:
-        print(f"[{level.upper()}] {message}")
+    """Startup-safe logging for environments without UTF-8 console support."""
+    print(f"[{level.upper()}] {message}")
 
 
 # 필수 API 키 검증
