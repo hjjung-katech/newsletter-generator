@@ -74,8 +74,7 @@ newsletter-generator/
 │   └── ...                      # Other test files
 ├── 📄 README.md                 # Main project entry point
 ├── 📄 .env.example              # 🆕 Environment variables example
-├── 📄 pyproject.toml            # Modern Python packaging config
-├── 📄 setup.py                  # Legacy setup (minimal)
+├── 📄 pyproject.toml            # Modern Python packaging config (single source)
 ├── 📄 requirements.txt          # Production dependencies
 ├── 📄 requirements-dev.txt      # Development dependencies
 ├── 📄 requirements-minimal.txt  # Minimal CI dependencies

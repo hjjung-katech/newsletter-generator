@@ -25,9 +25,7 @@
       "requirements-dev.txt",
       "requirements-minimal.txt",
       "requirements.txt",
-      "run_ci_checks.py",
-      "setup.cfg",
-      "setup.py"
+      "run_ci_checks.py"
     ],
     "allowed_file_globs": [
       "requirements*.txt"
