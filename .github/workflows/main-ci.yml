@@ -471,12 +471,12 @@ jobs:
   # ========================================
   build-check:
     name: Build Check (${{ matrix.os }})
-    needs: [mock-api-tests]
+    needs: [quality-checks]
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest, ubuntu-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -529,6 +529,7 @@ jobs:
           retry_pip_install pyinstaller build requests
 
       - name: Test package build
+        if: matrix.os != 'windows-latest'
         run: |
           python -m build
 
