@@ -1,25 +1,33 @@
 import os
-from pathlib import Path
 
 from .config_manager import config_manager
 
+
+def _cfg(name, default=None):
+    """Safely read lazy ConfigManager attributes during partial initialization."""
+    try:
+        return getattr(config_manager, name)
+    except AttributeError:
+        return default
+
+
 # 하위 호환성을 위한 변수들 (ConfigManager에서 가져옴)
-SERPER_API_KEY = config_manager.SERPER_API_KEY
-GEMINI_API_KEY = config_manager.GEMINI_API_KEY
-OPENAI_API_KEY = config_manager.OPENAI_API_KEY
-ANTHROPIC_API_KEY = config_manager.ANTHROPIC_API_KEY
-GOOGLE_APPLICATION_CREDENTIALS = config_manager.GOOGLE_APPLICATION_CREDENTIALS
-NAVER_CLIENT_ID = config_manager.NAVER_CLIENT_ID
-NAVER_CLIENT_SECRET = config_manager.NAVER_CLIENT_SECRET
-ADDITIONAL_RSS_FEEDS = config_manager.ADDITIONAL_RSS_FEEDS
+SERPER_API_KEY = _cfg("SERPER_API_KEY")
+GEMINI_API_KEY = _cfg("GEMINI_API_KEY")
+OPENAI_API_KEY = _cfg("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = _cfg("ANTHROPIC_API_KEY")
+GOOGLE_APPLICATION_CREDENTIALS = _cfg("GOOGLE_APPLICATION_CREDENTIALS")
+NAVER_CLIENT_ID = _cfg("NAVER_CLIENT_ID")
+NAVER_CLIENT_SECRET = _cfg("NAVER_CLIENT_SECRET")
+ADDITIONAL_RSS_FEEDS = _cfg("ADDITIONAL_RSS_FEEDS", "")
 
 # 이메일 발송 설정 (Postmark 사용)
-POSTMARK_SERVER_TOKEN = config_manager.POSTMARK_SERVER_TOKEN
-EMAIL_SENDER = config_manager.EMAIL_SENDER
+POSTMARK_SERVER_TOKEN = _cfg("POSTMARK_SERVER_TOKEN")
+EMAIL_SENDER = _cfg("EMAIL_SENDER")
 
 # Google Drive 설정
-GOOGLE_CLIENT_ID = config_manager.GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET = config_manager.GOOGLE_CLIENT_SECRET
+GOOGLE_CLIENT_ID = _cfg("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = _cfg("GOOGLE_CLIENT_SECRET")
 
 # LLM 설정
 LLM_CONFIG = config_manager.get_llm_config()
