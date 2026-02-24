@@ -1,4 +1,4 @@
-# Repo Hygiene Policy (Week 1-2 Baseline)
+# Repo Hygiene Policy
 
 이 문서는 루트 구조 정리 정책의 실행 정본(SSOT)입니다.
 
@@ -6,12 +6,13 @@
 - 정책 파일: `scripts/repo_hygiene_policy.json`
 - 인벤토리 도구: `scripts/repo_audit.py`
 - Week 2-4 반영: 루트 유틸 이관 + 루트 shim 9종 제거 완료
+- Week 5 반영: CI hard gate(`REPO_HYGIENE_STRICT=true`) 기본 활성화
 
 ## Scope
 
 - 루트 엔트리 분류(유지/이관/삭제/ignore)
 - dot 디렉터리(`.vscode`, `.agents`, `.githooks`) 추적 범위 고정
-- CI soft gate(warning-only) 운영 기준
+- CI repo hygiene gate 운영 기준
 
 ## Root Classification Table
 
@@ -36,7 +37,7 @@
 
 ## Dot Directory Tracking Agreement
 
-아래 범위만 추적합니다. 그 외 파일은 CI soft gate에서 경고합니다.
+아래 범위만 추적합니다. 그 외 파일은 CI repo hygiene gate에서 경고/실패 처리됩니다.
 
 ### `.vscode`
 
@@ -64,27 +65,27 @@
   - `.githooks/pre-push`
 - 금지: 개인 훅/로컬 자동생성 스크립트
 
-## CI Soft Gate
+## CI Repo Hygiene Gate
 
 - 위치: `.github/workflows/main-ci.yml`의 `quality-checks` stage
 - 실행 명령:
   - `python scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir artifacts/repo-audit --check-policy`
-- strict 전환 준비 토글:
-  - `REPO_HYGIENE_STRICT=false`(기본): warning-only soft gate
-  - `REPO_HYGIENE_STRICT=true`: `--strict`가 활성화되어 warning 발견 시 CI 실패
+- strict 토글:
+  - `REPO_HYGIENE_STRICT=true`(기본): `--strict` 활성화, warning 발견 시 CI 실패(hard gate)
+  - `REPO_HYGIENE_STRICT=false`: 임시 soft gate override(경고만 출력)
 - 산출물(artifact):
   - `artifacts/repo-audit/repo_audit_report.md`
   - `artifacts/repo-audit/repo_audit_report.json`
   - `artifacts/repo-audit/policy_warnings.md`
 - 운영 원칙:
-  - Week 1~2: warning-only(실패로 승격하지 않음)
-  - Phase 3: hard gate 전환 검토
+  - Week 1~4: warning-only soft gate로 준비 단계 운영
+  - Week 5+: hard gate 기본 운영, 예외 시에만 일시 override 검토
 
 ### Shim Policy (Week 4)
 
 - 루트 shim은 더 이상 유지하지 않습니다.
 - 실행/유틸 스크립트 경로는 `scripts/devtools/*`로 단일화합니다.
-- soft/strict gate 모두 루트 shim 파일 생성을 허용하지 않습니다.
+- soft/strict 모드 모두 루트 shim 파일 생성을 허용하지 않습니다.
 
 ## Local Runbook
 
@@ -95,7 +96,7 @@ python scripts/repo_audit.py \
   --check-policy
 ```
 
-strict 모드(향후 hard gate용):
+strict 모드(CI 기본):
 
 ```bash
 python scripts/repo_audit.py \
@@ -114,6 +115,6 @@ make repo-audit-strict
 
 ## Governance Notes
 
-- 본 문서는 Week 1~2 기준선입니다.
+- 본 문서는 Week 1 기준선에서 현재 운영 상태로 지속 업데이트합니다.
 - 정책 변경은 반드시 PR로 수행하고, `scripts/repo_hygiene_policy.json`과 함께 변경합니다.
 - root 예외 추가 시 사유와 제거 목표 시점을 PR 설명에 명시합니다.

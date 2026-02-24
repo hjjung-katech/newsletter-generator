@@ -19,8 +19,8 @@ env:
   # Default interpreter for non-matrix jobs (quality/mock/integration/report)
   PYTHON_VERSION: '3.12'
   CACHE_VERSION: v1
-  # Prepared toggle for Phase 3 hard-gate transition.
-  REPO_HYGIENE_STRICT: 'false'
+  # Hard gate is enabled by default; allow temporary override only if needed.
+  REPO_HYGIENE_STRICT: 'true'
 
 jobs:
   # ========================================
@@ -131,7 +131,7 @@ jobs:
           python scripts/architecture/check_import_boundaries.py --mode ratchet
           python scripts/architecture/check_import_cycles.py
 
-      - name: Repo hygiene audit (soft gate)
+      - name: Repo hygiene audit (gate)
         shell: bash
         run: |
           set -euo pipefail
@@ -140,7 +140,7 @@ jobs:
             STRICT_ARGS+=(--strict)
             echo "Repo hygiene strict mode: ENABLED" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "Repo hygiene strict mode: DISABLED (soft gate)" >> "$GITHUB_STEP_SUMMARY"
+            echo "Repo hygiene strict mode: DISABLED (temporary soft gate override)" >> "$GITHUB_STEP_SUMMARY"
           fi
           python scripts/repo_audit.py \
             --policy scripts/repo_hygiene_policy.json \

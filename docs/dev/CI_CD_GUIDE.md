@@ -50,12 +50,12 @@ make repo-audit-strict
 - `make check`: 빠른 로컬 게이트
 - `make check-full`: PR 전 전체 게이트
 - `make repo-audit`: 루트 인벤토리 + repo hygiene soft gate 리포트 생성
-- `make repo-audit-strict`: hard gate 전환 전 strict 리허설
+- `make repo-audit-strict`: CI hard gate와 동일(strict) 경로 점검
 - dev 유틸 실행 스크립트는 `scripts/devtools/`를 기본 경로로 사용합니다.
 
-## Repo Hygiene Soft Gate
+## Repo Hygiene Gate
 
-`main-ci.yml`의 `quality-checks` 단계에서 아래 soft gate를 실행합니다.
+`main-ci.yml`의 `quality-checks` 단계에서 repo hygiene gate를 실행합니다.
 
 ```bash
 python scripts/repo_audit.py \
@@ -64,8 +64,8 @@ python scripts/repo_audit.py \
   --check-policy
 ```
 
-- Week 1~2 운영: warning-only
-- 전환 준비: `REPO_HYGIENE_STRICT=true`일 때 `--strict` 모드로 실행되어 warning이 CI 실패로 승격
+- 현재 기본 운영: `REPO_HYGIENE_STRICT=true` (hard gate)
+- 임시 예외 경로: `REPO_HYGIENE_STRICT=false`로 soft gate override 가능(권장하지 않음)
 - CI artifact:
   - `artifacts/repo-audit/repo_audit_report.md`
   - `artifacts/repo-audit/repo_audit_report.json`
