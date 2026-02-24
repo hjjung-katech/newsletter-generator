@@ -4,13 +4,21 @@
 
 ## Migrated in Week 2
 
-- `build_web_exe.py`
-- `build_web_exe_enhanced.py`
+- `build_web_exe.py` (compatibility shim)
+- `build_web_exe_enhanced.py` (canonical)
 - `cleanup_debug_files.py`
 - `fix_env_setup.py`
 - `run_tests.py`
 - `check_quality.py`
 - `setup_env.py`
+- `generate_windows_release_artifacts.py`
+- `verify_windows_artifact_checksum.py`
+- `create_support_bundle.py`
+- `windows_exe_smoke.ps1`
+- `sign_windows_exe.ps1`
+- `validate_windows_release_artifacts.py`
+- `generate_windows_update_manifest.py`
+- `windows_ci_burnin_report.py`
 - `newsletter-test.sh`
 - `newsletter-test.bat`
 

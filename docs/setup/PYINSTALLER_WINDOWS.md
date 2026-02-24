@@ -24,14 +24,16 @@ pip install -r requirements.txt
 pip install pyinstaller
 ```
 
-## 3. 실행 파일 생성
+## 3. 실행 파일 생성 (Canonical)
 
 ```powershell
-# PyInstaller 스크립트 실행
-python scripts/devtools/build_web_exe.py
+# Canonical 빌드 스크립트 실행
+python scripts/devtools/build_web_exe_enhanced.py
 ```
 
 완료되면 `dist\newsletter_web.exe` 파일이 생성됩니다. 이 파일은 Python 환경 없이 바로 실행할 수 있습니다.
+
+> 참고: `python scripts/devtools/build_web_exe.py`는 호환용 shim이며 내부적으로 `build_web_exe_enhanced.py`를 호출합니다.
 
 ## 4. 실행 및 데이터베이스 초기화
 
@@ -42,6 +44,23 @@ python scripts/devtools/build_web_exe.py
 # 브라우저에서 http://localhost:5000 접속
 ```
 
-## 5. 배포
+## 5. 릴리즈 메타데이터/무결성 생성
+
+```powershell
+python scripts/devtools/generate_windows_release_artifacts.py --artifact dist/newsletter_web.exe --output-dir dist --target-os windows-x64
+python scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --checksum-file dist/SHA256SUMS.txt
+python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --output dist/support-bundle.zip
+python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist
+```
+
+- `dist\release-metadata.json`: 버전/빌드시각/Git SHA/Smoke 결과 등 릴리즈 메타데이터
+- `dist\SHA256SUMS.txt`: 배포 무결성 검증용 체크섬
+- `dist\support-bundle.zip`: 지원/장애 재현용 마스킹 진단 번들
+
+## 6. 배포
 
 생성된 `newsletter_web.exe` 단일 파일만 전달하면 됩니다. 필요 시 `dist` 폴더를 압축하여 배포할 수 있습니다.
+
+운영 정책(코드서명/업데이트/SLA/롤백)은 `docs/setup/WINDOWS_EXE_OPERATIONS.md`를 따릅니다.
+Smoke 대응 절차는 `docs/setup/WINDOWS_EXE_SMOKE_PLAYBOOK.md`를 따릅니다.
+업데이트 채널 운영은 `docs/setup/WINDOWS_EXE_UPDATE_CHANNEL.md`를 따릅니다.
