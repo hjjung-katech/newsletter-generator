@@ -77,7 +77,8 @@ jobs:
             RANGE="$BEFORE_SHA...${{ github.sha }}"
           fi
 
-          CHANGED="$(git diff --name-only "$RANGE" | grep -E '^(newsletter|tests|web|scripts|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
+          # Exclude deleted files so file-based linters do not fail on moved paths.
+          CHANGED="$(git diff --name-only --diff-filter=ACMR "$RANGE" | grep -E '^(newsletter|tests|web|scripts|apps|packages/newsletter_core|newsletter_core)/.*\.py$' || true)"
           RUNTIME_CHANGED="false"
           if echo "$CHANGED" | grep -E '^(newsletter|web|apps|packages/newsletter_core|newsletter_core)/.*\.py$' >/dev/null; then
             RUNTIME_CHANGED="true"

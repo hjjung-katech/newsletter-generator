@@ -103,7 +103,6 @@ class CIChecker:
                     "web/",
                     "scripts/",
                     "apps/",
-                    "packages/newsletter_core/",
                     "newsletter_core/",
                 )
             ):
@@ -121,7 +120,6 @@ class CIChecker:
                     "newsletter/",
                     "web/",
                     "apps/",
-                    "packages/newsletter_core/",
                     "newsletter_core/",
                 )
             )

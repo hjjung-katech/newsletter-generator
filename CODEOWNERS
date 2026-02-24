@@ -3,7 +3,7 @@
 
 # Runtime boundaries
 apps/** @hjjung-katech
-packages/newsletter_core/** @hjjung-katech
+newsletter_core/** @hjjung-katech
 newsletter/** @hjjung-katech
 web/** @hjjung-katech
 

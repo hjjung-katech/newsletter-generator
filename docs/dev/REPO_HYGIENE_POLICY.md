@@ -27,7 +27,7 @@
 | `setup.cfg`, `setup.py` | 제거 완료 | `pyproject.toml` 단일 경로 | 패키징 설정 중복 제거 |
 | `run_ci_checks.py` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 |
 | `.github/`, `.release/`, `docs/`, `scripts/`, `newsletter/`, `newsletter_core/`, `web/`, `tests/` | 유지 | 루트 유지 | 핵심 운영/도메인 디렉터리 |
-| `apps/`, `config/`, `packages/`, `templates/` | 유지(과도기) | 루트 유지 | 현 구조 호환 유지 |
+| `apps/`, `config/`, `templates/` | 유지(과도기) | 루트 유지 | 현 구조 호환 유지 |
 | `pyinstaller_hooks/` | 이관 완료 | `scripts/devtools/pyinstaller_hooks/` | 빌드 유틸 범주로 통합 |
 | `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
 | `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |

@@ -255,6 +255,8 @@ Delivery KPI:
   - 루트 `.coveragerc`, `.python-version` 제거로 dot-file 표면 축소
 - Week 11 실행 반영:
   - 루트 `config.yml`을 `config/config.yml`로 이관하고 레거시 경로 fallback 유지
+- Week 12 실행 반영:
+  - `packages/newsletter_core/src/newsletter_core`를 `newsletter_core/`로 평탄화
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 

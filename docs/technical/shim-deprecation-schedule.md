@@ -24,4 +24,4 @@
   - contract/integration tests pass without shim-only imports
 
 ## Ownership
-- Architecture policy owner: `CODEOWNERS` (`apps/**`, `packages/newsletter_core/**`, `scripts/architecture/**`).
+- Architecture policy owner: `CODEOWNERS` (`apps/**`, `newsletter_core/**`, `scripts/architecture/**`).
