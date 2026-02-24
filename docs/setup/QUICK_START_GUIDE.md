@@ -21,7 +21,7 @@ pip install -r web/requirements.txt
 ## 3. 환경변수 설정
 
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 최소 필수값:

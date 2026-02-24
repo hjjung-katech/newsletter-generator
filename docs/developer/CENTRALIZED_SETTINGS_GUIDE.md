@@ -23,7 +23,7 @@ F-14 Centralized Settings Layer는 애플리케이션의 모든 환경변수를 
 - **`newsletter/centralized_settings.py`**: 메인 설정 모듈
 - **`newsletter/compat_env.py`**: 레거시 호환 레이어
 - **`newsletter/config_manager.py`**: 기존 ConfigManager와의 통합
-- **`env.example`**: 환경변수 문서화
+- **`.env.example`**: 환경변수 문서화
 
 ---
 
@@ -96,7 +96,7 @@ def _load_environment_variables(self):
 
 ### 5단계: 문서 업데이트
 
-#### `env.example` 업데이트:
+#### `.env.example` 업데이트:
 ```bash
 # ===========================================
 # 🆕 New Feature Configuration
@@ -390,7 +390,7 @@ api_key = settings.serper_api_key.get_secret_value()
 
 - [Pydantic Settings Documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
 - [F-14 구현 상세 (TODOs.md)](../dev/TODOs.md)
-- [환경변수 예시 (env.example)](../../env.example)
+- [환경변수 예시 (.env.example)](../../.env.example)
 - [테스트 예제 (tests/unit_tests/test_centralized_settings.py)](../../tests/unit_tests/test_centralized_settings.py)
 
 ---
