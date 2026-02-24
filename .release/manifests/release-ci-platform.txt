@@ -2,7 +2,6 @@
 .github/workflows/deployment.yml
 .github/workflows/main-ci.yml
 .github/workflows/security-scan.yml
-.githooks/pre-push
 .pre-commit-config.yaml
 LOCAL_CI_GUIDE.md
 Makefile
@@ -16,5 +15,7 @@ requirements-dev.txt
 docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md
 docs/dev/MAIN_INTEGRATION_EXECUTION_PLAN.md
 scripts/apply_pr_metadata.py
+scripts/devtools/hooks/pre-push
+scripts/devtools/setup_pre_push_hook.sh
 scripts/release_preflight.py
 scripts/validate_release_manifest.py

@@ -13,7 +13,7 @@
 ## Scope
 
 - 루트 엔트리 분류(유지/이관/삭제/ignore)
-- dot 디렉터리(`.agents`, `.githooks`) 추적 범위 고정 + `.vscode` local-only 정책 고정
+- dot 디렉터리(`.agents`) 추적 범위 고정 + `.vscode`/`.githooks` local-only 정책 고정
 - CI repo hygiene gate 운영 기준
 
 ## Root Classification Table
@@ -59,10 +59,14 @@
 
 ### `.githooks`
 
-- 목적: 공통 pre-push 가드
-- 허용 추적 파일:
-  - `.githooks/pre-push`
-- 금지: 개인 훅/로컬 자동생성 스크립트
+- 목적: 개인 로컬 hooksPath 실험용 디렉터리
+- 정책: tracked 제외(local-only), 필요 시 각자 생성
+- CI 처리: repo hygiene에서 ignore 대상
+
+### Hook Source (Tracked)
+
+- pre-push 훅 원본 경로: `scripts/devtools/hooks/pre-push`
+- 로컬 설치 스크립트: `scripts/devtools/setup_pre_push_hook.sh`
 
 ## CI Repo Hygiene Gate
 

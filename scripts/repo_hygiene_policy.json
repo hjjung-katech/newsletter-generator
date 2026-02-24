@@ -29,7 +29,6 @@
     ],
     "allowed_directory_names": [
       ".agents",
-      ".githooks",
       ".github",
       ".release",
       "apps",
@@ -63,6 +62,7 @@
       ".pytest_cache",
       ".venv",
       ".vscode",
+      ".githooks",
       "__pycache__",
       "artifacts",
       "coverage_html_report",
@@ -77,13 +77,6 @@
       "allowed_tracked_file_globs": [
         ".agents/skills/*/SKILL.md",
         ".agents/skills/*/agents/openai.yaml"
-      ]
-    },
-    ".githooks": {
-      "mode": "conditional",
-      "purpose": "팀 공통 pre-push 훅만 추적",
-      "allowed_tracked_file_globs": [
-        ".githooks/pre-push"
       ]
     },
     ".release": {
