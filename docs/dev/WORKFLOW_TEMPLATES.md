@@ -81,6 +81,8 @@ PR 본문은 아래 7개 섹션을 고정합니다.
   - 필수 체크 성공 (`make check-full`와 CI)
   - PR 템플릿 필수 섹션 누락 없음
   - 리뷰 승인(최소 1)
+- Merge 후 자동 처리:
+  - `.github/workflows/rr-lifecycle-close.yml`가 `RR: #<n>`를 읽어 RR 이슈를 자동 close
 - 금지:
   - force-push로 리뷰 이력 소거
   - 테스트 증빙 없는 긴급 머지(사후 보완 없는 경우)

@@ -265,6 +265,8 @@ Delivery KPI:
   - `.vscode/`를 local-only(추적 제외)로 전환
 - Week 15 실행 반영:
   - `.githooks/pre-push`를 `scripts/devtools/hooks/pre-push`로 이관하고 설치 스크립트 기반으로 전환
+- Week 16 실행 반영:
+  - `rr-lifecycle-close.yml` 추가로 머지 후 RR 이슈 자동 종료(Delivery Unit 수명주기 자동화)
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
