@@ -9,7 +9,7 @@
 - release 브랜치에서는 `WINDOWS_OV_CERT_SHA1`가 없으면 CI가 실패해야 합니다.
 - 배포 검증 항목:
   - `dist/release-metadata.json`의 `signing_status`
-  - `dist/SHA256SUMS.txt` 무결성 일치
+  - `dist/SHA256SUMS.txt` 무결성 일치 (`newsletter_web.exe`, `release-metadata.json`, `support-bundle.zip`)
 
 ### 코드서명 파일럿 실행
 
@@ -51,6 +51,8 @@ python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.
 
 - 포함 항목:
   - `system-info.json`
+  - `bundle-manifest.json`
+  - `recent-errors.txt`
   - `release-metadata.json` (존재 시)
   - `SHA256SUMS.txt` (존재 시)
   - 최근 로그(최대 20개, 마스킹 적용)

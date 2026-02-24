@@ -49,15 +49,15 @@ python scripts/devtools/build_web_exe_enhanced.py
 
 ```powershell
 python scripts/devtools/generate_windows_release_artifacts.py --artifact dist/newsletter_web.exe --output-dir dist --target-os windows-x64
-python scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --checksum-file dist/SHA256SUMS.txt
-python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --output dist/support-bundle.zip
+python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.exe --dist-dir dist --checksum-file dist/SHA256SUMS.txt --output dist/support-bundle.zip
+python scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --artifact dist/release-metadata.json --artifact dist/support-bundle.zip --checksum-file dist/SHA256SUMS.txt
 python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist
 python scripts/devtools/check_legacy_web_types_paths.py
 ```
 
 - `dist\release-metadata.json`: 버전/빌드시각/Git SHA/Smoke 결과 등 릴리즈 메타데이터
-- `dist\SHA256SUMS.txt`: 배포 무결성 검증용 체크섬
-- `dist\support-bundle.zip`: 지원/장애 재현용 마스킹 진단 번들
+- `dist\SHA256SUMS.txt`: `newsletter_web.exe`, `release-metadata.json`, `support-bundle.zip` 무결성 체크섬
+- `dist\support-bundle.zip`: 지원/장애 재현용 마스킹 진단 번들(`bundle-manifest.json`, `recent-errors.txt` 포함)
 
 ## 6. 배포
 
