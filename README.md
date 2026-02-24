@@ -24,7 +24,7 @@
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
 make bootstrap
-cp env.example .env
+cp .env.example .env
 make check
 ```
 

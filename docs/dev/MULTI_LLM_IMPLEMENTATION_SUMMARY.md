@@ -34,7 +34,7 @@
 - ✅ **LLM 설정 가이드**: `docs/technical/LLM_CONFIGURATION.md` 작성
 - ✅ **README.md 업데이트**: 멀티 LLM 지원 정보 추가
 - ✅ **CHANGELOG.md**: v0.4.0 버전 변경사항 기록
-- ✅ **환경변수 예시**: `env.example` 파일 생성
+- ✅ **환경변수 예시**: `.env.example` 파일 생성
 
 ## 🏗️ 구현된 아키텍처
 
