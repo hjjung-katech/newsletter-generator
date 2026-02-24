@@ -32,6 +32,8 @@ def build():
         "--name",
         "newsletter_web",
         "--console",  # 디버깅을 위해 콘솔 창 표시
+        "--paths",
+        ".",
         # Use PyInstaller hooks directory
         "--additional-hooks-dir",
         os.path.join("scripts", "devtools", "pyinstaller_hooks"),
