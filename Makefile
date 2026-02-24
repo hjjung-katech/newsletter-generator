@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report
+.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -140,6 +140,10 @@ windows-update-manifest: ## Generate update-manifest.json (WINDOWS_UPDATE_BASE_U
 windows-ci-burnin-report: ## Measure latest Windows CI burn-in success rate
 	@echo "📈 Windows CI burn-in 리포트 생성 중..."
 	$(PYTHON) scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95 --output artifacts/windows-ci-burnin.json
+
+github-windows-release-controls: ## Verify GitHub release controls (branch protection/vars/secrets)
+	@echo "🧭 GitHub Windows release control 점검 중..."
+	$(PYTHON) scripts/devtools/check_github_windows_release_controls.py --repo hjjung-katech/newsletter-generator --output artifacts/windows-release-controls.json
 
 test-quick: preflight-release ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
 	@echo "⚡ Quick 게이트 실행 중..."
