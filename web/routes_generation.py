@@ -111,12 +111,12 @@ def register_generation_routes(
                 current_dir = os.path.dirname(os.path.abspath(__file__))
 
                 spec = importlib.util.spec_from_file_location(
-                    "web_types", os.path.join(current_dir, "types.py")
+                    "web.types", os.path.join(current_dir, "types.py")
                 )
-                web_types = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(web_types)
+                web_types_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(web_types_module)
 
-                validated_data = web_types.GenerateNewsletterRequest(**data)
+                validated_data = web_types_module.GenerateNewsletterRequest(**data)
             except (ValueError, Exception) as e:
                 print(f"❌ Validation error: {e}")
                 return jsonify({"error": f"Invalid request: {str(e)}"}), 400
