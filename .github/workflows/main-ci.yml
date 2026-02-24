@@ -534,7 +534,7 @@ jobs:
         shell: pwsh
         env:
           WINDOWS_OV_CERT_SHA1: ${{ secrets.WINDOWS_OV_CERT_SHA1 || '' }}
-          WINDOWS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+          WINDOWS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')) }}
         run: |
           $required = "$env:WINDOWS_SIGNING_REQUIRED" -eq "true"
           ./scripts/devtools/sign_windows_exe.ps1 -ExePath "dist\newsletter_web.exe" -CertSha1 "$env:WINDOWS_OV_CERT_SHA1" -RequireSignature:$required
@@ -571,34 +571,58 @@ jobs:
             --checksum-file dist/SHA256SUMS.txt \
             --output dist/support-bundle.zip
 
-      - name: Verify Windows artifact checksum
+      - name: Enforce release update channel configuration
         if: matrix.os == 'windows-latest'
         shell: bash
+        env:
+          WINDOWS_RELEASE_GATED: ${{ startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')) }}
+          WINDOWS_UPDATE_BASE_URL: ${{ vars.WINDOWS_UPDATE_BASE_URL || '' }}
         run: |
-          python scripts/devtools/verify_windows_artifact_checksum.py \
-            --artifact dist/newsletter_web.exe \
-            --artifact dist/release-metadata.json \
-            --artifact dist/support-bundle.zip \
-            --checksum-file dist/SHA256SUMS.txt
-
-      - name: Validate Windows release artifacts
-        if: matrix.os == 'windows-latest'
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/heads/release/* ]]; then
-            python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist --require-signing
-          else
-            python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist
+          if [[ "${WINDOWS_RELEASE_GATED}" == "true" && -z "${WINDOWS_UPDATE_BASE_URL}" ]]; then
+            echo "WINDOWS_UPDATE_BASE_URL must be configured for release branch builds."
+            exit 1
           fi
 
       - name: Generate Windows update manifest
-        if: matrix.os == 'windows-latest' && vars.WINDOWS_UPDATE_BASE_URL != ''
+        if: matrix.os == 'windows-latest' && (vars.WINDOWS_UPDATE_BASE_URL != '' || startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')))
         shell: bash
         run: |
           python scripts/devtools/generate_windows_update_manifest.py \
             --metadata dist/release-metadata.json \
             --output dist/update-manifest.json \
-            --base-url "${{ vars.WINDOWS_UPDATE_BASE_URL }}"
+            --base-url "${{ vars.WINDOWS_UPDATE_BASE_URL }}" \
+            --checksum-file dist/SHA256SUMS.txt
+
+      - name: Verify Windows artifact checksum
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          ARTIFACT_ARGS=(
+            --artifact dist/newsletter_web.exe
+            --artifact dist/release-metadata.json
+            --artifact dist/support-bundle.zip
+          )
+          if [[ -f dist/update-manifest.json ]]; then
+            ARTIFACT_ARGS+=(--artifact dist/update-manifest.json)
+          fi
+          python scripts/devtools/verify_windows_artifact_checksum.py \
+            "${ARTIFACT_ARGS[@]}" \
+            --checksum-file dist/SHA256SUMS.txt
+
+      - name: Validate Windows release artifacts
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        env:
+          WINDOWS_RELEASE_GATED: ${{ startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')) }}
+        run: |
+          if [[ "${WINDOWS_RELEASE_GATED}" == "true" ]]; then
+            python scripts/devtools/validate_windows_release_artifacts.py \
+              --dist-dir dist \
+              --require-signing \
+              --require-update-manifest
+          else
+            python scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist
+          fi
 
       - name: Upload build artifacts
         if: matrix.os == 'windows-latest' && always()

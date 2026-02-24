@@ -6,7 +6,7 @@
 
 - 목표: GA(정식 배포) 경로에서는 서명되지 않은 EXE 배포 금지.
 - 베타 단계에서는 `unsigned` 허용 가능하나, 고객 전달 파일에는 항상 SHA256 제공.
-- release 브랜치에서는 `WINDOWS_OV_CERT_SHA1`가 없으면 CI가 실패해야 합니다.
+- release 브랜치(push) 및 release 대상 PR에서는 `WINDOWS_OV_CERT_SHA1`가 없으면 CI가 실패해야 합니다.
 - 배포 검증 항목:
   - `dist/release-metadata.json`의 `signing_status`
   - `dist/SHA256SUMS.txt` 무결성 일치 (`newsletter_web.exe`, `release-metadata.json`, `support-bundle.zip`)
@@ -27,11 +27,13 @@
   - `newsletter_web.exe`
   - `release-metadata.json`
   - `SHA256SUMS.txt`
-  - `update-manifest.json`
+  - `update-manifest.json` (release 경로 필수)
   - `support-bundle.zip` (지원 요청 시)
+- `SHA256SUMS.txt`는 최소 `newsletter_web.exe`, `release-metadata.json`, `support-bundle.zip`를 포함하며,
+  `update-manifest.json` 생성 시 해당 파일 해시도 포함해야 합니다.
 - 반자동 업데이트 절차:
   1. 운영팀이 새 버전을 배포 포털에 게시
-  2. 고객/지원팀이 EXE 다운로드
+  2. `update-manifest.json`의 `download_url`/`sha256` 기준으로 배포 파일 확인
   3. `SHA256SUMS.txt` 기준으로 무결성 검증
   4. 기존 EXE 백업 후 신규 EXE 교체
 
