@@ -16,7 +16,6 @@
       "LICENSE",
       "Makefile",
       "README.md",
-      "config.yml",
       "nixpacks.toml",
       "pyproject.toml",
       "railway.yml",

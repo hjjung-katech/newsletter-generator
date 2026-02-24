@@ -5,6 +5,8 @@ from typing import Any, Dict
 import yaml  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 
+DEFAULT_CONFIG_PATHS = ("config/config.yml", "config.yml")
+
 
 def _load_dotenv_if_needed() -> None:
     """Load .env lazily to avoid import-time side effects."""
@@ -143,21 +145,49 @@ class ConfigManager:
         if config_file in self._config_cache:
             return self._config_cache[config_file]
 
-        try:
-            config_path = Path(config_file)
-            if not config_path.exists():
-                self._log_warning(f"설정 파일을 찾을 수 없습니다: {config_file}")
-                return {}
+        config_candidates = self._resolve_config_candidates(config_file)
+        resolved_config_path = next(
+            (candidate for candidate in config_candidates if candidate.exists()),
+            None,
+        )
 
-            with open(config_path, "r", encoding="utf-8") as f:
+        if resolved_config_path is None:
+            search_paths = ", ".join(str(candidate) for candidate in config_candidates)
+            self._log_warning(
+                f"설정 파일을 찾을 수 없습니다: {config_file} (searched: {search_paths})"
+            )
+            return {}
+
+        resolved_key = str(resolved_config_path)
+        if resolved_key in self._config_cache:
+            cached = self._config_cache[resolved_key]
+            self._config_cache[config_file] = cached
+            return cached
+
+        try:
+            with open(resolved_config_path, "r", encoding="utf-8") as f:
                 config_data = yaml.safe_load(f) or {}
 
+            self._config_cache[resolved_key] = config_data
             self._config_cache[config_file] = config_data
             return config_data
 
         except Exception as e:
-            self._log_warning(f"설정 파일 로딩 실패 {config_file}: {e}")
+            self._log_warning(f"설정 파일 로딩 실패 {resolved_config_path}: {e}")
             return {}
+
+    @staticmethod
+    def _resolve_config_candidates(config_file: str) -> list[Path]:
+        """기본 경로/레거시 경로를 포함해 탐색 후보를 반환합니다."""
+        config_path = Path(config_file)
+        if config_path.is_absolute():
+            return [config_path]
+
+        normalized = config_file.replace("\\", "/").lstrip("./")
+        if normalized in {"config.yml", "config/config.yml"}:
+            return [Path(path) for path in DEFAULT_CONFIG_PATHS]
+
+        return [config_path]
 
     def get_llm_config(self) -> Dict[str, Any]:
         """LLM 설정 반환"""

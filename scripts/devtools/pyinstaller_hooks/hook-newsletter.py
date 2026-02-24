@@ -255,6 +255,16 @@ hiddenimports = (
 # DATA FILES
 # =============================================================================
 
+# Prefer config/config.yml and keep legacy root config.yml as fallback.
+config_candidates = [
+    os.path.join(project_root, "config", "config.yml"),
+    os.path.join(project_root, "config.yml"),
+]
+config_data_file = next(
+    (path for path in config_candidates if os.path.exists(path)),
+    config_candidates[0],
+)
+
 # Define data files to be included in the bundle
 datas = [
     # Essential templates and static files only
@@ -262,7 +272,7 @@ datas = [
     (os.path.join(project_root, "web", "templates"), "templates"),
     (os.path.join(project_root, "web", "static"), "static"),
     # Configuration files (templates only, not user data)
-    (os.path.join(project_root, "config.yml"), "."),
+    (config_data_file, "."),
     (os.path.join(project_root, "config"), "config"),
     # Documentation files for user guidance
     (os.path.join(project_root, "web", "docs"), "docs"),

@@ -120,12 +120,18 @@ def check_config() -> None:
     # 5. 설정 파일 확인
     console.print("\n[bold yellow]⚙️  설정 파일[/bold yellow]")
 
-    config_file = "config.yml"
-    if os.path.exists(config_file):
-        console.print("[green]✅ config.yml:[/green] 파일 존재")
+    config_candidates = ["config/config.yml", "config.yml"]
+    resolved_config_file = next(
+        (candidate for candidate in config_candidates if os.path.exists(candidate)),
+        None,
+    )
+    if resolved_config_file:
+        console.print(f"[green]✅ config:[/green] 파일 존재 ({resolved_config_file})")
         console.print("   - 사용자 정의 설정 적용 가능")
     else:
-        console.print("[yellow]⚪ config.yml:[/yellow] 파일 없음")
+        console.print(
+            "[yellow]⚪ config:[/yellow] 파일 없음 (config/config.yml, config.yml)"
+        )
         console.print("   - 기본 설정 사용 중 (선택사항)")
 
     env_file = ".env"
@@ -146,7 +152,7 @@ def check_config() -> None:
     optional_settings = [
         ("이메일 발송", email_ready),
         ("Google Drive", os.path.exists(credentials_path)),
-        ("설정 파일", os.path.exists(config_file)),
+        ("설정 파일", resolved_config_file is not None),
     ]
 
     # 필수 설정 확인
