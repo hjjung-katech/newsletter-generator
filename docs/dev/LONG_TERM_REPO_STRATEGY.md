@@ -257,6 +257,8 @@ Delivery KPI:
   - 루트 `config.yml`을 `config/config.yml`로 이관하고 레거시 경로 fallback 유지
 - Week 12 실행 반영:
   - `packages/newsletter_core/src/newsletter_core`를 `newsletter_core/`로 평탄화
+- Week 13 실행 반영:
+  - `output/`, `debug_files/`를 local-only 생성 디렉터리로 전환(`.gitkeep` 추적 제거)
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
