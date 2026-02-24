@@ -96,10 +96,57 @@ def _validate_bundle(bundle_path: Path) -> None:
                     )
 
 
+def _validate_update_manifest(
+    update_manifest_path: Path,
+    metadata: dict,
+    checksums: dict[str, str],
+    checksum_path: Path,
+    require_update_manifest: bool,
+) -> None:
+    if not update_manifest_path.exists():
+        if require_update_manifest:
+            raise SystemExit(
+                f"update manifest is required but missing: {update_manifest_path}"
+            )
+        return
+
+    try:
+        manifest = json.loads(update_manifest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid update-manifest.json: {exc}") from exc
+
+    artifact = manifest.get("artifact")
+    if not isinstance(artifact, dict):
+        raise SystemExit("update-manifest.json missing artifact object")
+
+    if str(manifest.get("version", "")) != str(metadata["version"]):
+        raise SystemExit("update-manifest version mismatch against release metadata")
+
+    if str(artifact.get("name", "")) != str(metadata["artifact_name"]):
+        raise SystemExit("update-manifest artifact.name mismatch")
+
+    if str(artifact.get("sha256", "")) != str(metadata["artifact_sha256"]):
+        raise SystemExit("update-manifest artifact.sha256 mismatch")
+
+    if not str(artifact.get("download_url", "")).strip():
+        raise SystemExit("update-manifest artifact.download_url is empty")
+    if not str(manifest.get("metadata_url", "")).strip():
+        raise SystemExit("update-manifest metadata_url is empty")
+    if not str(manifest.get("checksum_url", "")).strip():
+        raise SystemExit("update-manifest checksum_url is empty")
+
+    checksum = checksums.get(update_manifest_path.name)
+    if checksum is None:
+        raise SystemExit(f"{update_manifest_path.name} not found in {checksum_path}")
+    if _sha256(update_manifest_path) != checksum:
+        raise SystemExit("update-manifest sha256 mismatch against SHA256SUMS.txt")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dist-dir", default="dist")
     parser.add_argument("--require-signing", action="store_true")
+    parser.add_argument("--require-update-manifest", action="store_true")
     args = parser.parse_args()
 
     dist_dir = Path(args.dist_dir)
@@ -107,6 +154,7 @@ def main() -> int:
     metadata_path = dist_dir / "release-metadata.json"
     checksum_path = dist_dir / "SHA256SUMS.txt"
     bundle_path = dist_dir / "support-bundle.zip"
+    update_manifest_path = dist_dir / "update-manifest.json"
 
     for path in (artifact_path, metadata_path, checksum_path, bundle_path):
         if not path.exists():
@@ -150,6 +198,13 @@ def main() -> int:
         raise SystemExit("support-bundle.zip sha256 mismatch against SHA256SUMS.txt")
 
     _validate_bundle(bundle_path)
+    _validate_update_manifest(
+        update_manifest_path,
+        metadata,
+        checksums,
+        checksum_path,
+        args.require_update_manifest,
+    )
 
     signing_status = str(metadata["signing_status"]).lower()
     if args.require_signing and signing_status != "signed":

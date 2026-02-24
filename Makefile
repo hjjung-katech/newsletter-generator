@@ -111,7 +111,11 @@ windows-release-artifacts: ## Generate release metadata + SHA256 for Windows art
 
 verify-windows-artifact-checksum: ## Verify SHA256 for EXE/metadata/support bundle artifacts
 	@echo "🔐 Windows 아티팩트 체크섬 검증 중..."
-	$(PYTHON) scripts/devtools/verify_windows_artifact_checksum.py --artifact dist/newsletter_web.exe --artifact dist/release-metadata.json --artifact dist/support-bundle.zip --checksum-file dist/SHA256SUMS.txt
+	@ARTIFACT_ARGS="--artifact dist/newsletter_web.exe --artifact dist/release-metadata.json --artifact dist/support-bundle.zip"; \
+	if [ -f dist/update-manifest.json ]; then \
+		ARTIFACT_ARGS="$$ARTIFACT_ARGS --artifact dist/update-manifest.json"; \
+	fi; \
+	$(PYTHON) scripts/devtools/verify_windows_artifact_checksum.py $$ARTIFACT_ARGS --checksum-file dist/SHA256SUMS.txt
 
 support-bundle: ## Create sanitized support bundle for customer troubleshooting
 	@echo "🧰 지원용 진단 번들 생성 중..."
@@ -123,7 +127,7 @@ windows-sign-exe: ## Sign Windows exe using OV certificate thumbprint
 
 validate-windows-release-artifacts: ## Validate release metadata/checksum/support bundle package
 	@echo "🧪 Windows 릴리즈 아티팩트 검증 중..."
-	$(PYTHON) scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist $(if $(REQUIRE_SIGNING),--require-signing,)
+	$(PYTHON) scripts/devtools/validate_windows_release_artifacts.py --dist-dir dist $(if $(REQUIRE_SIGNING),--require-signing,) $(if $(REQUIRE_UPDATE_MANIFEST),--require-update-manifest,)
 
 windows-update-manifest: ## Generate update-manifest.json (WINDOWS_UPDATE_BASE_URL required)
 	@echo "🔄 업데이트 매니페스트 생성 중..."
@@ -131,7 +135,7 @@ windows-update-manifest: ## Generate update-manifest.json (WINDOWS_UPDATE_BASE_U
 		echo "❌ WINDOWS_UPDATE_BASE_URL 환경변수가 필요합니다."; \
 		exit 1; \
 	fi
-	$(PYTHON) scripts/devtools/generate_windows_update_manifest.py --metadata dist/release-metadata.json --output dist/update-manifest.json --base-url "$(WINDOWS_UPDATE_BASE_URL)"
+	$(PYTHON) scripts/devtools/generate_windows_update_manifest.py --metadata dist/release-metadata.json --output dist/update-manifest.json --base-url "$(WINDOWS_UPDATE_BASE_URL)" --checksum-file dist/SHA256SUMS.txt
 
 windows-ci-burnin-report: ## Measure latest Windows CI burn-in success rate
 	@echo "📈 Windows CI burn-in 리포트 생성 중..."
