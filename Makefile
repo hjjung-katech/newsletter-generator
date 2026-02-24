@@ -11,7 +11,7 @@ PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
 PIP := $(PYTHON) -m pip
 
 # 디렉토리 설정
-SRC_DIRS := newsletter tests web scripts apps packages/newsletter_core/src/newsletter_core newsletter_core
+SRC_DIRS := newsletter tests web scripts apps newsletter_core
 
 help: ## 도움말 표시
 	@echo "Newsletter Generator - 개발 명령어"

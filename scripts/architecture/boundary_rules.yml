@@ -4,7 +4,7 @@
     {"path": "web", "module_prefix": "web"},
     {"path": "apps", "module_prefix": "apps"},
     {
-      "path": "packages/newsletter_core/src/newsletter_core",
+      "path": "newsletter_core",
       "module_prefix": "newsletter_core"
     }
   ],
