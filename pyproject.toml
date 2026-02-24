@@ -204,9 +204,11 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+norecursedirs = ["tests/_backup", ".venv", "venv", ".git"]
 minversion = "6.0"
 addopts = [
     "-ra",
+    "--import-mode=importlib",
     "--strict-markers",
     "--strict-config",
     "--cov=newsletter",
@@ -233,4 +235,6 @@ filterwarnings = [
     "ignore::PendingDeprecationWarning",
     "ignore:.*PytestReturnNotNoneWarning.*",
     "ignore:.*request_timeout.*:UserWarning",
+    "ignore:.*Accessing the 'model_fields' attribute.*:DeprecationWarning:langchain_google_genai",
+    "ignore:.*PydanticDeprecatedSince211.*:DeprecationWarning",
 ]
