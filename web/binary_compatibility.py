@@ -21,7 +21,7 @@ def get_base_path() -> str:
     """실행 환경에 따른 기본 경로 반환"""
     if is_frozen():
         # PyInstaller 바이너리 환경
-        return sys._MEIPASS
+        return str(getattr(sys, "_MEIPASS", os.path.dirname(sys.executable)))
     else:
         # 일반 Python 개발 환경
         return os.path.dirname(os.path.abspath(__file__))
@@ -192,7 +192,7 @@ def verify_critical_modules() -> Dict[str, bool]:
 
     if missing_essential:
         logger.warning(f"Missing essential modules: {missing_essential}")
-        return False
+        return critical_modules
 
     return critical_modules
 
@@ -221,7 +221,7 @@ def create_necessary_directories() -> List[str]:
     return created_dirs
 
 
-def setup_logging_for_binary():
+def setup_logging_for_binary() -> str:
     """바이너리 환경에 맞는 로깅 설정"""
     log_dir = get_external_resource_path("logs")
     os.makedirs(log_dir, exist_ok=True)
