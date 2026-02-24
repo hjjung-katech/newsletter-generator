@@ -14,9 +14,22 @@ if (-not (Test-Path -Path $ExePath -PathType Leaf)) {
 Write-Host "[SMOKE] Starting EXE: $ExePath"
 $process = $null
 $healthOk = $false
+$stdoutLog = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "newsletter_web_smoke_stdout.log"
+$stderrLog = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "newsletter_web_smoke_stderr.log"
+$uri = [Uri]$BaseUrl
+$smokePort = $uri.Port
+$previousPort = $env:PORT
+
+if (Test-Path -Path $stdoutLog -PathType Leaf) {
+    Remove-Item -Path $stdoutLog -Force
+}
+if (Test-Path -Path $stderrLog -PathType Leaf) {
+    Remove-Item -Path $stderrLog -Force
+}
 
 try {
-    $process = Start-Process -FilePath $ExePath -PassThru
+    $env:PORT = "$smokePort"
+    $process = Start-Process -FilePath $ExePath -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 
     while ((Get-Date) -lt $deadline) {
@@ -46,10 +59,28 @@ try {
         throw "Health smoke timed out after ${TimeoutSeconds}s"
     }
 } finally {
+    if ($null -eq $previousPort) {
+        Remove-Item Env:PORT -ErrorAction SilentlyContinue
+    } else {
+        $env:PORT = $previousPort
+    }
+
     if ($null -ne $process -and -not $process.HasExited) {
         Write-Host "[SMOKE] Stopping EXE process id=$($process.Id)"
         Stop-Process -Id $process.Id -Force
         Start-Sleep -Seconds 2
+    }
+
+    if ($null -ne $process -and $process.HasExited -and -not $healthOk) {
+        Write-Host "[SMOKE] Process exited with code $($process.ExitCode)"
+        if (Test-Path -Path $stdoutLog -PathType Leaf) {
+            Write-Host "[SMOKE] --- stdout ---"
+            Get-Content -Path $stdoutLog
+        }
+        if (Test-Path -Path $stderrLog -PathType Leaf) {
+            Write-Host "[SMOKE] --- stderr ---"
+            Get-Content -Path $stderrLog
+        }
     }
 }
 

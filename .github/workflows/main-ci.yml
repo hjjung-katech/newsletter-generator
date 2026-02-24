@@ -551,7 +551,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          ./scripts/devtools/windows_exe_smoke.ps1 -ExePath "dist\newsletter_web.exe" -BaseUrl "http://127.0.0.1:5000" -TimeoutSeconds 120
+          ./scripts/devtools/windows_exe_smoke.ps1 -ExePath "dist\newsletter_web.exe" -BaseUrl "http://127.0.0.1:58080" -TimeoutSeconds 120
 
       - name: Generate Windows release metadata
         if: matrix.os == 'windows-latest'
