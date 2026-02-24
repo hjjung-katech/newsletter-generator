@@ -16,7 +16,6 @@ from typing import Any, cast
 import redis
 from flask import Flask, jsonify, render_template, request, send_file
 from flask_cors import CORS
-from rq import Queue
 
 # Add current directory to path for local imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -115,6 +114,8 @@ try:
         redis_conn = None
         task_queue = None
     else:
+        from rq import Queue
+
         redis_conn = redis.from_url(app.config["REDIS_URL"])
         redis_conn.ping()  # Test connection
         task_queue = Queue(QUEUE_NAME, connection=redis_conn)
