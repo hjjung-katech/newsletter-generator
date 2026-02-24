@@ -5,6 +5,11 @@
 - Windows EXE release 제어 항목을 운영 환경에 적용한 이력을 남깁니다.
 - GitHub 관리자 설정 변경도 PR 증적으로 추적하기 위한 기준 로그입니다.
 
+## 추적 정보
+
+- RR: #137
+- Delivery Unit ID: `DU-20260224-windows-release-governance`
+
 ## 변경 요약
 
 1. Branch protection 고정
