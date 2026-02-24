@@ -66,7 +66,8 @@ make test-nightly
 git restore --source=work -- \
   .github/workflows/ \
   .pre-commit-config.yaml \
-  .githooks/pre-push \
+  scripts/devtools/hooks/pre-push \
+  scripts/devtools/setup_pre_push_hook.sh \
   run_ci_checks.py \
   scripts/devtools/check_quality.py \
   Makefile \

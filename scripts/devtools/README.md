@@ -19,6 +19,15 @@
 - `setup_git_message_template.sh`
   - 로컬 Git commit 템플릿을 `.gitmessage.txt`로 설정합니다.
   - 실행: `./scripts/devtools/setup_git_message_template.sh`
+- `setup_pre_push_hook.sh`
+  - 로컬 `.git/hooks/pre-push`에 표준 pre-push 가드를 설치합니다.
+  - 실행: `./scripts/devtools/setup_pre_push_hook.sh`
+
+## Hooks
+
+- `hooks/pre-push`
+  - 표준 pre-push 훅 원본입니다.
+  - 설치는 `setup_pre_push_hook.sh` 또는 `make pre-push-hook`으로 수행합니다.
 
 ## Backward Compatibility
 

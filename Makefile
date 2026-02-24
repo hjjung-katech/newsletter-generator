@@ -230,6 +230,14 @@ pre-commit: ## Pre-commit hooks 설치
 	pre-commit install
 	@echo "✅ Pre-commit hooks 설치 완료!"
 
+pre-push-hook: ## Local pre-push hook 설치
+	@echo "🔗 Pre-push hook 설치 중..."
+	./scripts/devtools/setup_pre_push_hook.sh
+	@echo "✅ Pre-push hook 설치 완료!"
+
+setup-local-git: pre-commit pre-push-hook ## 로컬 Git 훅(커밋/푸시) 설치
+	@echo "✅ 로컬 Git hook 설치 완료!"
+
 pre-commit-run: ## Pre-commit 수동 실행
 	@echo "🔍 Pre-commit 검사 실행 중..."
 	pre-commit run --all-files
