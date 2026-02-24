@@ -79,5 +79,8 @@
 - 브랜치명은 `<type>/<scope>-<topic>` 패턴을 사용합니다.
 - 커밋 메시지는 `.gitmessage.txt` 템플릿을 기준으로 작성합니다.
 - PR 본문은 `.github/pull_request_template.md` 섹션을 누락 없이 채웁니다.
+- RR과 PR은 1:1 Delivery Unit 경계를 유지합니다 (`RR: #<n>`, `Delivery Unit ID` 필수).
+- 하나의 RR(또는 Delivery Unit ID)을 동시에 여러 open PR에서 재사용하면 안 됩니다.
+- 기본 커밋 수는 PR당 2~6개를 권장/강제합니다 (예외 라벨: `docs-only`, `trivial`, `hotfix`).
 - 기본 머지 전략은 squash merge이며, 증빙 없는 예외 머지는 금지합니다.
 - CI에서 `.github/workflows/pr-policy-check.yml`로 브랜치/PR 템플릿 + 커밋 메시지 규칙을 검증합니다.
