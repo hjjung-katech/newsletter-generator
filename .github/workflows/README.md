@@ -49,6 +49,8 @@
 ## Windows Release Variables/Secrets
 
 - Secret: `WINDOWS_OV_CERT_SHA1` (OV 코드서명 인증서 thumbprint)
+- Secret: `WINDOWS_OV_CERT_PFX_BASE64` (OV 인증서 PFX base64 payload, release 경로 필수)
+- Secret: `WINDOWS_OV_CERT_PASSWORD` (PFX password, release 경로 필수)
 - Variable: `WINDOWS_UPDATE_BASE_URL` (`update-manifest.json`의 다운로드 base URL)
 
 ## Quick Check

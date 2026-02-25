@@ -528,12 +528,29 @@ jobs:
         run: |
           python scripts/devtools/build_web_exe_enhanced.py
 
+      - name: Provision Windows signing certificate
+        id: provision-windows-signing
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          WINDOWS_OV_CERT_SHA1: ${{ secrets.WINDOWS_OV_CERT_SHA1 || '' }}
+          WINDOWS_OV_CERT_PFX_BASE64: ${{ secrets.WINDOWS_OV_CERT_PFX_BASE64 || '' }}
+          WINDOWS_OV_CERT_PASSWORD: ${{ secrets.WINDOWS_OV_CERT_PASSWORD || '' }}
+          WINDOWS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')) }}
+        run: |
+          $required = "$env:WINDOWS_SIGNING_REQUIRED" -eq "true"
+          ./scripts/devtools/provision_windows_signing_cert.ps1 `
+            -CertSha1 "$env:WINDOWS_OV_CERT_SHA1" `
+            -PfxBase64 "$env:WINDOWS_OV_CERT_PFX_BASE64" `
+            -PfxPassword "$env:WINDOWS_OV_CERT_PASSWORD" `
+            -RequireSignature:$required
+
       - name: Sign Windows artifact (OV pilot)
         id: sign-windows
         if: matrix.os == 'windows-latest'
         shell: pwsh
         env:
-          WINDOWS_OV_CERT_SHA1: ${{ secrets.WINDOWS_OV_CERT_SHA1 || '' }}
+          WINDOWS_OV_CERT_SHA1: ${{ steps.provision-windows-signing.outputs.resolved_cert_sha1 }}
           WINDOWS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')) }}
         run: |
           $required = "$env:WINDOWS_SIGNING_REQUIRED" -eq "true"
