@@ -52,6 +52,15 @@
 3. 대응:
    - `scripts/devtools/provision_windows_signing_cert.ps1`에서 self-signed 인증서 감지 시 CI runner `CurrentUser\\Root`, `CurrentUser\\TrustedPublisher` 저장소를 임시 보강하도록 수정
 
+## 2026-02-25 추가 업데이트 2
+
+1. 최신 main 기준 release dry-run 재실행: `22377896633` (`release/dry-run-20260225-5`)
+2. 관찰:
+   - `Provision Windows signing certificate` 단계가 비정상 장기 실행되어 run 취소
+3. 대응:
+   - provisioning 경로의 self-signed 신뢰 저장소 주입을 제거
+   - `scripts/devtools/sign_windows_exe.ps1`에서 self-signed dry-run 인증서에 대해 thumbprint 기반 fallback 검증 로직으로 대체
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
