@@ -69,6 +69,22 @@
 3. 대응:
    - fallback 검증 성공 시 `LASTEXITCODE`를 `0`으로 명시 리셋하도록 수정
 
+## 2026-02-25 추가 업데이트 4
+
+1. 최신 main 기준 release dry-run 재실행: `22379041439` (`release/dry-run-20260225-7`)
+2. 결과:
+   - `Build Check (windows-latest)` 성공
+   - `Sign -> Smoke -> update-manifest -> checksum/validate` 전 단계 성공
+3. 임시 dry-run 브랜치 정리:
+   - 로컬: `release/dry-run-20260225-4~7` 삭제
+   - 원격: `release/dry-run-20260224-1`, `release/dry-run-20260224-2`, `release/dry-run-20260225-3~7` 삭제
+4. 보호 규칙 처리:
+   - 정리 작업을 위해 `release/*`의 `allowsDeletions`를 임시 `true`로 전환 후 즉시 `false` 원복
+   - 최종 상태: `main`, `release`, `release/*` 모두 `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=1`, `isAdminEnforced=true`, `allowsDeletions=false`
+   - 삭제 허용 임시 전환 대상 rule: `release/*` (`BPR_kwDOOnCa4M4EXd3D`)
+5. 남은 운영 조치:
+   - `WINDOWS_OV_CERT_*`를 실제 운영 OV 인증서 값으로 교체 필요(현재 값은 dry-run 인증서 기준)
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
