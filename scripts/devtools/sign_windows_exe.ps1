@@ -34,6 +34,72 @@ function Resolve-SignToolPath {
     return ""
 }
 
+function Normalize-Thumbprint {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return ""
+    }
+    return ($Value -replace "\s+", "").ToUpperInvariant()
+}
+
+function Find-CertificateByThumbprint {
+    param([string]$Thumbprint)
+
+    $normalized = Normalize-Thumbprint $Thumbprint
+    if ([string]::IsNullOrWhiteSpace($normalized)) {
+        return $null
+    }
+
+    $stores = @("Cert:\CurrentUser\My", "Cert:\LocalMachine\My")
+    foreach ($store in $stores) {
+        try {
+            $cert = Get-ChildItem -Path $store -ErrorAction Stop |
+                Where-Object { (Normalize-Thumbprint $_.Thumbprint) -eq $normalized } |
+                Select-Object -First 1
+            if ($null -ne $cert) {
+                return $cert
+            }
+        } catch {
+            continue
+        }
+    }
+
+    return $null
+}
+
+function Verify-SelfSignedDryRunSignature {
+    param(
+        [string]$Path,
+        [string]$ExpectedSha1
+    )
+
+    $expected = Normalize-Thumbprint $ExpectedSha1
+    if ([string]::IsNullOrWhiteSpace($expected)) {
+        return $false
+    }
+
+    $signingCert = Find-CertificateByThumbprint $expected
+    if ($null -eq $signingCert -or $signingCert.Subject -ne $signingCert.Issuer) {
+        return $false
+    }
+
+    $signature = Get-AuthenticodeSignature -FilePath $Path
+    if ($null -eq $signature -or $null -eq $signature.SignerCertificate) {
+        throw "Self-signed fallback verify failed: signer certificate not found."
+    }
+
+    $actual = Normalize-Thumbprint $signature.SignerCertificate.Thumbprint
+    if ($actual -ne $expected) {
+        throw "Self-signed fallback verify failed: signer thumbprint mismatch."
+    }
+    if ("$($signature.Status)" -eq "NotSigned") {
+        throw "Self-signed fallback verify failed: file is not signed."
+    }
+
+    Write-Host "[SIGN] Self-signed dry-run signature verified by signer thumbprint."
+    return $true
+}
+
 if (-not (Test-Path -Path $ExePath -PathType Leaf)) {
     throw "EXE not found: $ExePath"
 }
@@ -60,8 +126,13 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "[SIGN] Verifying signature: $ExePath"
 & $signtoolPath verify /pa /v $ExePath
-if ($LASTEXITCODE -ne 0) {
-    throw "signtool verify failed with exit code $LASTEXITCODE"
+$verifyExitCode = $LASTEXITCODE
+if ($verifyExitCode -ne 0) {
+    Write-Host "[SIGN] /pa verification failed. Checking self-signed dry-run fallback."
+    $fallbackVerified = Verify-SelfSignedDryRunSignature -Path $ExePath -ExpectedSha1 $CertSha1
+    if (-not $fallbackVerified) {
+        throw "signtool verify failed with exit code $verifyExitCode"
+    }
 }
 
 Write-Host "[SIGN] PASS"
