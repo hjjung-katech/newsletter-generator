@@ -70,8 +70,11 @@ python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.
 
 ## 6) P0 CI 운영 기준
 
-- `main` branch protection required check:
-  - `Build Check (windows-latest)`
+- branch protection required check:
+  - `main`: `Build Check (windows-latest)`
+  - `release`: `Build Check (windows-latest)`
+  - `release/*`: `Build Check (windows-latest)`
+  - 관리자 우회 방지(`isAdminEnforced=true`)를 유지
 - burn-in 기준:
   - 최근 10회 `Build Check (windows-latest)` 성공률 95% 이상
   - `cancelled/skipped/neutral/unknown` 결론은 burn-in 샘플에서 제외(중복 런 취소/진행중 런 노이즈 제거)
@@ -80,3 +83,24 @@ python scripts/devtools/create_support_bundle.py --artifact dist/newsletter_web.
 ```bash
 python scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95 --ignore-conclusions cancelled,skipped,neutral,unknown
 ```
+
+- GitHub release control 점검 명령:
+
+```bash
+make github-windows-release-controls
+```
+
+## 7) 작업 단위 운영 규칙 (필수)
+
+- Windows release 관련 작업은 반드시 `Branch -> Commit -> PR -> CI -> Merge` 순서로 진행합니다.
+- 단위 분할 기준:
+  - 코드/문서 변경: 1 Delivery Unit = 1 PR
+  - GitHub 관리자 설정(브랜치 보호/시크릿/변수): 단독 PR로 증적 문서를 남기고, PR 본문에 실제 적용 시각/명령/결과를 기록
+- PR 머지 전 필수 증적:
+  - `make github-windows-release-controls`
+  - release dry-run 실행 링크
+  - 실패 시 원인/차단 상태/롤백 메모
+
+## 8) 실행 로그
+
+- 2026-02-24 실행 로그: `docs/setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`

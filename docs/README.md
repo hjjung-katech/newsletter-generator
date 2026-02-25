@@ -43,6 +43,9 @@
 
 - 운영/배포
   - `setup/RAILWAY_DEPLOYMENT.md`
+  - `setup/WINDOWS_EXE_OPERATIONS.md`
+  - `setup/WINDOWS_EXE_UPDATE_CHANNEL.md`
+  - `setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`
   - `reference/web-api.md`
   - `reference/environment-variables.md`
 
