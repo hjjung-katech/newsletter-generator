@@ -133,6 +133,7 @@ if ($verifyExitCode -ne 0) {
     if (-not $fallbackVerified) {
         throw "signtool verify failed with exit code $verifyExitCode"
     }
+    $global:LASTEXITCODE = 0
 }
 
 Write-Host "[SIGN] PASS"
