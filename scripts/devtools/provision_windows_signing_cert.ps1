@@ -51,48 +51,6 @@ function Mask-Thumbprint {
     return "{0}...{1}" -f $normalized.Substring(0, 4), $normalized.Substring($normalized.Length - 4)
 }
 
-function Ensure-CertificateTrustForDryRun {
-    param([System.Security.Cryptography.X509Certificates.X509Certificate2]$Certificate)
-
-    if ($null -eq $Certificate) {
-        return
-    }
-
-    # Self-signed dry-run certificates are not trusted on fresh runners by default.
-    if ($Certificate.Subject -ne $Certificate.Issuer) {
-        return
-    }
-
-    $normalized = Normalize-Thumbprint $Certificate.Thumbprint
-    if ([string]::IsNullOrWhiteSpace($normalized)) {
-        return
-    }
-
-    Write-Host ("[SIGN-PROVISION] Self-signed certificate detected: {0}" -f (Mask-Thumbprint $normalized))
-
-    $runnerTemp = [System.Environment]::GetEnvironmentVariable("RUNNER_TEMP")
-    if ([string]::IsNullOrWhiteSpace($runnerTemp)) {
-        $runnerTemp = [System.IO.Path]::GetTempPath()
-    }
-    $cerPath = Join-Path $runnerTemp "windows-ov-signing-cert.cer"
-
-    try {
-        Export-Certificate -Cert $Certificate -FilePath $cerPath -Type CERT -Force | Out-Null
-        $trustStores = @("Cert:\CurrentUser\Root", "Cert:\CurrentUser\TrustedPublisher")
-        foreach ($store in $trustStores) {
-            $existing = Get-ChildItem -Path $store -ErrorAction SilentlyContinue |
-                Where-Object { (Normalize-Thumbprint $_.Thumbprint) -eq $normalized } |
-                Select-Object -First 1
-            if ($null -eq $existing) {
-                Import-Certificate -FilePath $cerPath -CertStoreLocation $store | Out-Null
-                Write-Host ("[SIGN-PROVISION] Added certificate to store: {0}" -f $store)
-            }
-        }
-    } finally {
-        Remove-Item -Path $cerPath -Force -ErrorAction SilentlyContinue
-    }
-}
-
 $normalizedSha1 = Normalize-Thumbprint $CertSha1
 $hasPfx = -not [string]::IsNullOrWhiteSpace($PfxBase64)
 $required = $RequireSignature.IsPresent
@@ -162,7 +120,6 @@ if (-not [string]::IsNullOrWhiteSpace($normalizedSha1)) {
     if ($null -eq $resolvedCert) {
         throw ("Certificate not found after provisioning: {0}" -f (Mask-Thumbprint $normalizedSha1))
     }
-    Ensure-CertificateTrustForDryRun -Certificate $resolvedCert
     Write-Host ("[SIGN-PROVISION] Certificate ready: {0}" -f (Mask-Thumbprint $normalizedSha1))
 } elseif ($required) {
     throw "Signing is required but no certificate thumbprint is available."
