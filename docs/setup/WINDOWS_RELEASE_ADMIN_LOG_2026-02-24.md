@@ -44,6 +44,14 @@
 4. 대응:
    - `scripts/devtools/provision_windows_signing_cert.ps1`에서 단일/배열 반환을 모두 처리하도록 hotfix 적용
 
+## 2026-02-25 추가 업데이트
+
+1. main 머지 후 release dry-run 재실행: `22377306953` (`release/dry-run-20260225-4`)
+2. 실패 원인:
+   - `Sign Windows artifact (OV pilot)` 단계에서 `signtool verify /pa`가 self-signed dry-run 인증서를 신뢰 체인으로 검증하지 못해 실패
+3. 대응:
+   - `scripts/devtools/provision_windows_signing_cert.ps1`에서 self-signed 인증서 감지 시 CI runner `CurrentUser\\Root`, `CurrentUser\\TrustedPublisher` 저장소를 임시 보강하도록 수정
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
