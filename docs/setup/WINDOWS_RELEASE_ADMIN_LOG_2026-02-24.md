@@ -81,6 +81,7 @@
 4. 보호 규칙 처리:
    - 정리 작업을 위해 `release/*`의 `allowsDeletions`를 임시 `true`로 전환 후 즉시 `false` 원복
    - 최종 상태: `main`, `release`, `release/*` 모두 `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=1`, `isAdminEnforced=true`, `allowsDeletions=false`
+   - 삭제 허용 임시 전환 대상 rule: `release/*` (`BPR_kwDOOnCa4M4EXd3D`)
 5. 남은 운영 조치:
    - `WINDOWS_OV_CERT_*`를 실제 운영 OV 인증서 값으로 교체 필요(현재 값은 dry-run 인증서 기준)
 
