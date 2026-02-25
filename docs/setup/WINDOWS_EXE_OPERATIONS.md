@@ -33,6 +33,16 @@
   4. import 후 thumbprint 일치 확인
 - 2~4 과정 중 하나라도 실패하면 sign 단계로 넘어가지 않고 CI를 즉시 실패 처리합니다.
 
+#### 운영 준비 예시 (PFX -> GitHub Secret)
+
+```bash
+# macOS/Linux
+base64 -i windows-ov-cert.pfx | tr -d '\n' > windows-ov-cert.base64.txt
+```
+
+- `windows-ov-cert.base64.txt` 내용을 `WINDOWS_OV_CERT_PFX_BASE64`에 등록
+- `.pfx` 비밀번호를 `WINDOWS_OV_CERT_PASSWORD`에 등록
+
 ## 2) 업데이트 정책 (반자동 + 체크섬)
 
 - 배포 단위:
