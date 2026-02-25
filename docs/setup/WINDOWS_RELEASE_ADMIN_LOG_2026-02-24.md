@@ -35,6 +35,15 @@
 2. release dry-run 재실행
 3. `sign -> smoke -> update-manifest -> checksum/validate` 전 단계 통과 확인
 
+## 2026-02-25 업데이트
+
+1. 임시 dry-run signing secret(`WINDOWS_OV_CERT_SHA1`, `WINDOWS_OV_CERT_PFX_BASE64`, `WINDOWS_OV_CERT_PASSWORD`) 등록
+2. release dry-run 실행: `22376468136`
+3. 실패 원인:
+   - `Provision Windows signing certificate` 단계에서 `Import-PfxCertificate` 반환값이 단일 객체일 때 `.Count` 접근 오류 발생
+4. 대응:
+   - `scripts/devtools/provision_windows_signing_cert.ps1`에서 단일/배열 반환을 모두 처리하도록 hotfix 적용
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복

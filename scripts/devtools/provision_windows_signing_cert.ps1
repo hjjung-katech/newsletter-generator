@@ -85,11 +85,15 @@ if ($null -eq $existingCert -and $hasPfx) {
         [System.IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
         $securePassword = ConvertTo-SecureString -String $PfxPassword -AsPlainText -Force
         $importedCerts = Import-PfxCertificate -FilePath $pfxPath -Password $securePassword -CertStoreLocation $CertStoreLocation -Exportable
-        if ($null -eq $importedCerts -or $importedCerts.Count -eq 0) {
+        $importedCertItems = @()
+        if ($null -ne $importedCerts) {
+            $importedCertItems = @($importedCerts)
+        }
+        if ($importedCertItems.Count -eq 0) {
             throw "Import-PfxCertificate returned no certificates."
         }
 
-        $importedCert = $importedCerts | Select-Object -First 1
+        $importedCert = $importedCertItems | Select-Object -First 1
         $importedThumb = Normalize-Thumbprint $importedCert.Thumbprint
         if ([string]::IsNullOrWhiteSpace($importedThumb)) {
             throw "Imported certificate thumbprint is empty."
