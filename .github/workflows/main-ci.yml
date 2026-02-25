@@ -530,7 +530,7 @@ jobs:
 
       - name: Provision Windows signing certificate
         id: provision-windows-signing
-        if: matrix.os == 'windows-latest'
+        if: matrix.os == 'windows-latest' && (startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')))
         shell: pwsh
         env:
           WINDOWS_OV_CERT_SHA1: ${{ secrets.WINDOWS_OV_CERT_SHA1 || '' }}
@@ -554,12 +554,13 @@ jobs:
           WINDOWS_SIGNING_REQUIRED: ${{ startsWith(github.ref, 'refs/heads/release/') || (github.event_name == 'pull_request' && startsWith(github.base_ref, 'release/')) }}
         run: |
           $required = "$env:WINDOWS_SIGNING_REQUIRED" -eq "true"
-          ./scripts/devtools/sign_windows_exe.ps1 -ExePath "dist\newsletter_web.exe" -CertSha1 "$env:WINDOWS_OV_CERT_SHA1" -RequireSignature:$required
-          if ($required -or -not [string]::IsNullOrWhiteSpace("$env:WINDOWS_OV_CERT_SHA1")) {
-            "signing_status=signed" >> $env:GITHUB_OUTPUT
-          } else {
+          if (-not $required) {
+            Write-Host "[SIGN] Non-release build: skipping code signing."
             "signing_status=unsigned" >> $env:GITHUB_OUTPUT
+            exit 0
           }
+          ./scripts/devtools/sign_windows_exe.ps1 -ExePath "dist\newsletter_web.exe" -CertSha1 "$env:WINDOWS_OV_CERT_SHA1" -RequireSignature:$true
+          "signing_status=signed" >> $env:GITHUB_OUTPUT
 
       - name: Windows EXE health smoke
         if: matrix.os == 'windows-latest'

@@ -22,7 +22,7 @@
   - `WINDOWS_OV_CERT_SHA1`: 인증서 Thumbprint
   - `WINDOWS_OV_CERT_PFX_BASE64`: OV 인증서 `.pfx` 파일의 base64 인코딩 값
   - `WINDOWS_OV_CERT_PASSWORD`: OV 인증서 `.pfx` 비밀번호
-- release 브랜치에서는 signing required, main/feature 브랜치에서는 optional.
+- release 브랜치에서는 signing required, main/feature 브랜치에서는 기본적으로 signing을 수행하지 않습니다(`unsigned`).
 
 ### GitHub-hosted runner 프로비저닝 기준
 
