@@ -31,6 +31,7 @@
   2. certificate store에서 thumbprint 조회
   3. store에 없으면 `WINDOWS_OV_CERT_PFX_BASE64` + `WINDOWS_OV_CERT_PASSWORD`로 임시 import
   4. import 후 thumbprint 일치 확인
+  5. self-signed dry-run 인증서인 경우 CI runner에서 `CurrentUser\\Root`, `CurrentUser\\TrustedPublisher` 신뢰 저장소를 임시 보강
 - 2~4 과정 중 하나라도 실패하면 sign 단계로 넘어가지 않고 CI를 즉시 실패 처리합니다.
 
 #### 운영 준비 예시 (PFX -> GitHub Secret)
