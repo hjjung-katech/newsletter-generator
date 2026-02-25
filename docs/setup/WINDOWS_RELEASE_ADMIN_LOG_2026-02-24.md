@@ -61,6 +61,14 @@
    - provisioning 경로의 self-signed 신뢰 저장소 주입을 제거
    - `scripts/devtools/sign_windows_exe.ps1`에서 self-signed dry-run 인증서에 대해 thumbprint 기반 fallback 검증 로직으로 대체
 
+## 2026-02-25 추가 업데이트 3
+
+1. 최신 main 기준 release dry-run 재실행: `22378547592` (`release/dry-run-20260225-6`)
+2. 실패 원인:
+   - self-signed fallback 검증은 성공했으나, 직전 `signtool verify`의 `LASTEXITCODE=1`가 유지되어 step이 실패 처리
+3. 대응:
+   - fallback 검증 성공 시 `LASTEXITCODE`를 `0`으로 명시 리셋하도록 수정
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
