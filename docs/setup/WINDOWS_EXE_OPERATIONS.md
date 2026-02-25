@@ -7,6 +7,7 @@
 - 목표: GA(정식 배포) 경로에서는 서명되지 않은 EXE 배포 금지.
 - 베타 단계에서는 `unsigned` 허용 가능하나, 고객 전달 파일에는 항상 SHA256 제공.
 - release 브랜치(push) 및 release 대상 PR에서는 `WINDOWS_OV_CERT_SHA1`가 없으면 CI가 실패해야 합니다.
+- release 브랜치(push) 및 release 대상 PR에서는 인증서 material(`WINDOWS_OV_CERT_PFX_BASE64`, `WINDOWS_OV_CERT_PASSWORD`)이 없으면 CI가 실패해야 합니다.
 - 배포 검증 항목:
   - `dist/release-metadata.json`의 `signing_status`
   - `dist/SHA256SUMS.txt` 무결성 일치 (`newsletter_web.exe`, `release-metadata.json`, `support-bundle.zip`)
@@ -19,7 +20,18 @@
 
 - CI secret:
   - `WINDOWS_OV_CERT_SHA1`: 인증서 Thumbprint
+  - `WINDOWS_OV_CERT_PFX_BASE64`: OV 인증서 `.pfx` 파일의 base64 인코딩 값
+  - `WINDOWS_OV_CERT_PASSWORD`: OV 인증서 `.pfx` 비밀번호
 - release 브랜치에서는 signing required, main/feature 브랜치에서는 optional.
+
+### GitHub-hosted runner 프로비저닝 기준
+
+- release 경로에서는 아래 순서로 검증합니다.
+  1. `WINDOWS_OV_CERT_SHA1` 존재 확인
+  2. certificate store에서 thumbprint 조회
+  3. store에 없으면 `WINDOWS_OV_CERT_PFX_BASE64` + `WINDOWS_OV_CERT_PASSWORD`로 임시 import
+  4. import 후 thumbprint 일치 확인
+- 2~4 과정 중 하나라도 실패하면 sign 단계로 넘어가지 않고 CI를 즉시 실패 처리합니다.
 
 ## 2) 업데이트 정책 (반자동 + 체크섬)
 
