@@ -80,7 +80,7 @@ PR 본문은 아래 7개 섹션을 고정합니다.
 - Merge 조건:
   - 필수 체크 성공 (`make check-full`와 CI)
   - PR 템플릿 필수 섹션 누락 없음
-  - 리뷰 승인(최소 1)
+  - 리뷰는 기본 비필수, 필요 시 고위험 변경에만 요청
 - Merge 후 자동 처리:
   - `.github/workflows/rr-lifecycle-close.yml`가 `RR: #<n>`를 읽어 RR 이슈를 자동 close
 - 금지:
@@ -118,7 +118,7 @@ git config commit.template .gitmessage.txt
 - 추가 권장(GitHub 설정):
   - Branch protection에서 `PR Policy Check`를 required check로 지정
   - Squash merge만 허용
-  - 최소 1 approval required
+  - 기본 approval required 없음 (`required_approving_review_count=0`)
 
 ## 10) 커밋 메시지 세부 가이드 (누락 보완)
 
