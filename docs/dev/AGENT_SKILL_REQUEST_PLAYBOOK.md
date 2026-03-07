@@ -16,7 +16,7 @@
 2. RR에는 `Delivery Unit ID`를 필수 기입하고, RR당 PR은 1개만 연동
 3. 브랜치: `<type>/<scope>-<topic>` (예: `codex/workflow-template-standard`)
 4. 커밋: `.gitmessage.txt` 템플릿 기반으로 의미 단위 분리
-5. 커밋 수: 기본 2~6개(예외 라벨: `docs-only`, `trivial`, `hotfix`)
+5. 커밋 수: 기본 1~6개(예외 라벨: `docs-only`, `trivial`, `hotfix`)
 6. 로컬 게이트: `make check`, `make check-full`, 필요 시 `make repo-audit`
 7. PR: `.github/pull_request_template.md`에 `## Delivery Unit` 섹션 포함 필수
 8. CI: GitHub Actions 결과 확인 후 상태 보고

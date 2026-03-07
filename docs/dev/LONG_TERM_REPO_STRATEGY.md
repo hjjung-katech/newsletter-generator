@@ -250,7 +250,7 @@ Delivery KPI:
 - Week 7 실행 반영:
   - 루트 `config.example.yml`을 `config/config.example.yml`로 이관
 - Week 8 실행 반영:
-  - RR/Delivery Unit/Commit 범위(2~6) 거버넌스를 `pr-policy-check`에서 자동 검증
+  - RR/Delivery Unit/Commit 범위(1~6) 거버넌스를 `pr-policy-check`에서 자동 검증
 - Week 9 실행 반영:
   - 루트 `setup.cfg`, `setup.py` 제거 및 `pyproject.toml` 단일 패키징 경로 확정
 - Week 10 실행 반영:

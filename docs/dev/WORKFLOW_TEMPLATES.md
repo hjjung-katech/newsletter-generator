@@ -50,7 +50,7 @@
 
 - 기본 패턴: `<type>(<scope>): <summary>`
 - summary는 72자 이내, 명령형, why 중심.
-- 기본 커밋 수: PR당 2~6개
+- 기본 커밋 수: PR당 1~6개
 - 예외 라벨: `docs-only`, `trivial`, `hotfix`
 
 예시:
