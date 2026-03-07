@@ -85,6 +85,21 @@
 5. 남은 운영 조치:
    - `WINDOWS_OV_CERT_*`를 실제 운영 OV 인증서 값으로 교체 필요(현재 값은 dry-run 인증서 기준)
 
+## 2026-03-07 추가 업데이트
+
+1. 최신 `main` 재점검:
+   - HEAD: `ae45c62` (`chore(ci): clarify agent guidance and delivery unit policy (#151)`)
+2. 운영 drift 발견:
+   - `main` branch protection의 `requiredApprovingReviewCount`가 `0`으로 풀려 있었음
+3. 즉시 대응:
+   - `main` rule (`BPR_kwDOOnCa4M4EXTTS`)을 `requiredApprovingReviewCount=1`로 원복
+4. 최종 확인:
+   - `main`, `release`, `release/*` 모두 `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=1`, `isAdminEnforced=true`, `allowsDeletions=false`
+   - `WINDOWS_UPDATE_BASE_URL`는 repo/environment(`production`) 모두 `https://github.com/hjjung-katech/newsletter-generator/releases/latest/download`로 유지됨
+5. 여전히 남은 운영 과제:
+   - `WINDOWS_OV_CERT_SHA1`, `WINDOWS_OV_CERT_PFX_BASE64`, `WINDOWS_OV_CERT_PASSWORD`는 실제 운영 OV 인증서 값으로 교체되지 않았음
+   - 현재 repo secret 등록 시각은 `2026-02-25 00:33 UTC` 기준이며, dry-run 인증서 교체 후 release dry-run 1회 재검증이 필요
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
