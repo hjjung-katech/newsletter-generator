@@ -111,6 +111,19 @@
    - `main`: `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=0`, `isAdminEnforced=true`, `allowsDeletions=false`
    - `release`, `release/*`: `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=1`, `isAdminEnforced=true`, `allowsDeletions=false`
 
+## 2026-03-07 추가 업데이트 3
+
+1. 운영 OV 인증서 최종화 재시도:
+   - repo secret 메타데이터를 재확인한 결과 `WINDOWS_OV_CERT_SHA1`, `WINDOWS_OV_CERT_PFX_BASE64`, `WINDOWS_OV_CERT_PASSWORD`의 갱신 시각은 여전히 `2026-02-25 00:33 UTC` 기준이었음
+2. 현재 등록값 성격 재검증:
+   - 성공했던 release dry-run `22379041439`의 Windows signing 로그를 재조회한 결과, 서명 인증서 `Issued to` / `Issued by`가 `Newsletter Generator DryRun Code Signing`으로 확인됨
+3. 로컬 운영자 환경 확인:
+   - 표준 보관 경로(`Desktop`, `Documents`, `Downloads`, `.config`)에서 운영 OV 인증서 후보 `.pfx` / `.p12` 파일을 찾지 못함
+   - macOS keychain codesigning identity 조회 결과 `0 valid identities found`
+4. 결론:
+   - 실제 운영 OV 인증서 원본이 현재 작업 환경에 없어서 `WINDOWS_OV_CERT_*` 교체와 release dry-run 재검증은 이번 차수에서 진행 불가
+   - 실제 완료를 위해서는 운영 OV `.pfx`, 비밀번호, 기대 thumbprint를 안전한 경로로 별도 제공받아야 함
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
