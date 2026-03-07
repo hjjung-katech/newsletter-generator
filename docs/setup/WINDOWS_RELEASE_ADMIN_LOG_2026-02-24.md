@@ -93,6 +93,7 @@
    - `main` branch protection의 `requiredApprovingReviewCount`가 `0`으로 풀려 있었음
 3. 즉시 대응:
    - `main` rule (`BPR_kwDOOnCa4M4EXTTS`)을 `requiredApprovingReviewCount=1`로 원복
+   - 원복 후 GraphQL 재조회로 rule 상태 재검증 완료
 4. 최종 확인:
    - `main`, `release`, `release/*` 모두 `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=1`, `isAdminEnforced=true`, `allowsDeletions=false`
    - `WINDOWS_UPDATE_BASE_URL`는 repo/environment(`production`) 모두 `https://github.com/hjjung-katech/newsletter-generator/releases/latest/download`로 유지됨
