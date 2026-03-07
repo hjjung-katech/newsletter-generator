@@ -124,6 +124,16 @@
    - 실제 운영 OV 인증서 원본이 현재 작업 환경에 없어서 `WINDOWS_OV_CERT_*` 교체와 release dry-run 재검증은 이번 차수에서 진행 불가
    - 실제 완료를 위해서는 운영 OV `.pfx`, 비밀번호, 기대 thumbprint를 안전한 경로로 별도 제공받아야 함
 
+## 2026-03-07 추가 업데이트 4
+
+1. 후속 작업 backlog 고정:
+   - 운영 OV `.pfx`, 비밀번호, 기대 thumbprint를 안전한 경로로 확보
+   - `WINDOWS_OV_CERT_SHA1`, `WINDOWS_OV_CERT_PFX_BASE64`, `WINDOWS_OV_CERT_PASSWORD`를 실제 운영값으로 교체
+   - release 브랜치에서 dry-run 1회 재실행 후 `sign -> smoke -> update-manifest -> checksum/validate` 전 단계 통과 증적 추가
+2. 차수 종료 정리:
+   - 저장소 변경사항은 admin log 기준으로 `main`에 반영 완료
+   - 로컬 생성 산출물(`artifacts/`)과 병합 완료 작업 브랜치는 이번 차수 종료 시점에 정리 대상
+
 ## 롤백 메모
 
 - branch protection 롤백: GitHub Branch Protection에서 대상 패턴의 required check/admin enforcement를 원복
