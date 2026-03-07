@@ -17,7 +17,7 @@ DELIVERY_UNIT_PATTERN = re.compile(
 )
 
 EXEMPT_COMMIT_COUNT_LABELS = {"docs-only", "trivial", "hotfix"}
-MIN_COMMITS = 2
+MIN_COMMITS = 1
 MAX_COMMITS = 6
 
 

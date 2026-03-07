@@ -83,7 +83,7 @@ web
 2. `git status --short --branch`에서 clean 확인
 3. RR 작성(`review-request` 라벨 + Delivery Unit ID 포함)
 4. `codex/<scope>-<topic>` 브랜치 생성
-5. PR 단위(2~6 커밋)로 작업 후 `make check`, `make check-full` 실행
+5. PR 단위(1~6 커밋)로 작업 후 `make check`, `make check-full` 실행
 
 ## 다음에 이렇게 요청하면 바로 재개 가능
 
