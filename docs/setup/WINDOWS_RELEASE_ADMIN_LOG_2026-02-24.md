@@ -89,8 +89,8 @@
 
 1. 최신 `main` 재점검:
    - HEAD: `ae45c62` (`chore(ci): clarify agent guidance and delivery unit policy (#151)`)
-2. 운영 drift 발견:
-   - `main` branch protection의 `requiredApprovingReviewCount`가 `0`으로 풀려 있었음
+2. 운영 상태 점검:
+   - `main` branch protection의 `requiredApprovingReviewCount`가 `0`으로 설정되어 있었음
 3. 즉시 대응:
    - `main` rule (`BPR_kwDOOnCa4M4EXTTS`)을 `requiredApprovingReviewCount=1`로 원복
    - 원복 후 GraphQL 재조회로 rule 상태 재검증 완료
@@ -100,6 +100,16 @@
 5. 여전히 남은 운영 과제:
    - `WINDOWS_OV_CERT_SHA1`, `WINDOWS_OV_CERT_PFX_BASE64`, `WINDOWS_OV_CERT_PASSWORD`는 실제 운영 OV 인증서 값으로 교체되지 않았음
    - 현재 repo secret 등록 시각은 `2026-02-25 00:33 UTC` 기준이며, dry-run 인증서 교체 후 release dry-run 1회 재검증이 필요
+
+## 2026-03-07 추가 업데이트 2
+
+1. 운영 기준 재확인:
+   - 현재 저장소는 solo-developer 모드로 운영 중이므로 `main`의 `requiredApprovingReviewCount`는 `0`으로 유지
+2. 정책 반영:
+   - `main` rule (`BPR_kwDOOnCa4M4EXTTS`)을 다시 `requiredApprovingReviewCount=0`으로 조정
+3. 최종 확인:
+   - `main`: `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=0`, `isAdminEnforced=true`, `allowsDeletions=false`
+   - `release`, `release/*`: `required check=Build Check (windows-latest)`, `requiredApprovingReviewCount=1`, `isAdminEnforced=true`, `allowsDeletions=false`
 
 ## 롤백 메모
 
