@@ -8,6 +8,8 @@ class NewsletterApp {
         this.currentJobId = null;
         this.pollInterval = null;
         this.adminTokenStorageKey = 'newsletter-admin-api-token';
+        this.savedPresets = [];
+        this.selectedPresetId = '';
         this.init();
     }
 
@@ -17,6 +19,8 @@ class NewsletterApp {
         this.toggleInputMethod();
         this.toggleScheduleSettings(document.getElementById('enableSchedule').checked);
         this.updateScheduleOptions();
+        this.syncPresetActions();
+        this.loadPresets();
     }
 
     bindEvents() {
@@ -46,7 +50,16 @@ class NewsletterApp {
         document.getElementById('downloadBtn').addEventListener('click', () => this.downloadNewsletter());
         document.getElementById('sendEmailBtn').addEventListener('click', () => this.sendEmail());
         document.getElementById('emailConfigBtn').addEventListener('click', () => this.checkEmailConfiguration());
-        document.getElementById('adminToken').addEventListener('input', (e) => this.persistAdminToken(e.target.value));
+        document.getElementById('adminToken').addEventListener('input', (e) => {
+            this.persistAdminToken(e.target.value);
+            this.loadPresets(this.selectedPresetId);
+        });
+        document.getElementById('presetSelect').addEventListener('change', (e) => this.handlePresetSelection(e.target.value));
+        document.getElementById('applyPresetBtn').addEventListener('click', () => this.applySelectedPreset());
+        document.getElementById('savePresetBtn').addEventListener('click', () => this.saveNewPreset());
+        document.getElementById('updatePresetBtn').addEventListener('click', () => this.updateSelectedPreset());
+        document.getElementById('deletePresetBtn').addEventListener('click', () => this.deleteSelectedPreset());
+        document.getElementById('refreshPresetsBtn').addEventListener('click', () => this.loadPresets(this.selectedPresetId));
 
         // Navigation buttons
         document.getElementById('historyBtn').addEventListener('click', () => this.switchTab('historyTab'));
@@ -96,6 +109,104 @@ class NewsletterApp {
 
     getProtectedRouteMessage(defaultMessage = '운영 토큰이 필요합니다.') {
         return `${defaultMessage} 상단의 운영 토큰을 입력한 뒤 다시 시도해주세요.`;
+    }
+
+    setPresetStatus(message, tone = 'gray') {
+        const presetStatus = document.getElementById('presetStatus');
+        presetStatus.className = `mt-2 text-sm text-${tone}-600`;
+        presetStatus.textContent = message;
+    }
+
+    syncPresetActions() {
+        const hasSelection = Boolean(this.selectedPresetId);
+        ['applyPresetBtn', 'updatePresetBtn', 'deletePresetBtn'].forEach((buttonId) => {
+            const button = document.getElementById(buttonId);
+            button.disabled = !hasSelection;
+            button.classList.toggle('opacity-50', !hasSelection);
+            button.classList.toggle('cursor-not-allowed', !hasSelection);
+        });
+    }
+
+    renderPresetOptions(preferredPresetId = '') {
+        const presetSelect = document.getElementById('presetSelect');
+        const nextSelectedId = preferredPresetId || this.selectedPresetId;
+        presetSelect.innerHTML = '';
+
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = '프리셋을 선택하세요';
+        presetSelect.appendChild(placeholderOption);
+
+        this.savedPresets.forEach((preset) => {
+            const option = document.createElement('option');
+            option.value = preset.id;
+            option.textContent = `${preset.name}${preset.is_default ? ' (기본)' : ''}`;
+            option.selected = preset.id === nextSelectedId;
+            presetSelect.appendChild(option);
+        });
+
+        this.selectedPresetId = presetSelect.value;
+        this.syncPresetActions();
+    }
+
+    getSelectedPreset() {
+        return this.savedPresets.find((preset) => preset.id === this.selectedPresetId) || null;
+    }
+
+    handlePresetSelection(presetId) {
+        this.selectedPresetId = presetId || '';
+        this.syncPresetActions();
+
+        const preset = this.getSelectedPreset();
+        if (preset) {
+            const summary = preset.description
+                ? `${preset.name}: ${preset.description}`
+                : `${preset.name} 프리셋이 준비되었습니다.`;
+            this.setPresetStatus(summary, 'gray');
+            return;
+        }
+
+        this.setPresetStatus('운영 토큰이 있으면 프리셋을 저장하고 불러올 수 있습니다.');
+    }
+
+    async loadPresets(preferredPresetId = '') {
+        const presetSelect = document.getElementById('presetSelect');
+
+        try {
+            const response = await fetch('/api/presets', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                this.savedPresets = [];
+                presetSelect.innerHTML = '<option value="">프리셋을 선택하세요</option>';
+                this.selectedPresetId = '';
+                this.syncPresetActions();
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '프리셋을 불러올 수 없습니다.')
+                    : (result.error || '프리셋을 불러올 수 없습니다.');
+                this.setPresetStatus(message, 'yellow');
+                return;
+            }
+
+            this.savedPresets = Array.isArray(result) ? result : [];
+            const resolvedPresetId = preferredPresetId || this.selectedPresetId || this.savedPresets.find((preset) => preset.is_default)?.id || '';
+            this.renderPresetOptions(resolvedPresetId);
+
+            if (this.savedPresets.length === 0) {
+                this.setPresetStatus('저장된 프리셋이 없습니다. 현재 입력값으로 새 프리셋을 저장해보세요.');
+            } else if (this.selectedPresetId) {
+                this.handlePresetSelection(this.selectedPresetId);
+            } else {
+                this.setPresetStatus('프리셋을 선택하면 현재 폼에 불러올 수 있습니다.');
+            }
+        } catch (error) {
+            this.savedPresets = [];
+            this.selectedPresetId = '';
+            this.syncPresetActions();
+            this.setPresetStatus(`프리셋 조회 실패: ${error.message}`, 'red');
+        }
     }
 
     switchTab(tabId) {
@@ -172,6 +283,74 @@ class NewsletterApp {
         } else {
             weeklyOptions.classList.add('hidden');
         }
+    }
+
+    applyScheduleFromRRule(rrule) {
+        if (!rrule) {
+            document.getElementById('enableSchedule').checked = false;
+            this.toggleScheduleSettings(false);
+            return;
+        }
+
+        const parts = Object.fromEntries(
+            rrule.split(';').map((part) => {
+                const [key, value] = part.split('=');
+                return [key, value];
+            })
+        );
+
+        document.getElementById('enableSchedule').checked = true;
+        this.toggleScheduleSettings(true);
+        document.getElementById('frequency').value = parts.FREQ || 'WEEKLY';
+        this.updateScheduleOptions();
+
+        if (parts.BYHOUR && parts.BYMINUTE) {
+            const hour = String(parts.BYHOUR).padStart(2, '0');
+            const minute = String(parts.BYMINUTE).padStart(2, '0');
+            document.getElementById('scheduleTime').value = `${hour}:${minute}`;
+        }
+
+        const selectedDays = new Set((parts.BYDAY || '').split(',').filter(Boolean));
+        document.querySelectorAll('.weekday').forEach((checkbox) => {
+            checkbox.checked = selectedDays.has(checkbox.value);
+        });
+    }
+
+    applyParamsToForm(params = {}) {
+        const keywords = params.keywords;
+
+        if (keywords && keywords.length > 0) {
+            document.getElementById('keywordsMethod').checked = true;
+            document.getElementById('keywords').value = Array.isArray(keywords) ? keywords.join(', ') : String(keywords);
+            document.getElementById('domain').value = '';
+        } else if (params.domain) {
+            document.getElementById('domainMethod').checked = true;
+            document.getElementById('domain').value = params.domain;
+            document.getElementById('keywords').value = '';
+        }
+
+        document.getElementById('period').value = String(params.period || 14);
+        document.getElementById('templateStyle').value = params.template_style || 'compact';
+        document.getElementById('emailCompatible').checked = Boolean(params.email_compatible);
+        document.getElementById('email').value = params.email || '';
+        this.applyScheduleFromRRule(params.rrule || '');
+        this.toggleInputMethod();
+    }
+
+    applyPresetToForm(preset) {
+        this.applyParamsToForm(preset?.params || {});
+    }
+
+    applySelectedPreset() {
+        const preset = this.getSelectedPreset();
+        if (!preset) {
+            this.showError('불러올 프리셋을 선택해주세요.');
+            return;
+        }
+
+        this.applyPresetToForm(preset);
+        this.setPresetStatus(`${preset.name} 프리셋을 현재 폼에 적용했습니다.`, 'green');
+        this.showSuccess(`프리셋 적용 완료: ${preset.name}`);
     }
 
     async generateNewsletter() {
@@ -283,6 +462,10 @@ class NewsletterApp {
             data.email = email;
         }
 
+        data.period = parseInt(document.getElementById('period').value, 10);
+        data.template_style = document.getElementById('templateStyle').value;
+        data.email_compatible = document.getElementById('emailCompatible').checked;
+
         // Schedule data
         const enableSchedule = document.getElementById('enableSchedule').checked;
         if (includeSchedule && enableSchedule) {
@@ -314,6 +497,146 @@ class NewsletterApp {
         }
 
         return data;
+    }
+
+    buildPresetRequest(existingPreset = null) {
+        const params = this.collectFormData({ includeSchedule: true, includeEmail: true });
+        if (!params) {
+            return null;
+        }
+
+        const name = window.prompt(
+            '프리셋 이름을 입력하세요.',
+            existingPreset?.name || ''
+        );
+        if (name === null) {
+            return null;
+        }
+
+        const normalizedName = String(name || '').trim();
+        if (!normalizedName) {
+            this.showError('프리셋 이름을 입력해주세요.');
+            return null;
+        }
+
+        const descriptionInput = window.prompt(
+            '프리셋 설명을 입력하세요. (선택)',
+            existingPreset?.description || ''
+        );
+        if (descriptionInput === null) {
+            return null;
+        }
+
+        const shouldSetDefault = window.confirm(
+            existingPreset?.is_default
+                ? '현재 기본 프리셋입니다. 기본 프리셋으로 유지할까요?'
+                : '이 프리셋을 기본 프리셋으로 지정할까요?'
+        );
+
+        return {
+            name: normalizedName,
+            description: (descriptionInput || '').trim(),
+            is_default: shouldSetDefault,
+            params
+        };
+    }
+
+    async saveNewPreset() {
+        const payload = this.buildPresetRequest();
+        if (!payload) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/presets', {
+                method: 'POST',
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '프리셋 저장 권한이 없습니다.')
+                    : (result.error || '프리셋 저장에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            await this.loadPresets(result.id);
+            this.showSuccess(`프리셋 저장 완료: ${result.name}`);
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
+    }
+
+    async updateSelectedPreset() {
+        const preset = this.getSelectedPreset();
+        if (!preset) {
+            this.showError('업데이트할 프리셋을 선택해주세요.');
+            return;
+        }
+
+        const payload = this.buildPresetRequest(preset);
+        if (!payload) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/presets/${preset.id}`, {
+                method: 'PUT',
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '프리셋 수정 권한이 없습니다.')
+                    : (result.error || '프리셋 수정에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            await this.loadPresets(result.id);
+            this.showSuccess(`프리셋 업데이트 완료: ${result.name}`);
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
+    }
+
+    async deleteSelectedPreset() {
+        const preset = this.getSelectedPreset();
+        if (!preset) {
+            this.showError('삭제할 프리셋을 선택해주세요.');
+            return;
+        }
+
+        if (!confirm(`프리셋 "${preset.name}"을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/presets/${preset.id}`, {
+                method: 'DELETE',
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '프리셋 삭제 권한이 없습니다.')
+                    : (result.error || '프리셋 삭제에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            this.selectedPresetId = '';
+            await this.loadPresets();
+            this.showSuccess(`프리셋 삭제 완료: ${preset.name}`);
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
     }
 
     showProgress() {
@@ -852,20 +1175,7 @@ class NewsletterApp {
             const result = await response.json();
 
             if (result.params) {
-                // Populate form with historical parameters
-                if (result.params.keywords) {
-                    document.getElementById('keywordsMethod').checked = true;
-                    document.getElementById('keywords').value = Array.isArray(result.params.keywords) ? result.params.keywords.join(', ') : result.params.keywords;
-                } else if (result.params.domain) {
-                    document.getElementById('domainMethod').checked = true;
-                    document.getElementById('domain').value = result.params.domain;
-                }
-
-                if (result.params.email) {
-                    document.getElementById('email').value = result.params.email;
-                }
-
-                this.toggleInputMethod();
+                this.applyParamsToForm(result.params);
                 this.switchTab('generateTab');
             }
         } catch (error) {
