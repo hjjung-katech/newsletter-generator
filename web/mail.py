@@ -1,6 +1,5 @@
 # web/mail.py
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, cast
@@ -39,30 +38,20 @@ except ImportError:
 def _get_email_config() -> tuple[str | None, str | None]:
     """이메일 설정을 동적으로 가져옵니다 (테스트 호환성 고려)"""
     try:
-        # 1차 시도: Centralized Settings
-        from newsletter_core.public.settings import get_settings
+        from newsletter_core.public.settings import get_email_config
 
-        settings = get_settings()
-        return (
-            settings.postmark_server_token.get_secret_value()
-            if settings.postmark_server_token
-            else None,
-            settings.email_sender,
-        )
+        token, from_email = get_email_config()
+        return token, from_email
     except Exception:
-        try:
-            # 2차 시도: Config Manager
-            from newsletter_core.public.settings import config_manager
-
-            return config_manager.POSTMARK_SERVER_TOKEN, config_manager.EMAIL_SENDER
-        except (ImportError, AttributeError):
-            # 3차 시도: Direct env access (레거시)
-            postmark_token = os.getenv("POSTMARK_SERVER_TOKEN")
-            email_sender = os.getenv("EMAIL_SENDER") or os.getenv("POSTMARK_FROM_EMAIL")
-            return postmark_token, email_sender
+        return None, None
 
 
 def resolve_mail_send_callable() -> Callable[..., Any]:
+    for module_name in ("mail", "web.mail"):
+        module = sys.modules.get(module_name)
+        candidate = getattr(module, "send_email", None) if module else None
+        if callable(candidate):
+            return cast(Callable[..., Any], candidate)
     return cast(Callable[..., Any], send_email)
 
 
@@ -183,9 +172,9 @@ def send_email(to: str, subject: str, html: str, **kwargs: Any) -> Dict[str, Any
 def check_email_configuration() -> Dict[str, bool]:
     """이메일 설정 상태를 확인합니다."""
     try:
-        from newsletter_core.public.settings import config_manager
+        from newsletter_core.public.settings import validate_email_config
 
-        return cast(Dict[str, bool], config_manager.validate_email_config())
+        return cast(Dict[str, bool], validate_email_config())
     except (ImportError, AttributeError):
         # Fallback 로직
         token, from_email = _get_email_config()

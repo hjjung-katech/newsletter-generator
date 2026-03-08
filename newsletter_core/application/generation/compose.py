@@ -954,9 +954,9 @@ def load_newsletter_settings(config_file: str = "config.yml") -> Dict[str, Any]:
         Dict[str, Any]: 뉴스레터 설정 딕셔너리
     """
     try:
-        from newsletter.config_manager import config_manager
+        from newsletter_core.public.settings import get_newsletter_settings
 
-        return config_manager.get_newsletter_settings()
+        return get_newsletter_settings()
     except ImportError:
         # Fallback to original implementation
         default_settings = {

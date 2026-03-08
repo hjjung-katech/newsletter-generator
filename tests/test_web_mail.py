@@ -104,13 +104,12 @@ class TestWebMail:
         with pytest.raises((RuntimeError, RetryError)):
             send_email(to="test@example.com", subject="Test", html="<h1>Test</h1>")
 
-    @patch("newsletter_core.public.settings.config_manager")
-    def test_check_email_configuration_complete(self, mock_config_manager):
+    @patch("newsletter_core.public.settings.validate_email_config")
+    def test_check_email_configuration_complete(self, mock_validate_email_config):
         """Test email configuration check with complete setup"""
         from web.mail import check_email_configuration
 
-        # Mock the config manager instance directly
-        mock_config_manager.validate_email_config.return_value = {
+        mock_validate_email_config.return_value = {
             "postmark_token_configured": True,
             "from_email_configured": True,
             "ready": True,
@@ -122,13 +121,12 @@ class TestWebMail:
         assert config["from_email_configured"] is True
         assert config["ready"] is True
 
-    @patch("newsletter_core.public.settings.config_manager")
-    def test_check_email_configuration_incomplete(self, mock_config_manager):
+    @patch("newsletter_core.public.settings.validate_email_config")
+    def test_check_email_configuration_incomplete(self, mock_validate_email_config):
         """Test email configuration check with incomplete setup"""
         from web.mail import check_email_configuration
 
-        # Mock the config manager instance directly
-        mock_config_manager.validate_email_config.return_value = {
+        mock_validate_email_config.return_value = {
             "postmark_token_configured": False,
             "from_email_configured": False,
             "ready": False,
@@ -141,18 +139,15 @@ class TestWebMail:
         assert config["from_email_configured"] is False
         assert config["ready"] is False
 
-    @patch("newsletter_core.public.settings.config_manager")
+    @patch("newsletter_core.public.settings.validate_email_config")
     @patch("web.mail._get_email_config")
     def test_check_email_configuration_fallback(
-        self, mock_get_email_config, mock_config_manager
+        self, mock_get_email_config, mock_validate_email_config
     ):
         """Test email configuration check with fallback logic"""
         from web.mail import check_email_configuration
 
-        # Mock config_manager to raise an exception, forcing fallback
-        mock_config_manager.validate_email_config.side_effect = ImportError(
-            "Test import error"
-        )
+        mock_validate_email_config.side_effect = ImportError("Test import error")
 
         # Mock _get_email_config to return None values for fallback
         mock_get_email_config.return_value = (None, None)

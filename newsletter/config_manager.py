@@ -1,21 +1,9 @@
-import os
 from pathlib import Path
 from typing import Any, Dict
 
 import yaml  # type: ignore[import-untyped]
-from dotenv import load_dotenv
 
 DEFAULT_CONFIG_PATHS = ("config/config.yml", "config.yml")
-
-
-def _load_dotenv_if_needed() -> None:
-    """Load .env lazily to avoid import-time side effects."""
-    app_env = os.getenv("APP_ENV", "production")
-    testing = os.getenv("TESTING") == "1" or "pytest" in os.getenv(
-        "PYTEST_CURRENT_TEST", ""
-    )
-    if app_env == "development" and not testing:
-        load_dotenv(override=False)
 
 
 class ConfigManager:
@@ -52,7 +40,6 @@ class ConfigManager:
     def _load_environment_variables(self) -> None:
         """환경 변수 로딩 - Centralized Settings 사용"""
         try:
-            _load_dotenv_if_needed()
             from newsletter.centralized_settings import get_settings
 
             settings = get_settings()
