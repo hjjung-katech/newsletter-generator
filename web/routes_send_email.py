@@ -3,40 +3,14 @@
 import json
 import logging
 import sqlite3
-from types import ModuleType
-from typing import cast
 
 from flask import Flask, jsonify, request
 from flask.typing import ResponseReturnValue
 
 try:
-    from db_state import (
-        get_or_create_outbox_record,
-        hash_subject,
-        is_feature_enabled,
-        mark_outbox_failed,
-        mark_outbox_sent,
-    )
+    from mail import get_newsletter_subject, send_email_with_outbox
 except ImportError:
-    from web.db_state import (  # pragma: no cover
-        get_or_create_outbox_record,
-        hash_subject,
-        is_feature_enabled,
-        mark_outbox_failed,
-        mark_outbox_sent,
-    )
-
-
-def _resolve_mail_module() -> ModuleType:
-    """Resolve mail module in both script and package execution modes."""
-    try:
-        import mail
-
-        return cast(ModuleType, mail)
-    except ImportError:
-        from . import mail  # pragma: no cover
-
-        return cast(ModuleType, mail)
+    from .mail import get_newsletter_subject, send_email_with_outbox  # pragma: no cover
 
 
 def register_send_email_route(app: Flask, database_path: str) -> None:
@@ -75,60 +49,25 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             if not html_content:
                 return jsonify({"error": "발송할 콘텐츠가 없습니다"}), 400
 
-            mail_module = _resolve_mail_module()
-
-            keywords = params.get("keywords", [])
-            if isinstance(keywords, str):
-                keywords = [keywords]
-
-            subject = (
-                f"Newsletter: {', '.join(keywords) if keywords else 'Your Newsletter'}"
+            subject = get_newsletter_subject(result=result, params=params)
+            send_result = send_email_with_outbox(
+                db_path=database_path,
+                job_id=job_id,
+                to=email,
+                subject=subject,
+                html=html_content,
             )
+            send_key = send_result["send_key"]
 
-            outbox_enabled = is_feature_enabled("WEB_OUTBOX_ENABLED", default=True)
-            send_key = f"{job_id}:{email}:{hash_subject(subject)}"
-
-            if outbox_enabled:
-                outbox_status = get_or_create_outbox_record(
-                    db_path=database_path,
-                    send_key=send_key,
-                    job_id=job_id,
-                    recipient=email,
-                    subject_hash=hash_subject(subject),
+            if send_result.get("skipped"):
+                return jsonify(
+                    {
+                        "success": True,
+                        "message": "이미 발송된 이메일입니다",
+                        "deduplicated": True,
+                        "send_key": send_key,
+                    }
                 )
-                if outbox_status == "sent":
-                    return jsonify(
-                        {
-                            "success": True,
-                            "message": "이미 발송된 이메일입니다",
-                            "deduplicated": True,
-                            "send_key": send_key,
-                        }
-                    )
-
-            try:
-                provider_response = mail_module.send_email(
-                    to=email, subject=subject, html=html_content
-                )
-                provider_message_id = (
-                    provider_response.get("MessageID")
-                    if isinstance(provider_response, dict)
-                    else None
-                )
-                if outbox_enabled:
-                    mark_outbox_sent(
-                        db_path=database_path,
-                        send_key=send_key,
-                        provider_message_id=provider_message_id,
-                    )
-            except Exception as send_exc:
-                if outbox_enabled:
-                    mark_outbox_failed(
-                        db_path=database_path,
-                        send_key=send_key,
-                        error_message=str(send_exc),
-                    )
-                raise
 
             return jsonify(
                 {
