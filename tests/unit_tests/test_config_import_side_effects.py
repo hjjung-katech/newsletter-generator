@@ -88,8 +88,24 @@ def test_legacy_config_attributes_resolve_through_public_accessors(
         def get_major_news_sources(self) -> dict:
             return {"tier1": ["A"], "tier2": ["B"]}
 
+        def get_newsletter_settings(self) -> dict:
+            return {"newsletter_title": "Configured Title"}
+
+        def validate_email_config(self) -> dict:
+            return {
+                "postmark_token_configured": True,
+                "from_email_configured": True,
+                "ready": True,
+            }
+
+    class _DummySecret:
+        def get_secret_value(self) -> str:
+            return "postmark-test-token"
+
     class _DummySettings:
         mock_mode = True
+        email_sender = "sender@example.com"
+        postmark_server_token = _DummySecret()
 
     _clear_module_cache()
     public_settings = importlib.import_module("newsletter_core.public.settings")
@@ -106,6 +122,18 @@ def test_legacy_config_attributes_resolve_through_public_accessors(
     assert legacy_config.MAJOR_NEWS_SOURCES == {"tier1": ["A"], "tier2": ["B"]}
     assert legacy_config.ALL_MAJOR_NEWS_SOURCES == ["A", "B"]
     assert legacy_config.MOCK_MODE is True
+    assert public_settings.get_newsletter_settings() == {
+        "newsletter_title": "Configured Title"
+    }
+    assert public_settings.get_email_config() == (
+        "postmark-test-token",
+        "sender@example.com",
+    )
+    assert public_settings.validate_email_config() == {
+        "postmark_token_configured": True,
+        "from_email_configured": True,
+        "ready": True,
+    }
 
 
 @pytest.mark.unit
