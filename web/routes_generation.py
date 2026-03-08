@@ -60,8 +60,14 @@ try:
 except ImportError:
     from web.analytics import record_schedule_event  # pragma: no cover
 
+from web.types import GenerateNewsletterRequest
 
 logger = logging.getLogger("web.routes_generation")
+
+
+def _validate_generate_request(data: dict[str, Any]) -> GenerateNewsletterRequest:
+    """Validate generation request payload without runtime dynamic loading."""
+    return GenerateNewsletterRequest(**data)
 
 
 def register_generation_routes(
@@ -128,22 +134,9 @@ def register_generation_routes(
                 log_info(logger, "generate.request.empty")
                 return jsonify({"error": "No data provided"}), 400
 
-            # Validate request using Pydantic
             try:
-                # Import here to avoid conflicts with Python's built-in types module
-                import importlib.util
-                import os
-
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-
-                spec = importlib.util.spec_from_file_location(
-                    "web.types", os.path.join(current_dir, "types.py")
-                )
-                web_types_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(web_types_module)
-
-                validated_data = web_types_module.GenerateNewsletterRequest(**data)
-            except (ValueError, Exception) as e:
+                validated_data = _validate_generate_request(data)
+            except Exception as e:
                 log_exception(logger, "generate.request.invalid", e)
                 return jsonify({"error": f"Invalid request: {str(e)}"}), 400
 

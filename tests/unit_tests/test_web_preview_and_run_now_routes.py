@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -61,6 +62,37 @@ def test_generate_route_accepts_preview_only_field(tmp_path: Path) -> None:
     assert payload["status"] == "processing"
     assert payload["deduplicated"] is False
     assert payload["idempotency_key"].startswith("generate:")
+
+
+def test_generate_route_avoids_dynamic_module_loading(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _build_generation_app(str(tmp_path / "storage.db"))
+
+    def fail_spec_from_file_location(*args: object, **kwargs: object) -> None:
+        raise AssertionError("dynamic module loading should not be used")
+
+    monkeypatch.setattr(
+        importlib.util, "spec_from_file_location", fail_spec_from_file_location
+    )
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/generate",
+            data=json.dumps(
+                {
+                    "keywords": ["AI", "robotics"],
+                    "template_style": "compact",
+                    "period": 14,
+                }
+            ),
+            content_type="application/json",
+        )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload is not None
+    assert payload["deduplicated"] is False
 
 
 def test_schedule_run_now_executes_scheduled_job(
