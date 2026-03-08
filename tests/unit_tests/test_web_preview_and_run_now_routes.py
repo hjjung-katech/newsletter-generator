@@ -25,15 +25,20 @@ EXPECTED_GENERATE_RESPONSE_KEYS = {
 }
 
 
-def _build_generation_app(database_path: str) -> Flask:
+def _build_generation_app(
+    database_path: str,
+    *,
+    in_memory_tasks: dict[str, Any] | None = None,
+    task_queue: Any = None,
+) -> Flask:
     app = Flask(__name__)
     app.config["TESTING"] = True
     routes_generation.register_generation_routes(
         app=app,
         database_path=database_path,
         newsletter_cli=object(),
-        in_memory_tasks={},
-        task_queue=None,
+        in_memory_tasks={} if in_memory_tasks is None else in_memory_tasks,
+        task_queue=task_queue,
         redis_conn=None,
     )
     return app
@@ -93,6 +98,44 @@ def test_generate_route_avoids_dynamic_module_loading(
     payload = response.get_json()
     assert payload is not None
     assert payload["deduplicated"] is False
+
+
+def test_generate_route_enqueues_with_resolved_job_metadata(tmp_path: Path) -> None:
+    database_path = str(tmp_path / "storage.db")
+    queued: dict[str, Any] = {}
+
+    class FakeQueue:
+        def enqueue(self, func: Any, *args: Any, **kwargs: Any) -> None:
+            queued["func"] = func
+            queued["args"] = args
+            queued["kwargs"] = kwargs
+
+    app = _build_generation_app(database_path, task_queue=FakeQueue())
+
+    with app.test_client() as client:
+        response = client.post(
+            "/api/generate",
+            data=json.dumps(
+                {
+                    "keywords": ["AI", "robotics"],
+                    "email": "queue@example.com",
+                }
+            ),
+            content_type="application/json",
+        )
+
+    assert response.status_code == 202
+    payload = response.get_json()
+    assert payload is not None
+    assert set(payload) == EXPECTED_GENERATE_RESPONSE_KEYS
+    assert payload["status"] == "queued"
+    assert payload["deduplicated"] is False
+    assert queued["func"] is routes_generation.generate_newsletter_task
+    assert queued["args"][1] == payload["job_id"]
+    assert queued["args"][2] is True
+    assert queued["args"][3] == payload["idempotency_key"]
+    assert queued["args"][4] == database_path
+    assert queued["kwargs"]["job_id"] == payload["job_id"]
 
 
 def test_schedule_run_now_executes_scheduled_job(
