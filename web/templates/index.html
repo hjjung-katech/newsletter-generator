@@ -118,6 +118,47 @@
                         </div>
                     </div>
 
+                    <div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <div class="flex flex-col gap-4">
+                            <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
+                                <div class="flex-1">
+                                    <label for="archiveSearchInput" class="block text-sm font-medium text-gray-700">과거 뉴스레터 참고 검색</label>
+                                    <div class="mt-1 flex gap-2">
+                                        <input id="archiveSearchInput"
+                                               type="text"
+                                               placeholder="키워드, 도메인, 제목으로 검색"
+                                               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                        <button id="searchArchiveBtn"
+                                                class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                            검색
+                                        </button>
+                                    </div>
+                                </div>
+                                <button id="clearArchiveSelectionBtn"
+                                        class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                                    참고본 초기화
+                                </button>
+                            </div>
+                            <p id="archiveStatus" class="text-sm text-gray-600">
+                                운영 토큰이 있으면 과거 뉴스레터를 검색해 새 생성본의 참고 섹션에 붙일 수 있습니다.
+                            </p>
+                            <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                                <div class="rounded-lg border border-white bg-white p-4 shadow-sm">
+                                    <h4 class="text-sm font-semibold text-gray-900">선택된 참고본</h4>
+                                    <div id="selectedArchiveReferences" class="mt-3 space-y-3">
+                                        <p class="text-sm text-gray-500">선택된 참고본이 없습니다.</p>
+                                    </div>
+                                </div>
+                                <div class="rounded-lg border border-white bg-white p-4 shadow-sm">
+                                    <h4 class="text-sm font-semibold text-gray-900">검색 결과</h4>
+                                    <div id="archiveSearchResults" class="mt-3 space-y-3">
+                                        <p class="text-sm text-gray-500">검색어를 입력하면 최근 뉴스레터를 불러옵니다.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Input Method Selection -->
                     <div class="mb-6">
                         <label class="text-base font-medium text-gray-900">입력 방식</label>

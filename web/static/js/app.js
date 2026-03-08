@@ -10,6 +10,8 @@ class NewsletterApp {
         this.adminTokenStorageKey = 'newsletter-admin-api-token';
         this.savedPresets = [];
         this.selectedPresetId = '';
+        this.archiveSearchResults = [];
+        this.selectedArchiveReferences = [];
         this.analyticsData = null;
         this.sourcePolicies = [];
         this.editingSourcePolicyId = '';
@@ -23,6 +25,8 @@ class NewsletterApp {
         this.toggleScheduleSettings(document.getElementById('enableSchedule').checked);
         this.updateScheduleOptions();
         this.syncPresetActions();
+        this.renderSelectedArchiveReferences();
+        this.renderArchiveSearchResults();
         this.loadPresets();
     }
 
@@ -56,6 +60,8 @@ class NewsletterApp {
         document.getElementById('adminToken').addEventListener('input', (e) => {
             this.persistAdminToken(e.target.value);
             this.loadPresets(this.selectedPresetId);
+            this.loadArchiveSearchResults(document.getElementById('archiveSearchInput').value);
+            this.hydrateArchiveReferences(this.selectedArchiveReferences.map((reference) => reference.job_id));
             this.loadAnalytics();
             this.loadSourcePolicies();
         });
@@ -65,6 +71,14 @@ class NewsletterApp {
         document.getElementById('updatePresetBtn').addEventListener('click', () => this.updateSelectedPreset());
         document.getElementById('deletePresetBtn').addEventListener('click', () => this.deleteSelectedPreset());
         document.getElementById('refreshPresetsBtn').addEventListener('click', () => this.loadPresets(this.selectedPresetId));
+        document.getElementById('searchArchiveBtn').addEventListener('click', () => this.loadArchiveSearchResults());
+        document.getElementById('clearArchiveSelectionBtn').addEventListener('click', () => this.clearArchiveReferences());
+        document.getElementById('archiveSearchInput').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.loadArchiveSearchResults();
+            }
+        });
         document.getElementById('refreshAnalyticsBtn').addEventListener('click', () => this.loadAnalytics());
         document.getElementById('refreshSourcePoliciesBtn').addEventListener('click', () => this.loadSourcePolicies());
         document.getElementById('saveSourcePolicyBtn').addEventListener('click', () => this.saveSourcePolicy());
@@ -137,6 +151,213 @@ class NewsletterApp {
             button.classList.toggle('opacity-50', !hasSelection);
             button.classList.toggle('cursor-not-allowed', !hasSelection);
         });
+    }
+
+    setArchiveStatus(message, tone = 'gray') {
+        const status = document.getElementById('archiveStatus');
+        const toneClassMap = {
+            gray: 'text-gray-600',
+            green: 'text-green-600',
+            yellow: 'text-amber-600',
+            red: 'text-red-600'
+        };
+
+        status.className = `text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        status.textContent = message;
+    }
+
+    normalizeArchiveReference(entry = {}) {
+        return {
+            job_id: entry.job_id,
+            title: entry.title || entry.job_id,
+            snippet: entry.snippet || '선택된 참고본 세부 정보를 불러오지 못했습니다.',
+            source_value: entry.source_value || '',
+            created_at: entry.created_at || null
+        };
+    }
+
+    isArchiveReferenceSelected(jobId) {
+        return this.selectedArchiveReferences.some((reference) => reference.job_id === jobId);
+    }
+
+    renderSelectedArchiveReferences() {
+        const container = document.getElementById('selectedArchiveReferences');
+
+        if (!this.selectedArchiveReferences.length) {
+            container.innerHTML = '<p class="text-sm text-gray-500">선택된 참고본이 없습니다.</p>';
+            return;
+        }
+
+        container.innerHTML = this.selectedArchiveReferences.map((reference) => `
+            <div class="rounded-md border border-blue-100 bg-blue-50 p-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-900">${reference.title}</p>
+                        <p class="mt-1 text-sm text-gray-600">${reference.snippet}</p>
+                        <p class="mt-2 text-xs text-gray-500">${reference.source_value || reference.job_id}</p>
+                    </div>
+                    <button onclick="app.removeArchiveReference('${reference.job_id}')"
+                            class="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
+                        제거
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    renderArchiveSearchResults() {
+        const container = document.getElementById('archiveSearchResults');
+
+        if (!this.archiveSearchResults.length) {
+            container.innerHTML = '<p class="text-sm text-gray-500">검색어를 입력하면 최근 뉴스레터를 불러옵니다.</p>';
+            return;
+        }
+
+        container.innerHTML = this.archiveSearchResults.map((reference) => {
+            const isSelected = this.isArchiveReferenceSelected(reference.job_id);
+            return `
+                <div class="rounded-md border border-gray-200 p-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900">${reference.title}</p>
+                            <p class="mt-1 text-sm text-gray-600">${reference.snippet}</p>
+                            <p class="mt-2 text-xs text-gray-500">${reference.source_value || reference.job_id}</p>
+                        </div>
+                        <button onclick="app.toggleArchiveReference('${reference.job_id}')"
+                                class="rounded-md px-2 py-1 text-xs font-medium ${isSelected ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}">
+                            ${isSelected ? '선택 해제' : '참고 추가'}
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async loadArchiveSearchResults(queryOverride = null) {
+        const query = typeof queryOverride === 'string'
+            ? queryOverride.trim()
+            : document.getElementById('archiveSearchInput').value.trim();
+
+        if (!this.hasAdminToken()) {
+            this.archiveSearchResults = [];
+            this.renderArchiveSearchResults();
+            this.setArchiveStatus(this.getProtectedRouteMessage('운영 토큰이 있어야 과거 뉴스레터를 검색할 수 있습니다.'), 'yellow');
+            return;
+        }
+
+        try {
+            const params = new URLSearchParams({
+                limit: '8'
+            });
+            if (query) {
+                params.set('q', query);
+            }
+
+            const response = await fetch(`/api/archive/search?${params.toString()}`, {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '과거 뉴스레터를 불러올 수 없습니다.')
+                    : (result.error || '과거 뉴스레터를 불러올 수 없습니다.');
+                this.archiveSearchResults = [];
+                this.renderArchiveSearchResults();
+                this.setArchiveStatus(message, 'yellow');
+                return;
+            }
+
+            this.archiveSearchResults = Array.isArray(result.results)
+                ? result.results.map((entry) => this.normalizeArchiveReference(entry))
+                : [];
+            this.renderArchiveSearchResults();
+            this.setArchiveStatus(
+                this.archiveSearchResults.length
+                    ? `${this.archiveSearchResults.length}개의 과거 뉴스레터를 찾았습니다.`
+                    : '조건에 맞는 과거 뉴스레터가 없습니다.',
+                this.archiveSearchResults.length ? 'green' : 'gray'
+            );
+        } catch (error) {
+            this.archiveSearchResults = [];
+            this.renderArchiveSearchResults();
+            this.setArchiveStatus(`과거 뉴스레터 조회 실패: ${error.message}`, 'red');
+        }
+    }
+
+    async hydrateArchiveReferences(referenceIds = []) {
+        const normalizedIds = Array.isArray(referenceIds)
+            ? referenceIds.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
+            : [];
+
+        if (!normalizedIds.length) {
+            this.selectedArchiveReferences = [];
+            this.renderSelectedArchiveReferences();
+            return;
+        }
+
+        const placeholderMap = new Map(this.selectedArchiveReferences.map((reference) => [reference.job_id, reference]));
+        this.selectedArchiveReferences = normalizedIds.map((jobId) => placeholderMap.get(jobId) || this.normalizeArchiveReference({ job_id: jobId, title: jobId }));
+        this.renderSelectedArchiveReferences();
+
+        if (!this.hasAdminToken()) {
+            this.setArchiveStatus('선택된 참고본 ID는 유지됩니다. 운영 토큰을 입력하면 세부 정보를 복원합니다.', 'yellow');
+            return;
+        }
+
+        const loadedReferences = await Promise.all(normalizedIds.map(async (jobId) => {
+            try {
+                const response = await fetch(`/api/archive/${jobId}`, {
+                    headers: this.buildHeaders({ includeAdminToken: true })
+                });
+                if (!response.ok) {
+                    return placeholderMap.get(jobId) || this.normalizeArchiveReference({ job_id: jobId, title: jobId });
+                }
+                const payload = await response.json();
+                return this.normalizeArchiveReference(payload);
+            } catch (error) {
+                return placeholderMap.get(jobId) || this.normalizeArchiveReference({ job_id: jobId, title: jobId });
+            }
+        }));
+
+        this.selectedArchiveReferences = loadedReferences;
+        this.renderSelectedArchiveReferences();
+    }
+
+    toggleArchiveReference(jobId) {
+        if (this.isArchiveReferenceSelected(jobId)) {
+            this.removeArchiveReference(jobId);
+            return;
+        }
+
+        if (this.selectedArchiveReferences.length >= 3) {
+            this.showError('과거 뉴스레터 참고본은 최대 3개까지 선택할 수 있습니다.');
+            return;
+        }
+
+        const match = this.archiveSearchResults.find((reference) => reference.job_id === jobId);
+        if (!match) {
+            this.showError('선택한 참고본 정보를 찾을 수 없습니다.');
+            return;
+        }
+
+        this.selectedArchiveReferences = [...this.selectedArchiveReferences, match];
+        this.renderSelectedArchiveReferences();
+        this.renderArchiveSearchResults();
+        this.setArchiveStatus(`${this.selectedArchiveReferences.length}개의 참고본을 선택했습니다.`, 'green');
+    }
+
+    removeArchiveReference(jobId) {
+        this.selectedArchiveReferences = this.selectedArchiveReferences.filter((reference) => reference.job_id !== jobId);
+        this.renderSelectedArchiveReferences();
+        this.renderArchiveSearchResults();
+    }
+
+    clearArchiveReferences() {
+        this.selectedArchiveReferences = [];
+        this.renderSelectedArchiveReferences();
+        this.renderArchiveSearchResults();
+        this.setArchiveStatus('선택된 참고본을 초기화했습니다.');
     }
 
     setSourcePolicyStatus(message, tone = 'gray') {
@@ -406,6 +627,7 @@ class NewsletterApp {
         document.getElementById('email').value = params.email || '';
         this.applyScheduleFromRRule(params.rrule || '');
         this.toggleInputMethod();
+        this.hydrateArchiveReferences(params.archive_reference_ids || []);
     }
 
     applyPresetToForm(preset) {
@@ -536,6 +758,9 @@ class NewsletterApp {
         data.period = parseInt(document.getElementById('period').value, 10);
         data.template_style = document.getElementById('templateStyle').value;
         data.email_compatible = document.getElementById('emailCompatible').checked;
+        if (this.selectedArchiveReferences.length) {
+            data.archive_reference_ids = this.selectedArchiveReferences.map((reference) => reference.job_id);
+        }
 
         // Schedule data
         const enableSchedule = document.getElementById('enableSchedule').checked;
@@ -927,6 +1152,9 @@ class NewsletterApp {
         // Input Parameters
         if (result.input_params) {
             const params = result.input_params;
+            const archiveReferences = Array.isArray(result.archive_references)
+                ? result.archive_references
+                : [];
             detailsHtml += `
                 <div class="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
                     <h4 class="text-lg font-semibold text-gray-800 mb-3">
@@ -943,6 +1171,19 @@ class NewsletterApp {
                             <div class="mb-2">
                                 <span class="font-medium text-gray-700">Domain:</span>
                                 <span class="ml-2 px-2 py-1 bg-purple-100 text-purple-800 rounded">${params.domain}</span>
+                            </div>
+                        ` : ''}
+                        ${archiveReferences.length ? `
+                            <div class="mt-3 rounded-md border border-blue-100 bg-blue-50 p-3">
+                                <div class="font-medium text-gray-700">Archive References</div>
+                                <ul class="mt-2 space-y-2">
+                                    ${archiveReferences.map((reference) => `
+                                        <li class="text-sm text-gray-600">
+                                            <span class="font-medium text-gray-800">${reference.title}</span>
+                                            <span class="block text-xs text-gray-500">${reference.source_value || reference.job_id}</span>
+                                        </li>
+                                    `).join('')}
+                                </ul>
                             </div>
                         ` : ''}
                     </div>
