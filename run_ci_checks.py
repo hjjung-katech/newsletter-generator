@@ -447,13 +447,31 @@ class CIChecker:
 
     def run_tests(self, quick: bool = False) -> bool:
         """테스트 실행"""
-        self.print_header("단위 테스트 실행")
-
         if quick:
             print(f"  {Colors.WARNING}빠른 모드에서는 테스트를 건너뜁니다{Colors.ENDC}")
             return True
 
-        # 환경 변수 설정
+        return self._run_pytest_check(
+            check_name="단위 테스트",
+            header="단위 테스트 실행",
+            args=["-m", "unit", "--tb=short", "-q"],
+        )
+
+    def run_contract_tests(self) -> bool:
+        """Canonical runtime contract 테스트 실행"""
+        return self._run_pytest_check(
+            check_name="Canonical 계약 테스트",
+            header="Canonical Contract 테스트",
+            args=[
+                "tests/contract/test_generation_facade.py",
+                "tests/contract/test_web_runtime_contract.py",
+                "--tb=short",
+                "-q",
+            ],
+        )
+
+    def _build_test_env(self) -> dict[str, str]:
+        """로컬 테스트용 공통 환경 변수."""
         env = os.environ.copy()
         env.update(
             {
@@ -467,29 +485,39 @@ class CIChecker:
                 "EMAIL_SENDER": "test@example.com",
             }
         )
+        return env
 
-        cmd = [
-            sys.executable,
-            "-m",
-            "pytest",
-            "-m",
-            "unit",
-            "--tb=short",
-            "-q",
-        ]
-
+    def _run_pytest_check(
+        self,
+        *,
+        check_name: str,
+        header: str,
+        args: List[str],
+    ) -> bool:
+        """공통 pytest 실행기."""
+        self.print_header(header)
         print(f"  {Colors.OKCYAN}테스트 실행 중... (시간이 걸릴 수 있습니다){Colors.ENDC}")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+
+        cmd = [sys.executable, "-m", "pytest"] + args
+        result = subprocess.run(
+            cmd,
+            env=self._build_test_env(),
+            capture_output=True,
+            text=True,
+        )
 
         if result.returncode == 0:
-            self.print_status("단위 테스트", True)
+            self.print_status(check_name, True)
             return True
-        else:
-            self.print_status("단위 테스트", False, "테스트 실패")
-            if result.stdout:
-                print(f"\n{Colors.FAIL}테스트 출력:{Colors.ENDC}")
-                print(result.stdout[-2000:])  # 마지막 2000자만 표시
-            return False
+
+        self.print_status(check_name, False, "테스트 실패")
+        if result.stdout:
+            print(f"\n{Colors.FAIL}테스트 출력:{Colors.ENDC}")
+            print(result.stdout[-2000:])
+        elif result.stderr:
+            print(f"\n{Colors.FAIL}테스트 오류:{Colors.ENDC}")
+            print(result.stderr[-2000:])
+        return False
 
     def check_pre_commit(self) -> bool:
         """Pre-commit hooks 설치 확인"""
@@ -549,6 +577,7 @@ class CIChecker:
         # 테스트는 full 모드에서만
         if full:
             checks.append(("단위 테스트", lambda: self.run_tests(quick=False)))
+            checks.append(("Canonical 계약 테스트", self.run_contract_tests))
 
         # Pre-commit hooks 확인
         checks.append(("Pre-commit hooks", self.check_pre_commit))

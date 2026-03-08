@@ -60,7 +60,7 @@ doctor: ## 작업 경로/인터프리터 전제 조건 검증
 check: doctor test-quick docs-check skills-check ## 표준 로컬 게이트
 	@echo "✅ check 완료"
 
-check-full: doctor test-full docs-check skills-check ## PR 전 전체 게이트
+check-full: doctor test-full docs-check skills-check ops-safety-check ## PR 전 전체 게이트
 	@echo "✅ check-full 완료"
 
 install: ## 의존성 설치
@@ -185,7 +185,7 @@ test-all: ## 모든 테스트 실행
 
 test-coverage: ## 커버리지 포함 테스트
 	@echo "📊 커버리지 측정 중..."
-	MOCK_MODE=true $(PYTHON) -m pytest -m unit --cov=newsletter --cov-report=html --cov-report=term
+	MOCK_MODE=true $(PYTHON) -m pytest -m unit --cov=newsletter --cov=newsletter_core --cov=web --cov-report=html --cov-report=term
 
 ci-check: ## CI 검사 실행 (GitHub Actions와 동일)
 	@echo "🚀 CI 검사 실행 중..."

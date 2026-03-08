@@ -274,7 +274,7 @@ jobs:
           POSTMARK_SERVER_TOKEN: dummy-token
           EMAIL_SENDER: test@example.com
         run: |
-          pytest -m unit --tb=short --junitxml=test-results-unit.xml --cov=newsletter --cov-report=xml --cov-report=html
+          pytest -m unit --tb=short --junitxml=test-results-unit.xml --cov=newsletter --cov=newsletter_core --cov=web --cov-report=xml --cov-report=html
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
