@@ -12,8 +12,8 @@ from flask.typing import ResponseReturnValue
 
 LOGGER = logging.getLogger(__name__)
 
-ADMIN_TOKEN_ENV_VAR = "ADMIN_API_TOKEN"
-ADMIN_TOKEN_HEADER = "X-Admin-Token"
+ADMIN_TOKEN_ENV_VAR = "ADMIN_API_TOKEN"  # nosec B105
+ADMIN_TOKEN_HEADER = "X-Admin-Token"  # nosec B105
 
 _PROTECTED_PREFIXES: tuple[str, ...] = (
     "/api/history",
@@ -72,11 +72,11 @@ def _resolve_expected_admin_token(
 
 
 def _resolve_provided_admin_token() -> str | None:
-    explicit_token = request.headers.get(ADMIN_TOKEN_HEADER, "").strip()
+    explicit_token = str(request.headers.get(ADMIN_TOKEN_HEADER, "")).strip()
     if explicit_token:
         return explicit_token
 
-    auth_header = request.headers.get("Authorization", "").strip()
+    auth_header = str(request.headers.get("Authorization", "")).strip()
     if auth_header.startswith("Bearer "):
         return auth_header.removeprefix("Bearer ").strip() or None
 
@@ -92,7 +92,7 @@ def configure_access_control(
     """Register a minimal admin-token guard for sensitive operational routes."""
     env = environ or os.environ
 
-    @app.before_request
+    @app.before_request  # type: ignore[untyped-decorator]
     def require_admin_api_token() -> ResponseReturnValue | None:
         if request.method == "OPTIONS" or not is_protected_route(
             request.path, prefixes
