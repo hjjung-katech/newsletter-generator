@@ -63,6 +63,7 @@ class NewsletterApp {
 
         // Navigation buttons
         document.getElementById('historyBtn').addEventListener('click', () => this.switchTab('historyTab'));
+        document.getElementById('approvalBtn').addEventListener('click', () => this.switchTab('approvalTab'));
         document.getElementById('scheduleBtn').addEventListener('click', () => this.switchTab('scheduleManageTab'));
     }
 
@@ -230,6 +231,7 @@ class NewsletterApp {
         const panelMap = {
             'generateTab': 'generatePanel',
             'historyTab': 'historyPanel',
+            'approvalTab': 'approvalPanel',
             'scheduleManageTab': 'scheduleManagePanel'
         };
 
@@ -240,6 +242,8 @@ class NewsletterApp {
             // Load data for specific tabs
             if (tabId === 'historyTab') {
                 this.loadHistory();
+            } else if (tabId === 'approvalTab') {
+                this.loadApprovals();
             } else if (tabId === 'scheduleManageTab') {
                 this.loadSchedules();
             }
@@ -702,6 +706,11 @@ class NewsletterApp {
                     if (result.result) {
                         result.result.job_id = jobId;
                         result.result.sent = result.sent;
+                        result.result.approval_status = result.approval_status ?? result.result.approval_status;
+                        result.result.delivery_status = result.delivery_status ?? result.result.delivery_status;
+                        result.result.approved_at = result.approved_at ?? result.result.approved_at;
+                        result.result.rejected_at = result.rejected_at ?? result.result.rejected_at;
+                        result.result.approval_note = result.approval_note ?? result.result.approval_note;
                     }
                     this.showResults(result.result);
 
@@ -744,6 +753,38 @@ class NewsletterApp {
 
         // Create detailed results display
         let detailsHtml = '';
+
+        if (result.delivery_status || result.approval_status) {
+            const approvalLabelMap = {
+                pending: ['승인 대기', 'bg-amber-100 text-amber-800'],
+                approved: ['승인 완료', 'bg-green-100 text-green-800'],
+                rejected: ['반려됨', 'bg-red-100 text-red-800'],
+                not_requested: ['승인 불필요', 'bg-slate-100 text-slate-700']
+            };
+            const deliveryLabelMap = {
+                draft: ['Draft', 'bg-slate-100 text-slate-700'],
+                pending_approval: ['승인 대기', 'bg-amber-100 text-amber-800'],
+                approved: ['승인됨', 'bg-blue-100 text-blue-800'],
+                sent: ['발송 완료', 'bg-green-100 text-green-800'],
+                send_failed: ['발송 실패', 'bg-red-100 text-red-800']
+            };
+            const approvalBadge = approvalLabelMap[result.approval_status];
+            const deliveryBadge = deliveryLabelMap[result.delivery_status];
+            detailsHtml += `
+                <div class="mb-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                    <h4 class="text-lg font-semibold text-amber-900 mb-3">
+                        <i class="fas fa-shield-alt mr-2"></i>Delivery Review
+                    </h4>
+                    <div class="flex flex-wrap gap-2 text-sm">
+                        ${approvalBadge ? `<span class="inline-flex px-2.5 py-1 rounded-full font-semibold ${approvalBadge[1]}">Approval: ${approvalBadge[0]}</span>` : ''}
+                        ${deliveryBadge ? `<span class="inline-flex px-2.5 py-1 rounded-full font-semibold ${deliveryBadge[1]}">Delivery: ${deliveryBadge[0]}</span>` : ''}
+                    </div>
+                    ${result.approved_at ? `<p class="mt-2 text-sm text-gray-600">승인 시각: ${new Date(result.approved_at).toLocaleString()}</p>` : ''}
+                    ${result.rejected_at ? `<p class="mt-2 text-sm text-gray-600">반려 시각: ${new Date(result.rejected_at).toLocaleString()}</p>` : ''}
+                    ${result.approval_note ? `<p class="mt-2 text-sm text-gray-600">메모: ${result.approval_note}</p>` : ''}
+                </div>
+            `;
+        }
 
         // Generation Statistics
         if (result.generation_stats) {
@@ -890,6 +931,7 @@ class NewsletterApp {
 
         if (this.hasAdminToken()) {
             this.loadHistory();
+            this.loadApprovals();
         }
     }
 
@@ -1004,9 +1046,23 @@ class NewsletterApp {
                                 item.status === 'failed' ? 'bg-red-100 text-red-800' :
                                 'bg-yellow-100 text-yellow-800'
                             }">${item.status}</span>
+                            ${item.approval_status && item.approval_status !== 'not_requested' ? `
+                                <span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                                    item.approval_status === 'pending' ? 'bg-amber-100 text-amber-800' :
+                                    item.approval_status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-red-100 text-red-800'
+                                }">${item.approval_status}</span>
+                            ` : ''}
                         </div>
                         <div class="space-x-2">
-                            ${item.status === 'completed' ? `
+                            ${item.status === 'completed' && item.approval_status === 'pending' ? `
+                                <button onclick="app.viewHistoryItem('${item.id}')"
+                                        class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
+                                <button onclick="app.approveHistoryItem('${item.id}')"
+                                        class="text-emerald-600 hover:text-emerald-900 text-sm">승인</button>
+                                <button onclick="app.rejectHistoryItem('${item.id}')"
+                                        class="text-red-600 hover:text-red-900 text-sm">반려</button>
+                            ` : item.status === 'completed' ? `
                                 <button onclick="app.viewHistoryItem('${item.id}')"
                                         class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
                                 <button onclick="app.rerunHistoryItem('${item.id}')"
@@ -1018,6 +1074,63 @@ class NewsletterApp {
             `).join('');
         } catch (error) {
             historyList.innerHTML = `<p class="text-red-600">히스토리 조회 실패: ${error.message}</p>`;
+        }
+    }
+
+    async loadApprovals() {
+        const approvalsList = document.getElementById('approvalsList');
+
+        try {
+            const response = await fetch('/api/approvals', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const approvals = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(approvals.error || '승인 대기함을 불러올 수 없습니다.')
+                    : (approvals.error || '승인 대기함을 불러올 수 없습니다.');
+                approvalsList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                return;
+            }
+
+            if (approvals.length === 0) {
+                approvalsList.innerHTML = '<p class="text-gray-500">승인 대기 중인 뉴스레터가 없습니다.</p>';
+                return;
+            }
+
+            approvalsList.innerHTML = approvals.map(item => `
+                <div class="border-b border-gray-200 py-4">
+                    <div class="flex justify-between items-start gap-4">
+                        <div>
+                            <h4 class="text-sm font-medium text-gray-900">
+                                ${item.params?.keywords ?
+                                    `키워드: ${Array.isArray(item.params.keywords) ? item.params.keywords.join(', ') : item.params.keywords}` :
+                                    `도메인: ${item.params?.domain || 'Unknown'}`}
+                            </h4>
+                            <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
+                            <p class="text-sm text-gray-500">이메일: ${item.params?.email || '미지정'}</p>
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">${item.approval_status}</span>
+                            <span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">${item.delivery_status}</span>
+                            ${item.approval_note ? `<p class="mt-2 text-sm text-gray-500">메모: ${item.approval_note}</p>` : ''}
+                        </div>
+                        <div class="space-x-2 whitespace-nowrap">
+                            <button onclick="app.viewHistoryItem('${item.id}')"
+                                    class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
+                            <button onclick="app.approveHistoryItem('${item.id}')"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm">
+                                승인
+                            </button>
+                            <button onclick="app.rejectHistoryItem('${item.id}')"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
+                                반려
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            approvalsList.innerHTML = `<p class="text-red-600">승인 대기함 조회 실패: ${error.message}</p>`;
         }
     }
 
@@ -1154,6 +1267,11 @@ class NewsletterApp {
                 console.log('HTML content found, switching to generate tab');
                 // Add job_id to result for iframe src
                 result.result.job_id = itemId;
+                result.result.approval_status = result.approval_status ?? result.result.approval_status;
+                result.result.delivery_status = result.delivery_status ?? result.result.delivery_status;
+                result.result.approved_at = result.approved_at ?? result.result.approved_at;
+                result.result.rejected_at = result.rejected_at ?? result.result.rejected_at;
+                result.result.approval_note = result.approval_note ?? result.result.approval_note;
                 this.currentJobId = itemId;
                 // Switch to generate tab and show the result
                 this.switchTab('generateTab');
@@ -1166,6 +1284,58 @@ class NewsletterApp {
         } catch (error) {
             console.error('Error in viewHistoryItem:', error);
             alert('Failed to load item: ' + error.message);
+        }
+    }
+
+    async approveHistoryItem(itemId) {
+        try {
+            const response = await fetch(`/api/approvals/${itemId}/approve`, {
+                method: 'POST',
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
+                body: JSON.stringify({})
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '승인 권한이 없습니다.')
+                    : (result.error || '승인에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            this.showSuccess('승인 완료. 이제 이메일 발송 버튼으로 발송할 수 있습니다.');
+            await this.loadApprovals();
+            await this.loadHistory();
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
+    }
+
+    async rejectHistoryItem(itemId) {
+        const note = prompt('반려 사유를 입력하세요. (선택)');
+
+        try {
+            const response = await fetch(`/api/approvals/${itemId}/reject`, {
+                method: 'POST',
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
+                body: JSON.stringify({ note: note || '' })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '반려 권한이 없습니다.')
+                    : (result.error || '반려에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            this.showSuccess('뉴스레터를 반려하고 draft 상태로 유지했습니다.');
+            await this.loadApprovals();
+            await this.loadHistory();
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
         }
     }
 
