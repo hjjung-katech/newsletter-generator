@@ -12,6 +12,14 @@ try:
 except ImportError:
     from .mail import get_newsletter_subject, send_email_with_outbox  # pragma: no cover
 
+try:
+    from ops_logging import log_exception, log_info
+except ImportError:
+    from web.ops_logging import log_exception, log_info  # pragma: no cover
+
+
+logger = logging.getLogger("web.routes_send_email")
+
 
 def register_send_email_route(app: Flask, database_path: str) -> None:
     """Register send-email route on the given Flask app."""
@@ -60,6 +68,13 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             send_key = send_result["send_key"]
 
             if send_result.get("skipped"):
+                log_info(
+                    logger,
+                    "email.send.deduplicated",
+                    job_id=job_id,
+                    email=email,
+                    send_key=send_key,
+                )
                 return jsonify(
                     {
                         "success": True,
@@ -69,6 +84,13 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
                     }
                 )
 
+            log_info(
+                logger,
+                "email.send.completed",
+                job_id=job_id,
+                email=email,
+                send_key=send_key,
+            )
             return jsonify(
                 {
                     "success": True,
@@ -79,5 +101,11 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             )
 
         except Exception as e:
-            logging.error(f"Email sending failed: {e}")
+            log_exception(
+                logger,
+                "email.send.failed",
+                e,
+                job_id=locals().get("job_id"),
+                email=locals().get("email"),
+            )
             return jsonify({"error": f"이메일 발송 실패: {str(e)}"}), 500
