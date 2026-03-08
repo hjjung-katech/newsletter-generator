@@ -5,9 +5,10 @@ Sentry initialization helpers for the Flask web runtime.
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Callable
 from typing import Any
+
+from newsletter_core.public.settings import get_setting_value
 
 SentryUserContextSetter = Callable[..., None]
 SentryTagSetter = Callable[..., None]
@@ -90,37 +91,18 @@ def setup_sentry() -> SentryCallbacks:
         _noop_set_sentry_tags,
     )
 
-    try:
-        from newsletter_core.public.settings import get_settings
-
-        settings = get_settings()
-        if settings.sentry_dsn:
-            return _init_sentry(
-                dsn=settings.sentry_dsn,
-                traces_sample_rate=settings.sentry_traces_sample_rate,
-                environment=settings.environment,
-                release=settings.app_version,
-                profiles_sample_rate=settings.sentry_profiles_sample_rate,
-                success_label="[OK] Sentry initialized successfully",
-            )
-
+    dsn = get_setting_value("SENTRY_DSN")
+    if not dsn:
         print("[INFO] Sentry DSN not configured, skipping Sentry integration")
-        return callbacks
-    except Exception as exc:
-        print(
-            f"[WARN] Centralized settings unavailable, checking legacy SENTRY_DSN: {exc}"
-        )
-
-    legacy_dsn = os.getenv("SENTRY_DSN")
-    if not legacy_dsn:
-        print("[INFO] Legacy SENTRY_DSN not configured, skipping Sentry integration")
         return callbacks
 
     return _init_sentry(
-        dsn=legacy_dsn,
-        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
-        environment=os.getenv("ENVIRONMENT", "production"),
-        release=os.getenv("APP_VERSION", "1.0.0"),
-        profiles_sample_rate=float(os.getenv("SENTRY_PROFILES_SAMPLE_RATE", "0.1")),
-        success_label="[OK] Sentry initialized successfully (legacy mode)",
+        dsn=str(dsn),
+        traces_sample_rate=float(get_setting_value("SENTRY_TRACES_SAMPLE_RATE", 0.1)),
+        environment=str(get_setting_value("ENVIRONMENT", "production")),
+        release=str(get_setting_value("APP_VERSION", "1.0.0")),
+        profiles_sample_rate=float(
+            get_setting_value("SENTRY_PROFILES_SAMPLE_RATE", 0.1)
+        ),
+        success_label="[OK] Sentry initialized successfully",
     )

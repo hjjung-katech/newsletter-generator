@@ -14,12 +14,52 @@ Legacy Compatibility Shim for Environment Variables
 
 import logging
 import os
-from typing import Any, List
+from typing import Any, List, cast
+
+from newsletter_core.public.settings import get_setting_value
 
 from .utils.error_handling import handle_exception
 from .utils.subprocess_utils import run_command_safely
 
 logger = logging.getLogger(__name__)
+
+_KNOWN_COMPAT_KEYS = {
+    "ADDITIONAL_RSS_FEEDS",
+    "ANTHROPIC_API_KEY",
+    "APP_ENV",
+    "APP_VERSION",
+    "DATABASE_URL",
+    "DEBUG",
+    "DEFAULT_PERIOD",
+    "DEFAULT_TEMPLATE_STYLE",
+    "EMAIL_SENDER",
+    "ENVIRONMENT",
+    "GEMINI_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "HOST",
+    "LOG_FORMAT",
+    "LOG_LEVEL",
+    "MOCK_MODE",
+    "NAVER_CLIENT_ID",
+    "NAVER_CLIENT_SECRET",
+    "OPENAI_API_KEY",
+    "PORT",
+    "POSTMARK_FROM_EMAIL",
+    "POSTMARK_SERVER_TOKEN",
+    "PRODUCTION_URL",
+    "RAILWAY_PRODUCTION_URL",
+    "REDIS_URL",
+    "RQ_QUEUE",
+    "SENTRY_DSN",
+    "SENTRY_PROFILES_SAMPLE_RATE",
+    "SENTRY_TRACES_SAMPLE_RATE",
+    "SECRET_KEY",
+    "SERPER_API_KEY",
+    "TEST_BASE_URL",
+    "TEST_EMAIL_RECIPIENT",
+}
 
 
 def getenv_compat(key: str, default: Any = None) -> Any:
@@ -37,84 +77,18 @@ def getenv_compat(key: str, default: Any = None) -> Any:
         이 함수는 마이그레이션 기간 동안만 사용하고,
         점진적으로 get_settings() 직접 호출로 교체해야 합니다.
     """
-    try:
-        # centralized settings에서 먼저 시도
-        from newsletter.centralized_settings import get_settings
+    normalized_key = str(key or "").strip().upper()
+    value = get_setting_value(normalized_key)
+    if value is not None:
+        return value
 
-        settings = get_settings()
-        key_lower = key.lower()
+    if normalized_key in _KNOWN_COMPAT_KEYS:
+        return default
 
-        # 주요 매핑들
-        mapping = {
-            "serper_api_key": lambda s: s.serper_api_key.get_secret_value(),
-            "openai_api_key": lambda s: (
-                s.openai_api_key.get_secret_value() if s.openai_api_key else None
-            ),
-            "anthropic_api_key": lambda s: (
-                s.anthropic_api_key.get_secret_value() if s.anthropic_api_key else None
-            ),
-            "gemini_api_key": lambda s: (
-                s.gemini_api_key.get_secret_value() if s.gemini_api_key else None
-            ),
-            "postmark_server_token": (
-                lambda s: s.postmark_server_token.get_secret_value()
-            ),
-            "email_sender": lambda s: s.email_sender,
-            "secret_key": lambda s: s.secret_key,
-            "port": lambda s: s.port,
-            "host": lambda s: s.host,
-            "app_env": lambda s: s.app_env,
-            "sentry_dsn": lambda s: s.sentry_dsn,
-            "sentry_traces_sample_rate": lambda s: s.sentry_traces_sample_rate,
-            "sentry_profiles_sample_rate": lambda s: s.sentry_profiles_sample_rate,
-            "log_level": lambda s: s.log_level,
-            "log_format": lambda s: s.log_format,
-            "mock_mode": lambda s: s.mock_mode,
-            "debug": lambda s: s.debug,
-            "redis_url": lambda s: s.redis_url,
-            "rq_queue": lambda s: s.rq_queue,
-            "database_url": lambda s: s.database_url,
-            "google_application_credentials": (
-                lambda s: s.google_application_credentials
-            ),
-            "google_client_id": lambda s: s.google_client_id,
-            "google_client_secret": lambda s: (
-                s.google_client_secret.get_secret_value()
-                if s.google_client_secret
-                else None
-            ),
-            "naver_client_id": lambda s: s.naver_client_id,
-            "naver_client_secret": lambda s: (
-                s.naver_client_secret.get_secret_value()
-                if s.naver_client_secret
-                else None
-            ),
-            "default_period": lambda s: s.default_period,
-            "default_template_style": lambda s: s.default_template_style,
-            "additional_rss_feeds": lambda s: s.additional_rss_feeds,
-            "test_base_url": lambda s: s.test_base_url,
-            "test_email_recipient": lambda s: s.test_email_recipient,
-            "railway_production_url": lambda s: s.railway_production_url,
-            "production_url": lambda s: s.production_url,
-            "app_version": lambda s: s.app_version,
-            "environment": lambda s: s.environment,
-        }
-
-        if key_lower in mapping:
-            value = mapping[key_lower](settings)
-            if value is not None:
-                return value
-
-        # 설정에 없으면 경고 후 fallback to os.getenv
-        logger.warning(
-            f"Key '{key}' not found in centralized settings, falling back to os.getenv"
-        )
-
-    except Exception as e:
-        # centralized settings 로드 실패 시 fallback
-        logger.debug(f"Centralized settings unavailable for key '{key}': {e}")
-
-    # fallback to 기존 os.getenv
+    logger.warning(
+        "Key '%s' not mapped to centralized settings, falling back to os.getenv",
+        key,
+    )
     return os.getenv(key, default)
 
 
@@ -131,7 +105,7 @@ def find_env_usage() -> List[str]:
             cwd=".",
         )
         if result.returncode == 0:
-            return result.stdout.splitlines()
+            return cast(list[str], result.stdout.splitlines())
     except Exception as e:
         handle_exception(
             e,
@@ -147,7 +121,7 @@ def find_env_usage() -> List[str]:
                 text=True,
             )
             if result.returncode == 0:
-                return result.stdout.splitlines()
+                return cast(list[str], result.stdout.splitlines())
         except Exception as e:
             handle_exception(
                 e,
@@ -158,7 +132,7 @@ def find_env_usage() -> List[str]:
     return []
 
 
-def migrate_getenv_calls():
+def migrate_getenv_calls() -> None:
     """
     모든 os.getenv 호출을 찾아서 마이그레이션이 필요한 곳을 보고하는 유틸리티
 

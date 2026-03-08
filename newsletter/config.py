@@ -9,9 +9,9 @@ from typing import Any
 
 from newsletter_core.public.settings import (
     get_all_major_news_sources,
-    get_config_manager,
     get_llm_config,
     get_major_news_sources,
+    get_setting_value,
     get_settings,
 )
 
@@ -42,11 +42,8 @@ __all__ = sorted(
 
 
 def _cfg(name: str, default: Any = None) -> Any:
-    """Safely read compatibility attributes from the lazy config manager."""
-    try:
-        return getattr(get_config_manager(), name)
-    except AttributeError:
-        return default
+    """Safely read compatibility attributes from centralized settings."""
+    return get_setting_value(name, default)
 
 
 def __getattr__(name: str) -> Any:

@@ -10,15 +10,9 @@ import sys
 import redis
 from rq import Queue, Worker
 
-# Queue name from centralized settings
-try:
-    from newsletter_core.public.settings import get_settings
+from newsletter_core.public.settings import get_setting_value
 
-    settings = get_settings()
-    QUEUE_NAME = settings.rq_queue
-except Exception:
-    # Fallback to environment variable
-    QUEUE_NAME = os.getenv("RQ_QUEUE", "default")
+QUEUE_NAME = str(get_setting_value("RQ_QUEUE", "default"))
 
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -27,15 +21,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from tasks import generate_newsletter_task  # noqa: E402,F401
 
 if __name__ == "__main__":
-    # Get Redis connection from centralized settings
-    try:
-        from newsletter_core.public.settings import get_settings
-
-        settings = get_settings()
-        redis_url = settings.redis_url or "redis://localhost:6379/0"
-    except Exception:
-        # Fallback to environment variable
-        redis_url = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+    redis_url = str(get_setting_value("REDIS_URL", "redis://localhost:6379/0"))
 
     redis_conn = redis.from_url(redis_url)
 

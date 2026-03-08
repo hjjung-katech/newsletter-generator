@@ -8,6 +8,8 @@ from typing import Any
 from flask import Flask, jsonify
 from flask.typing import ResponseReturnValue
 
+from newsletter_core.public.settings import get_setting_value
+
 
 def register_health_route(
     app: Flask,
@@ -61,13 +63,13 @@ def register_health_route(
             overall_status = "error"
 
         env_vars = {
-            "SERPER_API_KEY": bool(os.getenv("SERPER_API_KEY")),
-            "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
-            "GEMINI_API_KEY": bool(os.getenv("GEMINI_API_KEY")),
-            "SENTRY_DSN": bool(os.getenv("SENTRY_DSN")),
+            "SERPER_API_KEY": bool(get_setting_value("SERPER_API_KEY")),
+            "OPENAI_API_KEY": bool(get_setting_value("OPENAI_API_KEY")),
+            "GEMINI_API_KEY": bool(get_setting_value("GEMINI_API_KEY")),
+            "SENTRY_DSN": bool(get_setting_value("SENTRY_DSN")),
         }
 
-        mock_mode = os.getenv("MOCK_MODE", "false").lower() == "true"
+        mock_mode = bool(get_setting_value("MOCK_MODE", False))
         testing_mode = bool(app.config.get("TESTING"))
         has_serper = env_vars["SERPER_API_KEY"]
         has_llm = any([env_vars["OPENAI_API_KEY"], env_vars["GEMINI_API_KEY"]])
