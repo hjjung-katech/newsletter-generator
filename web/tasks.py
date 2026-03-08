@@ -17,9 +17,27 @@ from newsletter_core.public.generation import (
 )
 
 try:
-    from db_state import update_history_status
+    from db_state import (
+        APPROVAL_STATUS_NOT_REQUESTED,
+        APPROVAL_STATUS_PENDING,
+        DELIVERY_STATUS_DRAFT,
+        DELIVERY_STATUS_PENDING_APPROVAL,
+        DELIVERY_STATUS_SEND_FAILED,
+        DELIVERY_STATUS_SENT,
+        update_history_review_state,
+        update_history_status,
+    )
 except ImportError:
-    from web.db_state import update_history_status  # pragma: no cover
+    from web.db_state import (  # pragma: no cover
+        APPROVAL_STATUS_NOT_REQUESTED,
+        APPROVAL_STATUS_PENDING,
+        DELIVERY_STATUS_DRAFT,
+        DELIVERY_STATUS_PENDING_APPROVAL,
+        DELIVERY_STATUS_SEND_FAILED,
+        DELIVERY_STATUS_SENT,
+        update_history_review_state,
+        update_history_status,
+    )
 
 try:
     from mail import get_newsletter_subject, send_email_with_outbox
@@ -76,6 +94,7 @@ def generate_newsletter_task(
     )
 
     email = data.get("email", "")
+    approval_required = bool(data.get("require_approval")) and bool(email)
 
     try:
         request = _build_request(data)
@@ -90,9 +109,20 @@ def generate_newsletter_task(
             "error": None,
             "sent": False,
             "email_sent": False,
+            "approval_required": approval_required,
+            "approval_status": (
+                APPROVAL_STATUS_PENDING
+                if approval_required
+                else APPROVAL_STATUS_NOT_REQUESTED
+            ),
+            "delivery_status": (
+                DELIVERY_STATUS_PENDING_APPROVAL
+                if approval_required
+                else DELIVERY_STATUS_DRAFT
+            ),
         }
 
-        if send_email and email:
+        if send_email and email and not approval_required:
             try:
                 send_result = send_email_with_outbox(
                     db_path=db_path,
@@ -109,6 +139,7 @@ def generate_newsletter_task(
             except Exception as exc:
                 response["email_sent"] = False
                 response["email_error"] = str(exc)
+                response["delivery_status"] = DELIVERY_STATUS_SEND_FAILED
                 log_warning(
                     logger,
                     "worker.email.send_failed",
@@ -117,6 +148,11 @@ def generate_newsletter_task(
                     error=str(exc),
                     error_type=type(exc).__name__,
                 )
+        elif response["delivery_status"] == DELIVERY_STATUS_DRAFT and approval_required:
+            response["delivery_status"] = DELIVERY_STATUS_PENDING_APPROVAL
+
+        if response["email_sent"]:
+            response["delivery_status"] = DELIVERY_STATUS_SENT
 
         update_history_status(
             db_path=db_path,
@@ -125,6 +161,12 @@ def generate_newsletter_task(
             result=response,
             params=data,
             idempotency_key=idempotency_key,
+        )
+        update_history_review_state(
+            db_path=db_path,
+            job_id=job_id,
+            approval_status=response["approval_status"],
+            delivery_status=response["delivery_status"],
         )
         log_info(
             logger,

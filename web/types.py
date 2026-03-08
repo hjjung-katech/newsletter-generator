@@ -27,6 +27,7 @@ class GenerateNewsletterRequest(BaseModel):
     email_compatible: bool = False
     period: int = Field(default=14)
     email: Optional[str] = None  # 즉시 발송용 이메일 주소
+    require_approval: bool = False
 
     @field_validator("keywords")  # type: ignore[untyped-decorator]
     @classmethod

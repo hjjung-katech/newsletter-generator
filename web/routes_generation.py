@@ -560,6 +560,8 @@ def register_generation_routes(
                 # Extract sent status from result if available
                 if isinstance(task["result"], dict):
                     response["sent"] = task["result"].get("sent", False)
+                    response["approval_status"] = task["result"].get("approval_status")
+                    response["delivery_status"] = task["result"].get("delivery_status")
             if "error" in task:
                 response["error"] = task["error"]
 
@@ -569,7 +571,20 @@ def register_generation_routes(
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT params, result, status, idempotency_key FROM history WHERE id = ?",
+            """
+            SELECT
+                params,
+                result,
+                status,
+                idempotency_key,
+                approval_status,
+                delivery_status,
+                approved_at,
+                rejected_at,
+                approval_note
+            FROM history
+            WHERE id = ?
+            """,
             (job_id,),
         )
         row = cursor.fetchone()
@@ -578,13 +593,28 @@ def register_generation_routes(
         if not row:
             return jsonify({"error": "Job not found"}), 404
 
-        params, result, status, idempotency_key = row
+        (
+            params,
+            result,
+            status,
+            idempotency_key,
+            approval_status,
+            delivery_status,
+            approved_at,
+            rejected_at,
+            approval_note,
+        ) = row
         response = {
             "job_id": job_id,
             "status": status,
             "params": json.loads(params) if params else None,
             "sent": False,
             "idempotency_key": idempotency_key,
+            "approval_status": approval_status,
+            "delivery_status": delivery_status,
+            "approved_at": approved_at,
+            "rejected_at": rejected_at,
+            "approval_note": approval_note,
         }
 
         if result:
@@ -593,6 +623,12 @@ def register_generation_routes(
             # Extract sent status from result
             if isinstance(result_data, dict):
                 response["sent"] = result_data.get("sent", False)
+                response["approval_status"] = result_data.get(
+                    "approval_status", response["approval_status"]
+                )
+                response["delivery_status"] = result_data.get(
+                    "delivery_status", response["delivery_status"]
+                )
 
         return jsonify(response)
 
@@ -607,8 +643,10 @@ def register_generation_routes(
             cursor.execute(
                 """
                 SELECT id, params, result, created_at, status, idempotency_key
+                     , approval_status, delivery_status, approved_at, rejected_at, approval_note
                 FROM history
                 ORDER BY
+                    CASE WHEN approval_status = 'pending' THEN 0 ELSE 1 END,
                     CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
                     created_at DESC
                 LIMIT 20
@@ -624,7 +662,19 @@ def register_generation_routes(
 
         history = []
         for row in rows:
-            job_id, params, result, created_at, status, idempotency_key = row
+            (
+                job_id,
+                params,
+                result,
+                created_at,
+                status,
+                idempotency_key,
+                approval_status,
+                delivery_status,
+                approved_at,
+                rejected_at,
+                approval_note,
+            ) = row
 
             try:
                 parsed_params = json.loads(params) if params else None
@@ -646,6 +696,11 @@ def register_generation_routes(
                     "created_at": created_at,
                     "status": status,
                     "idempotency_key": idempotency_key,
+                    "approval_status": approval_status,
+                    "delivery_status": delivery_status,
+                    "approved_at": approved_at,
+                    "rejected_at": rejected_at,
+                    "approval_note": approval_note,
                 }
             )
 
@@ -692,6 +747,7 @@ def register_generation_routes(
             "email_compatible": data.get("email_compatible", True),
             "period": data.get("period", 14),
             "send_email": True,
+            "require_approval": bool(data.get("require_approval", False)),
         }
         is_test = bool(data.get("is_test", False))
         expires_at = data.get("expires_at")
