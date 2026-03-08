@@ -271,6 +271,14 @@ register_source_policy_routes(app, DATABASE_PATH)
 
 
 try:
+    from routes_analytics import register_analytics_routes
+except ImportError:
+    from web.routes_analytics import register_analytics_routes  # pragma: no cover
+
+register_analytics_routes(app, DATABASE_PATH)
+
+
+try:
     from routes_newsletter_html import register_newsletter_html_route
 except ImportError:
     from web.routes_newsletter_html import (

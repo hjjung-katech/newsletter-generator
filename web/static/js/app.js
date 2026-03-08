@@ -10,6 +10,7 @@ class NewsletterApp {
         this.adminTokenStorageKey = 'newsletter-admin-api-token';
         this.savedPresets = [];
         this.selectedPresetId = '';
+        this.analyticsData = null;
         this.sourcePolicies = [];
         this.editingSourcePolicyId = '';
         this.init();
@@ -55,6 +56,7 @@ class NewsletterApp {
         document.getElementById('adminToken').addEventListener('input', (e) => {
             this.persistAdminToken(e.target.value);
             this.loadPresets(this.selectedPresetId);
+            this.loadAnalytics();
             this.loadSourcePolicies();
         });
         document.getElementById('presetSelect').addEventListener('change', (e) => this.handlePresetSelection(e.target.value));
@@ -63,12 +65,14 @@ class NewsletterApp {
         document.getElementById('updatePresetBtn').addEventListener('click', () => this.updateSelectedPreset());
         document.getElementById('deletePresetBtn').addEventListener('click', () => this.deleteSelectedPreset());
         document.getElementById('refreshPresetsBtn').addEventListener('click', () => this.loadPresets(this.selectedPresetId));
+        document.getElementById('refreshAnalyticsBtn').addEventListener('click', () => this.loadAnalytics());
         document.getElementById('refreshSourcePoliciesBtn').addEventListener('click', () => this.loadSourcePolicies());
         document.getElementById('saveSourcePolicyBtn').addEventListener('click', () => this.saveSourcePolicy());
         document.getElementById('cancelSourcePolicyEditBtn').addEventListener('click', () => this.resetSourcePolicyForm());
 
         // Navigation buttons
         document.getElementById('historyBtn').addEventListener('click', () => this.switchTab('historyTab'));
+        document.getElementById('analyticsBtn').addEventListener('click', () => this.switchTab('analyticsTab'));
         document.getElementById('approvalBtn').addEventListener('click', () => this.switchTab('approvalTab'));
         document.getElementById('sourcesBtn').addEventListener('click', () => this.switchTab('sourcePolicyTab'));
         document.getElementById('scheduleBtn').addEventListener('click', () => this.switchTab('scheduleManageTab'));
@@ -288,6 +292,7 @@ class NewsletterApp {
         const panelMap = {
             'generateTab': 'generatePanel',
             'historyTab': 'historyPanel',
+            'analyticsTab': 'analyticsPanel',
             'approvalTab': 'approvalPanel',
             'sourcePolicyTab': 'sourcePolicyPanel',
             'scheduleManageTab': 'scheduleManagePanel'
@@ -300,6 +305,8 @@ class NewsletterApp {
             // Load data for specific tabs
             if (tabId === 'historyTab') {
                 this.loadHistory();
+            } else if (tabId === 'analyticsTab') {
+                this.loadAnalytics();
             } else if (tabId === 'approvalTab') {
                 this.loadApprovals();
             } else if (tabId === 'sourcePolicyTab') {
@@ -1191,6 +1198,143 @@ class NewsletterApp {
             `).join('');
         } catch (error) {
             approvalsList.innerHTML = `<p class="text-red-600">승인 대기함 조회 실패: ${error.message}</p>`;
+        }
+    }
+
+    setAnalyticsStatus(message, tone = 'gray') {
+        const status = document.getElementById('analyticsStatus');
+        const toneClassMap = {
+            gray: 'border-gray-200 bg-gray-50 text-gray-600',
+            green: 'border-green-200 bg-green-50 text-green-700',
+            yellow: 'border-amber-200 bg-amber-50 text-amber-700',
+            red: 'border-red-200 bg-red-50 text-red-700'
+        };
+
+        status.className = `mt-4 rounded-lg border px-4 py-3 text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        status.textContent = message;
+    }
+
+    renderAnalyticsCards(summary = {}) {
+        const container = document.getElementById('analyticsSummaryCards');
+        const generation = summary.generation || {};
+        const email = summary.email || {};
+        const schedule = summary.schedule || {};
+        const cards = [
+            {
+                label: 'Generation',
+                accent: 'text-blue-700',
+                body: `
+                    <div class="text-3xl font-bold ${generation.failed ? 'text-amber-700' : 'text-blue-700'}">${generation.completed ?? 0}</div>
+                    <p class="mt-1 text-sm text-gray-500">completed / ${generation.failed ?? 0} failed</p>
+                    <p class="mt-2 text-xs text-gray-500">success rate ${generation.success_rate ?? '-'}%</p>
+                `
+            },
+            {
+                label: 'Email Delivery',
+                accent: 'text-emerald-700',
+                body: `
+                    <div class="text-3xl font-bold text-emerald-700">${email.sent ?? 0}</div>
+                    <p class="mt-1 text-sm text-gray-500">sent / ${email.failed ?? 0} failed</p>
+                    <p class="mt-2 text-xs text-gray-500">deduplicated ${email.deduplicated ?? 0}</p>
+                `
+            },
+            {
+                label: 'Schedules',
+                accent: 'text-indigo-700',
+                body: `
+                    <div class="text-3xl font-bold text-indigo-700">${schedule.completed ?? 0}</div>
+                    <p class="mt-1 text-sm text-gray-500">completed / ${schedule.failed ?? 0} failed</p>
+                    <p class="mt-2 text-xs text-gray-500">created ${schedule.created ?? 0} / queued ${schedule.queued ?? 0}</p>
+                `
+            },
+            {
+                label: 'Duration & Cost',
+                accent: 'text-purple-700',
+                body: `
+                    <div class="text-3xl font-bold text-purple-700">${summary.generation?.average_duration_seconds ?? '-'}</div>
+                    <p class="mt-1 text-sm text-gray-500">avg seconds per completed run</p>
+                    <p class="mt-2 text-xs text-gray-500">total cost $${(summary.generation?.total_cost_usd ?? 0).toFixed(4)}</p>
+                `
+            }
+        ];
+
+        container.innerHTML = cards.map((card) => `
+            <div class="rounded-lg border border-gray-200 bg-white px-4 py-5 shadow-sm">
+                <div class="text-sm font-medium text-gray-500">${card.label}</div>
+                <div class="mt-3">${card.body}</div>
+            </div>
+        `).join('');
+    }
+
+    renderAnalyticsEvents(events = []) {
+        const eventsList = document.getElementById('analyticsEventsList');
+
+        if (!Array.isArray(events) || events.length === 0) {
+            eventsList.innerHTML = `
+                <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-5 text-sm text-gray-500">
+                    아직 analytics 이벤트가 없습니다.
+                </div>
+            `;
+            return;
+        }
+
+        eventsList.innerHTML = events.map((event) => {
+            const createdAt = event.created_at ? new Date(event.created_at).toLocaleString() : '-';
+            const payloadPairs = Object.entries(event.payload || {}).slice(0, 4);
+            return `
+                <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                    <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="inline-flex rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-800">${event.event_type}</span>
+                                ${event.status ? `<span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">${event.status}</span>` : ''}
+                                ${event.deduplicated ? '<span class="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">deduplicated</span>' : ''}
+                            </div>
+                            <p class="mt-2 text-sm text-gray-500">${createdAt}</p>
+                            <p class="mt-1 text-sm text-gray-500">job: ${event.job_id || '-'}</p>
+                            <p class="text-sm text-gray-500">schedule: ${event.schedule_id || '-'}</p>
+                        </div>
+                        <div class="min-w-0 flex-1 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600 md:max-w-xl">
+                            ${payloadPairs.length > 0
+                                ? payloadPairs.map(([key, value]) => `<div><span class="font-medium text-gray-700">${key}</span>: ${String(value)}</div>`).join('')
+                                : 'payload 없음'}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    async loadAnalytics() {
+        const analyticsWindow = document.getElementById('analyticsWindow');
+        const windowDays = parseInt(analyticsWindow.value, 10) || 7;
+
+        try {
+            const response = await fetch(`/api/analytics?window_days=${windowDays}&recent_limit=25`, {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                this.analyticsData = null;
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || 'Analytics를 불러올 수 없습니다.')
+                    : (result.error || 'Analytics를 불러올 수 없습니다.');
+                this.setAnalyticsStatus(message, 'yellow');
+                this.renderAnalyticsCards({});
+                this.renderAnalyticsEvents([]);
+                return;
+            }
+
+            this.analyticsData = result;
+            this.setAnalyticsStatus(`최근 ${result.window_days}일 기준 analytics 요약과 최근 ${result.recent_events.length}건 이벤트를 표시합니다.`, 'green');
+            this.renderAnalyticsCards(result.summary || {});
+            this.renderAnalyticsEvents(result.recent_events || []);
+        } catch (error) {
+            this.analyticsData = null;
+            this.setAnalyticsStatus(`Analytics 조회 실패: ${error.message}`, 'red');
+            this.renderAnalyticsCards({});
+            this.renderAnalyticsEvents([]);
         }
     }
 

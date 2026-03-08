@@ -7,7 +7,7 @@ import json
 import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
 APPROVAL_STATUS_NOT_REQUESTED = "not_requested"
@@ -973,12 +973,34 @@ def list_analytics_events(
     *,
     limit: int = 100,
     event_type_prefix: str | None = None,
+    created_since: str | None = None,
 ) -> list[Dict[str, Any]]:
     """Return recent analytics events for tests and dashboard routes."""
     conn = _connect(db_path)
     try:
         cursor = conn.cursor()
-        if event_type_prefix:
+        if event_type_prefix and created_since:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    event_type,
+                    job_id,
+                    schedule_id,
+                    status,
+                    deduplicated,
+                    duration_seconds,
+                    cost_usd,
+                    payload,
+                    created_at
+                FROM analytics_events
+                WHERE event_type LIKE ? AND created_at >= ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (f"{event_type_prefix}%", created_since, limit),
+            )
+        elif event_type_prefix:
             cursor.execute(
                 """
                 SELECT
@@ -998,6 +1020,27 @@ def list_analytics_events(
                 LIMIT ?
                 """,
                 (f"{event_type_prefix}%", limit),
+            )
+        elif created_since:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    event_type,
+                    job_id,
+                    schedule_id,
+                    status,
+                    deduplicated,
+                    duration_seconds,
+                    cost_usd,
+                    payload,
+                    created_at
+                FROM analytics_events
+                WHERE created_at >= ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (created_since, limit),
             )
         else:
             cursor.execute(
@@ -1037,3 +1080,105 @@ def list_analytics_events(
         ]
     finally:
         conn.close()
+
+
+def get_analytics_dashboard_data(
+    db_path: str,
+    *,
+    window_days: int = 7,
+    recent_limit: int = 25,
+) -> Dict[str, Any]:
+    """Return aggregated analytics metrics and recent events for the dashboard."""
+    since = (
+        (datetime.now(timezone.utc) - timedelta(days=max(1, int(window_days))))
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT
+                SUM(CASE WHEN event_type = 'generation.started' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type = 'generation.completed' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type = 'generation.failed' THEN 1 ELSE 0 END),
+                AVG(CASE WHEN event_type = 'generation.completed' THEN duration_seconds END),
+                SUM(CASE WHEN event_type = 'generation.completed' THEN COALESCE(cost_usd, 0) ELSE 0 END)
+            FROM analytics_events
+            WHERE created_at >= ?
+            """,
+            (since,),
+        )
+        generation_row = cursor.fetchone() or (0, 0, 0, None, 0.0)
+
+        cursor.execute(
+            """
+            SELECT
+                SUM(CASE WHEN event_type = 'email.sent' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type = 'email.deduplicated' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type = 'email.failed' THEN 1 ELSE 0 END)
+            FROM analytics_events
+            WHERE created_at >= ?
+            """,
+            (since,),
+        )
+        email_row = cursor.fetchone() or (0, 0, 0)
+
+        cursor.execute(
+            """
+            SELECT
+                SUM(CASE WHEN event_type = 'schedule.created' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type IN ('schedule.execute.enqueued', 'schedule.run_now.queued') THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type IN ('schedule.execute.completed', 'schedule.run_now.completed') THEN 1 ELSE 0 END),
+                SUM(CASE WHEN event_type IN ('schedule.execute.failed', 'schedule.run_now.failed') THEN 1 ELSE 0 END)
+            FROM analytics_events
+            WHERE created_at >= ?
+            """,
+            (since,),
+        )
+        schedule_row = cursor.fetchone() or (0, 0, 0, 0)
+    finally:
+        conn.close()
+
+    generation_started = int(generation_row[0] or 0)
+    generation_completed = int(generation_row[1] or 0)
+    generation_failed = int(generation_row[2] or 0)
+    success_base = generation_completed + generation_failed
+    success_rate = (
+        round((generation_completed / success_base) * 100, 1) if success_base else None
+    )
+
+    return {
+        "window_days": max(1, int(window_days)),
+        "summary": {
+            "generation": {
+                "started": generation_started,
+                "completed": generation_completed,
+                "failed": generation_failed,
+                "success_rate": success_rate,
+                "average_duration_seconds": (
+                    round(float(generation_row[3]), 2)
+                    if generation_row[3] is not None
+                    else None
+                ),
+                "total_cost_usd": round(float(generation_row[4] or 0.0), 4),
+            },
+            "email": {
+                "sent": int(email_row[0] or 0),
+                "deduplicated": int(email_row[1] or 0),
+                "failed": int(email_row[2] or 0),
+            },
+            "schedule": {
+                "created": int(schedule_row[0] or 0),
+                "queued": int(schedule_row[1] or 0),
+                "completed": int(schedule_row[2] or 0),
+                "failed": int(schedule_row[3] or 0),
+            },
+        },
+        "recent_events": list_analytics_events(
+            db_path,
+            limit=max(1, int(recent_limit)),
+            created_since=since,
+        ),
+    }

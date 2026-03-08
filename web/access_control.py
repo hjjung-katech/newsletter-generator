@@ -17,6 +17,7 @@ ADMIN_TOKEN_HEADER = "X-Admin-Token"  # nosec B105
 
 _PROTECTED_PREFIXES: tuple[str, ...] = (
     "/api/history",
+    "/api/analytics",
     "/api/presets",
     "/api/approvals",
     "/api/source-policies",

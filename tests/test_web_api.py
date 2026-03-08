@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from web.app import DATABASE_PATH, app  # noqa: E402
+from web.db_state import record_analytics_event  # noqa: E402
 
 pytestmark = [pytest.mark.api, pytest.mark.email]
 
@@ -31,6 +32,14 @@ def _delete_source_policy(policy_id: str) -> None:
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM source_policies WHERE id = ?", (policy_id,))
+    conn.commit()
+    conn.close()
+
+
+def _delete_analytics_event(event_id: str) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM analytics_events WHERE id = ?", (event_id,))
     conn.commit()
     conn.close()
 
@@ -250,6 +259,30 @@ class TestWebAPI:
 
         result = json.loads(response.data)
         assert isinstance(result, list)
+
+    def test_analytics_endpoint(self, client):
+        """Test analytics dashboard endpoint"""
+        event_id = record_analytics_event(
+            DATABASE_PATH,
+            "generation.completed",
+            job_id=f"analytics-job-{uuid.uuid4()}",
+            status="success",
+            duration_seconds=2.5,
+            cost_usd=0.42,
+            payload={"source": "test_web_api"},
+        )
+
+        try:
+            response = client.get("/api/analytics")
+            assert response.status_code == 200
+
+            result = json.loads(response.data)
+            assert result["window_days"] == 7
+            assert "summary" in result
+            assert "recent_events" in result
+            assert result["summary"]["generation"]["completed"] >= 1
+        finally:
+            _delete_analytics_event(event_id)
 
     def test_schedules_endpoint(self, client):
         """Test schedules endpoint"""
