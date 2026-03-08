@@ -35,6 +35,8 @@ def _build_app(*, testing: bool, monkeypatch: pytest.MonkeyPatch) -> Flask:
 def test_protected_route_matcher_covers_sensitive_paths() -> None:
     assert is_protected_route("/api/approvals")
     assert is_protected_route("/api/analytics")
+    assert is_protected_route("/api/archive")
+    assert is_protected_route("/api/archive/search")
     assert is_protected_route("/api/schedule")
     assert is_protected_route("/api/schedule/demo/run")
     assert is_protected_route("/api/presets")
