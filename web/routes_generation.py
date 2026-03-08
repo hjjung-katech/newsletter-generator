@@ -50,6 +50,14 @@ except ImportError:
         to_utc,
     )
 
+try:
+    from ops_logging import log_debug, log_exception, log_info
+except ImportError:
+    from web.ops_logging import log_debug, log_exception, log_info  # pragma: no cover
+
+
+logger = logging.getLogger("web.routes_generation")
+
 
 def register_generation_routes(
     app: Flask,
@@ -109,12 +117,10 @@ def register_generation_routes(
     @app.route("/api/generate", methods=["POST"])
     def generate_newsletter():
         """Generate newsletter based on keywords or domain with optional email sending"""
-        print(f"📨 Newsletter generation request received")
-
         try:
             data = request.get_json()
             if not data:
-                print("❌ No data provided in request")
+                log_info(logger, "generate.request.empty")
                 return jsonify({"error": "No data provided"}), 400
 
             # Validate request using Pydantic
@@ -133,15 +139,21 @@ def register_generation_routes(
 
                 validated_data = web_types_module.GenerateNewsletterRequest(**data)
             except (ValueError, Exception) as e:
-                print(f"❌ Validation error: {e}")
+                log_exception(logger, "generate.request.invalid", e)
                 return jsonify({"error": f"Invalid request: {str(e)}"}), 400
 
             # Extract email for sending
             email = validated_data.email
             send_email = bool(email)
-
-            print(f"📋 Request data: {data}")
-            print(f"📧 Send email: {send_email} to {email}")
+            log_info(
+                logger,
+                "generate.request.received",
+                has_domain=bool(validated_data.domain),
+                has_keywords=bool(validated_data.keywords),
+                email=email,
+                send_email=send_email,
+            )
+            log_debug(logger, "generate.request.payload", payload=data)
 
             idempotency_enabled = is_feature_enabled(
                 "WEB_IDEMPOTENCY_ENABLED", default=True
@@ -167,7 +179,14 @@ def register_generation_routes(
                 idempotency_key=idempotency_key if idempotency_enabled else None,
                 status="pending",
             )
-            print(f"🆔 Resolved job ID: {job_id} (deduplicated={deduplicated})")
+            log_info(
+                logger,
+                "generate.job.resolved",
+                job_id=job_id,
+                deduplicated=deduplicated,
+                idempotency_key=idempotency_key,
+                stored_status=stored_status,
+            )
 
             if deduplicated:
                 return (
@@ -183,7 +202,7 @@ def register_generation_routes(
                 )
 
             if task_queue:
-                print("📤 Queueing task with Redis")
+                log_info(logger, "generate.job.queued", job_id=job_id, via="redis")
                 task_queue.enqueue(
                     generate_newsletter_task,
                     data,
@@ -205,7 +224,7 @@ def register_generation_routes(
                     202,
                 )
 
-            print("🔄 Processing in-memory (Redis not available)")
+            log_info(logger, "generate.job.queued", job_id=job_id, via="in_memory")
             in_memory_tasks[job_id] = {
                 "status": "processing",
                 "started_at": datetime.now().isoformat(),
@@ -240,7 +259,7 @@ def register_generation_routes(
             )
 
         except Exception as e:
-            print(f"❌ Error in generate_newsletter endpoint: {e}")
+            log_exception(logger, "generate.request.failed", e)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/newsletter", methods=["GET"])
@@ -269,7 +288,13 @@ def register_generation_routes(
                     400,
                 )
 
-            print(f"🔍 Newsletter request - Keywords: {keywords}, Period: {period}")
+            log_info(
+                logger,
+                "newsletter.preview.requested",
+                keywords=keywords,
+                period=period,
+                template_style=template_style,
+            )
 
             # 뉴스레터 생성
             active_newsletter_cli = resolve_newsletter_cli()
@@ -298,16 +323,17 @@ def register_generation_routes(
                 )
 
         except Exception as e:
-            print(f"❌ Error in newsletter endpoint: {e}")
+            log_exception(logger, "newsletter.preview.failed", e)
             return jsonify({"error": str(e)}), 500
 
     def process_newsletter_sync(data):
         """Process newsletter synchronously (fallback when Redis is not available)"""
         try:
-            print(f"🔄 Starting synchronous newsletter processing")
             active_newsletter_cli = resolve_newsletter_cli()
-            print(
-                f"📊 Current newsletter_cli type: {type(active_newsletter_cli).__name__}"
+            log_info(
+                logger,
+                "generate.sync.started",
+                cli_type=type(active_newsletter_cli).__name__,
             )
 
             # Extract parameters
@@ -318,19 +344,25 @@ def register_generation_routes(
             period = data.get("period", 14)
             email = data.get("email", "")  # 이메일 주소 추가
 
-            print(f"📋 Processing parameters:")
-            print(f"   Keywords: {keywords}")
-            print(f"   Domain: {domain}")
-            print(f"   Template style: {template_style}")
-            print(f"   Email compatible: {email_compatible}")
-            print(f"   Period: {period}")
-            print(f"   Email: {email}")
+            log_debug(
+                logger,
+                "generate.sync.parameters",
+                keywords=keywords,
+                domain=domain,
+                template_style=template_style,
+                email_compatible=email_compatible,
+                period=period,
+                email=email,
+            )
 
             # Use newsletter CLI with proper parameters
             try:
                 if keywords:
-                    print(
-                        f"🔧 Generating newsletter with keywords using {type(active_newsletter_cli).__name__}"
+                    log_info(
+                        logger,
+                        "generate.sync.invoke",
+                        mode="keywords",
+                        cli_type=type(active_newsletter_cli).__name__,
                     )
                     result = active_newsletter_cli.generate_newsletter(
                         keywords=keywords,
@@ -339,8 +371,11 @@ def register_generation_routes(
                         period=period,
                     )
                 elif domain:
-                    print(
-                        f"🔧 Generating newsletter with domain using {type(active_newsletter_cli).__name__}"
+                    log_info(
+                        logger,
+                        "generate.sync.invoke",
+                        mode="domain",
+                        cli_type=type(active_newsletter_cli).__name__,
                     )
                     result = active_newsletter_cli.generate_newsletter(
                         domain=domain,
@@ -351,18 +386,25 @@ def register_generation_routes(
                 else:
                     raise ValueError("Either keywords or domain must be provided")
 
-                print(f"📊 CLI result status: {result['status']}")
-                print(f"📊 CLI result type: {type(result)}")
-                print(
-                    f"📊 CLI result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+                log_info(
+                    logger,
+                    "generate.sync.result",
+                    status=result.get("status"),
+                    result_type=type(result).__name__,
+                    result_keys=(
+                        list(result.keys()) if isinstance(result, dict) else None
+                    ),
                 )
 
             except Exception as cli_error:
-                print(f"❌ CLI generation failed: {str(cli_error)}")
-                print(f"❌ CLI error type: {type(cli_error).__name__}")
                 import traceback
 
-                print(f"❌ CLI error traceback: {traceback.format_exc()}")
+                log_exception(
+                    logger,
+                    "generate.sync.cli_failed",
+                    cli_error,
+                    traceback=traceback.format_exc(),
+                )
                 # Set result to error status for fallback logic
                 result = {"status": "error", "error": str(cli_error)}
 
@@ -370,7 +412,7 @@ def register_generation_routes(
             if result["status"] == "error":
                 # If CLI failed and returned error, try mock as fallback
                 if isinstance(active_newsletter_cli, RealNewsletterCLI):
-                    print("⚠️  Real CLI failed, trying mock fallback...")
+                    log_info(logger, "generate.sync.fallback_mock")
                     mock_cli = MockNewsletterCLI()
                     if keywords:
                         result = mock_cli.generate_newsletter(
@@ -386,13 +428,17 @@ def register_generation_routes(
                             email_compatible=email_compatible,
                             period=period,
                         )
-                    print(f"📊 Mock fallback result status: {result['status']}")
+                    log_info(
+                        logger,
+                        "generate.sync.fallback_result",
+                        status=result.get("status"),
+                    )
 
             # 이메일 발송 기능 추가
             email_sent = False
             if email and result.get("content") and not data.get("preview_only"):
                 try:
-                    print(f"📧 Attempting to send email to {email}")
+                    log_info(logger, "generate.sync.email_sending", email=email)
                     # 이메일 발송 - try-except로 import 처리
                     try:
                         import mail
@@ -421,9 +467,14 @@ def register_generation_routes(
                     # 이메일 발송
                     send_email_func(to=email, subject=subject, html=result["content"])
                     email_sent = True
-                    print(f"✅ Successfully sent email to {email}")
+                    log_info(logger, "generate.sync.email_sent", email=email)
                 except Exception as e:
-                    print(f"❌ Failed to send email to {email}: {str(e)}")
+                    log_exception(
+                        logger,
+                        "generate.sync.email_failed",
+                        e,
+                        email=email,
+                    )
                     # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
 
             response = {
@@ -447,18 +498,23 @@ def register_generation_routes(
                 },
             }
 
-            print(f"✅ Processing completed successfully")
+            log_info(
+                logger,
+                "generate.sync.completed",
+                status=response["status"],
+                email_sent=email_sent,
+            )
             return response
 
         except Exception as e:
             error_msg = f"Newsletter generation failed: {str(e)}"
-            print(f"❌ {error_msg}")
+            log_exception(logger, "generate.sync.failed", e)
             raise Exception(error_msg)
 
     def process_newsletter_in_memory(data, job_id):
         """Process newsletter in memory and update task status"""
         try:
-            print(f"📊 Starting newsletter processing for job {job_id}")
+            log_info(logger, "generate.in_memory.started", job_id=job_id)
             result = process_newsletter_sync(data)
 
             # 메모리에 결과 저장
@@ -468,15 +524,17 @@ def register_generation_routes(
                 "updated_at": datetime.now().isoformat(),
             }
 
-            print(f"📊 Newsletter processing completed for job {job_id}")
-            print(f"📊 Result status: {result.get('status', 'unknown')}")
-            print(
-                f"📊 Result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}"
+            log_info(
+                logger,
+                "generate.in_memory.completed",
+                job_id=job_id,
+                status=result.get("status", "unknown"),
+                result_keys=list(result.keys()) if isinstance(result, dict) else None,
             )
 
             return result
         except Exception as e:
-            print(f"❌ Error in process_newsletter_in_memory for job {job_id}: {e}")
+            log_exception(logger, "generate.in_memory.failed", e, job_id=job_id)
             in_memory_tasks[job_id] = {
                 "status": "failed",
                 "error": str(e),
@@ -541,8 +599,6 @@ def register_generation_routes(
     @app.route("/api/history")
     def get_history():
         """Get recent newsletter generation history"""
-        print(f"📚 Fetching history from database")
-
         try:
             conn = sqlite3.connect(DATABASE_PATH)
             cursor = conn.cursor()
@@ -560,28 +616,26 @@ def register_generation_routes(
             )
             rows = cursor.fetchall()
             conn.close()
-
-            print(f"📚 Found {len(rows)} history records")
+            log_info(logger, "history.loaded", count=len(rows))
 
         except Exception as e:
-            print(f"❌ Database error in get_history: {e}")
+            log_exception(logger, "history.load_failed", e)
             return jsonify({"error": f"Database error: {str(e)}"}), 500
 
         history = []
         for row in rows:
             job_id, params, result, created_at, status, idempotency_key = row
-            print(f"📚 Processing history record: {job_id} (status: {status})")
 
             try:
                 parsed_params = json.loads(params) if params else None
             except json.JSONDecodeError as e:
-                print(f"❌ Failed to parse params for job {job_id}: {e}")
+                log_exception(logger, "history.params_parse_failed", e, job_id=job_id)
                 parsed_params = None
 
             try:
                 parsed_result = json.loads(result) if result else None
             except json.JSONDecodeError as e:
-                print(f"❌ Failed to parse result for job {job_id}: {e}")
+                log_exception(logger, "history.result_parse_failed", e, job_id=job_id)
                 parsed_result = None
 
             history.append(
@@ -595,7 +649,7 @@ def register_generation_routes(
                 }
             )
 
-        print(f"📚 Returning {len(history)} history records")
+        log_info(logger, "history.returned", count=len(history))
         return jsonify(history)
 
     @app.route("/api/schedule", methods=["POST"])
@@ -790,5 +844,5 @@ def register_generation_routes(
                 )
 
         except Exception as e:
-            logging.error(f"Failed to run schedule {schedule_id}: {e}")
+            log_exception(logger, "schedule.run_now.failed", e, schedule_id=schedule_id)
             return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500

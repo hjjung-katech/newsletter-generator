@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import traceback
@@ -25,7 +26,13 @@ try:
 except ImportError:
     from .mail import get_newsletter_subject, send_email_with_outbox  # pragma: no cover
 
+try:
+    from ops_logging import log_exception, log_info, log_warning
+except ImportError:
+    from web.ops_logging import log_exception, log_info, log_warning  # pragma: no cover
+
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
+logger = logging.getLogger("web.tasks")
 
 
 def _resolve_database_path(database_path: str | None) -> str:
@@ -52,7 +59,14 @@ def generate_newsletter_task(
 ) -> Dict[str, Any]:
     """Generate newsletter in worker context with stable response schema."""
     db_path = _resolve_database_path(database_path)
-    print(f"🔄 Worker: starting newsletter generation for job {job_id}")
+    log_info(
+        logger,
+        "worker.job.started",
+        job_id=job_id,
+        send_email=send_email,
+        idempotency_key=idempotency_key,
+        db_path=db_path,
+    )
     update_history_status(
         db_path=db_path,
         job_id=job_id,
@@ -95,6 +109,14 @@ def generate_newsletter_task(
             except Exception as exc:
                 response["email_sent"] = False
                 response["email_error"] = str(exc)
+                log_warning(
+                    logger,
+                    "worker.email.send_failed",
+                    job_id=job_id,
+                    email=email,
+                    error=str(exc),
+                    error_type=type(exc).__name__,
+                )
 
         update_history_status(
             db_path=db_path,
@@ -103,6 +125,14 @@ def generate_newsletter_task(
             result=response,
             params=data,
             idempotency_key=idempotency_key,
+        )
+        log_info(
+            logger,
+            "worker.job.completed",
+            job_id=job_id,
+            status=response["status"],
+            email_sent=response["email_sent"],
+            email_deduplicated=response.get("email_deduplicated"),
         )
         return response
 
@@ -125,6 +155,7 @@ def generate_newsletter_task(
             params=data,
             idempotency_key=idempotency_key,
         )
+        log_exception(logger, "worker.job.generation_error", exc, job_id=job_id)
         raise
     except Exception as exc:
         error_response = {
@@ -146,6 +177,7 @@ def generate_newsletter_task(
             params=data,
             idempotency_key=idempotency_key,
         )
+        log_exception(logger, "worker.job.failed", exc, job_id=job_id)
         raise
 
 
@@ -172,4 +204,8 @@ def create_schedule_entry(params: Dict[str, Any], job_id: str) -> str:
 
 if __name__ == "__main__":
     test_params = {"keywords": "AI, machine learning", "email": "test@example.com"}
-    print(generate_newsletter_task(test_params, "test-job-id"))
+    log_info(
+        logger,
+        "worker.job.sample_result",
+        result=generate_newsletter_task(test_params, "test-job-id"),
+    )

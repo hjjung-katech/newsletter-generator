@@ -52,6 +52,11 @@ try:
 except ImportError:
     from web.db_state import ensure_database_schema  # pragma: no cover
 
+try:
+    from ops_logging import log_exception, log_info, log_warning
+except ImportError:
+    from web.ops_logging import log_exception, log_info, log_warning  # pragma: no cover
+
 # Import web types module - will be loaded later to avoid conflicts
 
 
@@ -103,9 +108,16 @@ configure_access_control(app)
 
 # Enable detailed logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-print("[INFO] Flask app initialized with detailed logging")
+logger = logging.getLogger("web.app")
+log_info(
+    logger,
+    "app.initialized",
+    template_folder=resolve_template_dir(),
+    static_folder=resolve_static_dir(),
+)
 
 # Configuration
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
@@ -120,7 +132,7 @@ try:
 
     # Windows에서는 RQ Worker가 제대로 작동하지 않으므로 직접 처리 사용
     if platform.system() == "Windows":
-        print("Windows detected: Using direct processing instead of Redis Queue")
+        log_warning(logger, "app.redis.disabled_for_windows")
         redis_conn = None
         task_queue = None
     else:
@@ -129,9 +141,19 @@ try:
         redis_conn = redis.from_url(app.config["REDIS_URL"])
         redis_conn.ping()  # Test connection
         task_queue = Queue(QUEUE_NAME, connection=redis_conn)
-        print("Redis connected successfully")
+        log_info(
+            logger,
+            "app.redis.connected",
+            queue_name=QUEUE_NAME,
+            redis_url=app.config["REDIS_URL"],
+        )
 except Exception as e:
-    print(f"Redis connection failed: {e}. Using in-memory processing.")
+    log_exception(
+        logger,
+        "app.redis.connection_failed",
+        e,
+        redis_url=app.config["REDIS_URL"],
+    )
     redis_conn = None
     task_queue = None
 
@@ -155,14 +177,17 @@ init_db()
 def index() -> str | tuple[str, int]:
     """Main dashboard page"""
     try:
-        print(f"Template folder: {app.template_folder}")
-        print(f"App root path: {app.root_path}")
-        template_path = os.path.join(app.template_folder, "index.html")
-        print(f"Template path: {template_path}")
-        print(f"Template exists: {os.path.exists(template_path)}")
         return cast(str, render_template("index.html"))
     except Exception as e:
-        print(f"Template rendering error: {e}")
+        template_path = os.path.join(app.template_folder, "index.html")
+        log_exception(
+            logger,
+            "app.template.render_failed",
+            e,
+            template_folder=app.template_folder,
+            template_path=template_path,
+            template_exists=os.path.exists(template_path),
+        )
         return f"Template error: {str(e)}", 500
 
 
@@ -238,5 +263,5 @@ app.register_blueprint(suggest_bp)
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     debug = os.environ.get("FLASK_ENV") == "development"
-    print(f"Starting Flask app on port {port}, debug={debug}")
+    log_info(logger, "app.starting", port=port, debug=debug)
     app.run(host="0.0.0.0", port=port, debug=debug)

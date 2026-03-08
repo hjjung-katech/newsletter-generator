@@ -49,9 +49,21 @@ try:
 except ImportError:
     from time_utils import to_iso_utc  # Development
 
+try:
+    from ops_logging import log_debug, log_error, log_exception, log_info, log_warning
+except ImportError:
+    from web.ops_logging import (  # pragma: no cover
+        log_debug,
+        log_error,
+        log_exception,
+        log_info,
+        log_warning,
+    )
+
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -74,7 +86,7 @@ class ScheduleRunner:
             self.redis_conn = redis.from_url(self.redis_url)
             self.queue = Queue("default", connection=self.redis_conn)
         except Exception as e:
-            logger.error(f"Redis connection failed: {e}")
+            log_exception(logger, "schedule.redis.connection_failed", e)
             self.redis_conn = None
             self.queue = None
 
@@ -91,14 +103,17 @@ class ScheduleRunner:
     def get_pending_schedules(self) -> List[Dict]:
         """실행 대기 중인 스케줄 목록을 가져옵니다."""
         try:
-            logger.info(f"[DEBUG] Using database path: {self.db_path}")
-            logger.info(f"[DEBUG] Database file exists: {os.path.exists(self.db_path)}")
-
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
             now = datetime.now(timezone.utc)
-            logger.info(f"[DEBUG] Current time (UTC): {now}")
+            log_debug(
+                logger,
+                "schedule.scan.started",
+                db_path=self.db_path,
+                db_exists=os.path.exists(self.db_path),
+                now=now,
+            )
 
             # Import time utilities and convert current time
             try:
@@ -114,14 +129,20 @@ class ScheduleRunner:
             )
             expired_count = cursor.rowcount
             if expired_count > 0:
-                logger.info(f"[DEBUG] Disabled {expired_count} expired test schedules")
+                log_info(
+                    logger,
+                    "schedule.expired_tests.disabled",
+                    count=expired_count,
+                )
 
             # 모든 활성 스케줄 조회
             cursor.execute(
                 "SELECT id, params, rrule, next_run, created_at, is_test FROM schedules WHERE enabled = 1"
             )
             all_schedules = cursor.fetchall()
-            logger.info(f"[DEBUG] Found {len(all_schedules)} total active schedules")
+            log_debug(
+                logger, "schedule.scan.loaded_active", active_count=len(all_schedules)
+            )
 
             # 스케줄 실행 대기열과 만료된 스케줄 분리 처리
             ready_for_execution = []
@@ -149,21 +170,36 @@ class ScheduleRunner:
                     # 실행 창 설정 (테스트 vs 정규)
                     execution_window = test_window if is_test else regular_window
 
-                    logger.info(
-                        f"[DEBUG] Schedule {schedule_id}: next_run={next_run_str}, time_diff={time_diff.total_seconds():.1f}s, window={execution_window.total_seconds()}s"
+                    log_debug(
+                        logger,
+                        "schedule.scan.evaluating",
+                        schedule_id=schedule_id,
+                        next_run=next_run_str,
+                        time_diff_seconds=round(time_diff.total_seconds(), 1),
+                        window_seconds=execution_window.total_seconds(),
                     )
 
                     # 실행 창 내에 있는 스케줄 (즉시 실행 대상)
                     if timedelta(0) <= time_diff <= execution_window:
-                        logger.info(
-                            f"[DEBUG] Schedule {schedule_id} is READY for execution (within {execution_window.total_seconds()/60:.1f}min window)"
+                        log_debug(
+                            logger,
+                            "schedule.scan.ready",
+                            schedule_id=schedule_id,
+                            window_minutes=round(
+                                execution_window.total_seconds() / 60, 1
+                            ),
                         )
                         ready_for_execution.append(schedule)
 
                     # 실행 창을 넘어선 과거 스케줄 (다음 주기로 업데이트)
                     elif time_diff > execution_window:
-                        logger.info(
-                            f"[DEBUG] Schedule {schedule_id} is EXPIRED (missed {time_diff.total_seconds()/60:.1f}min window), calculating next occurrence"
+                        log_info(
+                            logger,
+                            "schedule.scan.expired",
+                            schedule_id=schedule_id,
+                            missed_window_minutes=round(
+                                time_diff.total_seconds() / 60, 1
+                            ),
                         )
 
                         # 다음 실행 시간 계산
@@ -175,40 +211,58 @@ class ScheduleRunner:
                                 (to_iso_utc(next_run_calculated), schedule_id),
                             )
                             updated_count += 1
-                            logger.info(
-                                f"[DEBUG] Updated EXPIRED schedule {schedule_id} from {next_run_str} to {to_iso_utc(next_run_calculated)}"
+                            log_info(
+                                logger,
+                                "schedule.scan.expired_rescheduled",
+                                schedule_id=schedule_id,
+                                previous_next_run=next_run_str,
+                                next_run=to_iso_utc(next_run_calculated),
                             )
                         else:
                             cursor.execute(
                                 "UPDATE schedules SET enabled = 0 WHERE id = ?",
                                 (schedule_id,),
                             )
-                            logger.info(
-                                f"[DEBUG] Disabled schedule {schedule_id} - no more occurrences"
+                            log_info(
+                                logger,
+                                "schedule.scan.disabled_no_more_occurrences",
+                                schedule_id=schedule_id,
                             )
 
                     # 미래 스케줄 (아직 실행 시간이 아님)
                     else:
-                        logger.info(
-                            f"[DEBUG] Schedule {schedule_id} is FUTURE (will run in {abs(time_diff.total_seconds())/60:.1f}min)"
+                        log_debug(
+                            logger,
+                            "schedule.scan.future",
+                            schedule_id=schedule_id,
+                            run_in_minutes=round(
+                                abs(time_diff.total_seconds()) / 60, 1
+                            ),
                         )
 
                 except Exception as parse_error:
-                    logger.error(
-                        f"[DEBUG] Failed to parse schedule {schedule_id}: {parse_error}"
+                    log_exception(
+                        logger,
+                        "schedule.scan.parse_failed",
+                        parse_error,
+                        schedule_id=schedule_id,
                     )
                     continue
 
             if expired_count > 0 or updated_count > 0:
                 conn.commit()
             if updated_count > 0:
-                logger.info(
-                    f"[DEBUG] Updated {updated_count} expired schedules to next occurrence"
+                log_info(
+                    logger,
+                    "schedule.scan.expired_updates_committed",
+                    updated_count=updated_count,
                 )
 
             # 실행 준비 완료된 스케줄들을 반환 형식으로 변환
-            logger.info(
-                f"[DEBUG] Found {len(ready_for_execution)} schedules ready for immediate execution"
+            log_debug(
+                logger,
+                "schedule.scan.ready_summary",
+                ready_count=len(ready_for_execution),
             )
 
             # Ensure deterministic execution order (oldest next_run first).
@@ -228,8 +282,12 @@ class ScheduleRunner:
                 ) = schedule_data
                 is_test_bool = bool(is_test)
 
-                logger.info(
-                    f"[DEBUG] Adding {'TEST' if is_test_bool else 'REGULAR'} schedule {schedule_id} to execution queue (next_run={next_run_str})"
+                log_debug(
+                    logger,
+                    "schedule.queue.ready_entry",
+                    schedule_id=schedule_id,
+                    schedule_type="test" if is_test_bool else "regular",
+                    next_run=next_run_str,
                 )
 
                 schedules.append(
@@ -247,7 +305,7 @@ class ScheduleRunner:
             return schedules
 
         except Exception as e:
-            logger.error(f"Failed to get pending schedules: {e}")
+            log_exception(logger, "schedule.scan.failed", e, db_path=self.db_path)
             return []
 
     def calculate_next_run(
@@ -280,7 +338,12 @@ class ScheduleRunner:
                 return None
 
         except Exception as e:
-            logger.error(f"Failed to calculate next run for RRULE '{rrule_str}': {e}")
+            log_exception(
+                logger,
+                "schedule.next_run.calculate_failed",
+                e,
+                rrule=rrule_str,
+            )
             return None
 
     def update_schedule_next_run(self, schedule_id: str, next_run: datetime) -> bool:
@@ -301,11 +364,18 @@ class ScheduleRunner:
             conn.commit()
             conn.close()
 
-            logger.info(f"Updated schedule {schedule_id} next run to {next_run}")
+            log_info(
+                logger,
+                "schedule.next_run.updated",
+                schedule_id=schedule_id,
+                next_run=next_run,
+            )
             return True
 
         except Exception as e:
-            logger.error(f"Failed to update schedule {schedule_id}: {e}")
+            log_exception(
+                logger, "schedule.next_run.update_failed", e, schedule_id=schedule_id
+            )
             return False
 
     def disable_schedule(self, schedule_id: str) -> bool:
@@ -326,11 +396,11 @@ class ScheduleRunner:
             conn.commit()
             conn.close()
 
-            logger.info(f"Disabled schedule {schedule_id}")
+            log_info(logger, "schedule.disabled", schedule_id=schedule_id)
             return True
 
         except Exception as e:
-            logger.error(f"Failed to disable schedule {schedule_id}: {e}")
+            log_exception(logger, "schedule.disable_failed", e, schedule_id=schedule_id)
             return False
 
     def execute_schedule(self, schedule: Dict) -> bool:
@@ -348,30 +418,44 @@ class ScheduleRunner:
                 if next_run:
                     # 다음 실행 시간을 먼저 업데이트하여 중복 실행 방지
                     if self.update_schedule_next_run(schedule_id, next_run):
-                        logger.info(
-                            f"[EXECUTE] Pre-updated next run for schedule {schedule_id} to {next_run} (preventing duplicates)"
+                        log_info(
+                            logger,
+                            "schedule.execute.preupdated_next_run",
+                            schedule_id=schedule_id,
+                            next_run=next_run,
                         )
                     else:
-                        logger.error(
-                            f"[EXECUTE] Failed to pre-update next run for schedule {schedule_id}"
+                        log_error(
+                            logger,
+                            "schedule.execute.preupdate_failed",
+                            schedule_id=schedule_id,
                         )
                         return False
                 else:
                     # 더 이상 실행할 일정이 없으면 비활성화
-                    logger.info(
-                        f"[EXECUTE] No more occurrences for schedule {schedule_id}, disabling"
+                    log_info(
+                        logger,
+                        "schedule.execute.no_more_occurrences",
+                        schedule_id=schedule_id,
                     )
                     self.disable_schedule(schedule_id)
                     return True
             except Exception as update_error:
-                logger.error(
-                    f"[EXECUTE] Failed to calculate next run for schedule {schedule_id}: {update_error}"
+                log_exception(
+                    logger,
+                    "schedule.execute.next_run_failed",
+                    update_error,
+                    schedule_id=schedule_id,
                 )
                 # 업데이트 실패시 실행하지 않음 (중복 방지)
                 return False
 
-            logger.info(
-                f"[EXECUTE] Starting execution for schedule {schedule_id} - {params.get('keywords', 'No keywords')}"
+            log_info(
+                logger,
+                "schedule.execute.started",
+                schedule_id=schedule_id,
+                keywords=params.get("keywords"),
+                email=params.get("email"),
             )
 
             intended_run_at = schedule.get("next_run", datetime.now(timezone.utc))
@@ -412,22 +496,32 @@ class ScheduleRunner:
                         job_timeout="10m",
                         result_ttl=86400,  # 24시간 동안 결과 보관
                     )
-                    logger.info(
-                        f"Enqueued newsletter generation job {job.id} for schedule {schedule_id}"
+                    log_info(
+                        logger,
+                        "schedule.execute.enqueued",
+                        schedule_id=schedule_id,
+                        job_id=job.id,
                     )
                     redis_success = True
                 except Exception as redis_error:
                     # Redis 연결 실패 시 fallback으로 동기 실행
-                    logger.warning(
-                        f"Redis connection failed for schedule {schedule_id}: {redis_error}"
+                    log_exception(
+                        logger,
+                        "schedule.execute.redis_failed",
+                        redis_error,
+                        schedule_id=schedule_id,
                     )
-                    logger.info(
-                        f"Falling back to synchronous execution for schedule {schedule_id}"
+                    log_info(
+                        logger,
+                        "schedule.execute.fallback_sync",
+                        schedule_id=schedule_id,
                     )
 
             if not redis_success:
                 # Redis가 없거나 연결에 실패한 경우 동기 실행 (fallback)
-                logger.info(f"Executing schedule {schedule_id} synchronously")
+                log_info(
+                    logger, "schedule.execute.sync_started", schedule_id=schedule_id
+                )
                 result = generate_newsletter_task(
                     params,
                     schedule_job_id,
@@ -435,8 +529,11 @@ class ScheduleRunner:
                     idempotency_key,
                     self.db_path,
                 )
-                logger.info(
-                    f"Synchronous execution completed for schedule {schedule_id}: {result.get('status', 'unknown') if result else 'no result'}"
+                log_info(
+                    logger,
+                    "schedule.execute.sync_completed",
+                    schedule_id=schedule_id,
+                    status=result.get("status", "unknown") if result else "no_result",
                 )
 
             # 다음 실행 시간은 이미 실행 전에 업데이트됨 (중복 실행 방지)
@@ -444,45 +541,63 @@ class ScheduleRunner:
             return True
 
         except Exception as e:
-            logger.error(f"Failed to execute schedule {schedule['id']}: {e}")
-            # 스택트레이스 포함한 상세 에러 로깅
-            import traceback
-
-            logger.error(
-                f"Full traceback for schedule {schedule['id']}: {traceback.format_exc()}"
+            log_exception(
+                logger,
+                "schedule.execute.failed",
+                e,
+                schedule_id=schedule["id"],
             )
             return False
 
     def run_once(self) -> int:
         """한 번의 스케줄 체크 및 실행을 수행합니다."""
-        logger.info("Running schedule check...")
+        log_info(logger, "schedule.run_once.started")
 
         schedules = self.get_pending_schedules()
         executed_count = 0
 
-        logger.info(f"[DEBUG] Found {len(schedules)} pending schedules to execute")
+        log_debug(logger, "schedule.run_once.loaded", count=len(schedules))
 
         for i, schedule in enumerate(schedules):
             schedule_id = schedule.get("id", "unknown")
-            logger.info(
-                f"[DEBUG] Processing schedule {i+1}/{len(schedules)}: {schedule_id}"
+            log_debug(
+                logger,
+                "schedule.run_once.processing",
+                schedule_id=schedule_id,
+                index=i + 1,
+                total=len(schedules),
             )
             try:
                 if self.execute_schedule(schedule):
                     executed_count += 1
-                    logger.info(f"[DEBUG] Schedule {schedule_id} executed successfully")
+                    log_info(
+                        logger,
+                        "schedule.run_once.executed",
+                        schedule_id=schedule_id,
+                    )
                 else:
-                    logger.warning(f"[DEBUG] Schedule {schedule_id} execution failed")
+                    log_warning(
+                        logger,
+                        "schedule.run_once.execution_failed",
+                        schedule_id=schedule_id,
+                    )
             except Exception as e:
-                logger.error(f"[DEBUG] Exception executing schedule {schedule_id}: {e}")
+                log_exception(
+                    logger,
+                    "schedule.run_once.execution_exception",
+                    e,
+                    schedule_id=schedule_id,
+                )
 
-        logger.info(f"Executed {executed_count} schedules")
+        log_info(logger, "schedule.run_once.completed", executed_count=executed_count)
         return executed_count
 
     def run_continuous(self, check_interval: int = 60) -> None:
         """연속적으로 스케줄을 체크하고 실행합니다."""
-        logger.info(
-            f"Starting continuous schedule runner (check interval: {check_interval}s)"
+        log_info(
+            logger,
+            "schedule.runner.started",
+            check_interval_seconds=check_interval,
         )
 
         import time
@@ -493,10 +608,10 @@ class ScheduleRunner:
                 time.sleep(check_interval)
 
             except KeyboardInterrupt:
-                logger.info("Schedule runner stopped by user")
+                log_info(logger, "schedule.runner.stopped")
                 break
             except Exception as e:
-                logger.error(f"Error in schedule runner: {e}")
+                log_exception(logger, "schedule.runner.loop_failed", e)
                 time.sleep(check_interval)
 
 
@@ -518,7 +633,7 @@ def main() -> None:
 
     if args.once:
         count = runner.run_once()
-        logger.info(f"Executed {count} schedules")
+        log_info(logger, "schedule.runner.once_completed", executed_count=count)
     else:
         runner.run_continuous(args.interval)
 
