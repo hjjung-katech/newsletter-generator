@@ -1,96 +1,68 @@
-import os
+"""Lazy compatibility layer for legacy config imports.
+
+New runtime code should prefer `newsletter_core.public.settings`.
+"""
+
+from __future__ import annotations
+
 from typing import Any
 
-from .config_manager import config_manager
+from newsletter_core.public.settings import (
+    get_all_major_news_sources,
+    get_config_manager,
+    get_llm_config,
+    get_major_news_sources,
+    get_settings,
+)
+
+_CONFIG_MANAGER_FIELDS = {
+    "ADDITIONAL_RSS_FEEDS",
+    "ANTHROPIC_API_KEY",
+    "EMAIL_SENDER",
+    "GEMINI_API_KEY",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "NAVER_CLIENT_ID",
+    "NAVER_CLIENT_SECRET",
+    "OPENAI_API_KEY",
+    "POSTMARK_SERVER_TOKEN",
+    "SERPER_API_KEY",
+}
+
+__all__ = sorted(
+    _CONFIG_MANAGER_FIELDS
+    | {
+        "ALL_MAJOR_NEWS_SOURCES",
+        "LLM_CONFIG",
+        "MAJOR_NEWS_SOURCES",
+        "MOCK_MODE",
+    }
+)
 
 
 def _cfg(name: str, default: Any = None) -> Any:
-    """Safely read lazy ConfigManager attributes during partial initialization."""
+    """Safely read compatibility attributes from the lazy config manager."""
     try:
-        return getattr(config_manager, name)
+        return getattr(get_config_manager(), name)
     except AttributeError:
         return default
 
 
-# 하위 호환성을 위한 변수들 (ConfigManager에서 가져옴)
-SERPER_API_KEY = _cfg("SERPER_API_KEY")
-GEMINI_API_KEY = _cfg("GEMINI_API_KEY")
-OPENAI_API_KEY = _cfg("OPENAI_API_KEY")
-ANTHROPIC_API_KEY = _cfg("ANTHROPIC_API_KEY")
-GOOGLE_APPLICATION_CREDENTIALS = _cfg("GOOGLE_APPLICATION_CREDENTIALS")
-NAVER_CLIENT_ID = _cfg("NAVER_CLIENT_ID")
-NAVER_CLIENT_SECRET = _cfg("NAVER_CLIENT_SECRET")
-ADDITIONAL_RSS_FEEDS = _cfg("ADDITIONAL_RSS_FEEDS", "")
-
-# 이메일 발송 설정 (Postmark 사용)
-POSTMARK_SERVER_TOKEN = _cfg("POSTMARK_SERVER_TOKEN")
-EMAIL_SENDER = _cfg("EMAIL_SENDER")
-
-# Google Drive 설정
-GOOGLE_CLIENT_ID = _cfg("GOOGLE_CLIENT_ID")
-GOOGLE_CLIENT_SECRET = _cfg("GOOGLE_CLIENT_SECRET")
-
-# LLM 설정
-LLM_CONFIG = config_manager.get_llm_config()
-
-# 주요 언론사 설정
-MAJOR_NEWS_SOURCES = config_manager.get_major_news_sources()
-
-# 호환성을 위한 flat한 주요 언론사 목록 (tier1 + tier2)
-ALL_MAJOR_NEWS_SOURCES = MAJOR_NEWS_SOURCES["tier1"] + MAJOR_NEWS_SOURCES["tier2"]
+def __getattr__(name: str) -> Any:
+    if name in _CONFIG_MANAGER_FIELDS:
+        default = "" if name == "ADDITIONAL_RSS_FEEDS" else None
+        return _cfg(name, default)
+    if name == "LLM_CONFIG":
+        return get_llm_config()
+    if name == "MAJOR_NEWS_SOURCES":
+        return get_major_news_sources()
+    if name == "ALL_MAJOR_NEWS_SOURCES":
+        return get_all_major_news_sources()
+    if name == "MOCK_MODE":
+        return bool(get_settings().mock_mode)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-# 경고 메시지 출력 (ConfigManager에서 처리하므로 간소화)
-def log_message(level: str, message: str) -> None:
-    """Startup-safe logging for environments without UTF-8 console support."""
-    print(f"[{level.upper()}] {message}")
-
-
-# 필수 API 키 검증
-if not SERPER_API_KEY:
-    log_message("warning", "Warning: SERPER_API_KEY not found in .env file.")
-if not GEMINI_API_KEY:
-    log_message(
-        "warning",
-        "Warning: GEMINI_API_KEY not found in .env file. Gemini-based features may not work.",
-    )
-
-# 새로 추가된 LLM API 키 경고
-if not OPENAI_API_KEY:
-    log_message(
-        "info",
-        "Note: OPENAI_API_KEY not found in .env file. OpenAI/ChatGPT features will be disabled.",
-    )
-if not ANTHROPIC_API_KEY:
-    log_message(
-        "info",
-        "Note: ANTHROPIC_API_KEY not found in .env file. Anthropic/Claude features will be disabled.",
-    )
-
-# 선택적 API 키
-if not GOOGLE_APPLICATION_CREDENTIALS:
-    log_message(
-        "warning",
-        "Warning: GOOGLE_APPLICATION_CREDENTIALS not found in .env file. Google Drive upload will not work.",
-    )
-
-# Postmark 설정 경고
-if not POSTMARK_SERVER_TOKEN:
-    log_message(
-        "warning",
-        "Warning: POSTMARK_SERVER_TOKEN not found in .env file. Email sending will not work.",
-    )
-
-# 새로 추가된 API 키에 대한 경고 (선택적)
-if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
-    log_message(
-        "info",
-        "Note: Naver News API credentials not found. Naver News API source will be disabled.",
-    )
-
-# Mock 모드 설정 - 환경 변수에서 로드, 기본값은 False
-MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
-if MOCK_MODE:
-    log_message(
-        "warning", "Running in MOCK MODE - using sample data instead of real API calls"
-    )
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))
