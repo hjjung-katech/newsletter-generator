@@ -19,6 +19,13 @@ from web.db_state import record_analytics_event  # noqa: E402
 
 pytestmark = [pytest.mark.api, pytest.mark.email]
 
+EXPECTED_GENERATE_RESPONSE_KEYS = {
+    "deduplicated",
+    "idempotency_key",
+    "job_id",
+    "status",
+}
+
 
 def _delete_schedule(schedule_id: str) -> None:
     conn = sqlite3.connect(DATABASE_PATH)
@@ -95,6 +102,18 @@ def _insert_history_row(
     conn.close()
 
 
+def _assert_generate_response_contract(
+    payload: dict[str, object], *, expected_statuses: set[str]
+) -> None:
+    assert set(payload) == EXPECTED_GENERATE_RESPONSE_KEYS
+    assert isinstance(payload["job_id"], str)
+    assert payload["job_id"]
+    assert payload["status"] in expected_statuses
+    assert isinstance(payload["deduplicated"], bool)
+    assert isinstance(payload["idempotency_key"], str)
+    assert payload["idempotency_key"]
+
+
 class TestWebAPI:
     """Test web API endpoints"""
 
@@ -120,8 +139,11 @@ class TestWebAPI:
 
         assert response.status_code == 202
         result = json.loads(response.data)
-        assert "job_id" in result
-        assert result["status"] in ["queued", "processing"]
+        _assert_generate_response_contract(
+            result, expected_statuses={"processing", "queued"}
+        )
+        assert result["deduplicated"] is False
+        assert result["idempotency_key"].startswith("generate:")
 
     def test_generate_newsletter_with_email(self, client):
         """Test newsletter generation with email"""
@@ -139,8 +161,11 @@ class TestWebAPI:
 
         assert response.status_code == 202
         result = json.loads(response.data)
-        assert "job_id" in result
-        assert result["status"] in ["queued", "processing"]
+        _assert_generate_response_contract(
+            result, expected_statuses={"processing", "queued"}
+        )
+        assert result["deduplicated"] is False
+        assert result["idempotency_key"].startswith("generate:")
 
     def test_generate_newsletter_idempotency_reuses_job(self, client):
         """Same Idempotency-Key should return same job_id with deduplicated flag."""
@@ -170,10 +195,50 @@ class TestWebAPI:
 
         first_payload = json.loads(first.data)
         second_payload = json.loads(second.data)
+        _assert_generate_response_contract(
+            first_payload, expected_statuses={"processing", "queued"}
+        )
+        _assert_generate_response_contract(
+            second_payload, expected_statuses={"pending", "processing", "queued"}
+        )
         assert first_payload["job_id"] == second_payload["job_id"]
         assert first_payload["deduplicated"] is False
         assert second_payload["deduplicated"] is True
+        assert first_payload["idempotency_key"] == unique_key
         assert second_payload["idempotency_key"] == unique_key
+
+    def test_generate_newsletter_payload_hash_reuses_job_without_header(self, client):
+        """Same payload should deduplicate even without an explicit Idempotency-Key."""
+        unique_topic = f"AI-{uuid.uuid4()}"
+        data = {
+            "keywords": f"{unique_topic}, machine learning",
+            "template_style": "compact",
+            "period": 14,
+        }
+
+        first = client.post(
+            "/api/generate", data=json.dumps(data), content_type="application/json"
+        )
+        second = client.post(
+            "/api/generate", data=json.dumps(data), content_type="application/json"
+        )
+
+        assert first.status_code == 202
+        assert second.status_code == 202
+
+        first_payload = json.loads(first.data)
+        second_payload = json.loads(second.data)
+        _assert_generate_response_contract(
+            first_payload, expected_statuses={"processing", "queued"}
+        )
+        _assert_generate_response_contract(
+            second_payload, expected_statuses={"pending", "processing", "queued"}
+        )
+        assert first_payload["job_id"] == second_payload["job_id"]
+        assert first_payload["deduplicated"] is False
+        assert second_payload["deduplicated"] is True
+        assert first_payload["idempotency_key"] == second_payload["idempotency_key"]
+        assert first_payload["idempotency_key"].startswith("generate:")
 
     def test_generate_newsletter_invalid_email(self, client):
         """Test newsletter generation with invalid email"""
