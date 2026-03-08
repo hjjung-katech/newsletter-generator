@@ -483,3 +483,39 @@ def test_protected_schedule_routes_require_admin_token_in_production_like_runtim
         assert isinstance(authorized.get_json(), list)
     finally:
         app.config["TESTING"] = original_testing
+
+
+def test_generate_route_rate_limits_burst_requests_in_production_like_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    original_testing = app.config.get("TESTING", False)
+    app.config["TESTING"] = False
+
+    limiter = app.extensions["request_limiters"]["generate"]
+    limiter.reset()
+    for _ in range(4):
+        limiter.check("generate:127.0.0.1", limit=5, window_seconds=60)
+
+    try:
+        with app.test_client() as client:
+            first = client.post(
+                "/api/generate",
+                data=json.dumps({"keywords": "AI", "period": 14}),
+                content_type="application/json",
+                headers={"Idempotency-Key": "generate-limit-5"},
+            )
+            second = client.post(
+                "/api/generate",
+                data=json.dumps({"keywords": "AI", "period": 14}),
+                content_type="application/json",
+                headers={"Idempotency-Key": "generate-limit-6"},
+            )
+
+        assert first.status_code == 202
+        assert second.status_code == 429
+        assert second.get_json()["error"] == "Generate rate limit exceeded"
+        assert int(second.headers["Retry-After"]) >= 1
+    finally:
+        limiter.reset()
+        app.config["TESTING"] = original_testing
