@@ -623,12 +623,10 @@ def register_generation_routes(
             # Extract sent status from result
             if isinstance(result_data, dict):
                 response["sent"] = result_data.get("sent", False)
-                response["approval_status"] = result_data.get(
-                    "approval_status", response["approval_status"]
-                )
-                response["delivery_status"] = result_data.get(
-                    "delivery_status", response["delivery_status"]
-                )
+                if response["approval_status"] is None:
+                    response["approval_status"] = result_data.get("approval_status")
+                if response["delivery_status"] is None:
+                    response["delivery_status"] = result_data.get("delivery_status")
 
         return jsonify(response)
 

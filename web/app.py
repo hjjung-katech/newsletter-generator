@@ -237,6 +237,14 @@ register_send_email_route(app, DATABASE_PATH)
 
 
 try:
+    from routes_approval import register_approval_routes
+except ImportError:
+    from web.routes_approval import register_approval_routes  # pragma: no cover
+
+register_approval_routes(app, DATABASE_PATH)
+
+
+try:
     from routes_email_api import register_email_api_routes
 except ImportError:
     from web.routes_email_api import register_email_api_routes  # pragma: no cover
