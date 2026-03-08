@@ -16,6 +16,13 @@ import routes_generation  # noqa: E402
 
 pytestmark = [pytest.mark.unit, pytest.mark.mock_api]
 
+EXPECTED_GENERATE_RESPONSE_KEYS = {
+    "deduplicated",
+    "idempotency_key",
+    "job_id",
+    "status",
+}
+
 
 def _build_generation_app(database_path: str) -> Flask:
     app = Flask(__name__)
@@ -49,8 +56,11 @@ def test_generate_route_accepts_preview_only_field(tmp_path: Path) -> None:
     assert response.status_code == 202
     payload = response.get_json()
     assert payload is not None
+    assert set(payload) == EXPECTED_GENERATE_RESPONSE_KEYS
+    assert payload["job_id"].startswith("job_")
     assert payload["status"] == "processing"
     assert payload["deduplicated"] is False
+    assert payload["idempotency_key"].startswith("generate:")
 
 
 def test_schedule_run_now_executes_scheduled_job(
