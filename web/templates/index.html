@@ -36,6 +36,9 @@
                     <button id="approvalBtn" class="text-gray-600 hover:text-gray-900">
                         <i class="fas fa-user-check mr-1"></i> Approvals
                     </button>
+                    <button id="sourcesBtn" class="text-gray-600 hover:text-gray-900">
+                        <i class="fas fa-filter mr-1"></i> Sources
+                    </button>
                     <button id="scheduleBtn" class="text-gray-600 hover:text-gray-900">
                         <i class="fas fa-calendar mr-1"></i> Schedules
                     </button>
@@ -56,6 +59,9 @@
                 </button>
                 <button id="approvalTab" class="tab-button text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md">
                     Approval Inbox
+                </button>
+                <button id="sourcePolicyTab" class="tab-button text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md">
+                    Source Policies
                 </button>
                 <button id="scheduleManageTab" class="tab-button text-gray-500 hover:text-gray-700 px-3 py-2 font-medium text-sm rounded-md">
                     Schedule Management
@@ -327,6 +333,87 @@
                     <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">승인 대기함</h3>
                     <div id="approvalsList">
                         <!-- Approval items will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="sourcePolicyPanel" class="tab-panel hidden">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="flex flex-col gap-3 border-b border-gray-200 pb-4 md:flex-row md:items-end md:justify-between">
+                        <div>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">소스 정책 관리</h3>
+                            <p class="mt-1 text-sm text-gray-500">
+                                전역 allow/block 정책으로 생성 시 포함할 소스와 제외할 소스를 제어합니다.
+                            </p>
+                        </div>
+                        <button id="refreshSourcePoliciesBtn"
+                                class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                            새로고침
+                        </button>
+                    </div>
+
+                    <div class="mt-6 grid gap-6 lg:grid-cols-3">
+                        <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <h4 id="sourcePolicyFormTitle" class="text-sm font-semibold text-gray-900">새 정책 추가</h4>
+                                <span class="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-gray-500">admin token required</span>
+                            </div>
+                            <p id="sourcePolicyStatus" class="mt-2 text-sm text-gray-500">
+                                운영 토큰이 있으면 소스 정책을 추가하고 수정할 수 있습니다.
+                            </p>
+
+                            <input type="hidden" id="sourcePolicyId">
+
+                            <div class="mt-4">
+                                <label for="sourcePattern" class="block text-sm font-medium text-gray-700">소스 패턴</label>
+                                <input type="text"
+                                       id="sourcePattern"
+                                       placeholder="예: reuters.com 또는 reuters"
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <p class="mt-2 text-xs text-gray-500">
+                                    도메인은 하위 도메인까지 매칭되고, 일반 문자열은 source/domain 부분 일치로 처리됩니다.
+                                </p>
+                            </div>
+
+                            <div class="mt-4">
+                                <label for="sourcePolicyType" class="block text-sm font-medium text-gray-700">정책 타입</label>
+                                <select id="sourcePolicyType"
+                                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                    <option value="allow">Allow</option>
+                                    <option value="block">Block</option>
+                                </select>
+                            </div>
+
+                            <label class="mt-4 flex items-center rounded-md border border-gray-200 bg-white px-3 py-2 shadow-sm">
+                                <input type="checkbox"
+                                       id="sourcePolicyActive"
+                                       checked
+                                       class="rounded border-gray-300 text-blue-600 focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                                <span class="ml-2 text-sm text-gray-700">즉시 활성화</span>
+                            </label>
+
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                <button id="saveSourcePolicyBtn"
+                                        class="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                    저장
+                                </button>
+                                <button id="cancelSourcePolicyEditBtn"
+                                        class="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                                    편집 취소
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="lg:col-span-2">
+                            <div id="sourcePolicySummary" class="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                                정책을 불러오는 중입니다.
+                            </div>
+                            <div id="sourcePoliciesList" class="space-y-3">
+                                <!-- Source policy items will be loaded here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

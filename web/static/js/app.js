@@ -10,6 +10,8 @@ class NewsletterApp {
         this.adminTokenStorageKey = 'newsletter-admin-api-token';
         this.savedPresets = [];
         this.selectedPresetId = '';
+        this.sourcePolicies = [];
+        this.editingSourcePolicyId = '';
         this.init();
     }
 
@@ -53,6 +55,7 @@ class NewsletterApp {
         document.getElementById('adminToken').addEventListener('input', (e) => {
             this.persistAdminToken(e.target.value);
             this.loadPresets(this.selectedPresetId);
+            this.loadSourcePolicies();
         });
         document.getElementById('presetSelect').addEventListener('change', (e) => this.handlePresetSelection(e.target.value));
         document.getElementById('applyPresetBtn').addEventListener('click', () => this.applySelectedPreset());
@@ -60,10 +63,14 @@ class NewsletterApp {
         document.getElementById('updatePresetBtn').addEventListener('click', () => this.updateSelectedPreset());
         document.getElementById('deletePresetBtn').addEventListener('click', () => this.deleteSelectedPreset());
         document.getElementById('refreshPresetsBtn').addEventListener('click', () => this.loadPresets(this.selectedPresetId));
+        document.getElementById('refreshSourcePoliciesBtn').addEventListener('click', () => this.loadSourcePolicies());
+        document.getElementById('saveSourcePolicyBtn').addEventListener('click', () => this.saveSourcePolicy());
+        document.getElementById('cancelSourcePolicyEditBtn').addEventListener('click', () => this.resetSourcePolicyForm());
 
         // Navigation buttons
         document.getElementById('historyBtn').addEventListener('click', () => this.switchTab('historyTab'));
         document.getElementById('approvalBtn').addEventListener('click', () => this.switchTab('approvalTab'));
+        document.getElementById('sourcesBtn').addEventListener('click', () => this.switchTab('sourcePolicyTab'));
         document.getElementById('scheduleBtn').addEventListener('click', () => this.switchTab('scheduleManageTab'));
     }
 
@@ -126,6 +133,56 @@ class NewsletterApp {
             button.classList.toggle('opacity-50', !hasSelection);
             button.classList.toggle('cursor-not-allowed', !hasSelection);
         });
+    }
+
+    setSourcePolicyStatus(message, tone = 'gray') {
+        const status = document.getElementById('sourcePolicyStatus');
+        const toneClassMap = {
+            gray: 'text-gray-500',
+            green: 'text-green-600',
+            yellow: 'text-amber-600',
+            red: 'text-red-600'
+        };
+
+        status.className = `mt-2 text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        status.textContent = message;
+    }
+
+    setSourcePolicySummary(message, tone = 'gray') {
+        const summary = document.getElementById('sourcePolicySummary');
+        const toneClassMap = {
+            gray: 'border-gray-200 bg-gray-50 text-gray-600',
+            green: 'border-green-200 bg-green-50 text-green-700',
+            yellow: 'border-amber-200 bg-amber-50 text-amber-700',
+            red: 'border-red-200 bg-red-50 text-red-700'
+        };
+
+        summary.className = `mb-4 rounded-lg border px-4 py-3 text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        summary.textContent = message;
+    }
+
+    resetSourcePolicyForm() {
+        this.editingSourcePolicyId = '';
+        document.getElementById('sourcePolicyId').value = '';
+        document.getElementById('sourcePattern').value = '';
+        document.getElementById('sourcePolicyType').value = 'allow';
+        document.getElementById('sourcePolicyActive').checked = true;
+        document.getElementById('sourcePolicyFormTitle').textContent = '새 정책 추가';
+        this.setSourcePolicyStatus('운영 토큰이 있으면 소스 정책을 추가하고 수정할 수 있습니다.');
+    }
+
+    buildSourcePolicyPayload() {
+        const pattern = document.getElementById('sourcePattern').value.trim();
+        if (!pattern) {
+            this.showError('소스 패턴을 입력해주세요.');
+            return null;
+        }
+
+        return {
+            pattern,
+            policy_type: document.getElementById('sourcePolicyType').value,
+            is_active: document.getElementById('sourcePolicyActive').checked
+        };
     }
 
     renderPresetOptions(preferredPresetId = '') {
@@ -232,6 +289,7 @@ class NewsletterApp {
             'generateTab': 'generatePanel',
             'historyTab': 'historyPanel',
             'approvalTab': 'approvalPanel',
+            'sourcePolicyTab': 'sourcePolicyPanel',
             'scheduleManageTab': 'scheduleManagePanel'
         };
 
@@ -244,6 +302,8 @@ class NewsletterApp {
                 this.loadHistory();
             } else if (tabId === 'approvalTab') {
                 this.loadApprovals();
+            } else if (tabId === 'sourcePolicyTab') {
+                this.loadSourcePolicies();
             } else if (tabId === 'scheduleManageTab') {
                 this.loadSchedules();
             }
@@ -1131,6 +1191,234 @@ class NewsletterApp {
             `).join('');
         } catch (error) {
             approvalsList.innerHTML = `<p class="text-red-600">승인 대기함 조회 실패: ${error.message}</p>`;
+        }
+    }
+
+    async loadSourcePolicies() {
+        const sourcePoliciesList = document.getElementById('sourcePoliciesList');
+
+        try {
+            const response = await fetch('/api/source-policies', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const policies = await response.json();
+
+            if (!response.ok) {
+                this.sourcePolicies = [];
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(policies.error || '소스 정책을 불러올 수 없습니다.')
+                    : (policies.error || '소스 정책을 불러올 수 없습니다.');
+                sourcePoliciesList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                this.setSourcePolicySummary(message, 'yellow');
+                this.setSourcePolicyStatus(message, 'yellow');
+                return;
+            }
+
+            this.sourcePolicies = Array.isArray(policies) ? policies : [];
+            this.renderSourcePolicies();
+        } catch (error) {
+            this.sourcePolicies = [];
+            sourcePoliciesList.innerHTML = `<p class="text-red-600">소스 정책 조회 실패: ${error.message}</p>`;
+            this.setSourcePolicySummary(`소스 정책 조회 실패: ${error.message}`, 'red');
+            this.setSourcePolicyStatus(`소스 정책 조회 실패: ${error.message}`, 'red');
+        }
+    }
+
+    renderSourcePolicies() {
+        const sourcePoliciesList = document.getElementById('sourcePoliciesList');
+
+        if (this.sourcePolicies.length === 0) {
+            sourcePoliciesList.innerHTML = '<p class="text-gray-500">등록된 소스 정책이 없습니다.</p>';
+            this.setSourcePolicySummary('현재 적용 중인 소스 정책이 없습니다. 필요하면 allow/block 정책을 추가하세요.');
+            if (!this.editingSourcePolicyId) {
+                this.resetSourcePolicyForm();
+            }
+            return;
+        }
+
+        const activePolicies = this.sourcePolicies.filter((policy) => policy.is_active);
+        const allowCount = activePolicies.filter((policy) => policy.policy_type === 'allow').length;
+        const blockCount = activePolicies.filter((policy) => policy.policy_type === 'block').length;
+        this.setSourcePolicySummary(`활성 정책 ${activePolicies.length}개 (allow ${allowCount} / block ${blockCount})`);
+
+        sourcePoliciesList.innerHTML = this.sourcePolicies
+            .slice()
+            .sort((left, right) => {
+                if (left.policy_type !== right.policy_type) {
+                    return left.policy_type.localeCompare(right.policy_type);
+                }
+                return left.pattern.localeCompare(right.pattern);
+            })
+            .map((policy) => {
+                const typeBadge = policy.policy_type === 'allow'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-rose-100 text-rose-800';
+                const activeBadge = policy.is_active
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-slate-100 text-slate-700';
+                const updatedAt = policy.updated_at ? new Date(policy.updated_at).toLocaleString() : '-';
+
+                return `
+                    <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <code class="rounded bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-800">${policy.pattern}</code>
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${typeBadge}">${policy.policy_type}</span>
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${activeBadge}">${policy.is_active ? 'active' : 'paused'}</span>
+                                </div>
+                                <p class="mt-2 text-sm text-gray-500">업데이트: ${updatedAt}</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button onclick="app.editSourcePolicy('${policy.id}')"
+                                        class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                                    편집
+                                </button>
+                                <button onclick="app.toggleSourcePolicyActive('${policy.id}', ${policy.is_active ? 'false' : 'true'})"
+                                        class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+                                    ${policy.is_active ? '비활성화' : '활성화'}
+                                </button>
+                                <button onclick="app.deleteSourcePolicy('${policy.id}')"
+                                        class="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
+                                    삭제
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .join('');
+
+        if (!this.editingSourcePolicyId) {
+            this.resetSourcePolicyForm();
+        }
+    }
+
+    editSourcePolicy(policyId) {
+        const policy = this.sourcePolicies.find((item) => item.id === policyId);
+        if (!policy) {
+            this.showError('편집할 소스 정책을 찾을 수 없습니다.');
+            return;
+        }
+
+        this.editingSourcePolicyId = policy.id;
+        document.getElementById('sourcePolicyId').value = policy.id;
+        document.getElementById('sourcePattern').value = policy.pattern;
+        document.getElementById('sourcePolicyType').value = policy.policy_type;
+        document.getElementById('sourcePolicyActive').checked = Boolean(policy.is_active);
+        document.getElementById('sourcePolicyFormTitle').textContent = '정책 편집';
+        this.setSourcePolicyStatus(`${policy.pattern} 정책을 편집 중입니다.`, 'green');
+        document.getElementById('sourcePattern').focus();
+    }
+
+    async saveSourcePolicy() {
+        const payload = this.buildSourcePolicyPayload();
+        if (!payload) {
+            return;
+        }
+
+        const isEditing = Boolean(this.editingSourcePolicyId);
+        const url = isEditing ? `/api/source-policies/${this.editingSourcePolicyId}` : '/api/source-policies';
+        const method = isEditing ? 'PUT' : 'POST';
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '소스 정책 저장 권한이 없습니다.')
+                    : (result.error || '소스 정책 저장에 실패했습니다.');
+                this.showError(message);
+                this.setSourcePolicyStatus(message, response.status === 409 ? 'yellow' : 'red');
+                return;
+            }
+
+            this.resetSourcePolicyForm();
+            await this.loadSourcePolicies();
+            this.showSuccess(isEditing ? '소스 정책이 업데이트되었습니다.' : '소스 정책이 추가되었습니다.');
+            this.setSourcePolicyStatus(
+                isEditing ? '소스 정책 업데이트가 반영되었습니다.' : '새 소스 정책이 저장되었습니다.',
+                'green'
+            );
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+            this.setSourcePolicyStatus(`소스 정책 저장 실패: ${error.message}`, 'red');
+        }
+    }
+
+    async toggleSourcePolicyActive(policyId, nextActive) {
+        const policy = this.sourcePolicies.find((item) => item.id === policyId);
+        if (!policy) {
+            this.showError('상태를 변경할 소스 정책을 찾을 수 없습니다.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/source-policies/${policyId}`, {
+                method: 'PUT',
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
+                body: JSON.stringify({
+                    pattern: policy.pattern,
+                    policy_type: policy.policy_type,
+                    is_active: nextActive
+                })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '소스 정책 변경 권한이 없습니다.')
+                    : (result.error || '소스 정책 상태 변경에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            await this.loadSourcePolicies();
+            this.showSuccess(`소스 정책을 ${nextActive ? '활성화' : '비활성화'}했습니다.`);
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
+    }
+
+    async deleteSourcePolicy(policyId) {
+        const policy = this.sourcePolicies.find((item) => item.id === policyId);
+        if (!policy) {
+            this.showError('삭제할 소스 정책을 찾을 수 없습니다.');
+            return;
+        }
+
+        if (!confirm(`소스 정책 "${policy.pattern}"을 삭제하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/source-policies/${policyId}`, {
+                method: 'DELETE',
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '소스 정책 삭제 권한이 없습니다.')
+                    : (result.error || '소스 정책 삭제에 실패했습니다.');
+                this.showError(message);
+                return;
+            }
+
+            if (this.editingSourcePolicyId === policyId) {
+                this.resetSourcePolicyForm();
+            }
+
+            await this.loadSourcePolicies();
+            this.showSuccess(`소스 정책 삭제 완료: ${policy.pattern}`);
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
         }
     }
 
