@@ -146,14 +146,17 @@ newsletter test output/data.json --mode content
 
 ## 8. 성능 지표
 
-### 8.1 현재 성능
+### 8.1 현재 검증 상태
 
-| 지표 | 목표 | 현재 성과 |
-|------|------|----------|
-| **처리 시간** | < 60초 | 평균 45초 |
-| **API 응답률** | > 95% | 98% |
-| **이메일 발송률** | > 95% | 97% |
-| **테스트 커버리지** | > 80% | 85% |
+2026-03-08 기준으로 이 저장소는 로컬/CI 게이트 중심으로 품질을 검증합니다. 아래 표는 현재 저장소에서
+직접 확인 가능한 상태만 기록합니다.
+
+| 항목 | 현재 상태 | 근거 |
+|------|-----------|------|
+| **처리 시간** | 정식 SLO 미고정 | smoke/integration 회귀는 있으나 지속 수집되는 latency 대시보드는 아직 없음 |
+| **API 응답률** | 정식 SLI 미고정 | `tests/test_web_api.py`, contract/integration suite로 회귀만 검증 |
+| **이메일 발송률** | 실운영 계측 전 | 기본 게이트는 mock/dummy credential 중심이며 live delivery는 별도 환경 필요 |
+| **테스트 커버리지** | baseline 재산정 중 | coverage scope는 `newsletter + newsletter_core + web` 기준으로 추적 |
 
 ### 8.2 품질 지표
 
@@ -191,10 +194,12 @@ newsletter test output/data.json --mode content
 
 ### 10.2 CI/CD 파이프라인
 
-- ✅ 자동 테스트 (Python 3.10, 3.11)
-- ✅ 코드 품질 검사
-- ✅ 자동 문서 생성
-- ✅ GitHub Pages 배포
+- ✅ 단위 테스트 매트릭스 (Python 3.11, 3.12)
+- ✅ 코드 품질/보안 검사
+- ✅ Mock API 테스트 및 Windows 빌드 검증
+- ✅ 문서 품질 검사와 PR 정책 검사
+- ✅ main/develop push 시 scheduler integration contract 실행
+- ✅ GitHub Pages/Railway 배포 워크플로우 유지
 
 ---
 
@@ -247,10 +252,10 @@ newsletter test output/data.json --mode content
 
 ### 13.1 기술적 KPI
 
-- ✅ 시스템 가용성: 99% 이상
-- ✅ 평균 응답 시간: 60초 이내
-- ✅ 테스트 커버리지: 80% 이상
-- ✅ 코드 품질 점수: A 등급
+- 목표: `main-ci`, `docs-quality`, `security-scan`, 로컬 `make check-full`가 지속적으로 green 상태 유지
+- 목표: coverage는 최신 artifact 기준으로 `newsletter + newsletter_core + web` 전체 범위를 추적
+- 목표: scheduler/web/runtime contract 회귀 0건 유지
+- 목표: 실운영 SLI/SLO는 별도 모니터링 도입 후 수치화
 
 ### 13.2 사용자 KPI
 
