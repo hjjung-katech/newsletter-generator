@@ -7,62 +7,18 @@ import os
 import sys
 import traceback
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional, cast
-
-# F-14: Windows 한글 인코딩 문제 해결 (강화된 버전)
-if sys.platform.startswith("win"):
-    import io
-    import locale
-
-    # UTF-8 인코딩 강제 설정
-    os.environ["PYTHONIOENCODING"] = "utf-8"
-    os.environ["PYTHONUTF8"] = "1"
-
-    # 시스템 기본 인코딩을 UTF-8로 설정
-    try:
-        locale.setlocale(locale.LC_ALL, "ko_KR.UTF-8")
-    except locale.Error:
-        try:
-            locale.setlocale(locale.LC_ALL, ".65001")  # Windows UTF-8 codepage
-        except locale.Error:
-            pass  # 설정할 수 없으면 무시
-
-    # 표준 입출력 스트림을 UTF-8로 재구성
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-    else:
-        # 이전 Python 버전을 위한 fallback
-        sys.stdout = io.TextIOWrapper(
-            sys.stdout.buffer, encoding="utf-8", errors="replace"
-        )
-        sys.stderr = io.TextIOWrapper(
-            sys.stderr.buffer, encoding="utf-8", errors="replace"
-        )
-
-    # 디폴트 인코딩 설정
-    if hasattr(sys, "_setdefaultencoding"):
-        sys._setdefaultencoding("utf-8")
 
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
-
-# Explicitly load .env from the project root
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-dotenv_path = os.path.join(project_root, ".env")
 
 # 새로운 로깅 시스템 import
 from .utils.logger import get_logger, set_log_level
 
 # 로거 초기화
 logger = get_logger()
-
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path=dotenv_path)
-    logger.debug(f"Loaded .env file from: {dotenv_path}")
-else:
-    logger.warning(f".env file not found at: {dotenv_path}")
 
 from . import collect as news_collect
 from . import compose as news_compose
@@ -84,6 +40,63 @@ from .compose import compose_compact_newsletter_html, compose_newsletter_html
 
 app = typer.Typer()
 console = Console()
+_CLI_BOOTSTRAPPED = False
+
+
+def _configure_windows_utf8_io() -> None:
+    if sys.platform.startswith("win"):
+        import io
+        import locale
+
+        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+        os.environ.setdefault("PYTHONUTF8", "1")
+
+        try:
+            locale.setlocale(locale.LC_ALL, "ko_KR.UTF-8")
+        except locale.Error:
+            try:
+                locale.setlocale(locale.LC_ALL, ".65001")
+            except locale.Error:
+                pass
+
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        else:  # pragma: no cover - legacy Python fallback
+            sys.stdout = io.TextIOWrapper(
+                sys.stdout.buffer, encoding="utf-8", errors="replace"
+            )
+            sys.stderr = io.TextIOWrapper(
+                sys.stderr.buffer, encoding="utf-8", errors="replace"
+            )
+
+        if hasattr(sys, "_setdefaultencoding"):  # pragma: no cover
+            sys._setdefaultencoding("utf-8")
+
+
+def _load_project_dotenv_if_present() -> None:
+    project_root = Path(__file__).resolve().parent.parent
+    dotenv_path = project_root / ".env"
+    if dotenv_path.exists():
+        load_dotenv(dotenv_path=dotenv_path, override=False)
+        logger.debug(f"Loaded .env file from: {dotenv_path}")
+    else:
+        logger.warning(f".env file not found at: {dotenv_path}")
+
+
+def _bootstrap_cli_environment() -> None:
+    global _CLI_BOOTSTRAPPED
+    if _CLI_BOOTSTRAPPED:
+        return
+    _configure_windows_utf8_io()
+    _load_project_dotenv_if_present()
+    _CLI_BOOTSTRAPPED = True
+
+
+@app.callback()  # type: ignore[untyped-decorator]
+def main() -> None:
+    """Bootstrap CLI runtime only when a command executes."""
+    _bootstrap_cli_environment()
 
 
 # The 'collect' command can remain if it's used for other purposes or direct testing.

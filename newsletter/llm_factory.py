@@ -7,13 +7,17 @@ LLM Factory Module
 F-14: 중앙화된 설정을 활용한 성능 최적화
 """
 
+import logging
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, cast
 
-from .utils.logger import get_logger
+from newsletter_core.public.settings import get_llm_config
+
+from .cost_tracking import get_cost_callback_for_provider
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 # 중앙화된 설정 import 추가 (F-14)
 try:
@@ -26,26 +30,6 @@ except ImportError:
 
 # 로거 초기화
 logger = get_logger()
-
-# Google Cloud 인증 문제 해결
-# 시스템에 잘못된 GOOGLE_APPLICATION_CREDENTIALS가 설정되어 있는 경우 처리
-google_creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
-if google_creds_path and not os.path.exists(google_creds_path):
-    # 파일이 존재하지 않으면 환경변수 제거
-    logger.warning(
-        f"GOOGLE_APPLICATION_CREDENTIALS이 존재하지 않는 파일을 가리킵니다: {google_creds_path}"
-    )
-    logger.info("Google Cloud 인증을 비활성화하고 API 키만 사용합니다.")
-    os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
-
-# Google Cloud 기본 인증 파일 검색 완전 비활성화
-# 이렇게 하면 langchain_google_genai가 credentials.json을 찾지 않음
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
-os.environ["GOOGLE_CLOUD_PROJECT"] = ""
-
-# Google Cloud SDK 기본 설정 파일도 비활성화
-os.environ.pop("CLOUDSDK_CONFIG", None)
-os.environ.pop("GCLOUD_PROJECT", None)
 
 try:
     from langchain_google_genai import ChatGoogleGenerativeAI
@@ -74,8 +58,62 @@ except ImportError:
     Input = Any
     Output = Any
 
-from . import config
-from .cost_tracking import get_cost_callback_for_provider
+
+def _get_runtime_settings() -> Any | None:
+    if not CENTRALIZED_SETTINGS_AVAILABLE or get_settings is None:
+        return None
+    try:
+        return get_settings()
+    except Exception as exc:
+        logger.warning(f"중앙화된 설정 로드 실패, 환경변수 fallback 사용: {exc}")
+        return None
+
+
+def _get_secret_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    if hasattr(value, "get_secret_value"):
+        secret_value = value.get_secret_value()
+        return str(secret_value) if secret_value is not None else None
+    return str(value)
+
+
+def _get_provider_api_key(provider_name: str) -> str | None:
+    settings = _get_runtime_settings()
+    if settings is not None:
+        secret_map = {
+            "gemini": settings.gemini_api_key,
+            "openai": settings.openai_api_key,
+            "anthropic": settings.anthropic_api_key,
+        }
+        secret_value = _get_secret_value(secret_map.get(provider_name))
+        if secret_value:
+            return secret_value
+
+    env_keys = {
+        "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+        "openai": ("OPENAI_API_KEY",),
+        "anthropic": ("ANTHROPIC_API_KEY",),
+    }
+    for env_key in env_keys.get(provider_name, ()):
+        env_value = os.getenv(env_key)
+        if env_value:
+            return env_value
+    return None
+
+
+def _prepare_google_runtime_environment() -> None:
+    google_creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+    if google_creds_path and not os.path.exists(google_creds_path):
+        logger.warning(
+            f"GOOGLE_APPLICATION_CREDENTIALS이 존재하지 않는 파일을 가리킵니다: {google_creds_path}"
+        )
+        logger.info("Google Cloud 인증을 비활성화하고 API 키만 사용합니다.")
+
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
+    os.environ["GOOGLE_CLOUD_PROJECT"] = ""
+    os.environ.pop("CLOUDSDK_CONFIG", None)
+    os.environ.pop("GCLOUD_PROJECT", None)
 
 
 class QuotaExceededError(Exception):
@@ -90,10 +128,16 @@ class LLMWithFallback(Runnable):
     F-14: 중앙화된 설정 활용
     """
 
-    def __init__(self, primary_llm, factory, task, callbacks=None):
+    def __init__(
+        self,
+        primary_llm: Any,
+        factory: "LLMFactory",
+        task: str,
+        callbacks: Optional[List[Any]] = None,
+    ) -> None:
         """F-14 중앙화된 설정을 사용한 LLM with Fallback 초기화"""
         self.primary_llm = primary_llm
-        self.fallback_llm = None
+        self.fallback_llm: Any | None = None
         self.factory = factory
         self.task = task
         self.callbacks = callbacks or []
@@ -144,7 +188,12 @@ class LLMWithFallback(Runnable):
         if self.test_mode:
             logger.info("F-14 테스트 모드 활성화 - 모킹된 응답 사용")
 
-    def invoke(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
+    def invoke(
+        self,
+        input_data: Any,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> Any:
         """F-14 중앙화된 설정을 사용한 LLM 호출 with fallback"""
 
         # F-14: 테스트 모드에서는 모킹된 응답 반환
@@ -159,9 +208,9 @@ class LLMWithFallback(Runnable):
         # 실제 LLM 호출 (프로덕션 모드)
         return self._invoke_real_llm(input_data, config, **kwargs)
 
-    def _generate_mock_response(self, input_data):
+    def _generate_mock_response(self, input_data: Any) -> Any:
         """F-14 테스트 모드용 모킹된 응답 생성"""
-        logger.debug(f"F-14 테스트 모드: 모킹된 응답 생성 중...")
+        logger.debug("F-14 테스트 모드: 모킹된 응답 생성 중...")
 
         # 입력 데이터 기반 모킹된 응답 생성
         if isinstance(input_data, str):
@@ -173,13 +222,9 @@ class LLMWithFallback(Runnable):
             elif "번역" in input_data or "translate" in input_data.lower():
                 mock_content = "안녕하세요, 세계!"
             else:
-                mock_content = (
-                    f"F-14 테스트 응답: {input_data[:50]}에 대한 모킹된 결과입니다."
-                )
+                mock_content = f"F-14 테스트 응답: {input_data[:50]}에 대한 모킹된 결과입니다."
         else:
-            mock_content = (
-                "F-14 테스트 응답: 중앙화된 설정을 사용한 모킹된 LLM 응답입니다."
-            )
+            mock_content = "F-14 테스트 응답: 중앙화된 설정을 사용한 모킹된 LLM 응답입니다."
 
         # LangChain AIMessage 형태로 반환
         try:
@@ -189,15 +234,20 @@ class LLMWithFallback(Runnable):
         except ImportError:
             # Fallback: 간단한 객체 반환
             class MockAIMessage:
-                def __init__(self, content):
+                def __init__(self, content: str) -> None:
                     self.content = content
 
-                def __str__(self):
+                def __str__(self) -> str:
                     return self.content
 
             return MockAIMessage(mock_content)
 
-    def _invoke_real_llm(self, input_data, config=None, **kwargs):
+    def _invoke_real_llm(
+        self,
+        input_data: Any,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> Any:
         """실제 LLM 호출 (프로덕션 모드)"""
         # 기존 retry 로직 유지
         max_retries = self.max_retries
@@ -218,10 +268,15 @@ class LLMWithFallback(Runnable):
                     time.sleep(wait_time)
                     continue
                 else:
-                    if self.fallback_llm:
+                    fallback_llm = self.fallback_llm
+                    if fallback_llm is None:
+                        fallback_llm = self._get_fallback_llm()
+                        self.fallback_llm = fallback_llm
+
+                    if fallback_llm is not None:
                         logger.warning(f"Primary LLM 실패, fallback 사용: {e}")
                         try:
-                            result = self.fallback_llm.invoke(
+                            result = fallback_llm.invoke(
                                 input_data, config=config, **kwargs
                             )
                             self.last_used = "fallback"
@@ -232,15 +287,20 @@ class LLMWithFallback(Runnable):
                     logger.error(f"모든 LLM 호출 실패: {e}")
                     raise e
 
-    def stream(self, input_data, config: Optional[RunnableConfig] = None, **kwargs):
+    def stream(
+        self,
+        input_data: Any,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> Iterator[Any]:
         """스트리밍 지원 (F-14 개선)"""
         try:
             if hasattr(self.primary_llm, "stream"):
-                return self.primary_llm.stream(input_data, config=config, **kwargs)
-            else:
-                # 스트리밍을 지원하지 않는 경우 일반 invoke 사용
-                result = self.invoke(input_data, config=config, **kwargs)
-                yield result
+                yield from self.primary_llm.stream(input_data, config=config, **kwargs)
+                return
+
+            result = self.invoke(input_data, config=config, **kwargs)
+            yield result
         except Exception as e:
             error_str = str(e).lower()
             is_retryable = any(
@@ -256,32 +316,39 @@ class LLMWithFallback(Runnable):
             )
 
             if is_retryable:
-                if self.fallback_llm is None:
-                    self.fallback_llm = self._get_fallback_llm()
+                fallback_llm = self.fallback_llm
+                if fallback_llm is None:
+                    fallback_llm = self._get_fallback_llm()
+                    self.fallback_llm = fallback_llm
 
-                if self.fallback_llm and hasattr(self.fallback_llm, "stream"):
-                    return self.fallback_llm.stream(input_data, config=config, **kwargs)
-                elif self.fallback_llm:
-                    result = self.fallback_llm.invoke(
-                        input_data, config=config, **kwargs
-                    )
-                    yield result
-                else:
+                if fallback_llm is None:
                     raise e
-            else:
-                raise e
 
-    def batch(self, inputs, config: Optional[RunnableConfig] = None, **kwargs):
+                if hasattr(fallback_llm, "stream"):
+                    yield from fallback_llm.stream(input_data, config=config, **kwargs)
+                    return
+
+                result = fallback_llm.invoke(input_data, config=config, **kwargs)
+                yield result
+                return
+
+            raise e
+
+    def batch(
+        self,
+        inputs: Any,
+        config: Optional[RunnableConfig] = None,
+        **kwargs: Any,
+    ) -> Any:
         """배치 처리 지원 (F-14 개선)"""
         try:
             if hasattr(self.primary_llm, "batch"):
                 return self.primary_llm.batch(inputs, config=config, **kwargs)
-            else:
-                # 배치를 지원하지 않는 경우 개별 처리
-                return [
-                    self.invoke(input_data, config=config, **kwargs)
-                    for input_data in inputs
-                ]
+
+            return [
+                self.invoke(input_data, config=config, **kwargs)
+                for input_data in inputs
+            ]
         except Exception as e:
             error_str = str(e).lower()
             is_retryable = any(
@@ -297,29 +364,30 @@ class LLMWithFallback(Runnable):
             )
 
             if is_retryable:
-                if self.fallback_llm is None:
-                    self.fallback_llm = self._get_fallback_llm()
+                fallback_llm = self.fallback_llm
+                if fallback_llm is None:
+                    fallback_llm = self._get_fallback_llm()
+                    self.fallback_llm = fallback_llm
 
-                if self.fallback_llm and hasattr(self.fallback_llm, "batch"):
-                    return self.fallback_llm.batch(inputs, config=config, **kwargs)
-                elif self.fallback_llm:
-                    return [
-                        self.fallback_llm.invoke(input_data, config=config, **kwargs)
-                        for input_data in inputs
-                    ]
-                else:
+                if fallback_llm is None:
                     raise e
-            else:
-                raise e
 
-    def _get_fallback_llm(self):
+                if hasattr(fallback_llm, "batch"):
+                    return fallback_llm.batch(inputs, config=config, **kwargs)
+
+                return [
+                    fallback_llm.invoke(input_data, config=config, **kwargs)
+                    for input_data in inputs
+                ]
+
+            raise e
+
+    def _get_fallback_llm(self) -> Any | None:
         """Fallback LLM을 찾아서 반환"""
         primary_provider = type(self.primary_llm).__name__
         primary_model = getattr(self.primary_llm, "model", "unknown")
 
-        logger.info(
-            f"{primary_provider} ({primary_model})에 대한 대체 모델을 찾는 중입니다"
-        )
+        logger.info(f"{primary_provider} ({primary_model})에 대한 대체 모델을 찾는 중입니다")
 
         # 1. 같은 제공자 내에서 안정적인 모델로 fallback 시도
         if "gemini" in primary_provider.lower():
@@ -328,9 +396,7 @@ class LLMWithFallback(Runnable):
             for stable_model in stable_models:
                 if stable_model != primary_model:  # 동일한 모델이 아닌 경우만
                     try:
-                        logger.info(
-                            f"안정적인 Gemini 모델을 시도합니다: {stable_model}"
-                        )
+                        logger.info(f"안정적인 Gemini 모델을 시도합니다: {stable_model}")
                         fallback_config = {
                             "provider": "gemini",
                             "model": stable_model,
@@ -347,9 +413,7 @@ class LLMWithFallback(Runnable):
                             cost_callback = get_cost_callback_for_provider("gemini")
                             fallback_callbacks.append(cost_callback)
                         except Exception as e:
-                            handle_exception(
-                                e, "비용 추적 콜백 추가", log_level=logging.INFO
-                            )
+                            handle_exception(e, "비용 추적 콜백 추가", log_level=logging.INFO)
                             # 비용 추적 실패는 치명적이지 않음
 
                         provider = self.factory.providers.get("gemini")
@@ -358,9 +422,7 @@ class LLMWithFallback(Runnable):
                                 fallback_config, fallback_callbacks
                             )
                     except Exception as e:
-                        logger.warning(
-                            f"안정적인 Gemini 모델 {stable_model} 생성에 실패했습니다: {e}"
-                        )
+                        logger.warning(f"안정적인 Gemini 모델 {stable_model} 생성에 실패했습니다: {e}")
                         continue
 
         # 2. 다른 제공자로 fallback 시도
@@ -384,9 +446,7 @@ class LLMWithFallback(Runnable):
                     provider_name, self.factory._get_default_model(provider_name)
                 )
 
-                logger.info(
-                    f"다른 제공자를 시도합니다: {provider_name} (모델: {fallback_model})"
-                )
+                logger.info(f"다른 제공자를 시도합니다: {provider_name} (모델: {fallback_model})")
 
                 fallback_config = {
                     "provider": provider_name,
@@ -418,11 +478,11 @@ class LLMWithFallback(Runnable):
         logger.warning("대체 LLM을 생성할 수 없습니다")
         return None
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         """다른 속성들은 primary LLM에 위임"""
         return getattr(self.primary_llm, name)
 
-    def _is_retryable_error(self, e):
+    def _is_retryable_error(self, e: Exception) -> bool:
         error_str = str(e).lower()
         return any(
             keyword in error_str
@@ -444,8 +504,8 @@ class LLMProvider(ABC):
 
     @abstractmethod
     def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List] = None
-    ):
+        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
+    ) -> Any:
         """LLM 모델 인스턴스를 생성합니다."""
         pass
 
@@ -459,33 +519,31 @@ class GeminiProvider(LLMProvider):
     """Google Gemini LLM 제공자"""
 
     def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List] = None
-    ):
+        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
+    ) -> Any:
         """Gemini 모델 생성 - F-14 중앙화된 설정 시스템 적용"""
         logger.debug("Creating Gemini model")
 
         if not ChatGoogleGenerativeAI:
             raise ImportError("langchain_google_genai 패키지가 설치되지 않았습니다")
 
-        api_key = os.getenv("GOOGLE_API_KEY")
+        _prepare_google_runtime_environment()
+        api_key = _get_provider_api_key("gemini")
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY 환경변수가 설정되지 않았습니다")
+            raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다")
 
         # F-14: 중앙화된 설정에서 파라미터 가져오기
         model_params = model_config.copy()
-        if CENTRALIZED_SETTINGS_AVAILABLE:
-            try:
-                settings = get_settings()
-                model_params.setdefault("timeout", settings.llm_request_timeout)
-                # 빠른 모드 활성화 시 더 빠른 모델 사용
-                if settings.enable_fast_mode and "gemini-1.5-pro" in model_params.get(
-                    "model", ""
-                ):
-                    model_params["model"] = "gemini-1.5-flash"
-                    logger.info("빠른 모드: Gemini Pro를 Flash로 변경")
-            except Exception as e:
-                logger.warning(f"중앙화된 설정 적용 실패, 기본값 사용: {e}")
-                model_params.setdefault("timeout", 120)
+        settings = _get_runtime_settings()
+        if settings is not None:
+            model_params.setdefault("timeout", settings.llm_request_timeout)
+            if settings.enable_fast_mode and "gemini-1.5-pro" in model_params.get(
+                "model", ""
+            ):
+                model_params["model"] = "gemini-1.5-flash"
+                logger.info("빠른 모드: Gemini Pro를 Flash로 변경")
+        else:
+            model_params.setdefault("timeout", 120)
 
         model_params.setdefault("temperature", 0.3)
         model_params.setdefault("max_tokens", 4000)
@@ -506,40 +564,37 @@ class GeminiProvider(LLMProvider):
         )
 
     def is_available(self) -> bool:
-        return ChatGoogleGenerativeAI is not None and bool(os.getenv("GOOGLE_API_KEY"))
+        return ChatGoogleGenerativeAI is not None and bool(
+            _get_provider_api_key("gemini")
+        )
 
 
 class OpenAIProvider(LLMProvider):
     """OpenAI LLM 제공자"""
 
     def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List] = None
-    ):
+        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
+    ) -> Any:
         """OpenAI 모델 생성 - F-14 중앙화된 설정 시스템 적용"""
         logger.debug("Creating OpenAI model")
 
         if not ChatOpenAI:
             raise ImportError("langchain_openai 패키지가 설치되지 않았습니다")
 
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = _get_provider_api_key("openai")
         if not api_key:
             raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다")
 
         # F-14: 중앙화된 설정에서 파라미터 가져오기
         model_params = model_config.copy()
-        if CENTRALIZED_SETTINGS_AVAILABLE:
-            try:
-                settings = get_settings()
-                model_params.setdefault("timeout", settings.llm_request_timeout)
-                # 빠른 모드 활성화 시 더 빠른 모델 사용
-                if settings.enable_fast_mode and "gpt-4" in model_params.get(
-                    "model", ""
-                ):
-                    model_params["model"] = "gpt-3.5-turbo"
-                    logger.info("빠른 모드: GPT-4를 GPT-3.5-turbo로 변경")
-            except Exception as e:
-                logger.warning(f"중앙화된 설정 적용 실패, 기본값 사용: {e}")
-                model_params.setdefault("timeout", 120)
+        settings = _get_runtime_settings()
+        if settings is not None:
+            model_params.setdefault("timeout", settings.llm_request_timeout)
+            if settings.enable_fast_mode and "gpt-4" in model_params.get("model", ""):
+                model_params["model"] = "gpt-3.5-turbo"
+                logger.info("빠른 모드: GPT-4를 GPT-3.5-turbo로 변경")
+        else:
+            model_params.setdefault("timeout", 120)
 
         model_params.setdefault("temperature", 0.3)
         model_params.setdefault("max_tokens", 4000)
@@ -560,37 +615,34 @@ class OpenAIProvider(LLMProvider):
         )
 
     def is_available(self) -> bool:
-        return ChatOpenAI is not None and bool(os.getenv("OPENAI_API_KEY"))
+        return ChatOpenAI is not None and bool(_get_provider_api_key("openai"))
 
 
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude LLM 제공자"""
 
     def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List] = None
-    ):
+        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
+    ) -> Any:
         if not ChatAnthropic:
             raise ImportError("langchain_anthropic 패키지가 설치되지 않았습니다")
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
+        api_key = _get_provider_api_key("anthropic")
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다")
 
         # F-14: 중앙화된 설정에서 타임아웃 적용
         model_params = model_config.copy()
-        if CENTRALIZED_SETTINGS_AVAILABLE:
-            try:
-                settings = get_settings()
-                model_params.setdefault("timeout", settings.llm_request_timeout)
-                # 빠른 모드 활성화 시 더 빠른 모델 사용
-                if settings.enable_fast_mode and "claude-3-opus" in model_params.get(
-                    "model", ""
-                ):
-                    model_params["model"] = "claude-3-haiku-20240307"
-                    logger.info("빠른 모드: Claude Opus를 Haiku로 변경")
-            except Exception as e:
-                logger.warning(f"중앙화된 설정 적용 실패, 기본값 사용: {e}")
-                model_params.setdefault("timeout", 120)
+        settings = _get_runtime_settings()
+        if settings is not None:
+            model_params.setdefault("timeout", settings.llm_request_timeout)
+            if settings.enable_fast_mode and "claude-3-opus" in model_params.get(
+                "model", ""
+            ):
+                model_params["model"] = "claude-3-haiku-20240307"
+                logger.info("빠른 모드: Claude Opus를 Haiku로 변경")
+        else:
+            model_params.setdefault("timeout", 120)
 
         model_params.setdefault("temperature", 0.1)
         model_params.setdefault("max_tokens", 4000)
@@ -611,23 +663,29 @@ class AnthropicProvider(LLMProvider):
         )
 
     def is_available(self) -> bool:
-        return ChatAnthropic is not None and bool(os.getenv("ANTHROPIC_API_KEY"))
+        return ChatAnthropic is not None and bool(_get_provider_api_key("anthropic"))
 
 
 class LLMFactory:
     """LLM 팩토리 클래스"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.providers = {
             "gemini": GeminiProvider(),
             "openai": OpenAIProvider(),
             "anthropic": AnthropicProvider(),
         }
-        self.llm_config = config.LLM_CONFIG
+
+    @property
+    def llm_config(self) -> Dict[str, Any]:
+        return cast(Dict[str, Any], get_llm_config())
 
     def get_llm_for_task(
-        self, task: str, callbacks: Optional[List] = None, enable_fallback: bool = True
-    ):
+        self,
+        task: str,
+        callbacks: Optional[List[Any]] = None,
+        enable_fallback: bool = True,
+    ) -> Any:
         """
         특정 작업에 최적화된 LLM 모델을 반환합니다.
 
@@ -674,9 +732,7 @@ class LLMFactory:
             # Fallback to available provider
             for fallback_name, fallback_provider in self.providers.items():
                 if fallback_provider.is_available():
-                    logger.warning(
-                        f"{provider_name}을 사용할 수 없어 {fallback_name}으로 대체합니다"
-                    )
+                    logger.warning(f"{provider_name}을 사용할 수 없어 {fallback_name}으로 대체합니다")
                     model_config = model_config.copy()
                     model_config["provider"] = fallback_name
                     model_config["model"] = self._get_default_model(fallback_name)
@@ -703,7 +759,7 @@ class LLMFactory:
                         return llm
 
             raise ValueError(
-                f"No LLM providers are available. Please check your API keys."
+                "No LLM providers are available. Please check your API keys."
             )
 
         llm = provider.create_model(model_config, final_callbacks)
@@ -718,14 +774,12 @@ class LLMFactory:
         """제공자별 기본 모델명을 반환합니다."""
         provider_models = self.llm_config.get("provider_models", {})
         models = provider_models.get(provider_name, {})
-        return models.get(
-            "standard",
-            {
-                "gemini": "gemini-1.5-pro",
-                "openai": "gpt-4o",
-                "anthropic": "claude-3-sonnet-20240229",
-            }.get(provider_name, "gemini-1.5-pro"),
-        )
+        default_model = {
+            "gemini": "gemini-1.5-pro",
+            "openai": "gpt-4o",
+            "anthropic": "claude-3-sonnet-20240229",
+        }.get(provider_name, "gemini-1.5-pro")
+        return cast(str, models.get("standard", default_model))
 
     def get_available_providers(self) -> List[str]:
         """사용 가능한 제공자 목록을 반환합니다."""
@@ -744,13 +798,32 @@ class LLMFactory:
         return info
 
 
-# 전역 팩토리 인스턴스
-llm_factory = LLMFactory()
+_llm_factory_instance: LLMFactory | None = None
+
+
+def get_llm_factory() -> LLMFactory:
+    global _llm_factory_instance
+    if _llm_factory_instance is None:
+        _llm_factory_instance = LLMFactory()
+    return _llm_factory_instance
+
+
+class _LazyLLMFactory:
+    def __getattr__(self, item: str) -> Any:
+        return getattr(get_llm_factory(), item)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return "<LazyLLMFactory proxy>"
+
+
+llm_factory = _LazyLLMFactory()
 
 
 def get_llm_for_task(
-    task: str, callbacks: Optional[List] = None, enable_fallback: bool = True
-):
+    task: str,
+    callbacks: Optional[List[Any]] = None,
+    enable_fallback: bool = True,
+) -> Any:
     """
     편의 함수: 특정 작업에 최적화된 LLM 모델을 반환합니다.
 
@@ -762,14 +835,14 @@ def get_llm_for_task(
     Returns:
         LLM 모델 인스턴스
     """
-    return llm_factory.get_llm_for_task(task, callbacks, enable_fallback)
+    return get_llm_factory().get_llm_for_task(task, callbacks, enable_fallback)
 
 
 def get_available_providers() -> List[str]:
     """편의 함수: 사용 가능한 LLM 제공자 목록을 반환합니다."""
-    return llm_factory.get_available_providers()
+    return get_llm_factory().get_available_providers()
 
 
 def get_provider_info() -> Dict[str, Dict[str, Any]]:
     """편의 함수: 제공자 정보를 반환합니다."""
-    return llm_factory.get_provider_info()
+    return get_llm_factory().get_provider_info()
