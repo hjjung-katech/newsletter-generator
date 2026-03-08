@@ -7,16 +7,16 @@ class NewsletterApp {
     constructor() {
         this.currentJobId = null;
         this.pollInterval = null;
+        this.adminTokenStorageKey = 'newsletter-admin-api-token';
         this.init();
     }
 
     init() {
         this.bindEvents();
+        this.hydrateAdminToken();
         this.toggleInputMethod();
         this.toggleScheduleSettings(document.getElementById('enableSchedule').checked);
         this.updateScheduleOptions();
-        this.loadHistory();
-        this.loadSchedules();
     }
 
     bindEvents() {
@@ -46,10 +46,56 @@ class NewsletterApp {
         document.getElementById('downloadBtn').addEventListener('click', () => this.downloadNewsletter());
         document.getElementById('sendEmailBtn').addEventListener('click', () => this.sendEmail());
         document.getElementById('emailConfigBtn').addEventListener('click', () => this.checkEmailConfiguration());
+        document.getElementById('adminToken').addEventListener('input', (e) => this.persistAdminToken(e.target.value));
 
         // Navigation buttons
         document.getElementById('historyBtn').addEventListener('click', () => this.switchTab('historyTab'));
         document.getElementById('scheduleBtn').addEventListener('click', () => this.switchTab('scheduleManageTab'));
+    }
+
+    hydrateAdminToken() {
+        const tokenInput = document.getElementById('adminToken');
+        const storedToken = window.sessionStorage.getItem(this.adminTokenStorageKey) || '';
+        tokenInput.value = storedToken;
+    }
+
+    persistAdminToken(value) {
+        const normalized = (value || '').trim();
+        if (normalized) {
+            window.sessionStorage.setItem(this.adminTokenStorageKey, normalized);
+            return;
+        }
+
+        window.sessionStorage.removeItem(this.adminTokenStorageKey);
+    }
+
+    getAdminToken() {
+        return window.sessionStorage.getItem(this.adminTokenStorageKey) || '';
+    }
+
+    hasAdminToken() {
+        return Boolean(this.getAdminToken());
+    }
+
+    buildHeaders({ includeJson = false, includeAdminToken = false } = {}) {
+        const headers = {};
+
+        if (includeJson) {
+            headers['Content-Type'] = 'application/json';
+        }
+
+        if (includeAdminToken) {
+            const adminToken = this.getAdminToken();
+            if (adminToken) {
+                headers['X-Admin-Token'] = adminToken;
+            }
+        }
+
+        return headers;
+    }
+
+    getProtectedRouteMessage(defaultMessage = '운영 토큰이 필요합니다.') {
+        return `${defaultMessage} 상단의 운영 토큰을 입력한 뒤 다시 시도해주세요.`;
     }
 
     switchTab(tabId) {
@@ -150,9 +196,7 @@ class NewsletterApp {
         try {
             const response = await fetch('/api/generate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: this.buildHeaders({ includeJson: true }),
                 body: JSON.stringify(requestData)
             });
 
@@ -180,9 +224,7 @@ class NewsletterApp {
         try {
             const response = await fetch('/api/schedule', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
                 body: JSON.stringify(scheduleRequest)
             });
 
@@ -196,7 +238,10 @@ class NewsletterApp {
                 this.switchTab('scheduleManageTab');
                 this.showSuccess(`예약이 등록되었습니다. 다음 실행: ${new Date(result.next_run).toLocaleString()}`);
             } else {
-                this.showError(result.error || 'Schedule creation failed');
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '예약 저장 권한이 없습니다.')
+                    : (result.error || 'Schedule creation failed');
+                this.showError(message);
             }
         } catch (error) {
             this.showError('Network error: ' + error.message);
@@ -520,8 +565,9 @@ class NewsletterApp {
         // Update button states
         this.updateResultButtons(result);
 
-        // Reload history
-        this.loadHistory();
+        if (this.hasAdminToken()) {
+            this.loadHistory();
+        }
     }
 
     renderStepTimes(stepTimes) {
@@ -599,11 +645,22 @@ class NewsletterApp {
     }
 
     async loadHistory() {
+        const historyList = document.getElementById('historyList');
+
         try {
-            const response = await fetch('/api/history');
+            const response = await fetch('/api/history', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
             const history = await response.json();
 
-            const historyList = document.getElementById('historyList');
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(history.error || '히스토리를 불러올 수 없습니다.')
+                    : (history.error || '히스토리를 불러올 수 없습니다.');
+                historyList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                return;
+            }
+
             if (history.length === 0) {
                 historyList.innerHTML = '<p class="text-gray-500">아직 생성된 뉴스레터가 없습니다.</p>';
                 return;
@@ -637,16 +694,27 @@ class NewsletterApp {
                 </div>
             `).join('');
         } catch (error) {
-            console.error('Failed to load history:', error);
+            historyList.innerHTML = `<p class="text-red-600">히스토리 조회 실패: ${error.message}</p>`;
         }
     }
 
     async loadSchedules() {
+        const schedulesList = document.getElementById('schedulesList');
+
         try {
-            const response = await fetch('/api/schedules');
+            const response = await fetch('/api/schedules', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
             const schedules = await response.json();
 
-            const schedulesList = document.getElementById('schedulesList');
+            if (!response.ok) {
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(schedules.error || '예약 목록을 불러올 수 없습니다.')
+                    : (schedules.error || '예약 목록을 불러올 수 없습니다.');
+                schedulesList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                return;
+            }
+
             if (schedules.length === 0) {
                 schedulesList.innerHTML = '<p class="text-gray-500">예약된 발송이 없습니다.</p>';
                 return;
@@ -685,7 +753,7 @@ class NewsletterApp {
                 </div>
             `).join('');
         } catch (error) {
-            console.error('Failed to load schedules:', error);
+            schedulesList.innerHTML = `<p class="text-red-600">예약 목록 조회 실패: ${error.message}</p>`;
         }
     }
 
@@ -694,7 +762,8 @@ class NewsletterApp {
 
         try {
             const response = await fetch(`/api/schedule/${scheduleId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: this.buildHeaders({ includeAdminToken: true })
             });
 
             if (response.ok) {
@@ -702,7 +771,10 @@ class NewsletterApp {
                 this.showSuccess('예약이 취소되었습니다.');
             } else {
                 const result = await response.json();
-                alert('취소 실패: ' + (result.error || 'Unknown error'));
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '예약 취소 권한이 없습니다.')
+                    : (result.error || 'Unknown error');
+                alert('취소 실패: ' + message);
             }
         } catch (error) {
             alert('Network error: ' + error.message);
@@ -712,13 +784,17 @@ class NewsletterApp {
     async runScheduleNow(scheduleId) {
         try {
             const response = await fetch(`/api/schedule/${scheduleId}/run`, {
-                method: 'POST'
+                method: 'POST',
+                headers: this.buildHeaders({ includeAdminToken: true })
             });
 
             const result = await response.json();
 
             if (!response.ok) {
-                this.showError(result.error || 'Immediate execution failed');
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '즉시 실행 권한이 없습니다.')
+                    : (result.error || 'Immediate execution failed');
+                this.showError(message);
                 return;
             }
 
@@ -834,8 +910,15 @@ class NewsletterApp {
 
         // 이메일 설정 확인
         try {
-            const configResponse = await fetch('/api/email-config');
+            const configResponse = await fetch('/api/email-config', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
             const configResult = await configResponse.json();
+
+            if (!configResponse.ok) {
+                alert(configResult.error || this.getProtectedRouteMessage('이메일 설정을 확인할 수 없습니다.'));
+                return;
+            }
 
             if (!configResult.ready) {
                 if (confirm('이메일 설정이 완료되지 않았습니다. 테스트 이메일을 발송해보시겠습니까?')) {
@@ -853,9 +936,7 @@ class NewsletterApp {
         try {
             const response = await fetch('/api/send-email', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
                 body: JSON.stringify({
                     job_id: this.currentJobId,
                     email: email
@@ -867,7 +948,10 @@ class NewsletterApp {
             if (response.ok) {
                 alert('이메일이 성공적으로 발송되었습니다!');
             } else {
-                alert('이메일 발송 실패: ' + (result.error || 'Unknown error'));
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '이메일 발송 권한이 없습니다.')
+                    : (result.error || 'Unknown error');
+                alert('이메일 발송 실패: ' + message);
             }
         } catch (error) {
             alert('Network error: ' + error.message);
@@ -883,9 +967,7 @@ class NewsletterApp {
         try {
             const response = await fetch('/api/test-email', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: this.buildHeaders({ includeJson: true, includeAdminToken: true }),
                 body: JSON.stringify({ email: email })
             });
 
@@ -894,7 +976,10 @@ class NewsletterApp {
             if (response.ok) {
                 alert(`테스트 이메일이 ${email}로 발송되었습니다!\n메시지 ID: ${result.message_id || 'N/A'}`);
             } else {
-                alert('테스트 이메일 발송 실패: ' + (result.error || 'Unknown error'));
+                const message = response.status === 401 || response.status === 503
+                    ? this.getProtectedRouteMessage(result.error || '테스트 이메일 발송 권한이 없습니다.')
+                    : (result.error || 'Unknown error');
+                alert('테스트 이메일 발송 실패: ' + message);
             }
         } catch (error) {
             alert('Network error: ' + error.message);
@@ -903,8 +988,15 @@ class NewsletterApp {
 
     async checkEmailConfiguration() {
         try {
-            const response = await fetch('/api/email-config');
+            const response = await fetch('/api/email-config', {
+                headers: this.buildHeaders({ includeAdminToken: true })
+            });
             const result = await response.json();
+
+            if (!response.ok) {
+                alert(result.error || this.getProtectedRouteMessage('설정 확인 권한이 없습니다.'));
+                return;
+            }
 
             let message = '이메일 설정 상태:\n';
             message += `Postmark 토큰: ${result.postmark_token_configured ? '✓ 설정됨' : '✗ 미설정'}\n`;

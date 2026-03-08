@@ -309,3 +309,26 @@ class TestWebAPI:
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
+
+def test_protected_schedule_routes_require_admin_token_in_production_like_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("ADMIN_API_TOKEN", "ops-secret-token")
+    original_testing = app.config.get("TESTING", False)
+    app.config["TESTING"] = False
+
+    try:
+        with app.test_client() as client:
+            unauthorized = client.get("/api/schedules")
+            authorized = client.get(
+                "/api/schedules", headers={"X-Admin-Token": "ops-secret-token"}
+            )
+
+        assert unauthorized.status_code == 401
+        assert unauthorized.get_json() == {"error": "Admin API token required"}
+        assert authorized.status_code == 200
+        assert isinstance(authorized.get_json(), list)
+    finally:
+        app.config["TESTING"] = original_testing

@@ -13,6 +13,7 @@
 | `POSTMARK_SERVER_TOKEN` | 이메일 발송 시 필수 | Postmark 서버 토큰 |
 | `EMAIL_SENDER` | 이메일 발송 시 필수 | 발신자 이메일 (인증 필요) |
 | `SECRET_KEY` | 프로덕션 권장(웹) | Flask 시크릿 키 |
+| `ADMIN_API_TOKEN` | 민감 운영 API 보호 시 필수 | `/api/history`, `/api/schedule*`, `/api/send-email`, `/api/email-config`, `/api/test-email` 보호 토큰 |
 | `REDIS_URL` | worker/scheduler 사용 시 필수 | Redis 연결 |
 | `RQ_QUEUE` | 선택 | RQ 큐 이름 (`default`) |
 | `FLASK_ENV` | 선택 | `development`/`production` |
@@ -55,5 +56,6 @@ EMAIL_SENDER=newsletter@example.com
 
 # 웹/운영
 SECRET_KEY=replace-me-in-production
+ADMIN_API_TOKEN=replace-me-with-an-ops-token
 REDIS_URL=redis://localhost:6379/0
 ```

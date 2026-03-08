@@ -26,6 +26,11 @@ except ImportError:
     from web.cors_config import configure_cors  # pragma: no cover
 
 try:
+    from access_control import configure_access_control
+except ImportError:
+    from web.access_control import configure_access_control  # pragma: no cover
+
+try:
     from runtime_paths import (
         resolve_database_path,
         resolve_env_file_path,
@@ -94,6 +99,7 @@ app = Flask(
     static_folder=resolve_static_dir(),
 )
 configure_cors(app)
+configure_access_control(app)
 
 # Enable detailed logging
 logging.basicConfig(
