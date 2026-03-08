@@ -245,6 +245,14 @@ register_email_api_routes(app)
 
 
 try:
+    from routes_presets import register_preset_routes
+except ImportError:
+    from web.routes_presets import register_preset_routes  # pragma: no cover
+
+register_preset_routes(app, DATABASE_PATH)
+
+
+try:
     from routes_newsletter_html import register_newsletter_html_route
 except ImportError:
     from web.routes_newsletter_html import (
