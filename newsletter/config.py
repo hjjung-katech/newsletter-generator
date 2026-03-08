@@ -9,10 +9,9 @@ from typing import Any
 
 from newsletter_core.public.settings import (
     get_all_major_news_sources,
-    get_config_manager,
     get_llm_config,
     get_major_news_sources,
-    get_settings,
+    get_setting_value,
 )
 
 _CONFIG_MANAGER_FIELDS = {
@@ -42,11 +41,8 @@ __all__ = sorted(
 
 
 def _cfg(name: str, default: Any = None) -> Any:
-    """Safely read compatibility attributes from the lazy config manager."""
-    try:
-        return getattr(get_config_manager(), name)
-    except AttributeError:
-        return default
+    """Safely read compatibility attributes from centralized settings."""
+    return get_setting_value(name, default)
 
 
 def __getattr__(name: str) -> Any:
@@ -60,7 +56,7 @@ def __getattr__(name: str) -> Any:
     if name == "ALL_MAJOR_NEWS_SOURCES":
         return get_all_major_news_sources()
     if name == "MOCK_MODE":
-        return bool(get_settings().mock_mode)
+        return bool(_cfg(name, False))
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

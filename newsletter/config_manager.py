@@ -2,8 +2,13 @@ from pathlib import Path
 from typing import Any, Dict
 
 import yaml  # type: ignore[import-untyped]
+from pydantic import SecretStr
 
 DEFAULT_CONFIG_PATHS = ("config/config.yml", "config.yml")
+
+
+def _read_secret(value: SecretStr | None) -> str | None:
+    return value.get_secret_value() if value is not None else None
 
 
 class ConfigManager:
@@ -38,94 +43,26 @@ class ConfigManager:
             pass
 
     def _load_environment_variables(self) -> None:
-        """환경 변수 로딩 - Centralized Settings 사용"""
-        try:
-            from newsletter.centralized_settings import get_settings
+        """환경 변수 로딩 - Centralized Settings 단일 경로 사용"""
+        from newsletter.centralized_settings import get_settings
 
-            settings = get_settings()
+        settings = get_settings()
 
-            # API 키들 (SecretStr에서 값 추출)
-            self.SERPER_API_KEY = (
-                settings.serper_api_key.get_secret_value()
-                if settings.serper_api_key
-                else None
-            )
-            self.GEMINI_API_KEY = (
-                settings.gemini_api_key.get_secret_value()
-                if settings.gemini_api_key
-                else None
-            )
-            self.OPENAI_API_KEY = (
-                settings.openai_api_key.get_secret_value()
-                if settings.openai_api_key
-                else None
-            )
-            self.ANTHROPIC_API_KEY = (
-                settings.anthropic_api_key.get_secret_value()
-                if settings.anthropic_api_key
-                else None
-            )
+        self.SERPER_API_KEY = _read_secret(settings.serper_api_key)
+        self.GEMINI_API_KEY = _read_secret(settings.gemini_api_key)
+        self.OPENAI_API_KEY = _read_secret(settings.openai_api_key)
+        self.ANTHROPIC_API_KEY = _read_secret(settings.anthropic_api_key)
 
-            # Google 관련
-            self.GOOGLE_APPLICATION_CREDENTIALS = (
-                settings.google_application_credentials
-            )
-            self.GOOGLE_CLIENT_ID = settings.google_client_id
-            self.GOOGLE_CLIENT_SECRET = (
-                settings.google_client_secret.get_secret_value()
-                if settings.google_client_secret
-                else None
-            )
+        self.GOOGLE_APPLICATION_CREDENTIALS = settings.google_application_credentials
+        self.GOOGLE_CLIENT_ID = settings.google_client_id
+        self.GOOGLE_CLIENT_SECRET = _read_secret(settings.google_client_secret)
 
-            # 네이버 API
-            self.NAVER_CLIENT_ID = settings.naver_client_id
-            self.NAVER_CLIENT_SECRET = (
-                settings.naver_client_secret.get_secret_value()
-                if settings.naver_client_secret
-                else None
-            )
+        self.NAVER_CLIENT_ID = settings.naver_client_id
+        self.NAVER_CLIENT_SECRET = _read_secret(settings.naver_client_secret)
 
-            # 이메일 설정
-            self.EMAIL_SENDER = settings.email_sender
-            self.POSTMARK_SERVER_TOKEN = (
-                settings.postmark_server_token.get_secret_value()
-                if settings.postmark_server_token
-                else None
-            )
-
-            # 기타 설정
-            self.ADDITIONAL_RSS_FEEDS = settings.additional_rss_feeds
-
-        except Exception as e:
-            # 테스트 모드에서는 fallback 하지 않음
-            from newsletter.centralized_settings import _test_mode
-
-            if _test_mode:
-                # 테스트 모드에서는 예외를 다시 발생시켜 테스트가 실패하도록 함
-                raise e
-
-            # Centralized settings 실패 시 fallback to legacy
-            self._log_warning(f"Centralized settings 로드 실패, legacy os.getenv 사용: {e}")
-
-            # 레거시 fallback (호환성을 위해 유지)
-            from newsletter.compat_env import getenv_compat
-
-            self.SERPER_API_KEY = getenv_compat("SERPER_API_KEY")
-            self.GEMINI_API_KEY = getenv_compat("GEMINI_API_KEY")
-            self.OPENAI_API_KEY = getenv_compat("OPENAI_API_KEY")
-            self.ANTHROPIC_API_KEY = getenv_compat("ANTHROPIC_API_KEY")
-            self.GOOGLE_APPLICATION_CREDENTIALS = getenv_compat(
-                "GOOGLE_APPLICATION_CREDENTIALS"
-            )
-            self.GOOGLE_CLIENT_ID = getenv_compat("GOOGLE_CLIENT_ID")
-            self.GOOGLE_CLIENT_SECRET = getenv_compat("GOOGLE_CLIENT_SECRET")
-            self.NAVER_CLIENT_ID = getenv_compat("NAVER_CLIENT_ID")
-            self.NAVER_CLIENT_SECRET = getenv_compat("NAVER_CLIENT_SECRET")
-            self.EMAIL_SENDER = getenv_compat("EMAIL_SENDER") or getenv_compat(
-                "POSTMARK_FROM_EMAIL"
-            )
-            self.POSTMARK_SERVER_TOKEN = getenv_compat("POSTMARK_SERVER_TOKEN")
-            self.ADDITIONAL_RSS_FEEDS = getenv_compat("ADDITIONAL_RSS_FEEDS", "")
+        self.EMAIL_SENDER = settings.email_sender
+        self.POSTMARK_SERVER_TOKEN = _read_secret(settings.postmark_server_token)
+        self.ADDITIONAL_RSS_FEEDS = settings.additional_rss_feeds or ""
 
     def load_config_file(self, config_file: str = "config.yml") -> Dict[str, Any]:
         """YAML 설정 파일 로딩 (캐시 지원)"""

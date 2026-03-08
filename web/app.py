@@ -84,6 +84,11 @@ project_root = resolve_project_root()
 sys.path.insert(0, project_root)
 
 try:
+    from newsletter_core.public.settings import get_setting_value
+except ImportError:
+    from newsletter_core.public.settings import get_setting_value  # pragma: no cover
+
+try:
     from newsletter_clients import (
         MockNewsletterCLI,
         RealNewsletterCLI,
@@ -108,7 +113,7 @@ configure_access_control(app)
 
 # Enable detailed logging
 logging.basicConfig(
-    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    level=str(get_setting_value("LOG_LEVEL", "INFO")).upper(),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger("web.app")
@@ -120,11 +125,13 @@ log_info(
 )
 
 # Configuration
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-key-change-in-production")
-app.config["REDIS_URL"] = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+app.config["SECRET_KEY"] = get_setting_value(
+    "SECRET_KEY", "dev-key-change-in-production"
+)
+app.config["REDIS_URL"] = get_setting_value("REDIS_URL", "redis://localhost:6379/0")
 
 # Queue name can be customized via environment variable
-QUEUE_NAME = os.getenv("RQ_QUEUE", "default")
+QUEUE_NAME = str(get_setting_value("RQ_QUEUE", "default"))
 
 # Redis connection with fallback to in-memory processing
 try:
