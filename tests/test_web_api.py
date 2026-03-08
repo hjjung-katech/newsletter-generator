@@ -44,6 +44,15 @@ def _delete_analytics_event(event_id: str) -> None:
     conn.close()
 
 
+def _delete_history_row(job_id: str) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM archive_entries WHERE job_id = ?", (job_id,))
+    cursor.execute("DELETE FROM history WHERE id = ?", (job_id,))
+    conn.commit()
+    conn.close()
+
+
 def _insert_schedule_row(
     *,
     schedule_id: str,
@@ -60,6 +69,27 @@ def _insert_schedule_row(
         VALUES (?, ?, ?, ?, ?, 1)
         """,
         (schedule_id, json.dumps(params), rrule, next_run, created_at),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _insert_history_row(
+    *,
+    job_id: str,
+    params: dict,
+    result: dict,
+    created_at: str,
+    status: str = "completed",
+) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO history (id, params, result, created_at, status)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (job_id, json.dumps(params), json.dumps(result), created_at, status),
     )
     conn.commit()
     conn.close()
@@ -283,6 +313,39 @@ class TestWebAPI:
             assert result["summary"]["generation"]["completed"] >= 1
         finally:
             _delete_analytics_event(event_id)
+
+    def test_archive_search_endpoint(self, client):
+        """Test archive search and detail endpoints."""
+        job_id = f"archive-job-{uuid.uuid4()}"
+        _insert_history_row(
+            job_id=job_id,
+            params={
+                "keywords": ["battery", "materials"],
+                "template_style": "compact",
+                "period": 7,
+            },
+            result={
+                "title": "Battery Materials Weekly",
+                "html_content": "<html><body><p>Battery recycling and cathode materials update.</p></body></html>",
+            },
+            created_at="2026-03-08T08:00:00Z",
+        )
+
+        try:
+            response = client.get("/api/archive/search?q=battery")
+            assert response.status_code == 200
+
+            payload = json.loads(response.data)
+            assert payload["count"] >= 1
+            assert any(item["job_id"] == job_id for item in payload["results"])
+
+            detail_response = client.get(f"/api/archive/{job_id}")
+            assert detail_response.status_code == 200
+            detail_payload = json.loads(detail_response.data)
+            assert detail_payload["job_id"] == job_id
+            assert detail_payload["result"]["title"] == "Battery Materials Weekly"
+        finally:
+            _delete_history_row(job_id)
 
     def test_schedules_endpoint(self, client):
         """Test schedules endpoint"""

@@ -21,6 +21,7 @@ _PROTECTED_PREFIXES: tuple[str, ...] = (
     "/api/presets",
     "/api/approvals",
     "/api/source-policies",
+    "/api/archive",
     "/api/schedule",
     "/api/schedules",
     "/api/send-email",
