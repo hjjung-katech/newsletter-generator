@@ -126,7 +126,7 @@ def register_generation_routes(
                 current_dir = os.path.dirname(os.path.abspath(__file__))
 
                 spec = importlib.util.spec_from_file_location(
-                    "web.types", os.path.join(current_dir, "types.py")
+                    "web.api_types", os.path.join(current_dir, "api_types.py")
                 )
                 web_types_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(web_types_module)

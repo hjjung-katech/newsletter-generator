@@ -2,6 +2,7 @@
 """
 LLM 제공자별 상세 테스트
 """
+
 import os
 import sys
 import time
@@ -23,6 +24,20 @@ try:
 except ImportError:
     CENTRALIZED_SETTINGS_AVAILABLE = False
     print("⚠️ F-14 중앙집중식 설정 시스템 사용 불가")
+
+
+@pytest.fixture(autouse=True)
+def setup_mock_api_keys(monkeypatch):
+    """테스트용 가짜 API 키 설정"""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-openai-key-1234567890")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key-1234567890")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test-key-1234567890")
+    monkeypatch.setenv("SERPER_API_KEY", "test-serper-key-1234567890")
+    if CENTRALIZED_SETTINGS_AVAILABLE:
+        from newsletter.centralized_settings import clear_settings_cache
+
+        clear_settings_cache()
+
 
 # F-14: 작업 정의 - 중앙집중식 관리
 TASK_DEFINITIONS = {

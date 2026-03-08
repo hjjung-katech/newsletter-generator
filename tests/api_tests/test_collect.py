@@ -18,8 +18,10 @@ from newsletter.collect import (  # collect_articles_from_serper 추가
 
 class TestCollect(unittest.TestCase):
 
-    @patch("newsletter.collect.article_filter.remove_duplicate_articles")
-    @patch("newsletter.collect.configure_default_sources")
+    @patch(
+        "newsletter_core.application.generation.collect.article_filter.remove_duplicate_articles"
+    )
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     def test_collect_articles_with_multiple_sources(
         self, mock_configure_sources, mock_remove_duplicates
     ):
@@ -55,7 +57,7 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["title"], "Test Article 1")
 
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     def test_collect_articles_with_no_sources(self, mock_configure_sources):
         """소스가 없는 경우 테스트"""
         # 소스가 없는 모의 NewsSourceManager 생성

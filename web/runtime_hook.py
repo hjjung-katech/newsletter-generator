@@ -63,7 +63,7 @@ def _fallback_basic_setup() -> None:
 
 
 def _setup_web_types() -> None:
-    """Load ``web.types`` and keep ``web.web_types`` as temporary compatibility alias."""
+    """Load ``web.api_types`` and keep ``web.web_types`` as temporary compatibility alias."""
     try:
         import importlib.util
         import types as py_types
@@ -74,8 +74,8 @@ def _setup_web_types() -> None:
             base_path = os.path.dirname(os.path.abspath(__file__))
 
         candidate_paths = [
-            os.path.join(base_path, "web", "types.py"),
-            os.path.join(base_path, "types.py"),
+            os.path.join(base_path, "web", "api_types.py"),
+            os.path.join(base_path, "api_types.py"),
         ]
         types_path = next(
             (path for path in candidate_paths if os.path.exists(path)), ""
@@ -83,12 +83,12 @@ def _setup_web_types() -> None:
 
         if not types_path:
             logger.warning(
-                "types.py not found in expected locations: "
+                "api_types.py not found in expected locations: "
                 + ", ".join(candidate_paths)
             )
             return
 
-        spec = importlib.util.spec_from_file_location("web.types", types_path)
+        spec = importlib.util.spec_from_file_location("web.api_types", types_path)
         if spec is None or spec.loader is None:
             raise RuntimeError(f"failed to create import spec for {types_path}")
 
@@ -101,15 +101,17 @@ def _setup_web_types() -> None:
             sys.modules["web"] = web_module
 
         web_module = sys.modules["web"]
-        setattr(web_module, "types", web_types_module)
+        setattr(web_module, "api_types", web_types_module)
         setattr(web_module, "web_types", web_types_module)
+        setattr(web_module, "types", web_types_module)  # compatibility
 
-        sys.modules["web.types"] = web_types_module
+        sys.modules["web.api_types"] = web_types_module
         sys.modules["web.web_types"] = web_types_module
+        sys.modules["web.types"] = web_types_module
         sys.modules["web_types"] = web_types_module
 
         logger.info(
-            f"web.types loaded from {types_path} "
+            f"web.api_types loaded from {types_path} "
             "(legacy alias web.web_types enabled for compatibility)"
         )
 

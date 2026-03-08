@@ -2,7 +2,7 @@
 
 Placing this script under ``scripts/devtools`` avoids introducing new
 repository-root runtime files while preventing stdlib ``types`` shadowing
-by ``web/types.py`` during PyInstaller subprocess imports.
+by ``web/api_types.py`` during PyInstaller subprocess imports.
 """
 
 from __future__ import annotations

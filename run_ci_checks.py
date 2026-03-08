@@ -80,7 +80,7 @@ class CIChecker:
 
         if self.verbose:
             print(f"{Colors.OKCYAN}검사 소스: {source}{Colors.ENDC}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
         if result.returncode != 0:
             if self.verbose:
                 print(f"{Colors.WARNING}변경 파일 조회 실패, 전체 검사로 폴백합니다{Colors.ENDC}")
@@ -177,7 +177,7 @@ class CIChecker:
         if self.verbose:
             print(f"    {Colors.OKCYAN}$ {' '.join(cmd)}{Colors.ENDC}")
 
-        result = subprocess.run(cmd, capture_output=capture_output, text=True)
+        result = subprocess.run(cmd, capture_output=capture_output, text=True, encoding="utf-8")
         return result.returncode, result.stdout, result.stderr
 
     def check_black(self) -> bool:
@@ -479,7 +479,7 @@ class CIChecker:
         ]
 
         print(f"  {Colors.OKCYAN}테스트 실행 중... (시간이 걸릴 수 있습니다){Colors.ENDC}")
-        result = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        result = subprocess.run(cmd, env=env, capture_output=True, text=True, encoding="utf-8")
 
         if result.returncode == 0:
             self.print_status("단위 테스트", True)

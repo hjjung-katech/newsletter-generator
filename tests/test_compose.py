@@ -29,7 +29,9 @@ class TestCompose(unittest.TestCase):
                 "date": "2025-01-02",
             },
         ]
-        template_dir = "c:\\Development\\newsletter-generator\\templates"
+        template_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "templates")
+        )
         template_name = "newsletter_template.html"
 
         # Mocking os.getenv to control generation_date and generation_timestamp
@@ -63,7 +65,9 @@ class TestCompose(unittest.TestCase):
 
     def test_compose_newsletter_html_empty_summaries(self):
         summaries = []
-        template_dir = "c:\\Development\\newsletter-generator\\templates"
+        template_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "templates")
+        )
         template_name = "newsletter_template.html"
         with patch.dict(
             os.environ,
@@ -90,7 +94,9 @@ class TestCompose(unittest.TestCase):
                 "summary_text": "Summary 1",
             }
         ]
-        template_dir = "c:\\Development\\newsletter-generator\\templates"
+        template_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "templates")
+        )
         template_name = "non_existent_template.html"
 
         with self.assertRaises(

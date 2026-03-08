@@ -58,20 +58,16 @@ except ImportError:
 set_sentry_user_context, set_sentry_tags = setup_sentry()
 
 
-# Import task function for RQ
-from tasks import generate_newsletter_task
-
 # Add the parent directory to the path to import newsletter modules
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-
-# 현재 디렉토리를 파이썬 패스에 추가
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, current_dir)
-
 # 프로젝트 루트를 파이썬 패스에 추가
 project_root = resolve_project_root()
-sys.path.insert(0, project_root)
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Import task function for RQ
+from tasks import generate_newsletter_task
 
 try:
     from newsletter_clients import (
