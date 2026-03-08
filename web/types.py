@@ -28,6 +28,7 @@ class GenerateNewsletterRequest(BaseModel):
     period: int = Field(default=14)
     email: Optional[str] = None  # 즉시 발송용 이메일 주소
     require_approval: bool = False
+    archive_reference_ids: Optional[List[str]] = None
 
     @field_validator("keywords")  # type: ignore[untyped-decorator]
     @classmethod
@@ -55,6 +56,19 @@ class GenerateNewsletterRequest(BaseModel):
         if v is not None and not EMAIL_PATTERN.match(v):
             raise ValueError("Invalid email format")
         return v
+
+    @field_validator("archive_reference_ids")  # type: ignore[untyped-decorator]
+    @classmethod
+    def validate_archive_reference_ids(
+        cls, value: Optional[List[str]]
+    ) -> Optional[List[str]]:
+        if value is None:
+            return None
+
+        normalized = [str(item).strip() for item in value if str(item).strip()]
+        if len(normalized) > 3:
+            raise ValueError("Archive references are limited to 3 items")
+        return normalized
 
     @model_validator(mode="after")  # type: ignore[untyped-decorator]
     def validate_keywords_or_domain(self) -> "GenerateNewsletterRequest":

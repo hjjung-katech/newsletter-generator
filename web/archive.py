@@ -1,4 +1,4 @@
-"""Helpers for deriving searchable archive entries from completed history rows."""
+"""Helpers for deriving searchable archive entries and reuse sections."""
 
 from __future__ import annotations
 
@@ -94,3 +94,49 @@ def build_archive_entry(
         "created_at": created_at,
         "updated_at": created_at,
     }
+
+
+def render_archive_reference_section(references: List[Dict[str, Any]]) -> str:
+    """Render a portable HTML section summarizing selected archive references."""
+    if not references:
+        return ""
+
+    items_html = "".join(
+        f"""
+        <li style="margin-bottom: 14px;">
+            <div style="font-weight: 600; color: #1f2937;">{html.escape(str(reference.get("title") or reference.get("job_id") or "Archive Reference"))}</div>
+            <div style="margin-top: 4px; color: #4b5563; font-size: 14px; line-height: 1.5;">{html.escape(str(reference.get("snippet") or ""))}</div>
+            <div style="margin-top: 4px; color: #6b7280; font-size: 12px;">{html.escape(str(reference.get("source_value") or ""))}</div>
+        </li>
+        """
+        for reference in references
+    )
+
+    return f"""
+    <section style="margin: 28px 0; padding: 20px; border: 1px solid #dbeafe; border-radius: 12px; background: #eff6ff;">
+        <h2 style="margin: 0 0 12px 0; color: #1d4ed8; font-size: 20px;">지난 뉴스레터 참고</h2>
+        <p style="margin: 0 0 14px 0; color: #1f2937; font-size: 14px; line-height: 1.6;">
+            이번 생성에는 아래 과거 뉴스레터를 참고본으로 함께 보관했습니다.
+        </p>
+        <ul style="margin: 0; padding-left: 20px;">
+            {items_html}
+        </ul>
+    </section>
+    """
+
+
+def inject_archive_references(
+    html_content: str,
+    references: List[Dict[str, Any]],
+) -> str:
+    """Inject a reusable archive reference section before the closing body tag."""
+    if not html_content or not references:
+        return html_content
+
+    reference_section = render_archive_reference_section(references)
+    if not reference_section:
+        return html_content
+
+    if "</body>" in html_content:
+        return html_content.replace("</body>", f"{reference_section}\n</body>", 1)
+    return f"{html_content}\n{reference_section}"

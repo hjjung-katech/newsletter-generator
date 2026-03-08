@@ -25,6 +25,7 @@ try:
         DELIVERY_STATUS_SEND_FAILED,
         DELIVERY_STATUS_SENT,
         get_active_source_policies,
+        get_archive_entry,
         update_history_review_state,
         update_history_status,
     )
@@ -37,6 +38,7 @@ except ImportError:
         DELIVERY_STATUS_SEND_FAILED,
         DELIVERY_STATUS_SENT,
         get_active_source_policies,
+        get_archive_entry,
         update_history_review_state,
         update_history_status,
     )
@@ -66,6 +68,11 @@ except ImportError:
         record_generation_started,
     )
 
+try:
+    from archive import inject_archive_references
+except ImportError:
+    from web.archive import inject_archive_references  # pragma: no cover
+
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
 logger = logging.getLogger("web.tasks")
 
@@ -88,6 +95,29 @@ def _build_request(
         source_allowlist=policies.get("allowlist") or [],
         source_blocklist=policies.get("blocklist") or [],
     )
+
+
+def _resolve_archive_references(
+    db_path: str, archive_reference_ids: list[str] | None
+) -> list[Dict[str, Any]]:
+    references: list[Dict[str, Any]] = []
+    for raw_reference_id in archive_reference_ids or []:
+        reference_id = str(raw_reference_id).strip()
+        if not reference_id:
+            continue
+        archive_entry = get_archive_entry(db_path, reference_id)
+        if not archive_entry:
+            continue
+        references.append(
+            {
+                "job_id": archive_entry["job_id"],
+                "title": archive_entry["title"],
+                "snippet": archive_entry["snippet"],
+                "source_value": archive_entry.get("source_value") or "",
+                "created_at": archive_entry.get("created_at"),
+            }
+        )
+    return references[:3]
 
 
 def generate_newsletter_task(
@@ -125,18 +155,31 @@ def generate_newsletter_task(
 
     email = data.get("email", "")
     approval_required = bool(data.get("require_approval")) and bool(email)
+    archive_references = _resolve_archive_references(
+        db_path,
+        [str(item).strip() for item in data.get("archive_reference_ids", []) or []],
+    )
 
     try:
         source_policies = get_active_source_policies(db_path)
         request = _build_request(data, source_policies=source_policies)
         result = generate_newsletter(request)
+        html_content = inject_archive_references(
+            result["html_content"],
+            archive_references,
+        )
+        input_params = dict(result.get("input_params", {}))
+        input_params["archive_reference_ids"] = [
+            reference["job_id"] for reference in archive_references
+        ]
 
         response: Dict[str, Any] = {
             "status": result["status"],
-            "html_content": result["html_content"],
+            "html_content": html_content,
             "title": result["title"],
             "generation_stats": result.get("generation_stats", {}),
-            "input_params": result.get("input_params", {}),
+            "input_params": input_params,
+            "archive_references": archive_references,
             "error": None,
             "sent": False,
             "email_sent": False,
@@ -160,7 +203,7 @@ def generate_newsletter_task(
                     job_id=job_id,
                     to=email,
                     subject=get_newsletter_subject(result=result, params=data),
-                    html=result["html_content"],
+                    html=html_content,
                 )
                 response["sent"] = True
                 response["email_sent"] = True
