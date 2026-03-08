@@ -164,6 +164,44 @@ class TestWebMail:
         assert config["from_email_configured"] is False
         assert config["ready"] is False
 
+    def test_get_newsletter_subject_prefers_generated_title(self):
+        """Generated result title should win over keyword-derived fallback."""
+        from web.mail import get_newsletter_subject
+
+        subject = get_newsletter_subject(
+            result={"title": "Generated Weekly Brief"},
+            params={"keywords": ["AI", "ML"]},
+        )
+
+        assert subject == "Generated Weekly Brief"
+
+    @patch("web.mail.get_or_create_outbox_record", return_value="sent")
+    @patch("web.mail.is_feature_enabled", return_value=True)
+    @patch("web.mail.resolve_mail_send_callable")
+    def test_send_email_with_outbox_skips_previously_sent_email(
+        self,
+        mock_resolve_send_callable,
+        mock_feature_enabled,
+        mock_get_or_create_outbox_record,
+    ):
+        """Shared helper should short-circuit when the outbox already marked sent."""
+        from web.mail import send_email_with_outbox
+
+        result = send_email_with_outbox(
+            db_path=":memory:",
+            job_id="job-1",
+            to="test@example.com",
+            subject="Newsletter: AI",
+            html="<h1>Newsletter</h1>",
+        )
+
+        assert result["sent"] is True
+        assert result["skipped"] is True
+        assert result["send_key"].startswith("job-1:test@example.com:")
+        mock_feature_enabled.assert_called_once_with("WEB_OUTBOX_ENABLED", default=True)
+        mock_get_or_create_outbox_record.assert_called_once()
+        mock_resolve_send_callable.assert_not_called()
+
     @pytest.mark.skip(reason="Requires actual email service and may hit API limits")
     def test_send_test_email(self):
         """Test sending test email - skipped to avoid API calls"""
