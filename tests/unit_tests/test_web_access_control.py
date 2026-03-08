@@ -37,6 +37,7 @@ def test_protected_route_matcher_covers_sensitive_paths() -> None:
     assert is_protected_route("/api/schedule")
     assert is_protected_route("/api/schedule/demo/run")
     assert is_protected_route("/api/presets")
+    assert is_protected_route("/api/source-policies")
     assert is_protected_route("/api/send-email")
     assert not is_protected_route("/api/generate")
     assert not is_protected_route("/health")

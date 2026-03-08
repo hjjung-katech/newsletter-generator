@@ -20,6 +20,9 @@ DELIVERY_STATUS_APPROVED = "approved"
 DELIVERY_STATUS_SENT = "sent"
 DELIVERY_STATUS_SEND_FAILED = "send_failed"
 
+SOURCE_POLICY_ALLOW = "allow"
+SOURCE_POLICY_BLOCK = "block"
+
 _UNSET = object()
 
 
@@ -176,6 +179,20 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     )
 
     cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS source_policies (
+            id TEXT PRIMARY KEY,
+            pattern TEXT NOT NULL,
+            policy_type TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(pattern, policy_type)
+        )
+        """
+    )
+
+    cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)"
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_status ON history(status)")
@@ -196,6 +213,9 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_generation_presets_updated_at ON generation_presets(updated_at)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_source_policies_type_active ON source_policies(policy_type, is_active)"
     )
 
     conn.commit()
@@ -694,5 +714,158 @@ def delete_generation_preset(db_path: str, preset_id: str) -> bool:
         cursor.execute("DELETE FROM generation_presets WHERE id = ?", (preset_id,))
         conn.commit()
         return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def list_source_policies(db_path: str) -> list[Dict[str, Any]]:
+    """Return source policy rows ordered by type and recency."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, pattern, policy_type, is_active, created_at, updated_at
+            FROM source_policies
+            ORDER BY policy_type ASC, updated_at DESC, created_at DESC
+            """
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "pattern": row[1],
+                "policy_type": row[2],
+                "is_active": bool(row[3]),
+                "created_at": row[4],
+                "updated_at": row[5],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
+def get_source_policy(db_path: str, policy_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch a single source policy row."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, pattern, policy_type, is_active, created_at, updated_at
+            FROM source_policies
+            WHERE id = ?
+            """,
+            (policy_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "pattern": row[1],
+            "policy_type": row[2],
+            "is_active": bool(row[3]),
+            "created_at": row[4],
+            "updated_at": row[5],
+        }
+    finally:
+        conn.close()
+
+
+def create_source_policy(
+    db_path: str,
+    policy_id: str,
+    pattern: str,
+    policy_type: str,
+    *,
+    is_active: bool = True,
+) -> Dict[str, Any]:
+    """Create a source policy row and return it."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO source_policies (id, pattern, policy_type, is_active)
+            VALUES (?, ?, ?, ?)
+            """,
+            (policy_id, pattern, policy_type, int(is_active)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_source_policy(db_path, policy_id) or {}
+
+
+def update_source_policy(
+    db_path: str,
+    policy_id: str,
+    pattern: str,
+    policy_type: str,
+    *,
+    is_active: bool = True,
+) -> Optional[Dict[str, Any]]:
+    """Update an existing source policy row."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM source_policies WHERE id = ?", (policy_id,))
+        if not cursor.fetchone():
+            return None
+
+        cursor.execute(
+            """
+            UPDATE source_policies
+            SET pattern = ?,
+                policy_type = ?,
+                is_active = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (pattern, policy_type, int(is_active), policy_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_source_policy(db_path, policy_id)
+
+
+def delete_source_policy(db_path: str, policy_id: str) -> bool:
+    """Delete a source policy row."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM source_policies WHERE id = ?", (policy_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def get_active_source_policies(db_path: str) -> Dict[str, list[str]]:
+    """Return active source policy patterns grouped by allow/block type."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT pattern, policy_type
+            FROM source_policies
+            WHERE is_active = 1
+            ORDER BY policy_type ASC, updated_at DESC
+            """
+        )
+        allowlist: list[str] = []
+        blocklist: list[str] = []
+        for pattern, policy_type in cursor.fetchall():
+            if policy_type == SOURCE_POLICY_ALLOW:
+                allowlist.append(str(pattern))
+            elif policy_type == SOURCE_POLICY_BLOCK:
+                blocklist.append(str(pattern))
+        return {"allowlist": allowlist, "blocklist": blocklist}
     finally:
         conn.close()

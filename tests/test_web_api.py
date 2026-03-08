@@ -27,6 +27,14 @@ def _delete_schedule(schedule_id: str) -> None:
     conn.close()
 
 
+def _delete_source_policy(policy_id: str) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM source_policies WHERE id = ?", (policy_id,))
+    conn.commit()
+    conn.close()
+
+
 def _insert_schedule_row(
     *,
     schedule_id: str,
@@ -250,6 +258,53 @@ class TestWebAPI:
 
         result = json.loads(response.data)
         assert isinstance(result, list)
+
+    def test_source_policy_crud_endpoint(self, client):
+        created_policy_id = None
+        response = client.post(
+            "/api/source-policies",
+            data=json.dumps(
+                {"pattern": "https://www.reuters.com", "policy_type": "allow"}
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 201
+        created = json.loads(response.data)
+        created_policy_id = created["id"]
+        assert created["pattern"] == "reuters.com"
+        assert created["policy_type"] == "allow"
+        assert created["is_active"] is True
+
+        try:
+            list_response = client.get("/api/source-policies")
+            assert list_response.status_code == 200
+            listed = json.loads(list_response.data)
+            assert any(item["id"] == created_policy_id for item in listed)
+
+            update_response = client.put(
+                f"/api/source-policies/{created_policy_id}",
+                data=json.dumps(
+                    {
+                        "pattern": "spam.example",
+                        "policy_type": "block",
+                        "is_active": False,
+                    }
+                ),
+                content_type="application/json",
+            )
+            assert update_response.status_code == 200
+            updated = json.loads(update_response.data)
+            assert updated["pattern"] == "spam.example"
+            assert updated["policy_type"] == "block"
+            assert updated["is_active"] is False
+
+            delete_response = client.delete(f"/api/source-policies/{created_policy_id}")
+            assert delete_response.status_code == 200
+            assert json.loads(delete_response.data)["success"] is True
+        finally:
+            if created_policy_id:
+                _delete_source_policy(created_policy_id)
 
     def test_schedule_creation_returns_utc_next_run(self, client):
         schedule_id = None

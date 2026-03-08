@@ -24,6 +24,7 @@ try:
         DELIVERY_STATUS_PENDING_APPROVAL,
         DELIVERY_STATUS_SEND_FAILED,
         DELIVERY_STATUS_SENT,
+        get_active_source_policies,
         update_history_review_state,
         update_history_status,
     )
@@ -35,6 +36,7 @@ except ImportError:
         DELIVERY_STATUS_PENDING_APPROVAL,
         DELIVERY_STATUS_SEND_FAILED,
         DELIVERY_STATUS_SENT,
+        get_active_source_policies,
         update_history_review_state,
         update_history_status,
     )
@@ -57,7 +59,10 @@ def _resolve_database_path(database_path: str | None) -> str:
     return database_path or DATABASE_PATH
 
 
-def _build_request(data: Dict[str, Any]) -> GenerateNewsletterRequest:
+def _build_request(
+    data: Dict[str, Any], source_policies: Dict[str, list[str]] | None = None
+) -> GenerateNewsletterRequest:
+    policies = source_policies or {"allowlist": [], "blocklist": []}
     return GenerateNewsletterRequest(
         keywords=data.get("keywords"),
         domain=data.get("domain"),
@@ -65,6 +70,8 @@ def _build_request(data: Dict[str, Any]) -> GenerateNewsletterRequest:
         email_compatible=bool(data.get("email_compatible", False)),
         period=int(data.get("period", 14)),
         suggest_count=int(data.get("suggest_count", 10)),
+        source_allowlist=policies.get("allowlist") or [],
+        source_blocklist=policies.get("blocklist") or [],
     )
 
 
@@ -97,7 +104,8 @@ def generate_newsletter_task(
     approval_required = bool(data.get("require_approval")) and bool(email)
 
     try:
-        request = _build_request(data)
+        source_policies = get_active_source_policies(db_path)
+        request = _build_request(data, source_policies=source_policies)
         result = generate_newsletter(request)
 
         response: Dict[str, Any] = {
