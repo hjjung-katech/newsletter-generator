@@ -7,6 +7,7 @@ import logging
 import sqlite3
 import threading
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
 
@@ -65,9 +66,122 @@ from web.types import GenerateNewsletterRequest
 logger = logging.getLogger("web.routes_generation")
 
 
+@dataclass(frozen=True)
+class GenerationJobResolution:
+    job_id: str
+    deduplicated: bool
+    stored_status: str
+    idempotency_key: str
+    effective_idempotency_key: str | None
+
+
 def _validate_generate_request(data: dict[str, Any]) -> GenerateNewsletterRequest:
     """Validate generation request payload without runtime dynamic loading."""
     return GenerateNewsletterRequest(**data)
+
+
+def _build_generate_response(
+    *, job_id: str, status: str, deduplicated: bool, idempotency_key: str
+) -> dict[str, Any]:
+    return {
+        "job_id": job_id,
+        "status": status,
+        "deduplicated": deduplicated,
+        "idempotency_key": idempotency_key,
+    }
+
+
+def _resolve_generation_job(
+    *,
+    payload: dict[str, Any],
+    database_path: str,
+    provided_idempotency_key: str | None,
+) -> GenerationJobResolution:
+    idempotency_enabled = is_feature_enabled("WEB_IDEMPOTENCY_ENABLED", default=True)
+    idempotency_key = build_idempotency_key(
+        payload=payload,
+        provided_key=provided_idempotency_key,
+        namespace="generate",
+    )
+    if not idempotency_enabled:
+        idempotency_key = f"generate:{uuid.uuid4()}"
+
+    proposed_job_id = (
+        derive_job_id(idempotency_key, prefix="job")
+        if idempotency_enabled
+        else str(uuid.uuid4())
+    )
+    job_id, deduplicated, stored_status = create_or_get_history_job(
+        db_path=database_path,
+        job_id=proposed_job_id,
+        params=payload,
+        idempotency_key=idempotency_key if idempotency_enabled else None,
+        status="pending",
+    )
+    return GenerationJobResolution(
+        job_id=job_id,
+        deduplicated=deduplicated,
+        stored_status=stored_status,
+        idempotency_key=idempotency_key,
+        effective_idempotency_key=idempotency_key if idempotency_enabled else None,
+    )
+
+
+def _dispatch_generation_job(
+    *,
+    app: Flask,
+    payload: dict[str, Any],
+    resolution: GenerationJobResolution,
+    send_email: bool,
+    database_path: str,
+    in_memory_tasks: dict[str, Any],
+    task_queue: Any,
+    run_in_memory_job: Callable[..., None],
+) -> dict[str, Any]:
+    if task_queue:
+        log_info(logger, "generate.job.queued", job_id=resolution.job_id, via="redis")
+        task_queue.enqueue(
+            generate_newsletter_task,
+            payload,
+            resolution.job_id,
+            send_email,
+            resolution.effective_idempotency_key,
+            database_path,
+            job_id=resolution.job_id,
+        )
+        return _build_generate_response(
+            job_id=resolution.job_id,
+            status="queued",
+            deduplicated=False,
+            idempotency_key=resolution.idempotency_key,
+        )
+
+    log_info(logger, "generate.job.queued", job_id=resolution.job_id, via="in_memory")
+    in_memory_tasks[resolution.job_id] = {
+        "status": "processing",
+        "started_at": datetime.now().isoformat(),
+        "idempotency_key": resolution.idempotency_key,
+    }
+
+    if not app.config.get("TESTING", False):
+        thread = threading.Thread(
+            target=run_in_memory_job,
+            kwargs={
+                "job_id": resolution.job_id,
+                "data": payload,
+                "send_email": send_email,
+                "idempotency_key": resolution.effective_idempotency_key,
+            },
+            daemon=True,
+        )
+        thread.start()
+
+    return _build_generate_response(
+        job_id=resolution.job_id,
+        status="processing",
+        deduplicated=False,
+        idempotency_key=resolution.idempotency_key,
+    )
 
 
 def register_generation_routes(
@@ -153,106 +267,45 @@ def register_generation_routes(
             )
             log_debug(logger, "generate.request.payload", payload=data)
 
-            idempotency_enabled = is_feature_enabled(
-                "WEB_IDEMPOTENCY_ENABLED", default=True
-            )
-            provided_idempotency_key = request.headers.get("Idempotency-Key")
-            idempotency_key = build_idempotency_key(
+            resolution = _resolve_generation_job(
                 payload=data,
-                provided_key=provided_idempotency_key,
-                namespace="generate",
-            )
-            if not idempotency_enabled:
-                idempotency_key = f"generate:{uuid.uuid4()}"
-
-            proposed_job_id = (
-                derive_job_id(idempotency_key, prefix="job")
-                if idempotency_enabled
-                else str(uuid.uuid4())
-            )
-            job_id, deduplicated, stored_status = create_or_get_history_job(
-                db_path=DATABASE_PATH,
-                job_id=proposed_job_id,
-                params=data,
-                idempotency_key=idempotency_key if idempotency_enabled else None,
-                status="pending",
+                database_path=DATABASE_PATH,
+                provided_idempotency_key=request.headers.get("Idempotency-Key"),
             )
             log_info(
                 logger,
                 "generate.job.resolved",
-                job_id=job_id,
-                deduplicated=deduplicated,
-                idempotency_key=idempotency_key,
-                stored_status=stored_status,
+                job_id=resolution.job_id,
+                deduplicated=resolution.deduplicated,
+                idempotency_key=resolution.idempotency_key,
+                stored_status=resolution.stored_status,
             )
 
-            if deduplicated:
+            if resolution.deduplicated:
                 return (
                     jsonify(
-                        {
-                            "job_id": job_id,
-                            "status": stored_status,
-                            "deduplicated": True,
-                            "idempotency_key": idempotency_key,
-                        }
+                        _build_generate_response(
+                            job_id=resolution.job_id,
+                            status=resolution.stored_status,
+                            deduplicated=True,
+                            idempotency_key=resolution.idempotency_key,
+                        )
                     ),
                     202,
                 )
 
-            if task_queue:
-                log_info(logger, "generate.job.queued", job_id=job_id, via="redis")
-                task_queue.enqueue(
-                    generate_newsletter_task,
-                    data,
-                    job_id,
-                    send_email,
-                    idempotency_key if idempotency_enabled else None,
-                    DATABASE_PATH,
-                    job_id=job_id,
-                )
-                return (
-                    jsonify(
-                        {
-                            "job_id": job_id,
-                            "status": "queued",
-                            "deduplicated": False,
-                            "idempotency_key": idempotency_key,
-                        }
-                    ),
-                    202,
-                )
-
-            log_info(logger, "generate.job.queued", job_id=job_id, via="in_memory")
-            in_memory_tasks[job_id] = {
-                "status": "processing",
-                "started_at": datetime.now().isoformat(),
-                "idempotency_key": idempotency_key,
-            }
-
-            if not app.config.get("TESTING", False):
-                thread = threading.Thread(
-                    target=run_in_memory_job,
-                    kwargs={
-                        "job_id": job_id,
-                        "data": data,
-                        "send_email": send_email,
-                        "idempotency_key": (
-                            idempotency_key if idempotency_enabled else None
-                        ),
-                    },
-                    daemon=True,
-                )
-                thread.start()
-
+            response_payload = _dispatch_generation_job(
+                app=app,
+                payload=data,
+                resolution=resolution,
+                send_email=send_email,
+                database_path=DATABASE_PATH,
+                in_memory_tasks=in_memory_tasks,
+                task_queue=task_queue,
+                run_in_memory_job=run_in_memory_job,
+            )
             return (
-                jsonify(
-                    {
-                        "job_id": job_id,
-                        "status": "processing",
-                        "deduplicated": False,
-                        "idempotency_key": idempotency_key,
-                    }
-                ),
+                jsonify(response_payload),
                 202,
             )
 
