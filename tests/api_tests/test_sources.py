@@ -66,13 +66,11 @@ class TestNewsSource(unittest.TestCase):
 
 class TestSerperAPISource(unittest.TestCase):
     @patch("newsletter.sources.config.SERPER_API_KEY", "fake_api_key")
-    @patch("newsletter.sources.requests.request")
-    def test_fetch_news(self, mock_request):
+    @patch("newsletter.sources.fetch_url_content")
+    def test_fetch_news(self, mock_fetch):
         """SerperAPISource의 fetch_news 메서드 테스트"""
-        # API 응답 모의 객체 설정
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
+        # API 응답 문자열 객체 설정
+        response_json = {
             "news": [
                 {
                     "title": "Test News Article",
@@ -90,14 +88,14 @@ class TestSerperAPISource(unittest.TestCase):
                 },
             ]
         }
-        mock_request.return_value = mock_response
+        mock_fetch.return_value = json.dumps(response_json)
 
         # 소스 객체 생성 및 테스트
         source = SerperAPISource()
         articles = source.fetch_news(["test keyword"], 10)
 
         # API 호출 확인
-        mock_request.assert_called_once()
+        mock_fetch.assert_called_once()
 
         # 결과 확인
         self.assertEqual(len(articles), 2)
@@ -117,9 +115,11 @@ class TestSerperAPISource(unittest.TestCase):
 
 
 class TestRSSFeedSource(unittest.TestCase):
+    @patch("newsletter.sources.fetch_url_content")
     @patch("newsletter.sources.feedparser.parse")
-    def test_fetch_news(self, mock_parse):
+    def test_fetch_news(self, mock_parse, mock_fetch):
         """RSSFeedSource의 fetch_news 메서드 테스트"""
+        mock_fetch.return_value = "<xml>dummy xml data</xml>"
         # RSS 피드 모의 객체 설정
         mock_feed = MagicMock()
         mock_feed.status = 200
@@ -150,7 +150,7 @@ class TestRSSFeedSource(unittest.TestCase):
         articles = source.fetch_news(["keyword"], 10)
 
         # 피드 파싱 호출 확인
-        mock_parse.assert_called_once_with("http://test.com/rss")
+        mock_parse.assert_called_once_with("<xml>dummy xml data</xml>")
 
         # 결과 확인 - 키워드가 포함된 첫 번째 항목만 반환되어야 함
         self.assertEqual(len(articles), 1)
@@ -159,9 +159,11 @@ class TestRSSFeedSource(unittest.TestCase):
         self.assertEqual(articles[0]["source"], "Test RSS Feed")
         self.assertEqual(articles[0]["date"], "2023-05-20")
 
+    @patch("newsletter.sources.fetch_url_content")
     @patch("newsletter.sources.feedparser.parse")
-    def test_feed_error(self, mock_parse):
+    def test_feed_error(self, mock_parse, mock_fetch):
         """RSS 피드 오류 처리 테스트"""
+        mock_fetch.return_value = ""
         # 오류 상태 설정
         mock_feed = MagicMock()
         mock_feed.status = 404
@@ -177,13 +179,11 @@ class TestRSSFeedSource(unittest.TestCase):
 class TestNaverNewsAPISource(unittest.TestCase):
     @patch("newsletter.sources.config.NAVER_CLIENT_ID", "fake_client_id")
     @patch("newsletter.sources.config.NAVER_CLIENT_SECRET", "fake_client_secret")
-    @patch("newsletter.sources.requests.get")
-    def test_fetch_news(self, mock_get):
+    @patch("newsletter.sources.fetch_url_content")
+    def test_fetch_news(self, mock_fetch):
         """NaverNewsAPISource의 fetch_news 메서드 테스트"""
-        # API 응답 모의 객체 설정
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
+        # API 응답 문자열 객체 설정
+        response_json = {
             "items": [
                 {
                     "title": "Test <b>Naver</b> Article",
@@ -201,14 +201,14 @@ class TestNaverNewsAPISource(unittest.TestCase):
                 },
             ]
         }
-        mock_get.return_value = mock_response
+        mock_fetch.return_value = json.dumps(response_json)
 
         # 소스 객체 생성 및 테스트
         source = NaverNewsAPISource()
         articles = source.fetch_news(["네이버"], 10)
 
         # API 호출 확인
-        mock_get.assert_called_once()
+        mock_fetch.assert_called_once()
 
         # 결과 확인 - HTML 태그가 제거되어야 함
         self.assertEqual(len(articles), 2)

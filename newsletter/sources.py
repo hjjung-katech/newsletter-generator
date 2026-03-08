@@ -8,19 +8,20 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union, Final
+from typing import Any, Dict, Final, List, Optional, Union
 
 import feedparser
 import requests
+import logging
 from bs4 import BeautifulSoup
-from rich.console import Console
 from requests.adapters import HTTPAdapter
+from rich.console import Console
 from urllib3.util.retry import Retry
 
 from . import config
 from .date_utils import parse_date_string, standardize_date
-from .utils.logger import get_logger, show_collection_brief
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
@@ -47,7 +48,10 @@ def create_requests_session() -> requests.Session:
 
 
 def fetch_url_content(
-    url: str, headers: dict = None, method: str = "GET", data: dict = None
+    url: str,
+    headers: Optional[dict] = None,
+    method: str = "GET",
+    data: Optional[dict] = None,
 ) -> str:
     """URL에서 컨텐츠를 안전하게 가져옴"""
     session = create_requests_session()
@@ -269,7 +273,9 @@ class RSSFeedSource(NewsSource):
                             )
                         if match:
                             matched_keyword = True
-                            keyword_article_counts[keyword] += 1
+                            keyword_article_counts[keyword] = (
+                                keyword_article_counts.get(keyword, 0) + 1
+                            )
                             break
 
                     if matched_keyword:

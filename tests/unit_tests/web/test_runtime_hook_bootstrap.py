@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 LEGACY_ALIAS = "web." + "web_types"
-MODULE_KEYS = ("web", "web.types", LEGACY_ALIAS, "web_types")
+MODULE_KEYS = ("web", "web.api_types", "web.types", LEGACY_ALIAS, "web_types")
 
 
 def _snapshot_modules() -> dict[str, object | None]:
@@ -48,8 +48,8 @@ def test_setup_web_types_non_frozen_loads_generate_request(
 
         runtime_hook._setup_web_types()
 
-        assert "web.types" in sys.modules
-        web_types_module = sys.modules["web.types"]
+        assert "web.api_types" in sys.modules
+        web_types_module = sys.modules["web.api_types"]
         assert sys.modules[LEGACY_ALIAS] is web_types_module
         assert sys.modules["web_types"] is web_types_module
         _assert_generate_request_loaded(web_types_module)
@@ -71,8 +71,8 @@ def test_setup_web_types_frozen_loads_generate_request(
         bundle_web_dir = bundle_root / "web"
         bundle_web_dir.mkdir(parents=True)
 
-        source_types = Path(runtime_hook.__file__).with_name("types.py")
-        target_types = bundle_web_dir / "types.py"
+        source_types = Path(runtime_hook.__file__).with_name("api_types.py")
+        target_types = bundle_web_dir / "api_types.py"
         target_types.write_text(
             source_types.read_text(encoding="utf-8"), encoding="utf-8"
         )
@@ -82,8 +82,8 @@ def test_setup_web_types_frozen_loads_generate_request(
 
         runtime_hook._setup_web_types()
 
-        assert "web.types" in sys.modules
-        web_types_module = sys.modules["web.types"]
+        assert "web.api_types" in sys.modules
+        web_types_module = sys.modules["web.api_types"]
         assert sys.modules[LEGACY_ALIAS] is web_types_module
         assert sys.modules["web_types"] is web_types_module
         _assert_generate_request_loaded(web_types_module)

@@ -38,16 +38,14 @@ class TestCentralizedSettings:
         finally:
             disable_test_mode()
 
-    def test_missing_required_field_raises_validation_error(self):
-        """필수 필드 누락 시 ValidationError 발생"""
-        incomplete_env = {
-            # POSTMARK_SERVER_TOKEN 누락 (여전히 필수)
-            "EMAIL_SENDER": "test@example.com",
-            "OPENAI_API_KEY": "sk-test-openai-key-1234567890123456",
+    def test_invalid_field_type_raises_validation_error(self):
+        """잘못된 타입의 설정값 제공 시 ValidationError 발생"""
+        invalid_env = {
+            "PORT": "not_an_integer",
         }
 
         # 테스트 모드를 사용하지 않고 직접 환경변수 패치
-        with patch.dict(os.environ, incomplete_env, clear=True):
+        with patch.dict(os.environ, invalid_env, clear=True):
             with pytest.raises(ValidationError):
                 CentralizedSettings()
 
