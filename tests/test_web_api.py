@@ -5,6 +5,7 @@ Tests the Flask app with email functionality
 
 import json
 import os
+import sqlite3
 import sys
 import uuid
 
@@ -13,9 +14,38 @@ import pytest
 # Add project root to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from web.app import app  # noqa: E402
+from web.app import DATABASE_PATH, app  # noqa: E402
 
 pytestmark = [pytest.mark.api, pytest.mark.email]
+
+
+def _delete_schedule(schedule_id: str) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,))
+    conn.commit()
+    conn.close()
+
+
+def _insert_schedule_row(
+    *,
+    schedule_id: str,
+    params: dict,
+    rrule: str,
+    next_run: str,
+    created_at: str,
+) -> None:
+    conn = sqlite3.connect(DATABASE_PATH)
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO schedules (id, params, rrule, next_run, created_at, enabled)
+        VALUES (?, ?, ?, ?, ?, 1)
+        """,
+        (schedule_id, json.dumps(params), rrule, next_run, created_at),
+    )
+    conn.commit()
+    conn.close()
 
 
 class TestWebAPI:
@@ -220,6 +250,61 @@ class TestWebAPI:
 
         result = json.loads(response.data)
         assert isinstance(result, list)
+
+    def test_schedule_creation_returns_utc_next_run(self, client):
+        schedule_id = None
+        response = client.post(
+            "/api/schedule",
+            data=json.dumps(
+                {
+                    "keywords": ["AI", "ML"],
+                    "email": "schedule@example.com",
+                    "rrule": "FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 201
+        result = json.loads(response.data)
+        schedule_id = result["schedule_id"]
+
+        try:
+            assert result["next_run"].endswith("Z")
+
+            conn = sqlite3.connect(DATABASE_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT next_run FROM schedules WHERE id = ?", (schedule_id,)
+            )
+            stored_next_run = cursor.fetchone()[0]
+            conn.close()
+
+            assert stored_next_run.endswith("Z")
+        finally:
+            if schedule_id:
+                _delete_schedule(schedule_id)
+
+    def test_schedules_endpoint_normalizes_timestamp_fields_to_utc(self, client):
+        schedule_id = f"schedule-utc-{uuid.uuid4()}"
+        _insert_schedule_row(
+            schedule_id=schedule_id,
+            params={"keywords": ["AI"], "send_email": False},
+            rrule="FREQ=DAILY;BYHOUR=9;BYMINUTE=0",
+            next_run="2026-03-08 09:30:00",
+            created_at="2026-03-08 08:15:00",
+        )
+
+        try:
+            response = client.get("/api/schedules")
+            assert response.status_code == 200
+            schedules = json.loads(response.data)
+
+            matching = next(item for item in schedules if item["id"] == schedule_id)
+            assert matching["next_run"] == "2026-03-08T09:30:00Z"
+            assert matching["created_at"] == "2026-03-08T08:15:00Z"
+        finally:
+            _delete_schedule(schedule_id)
 
 
 if __name__ == "__main__":
