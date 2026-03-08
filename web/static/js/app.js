@@ -12,6 +12,9 @@ class NewsletterApp {
 
     init() {
         this.bindEvents();
+        this.toggleInputMethod();
+        this.toggleScheduleSettings(document.getElementById('enableSchedule').checked);
+        this.updateScheduleOptions();
         this.loadHistory();
         this.loadSchedules();
     }
@@ -102,11 +105,16 @@ class NewsletterApp {
 
     toggleScheduleSettings(enabled) {
         const scheduleSettings = document.getElementById('scheduleSettings');
+        const generateBtn = document.getElementById('generateBtn');
         if (enabled) {
             scheduleSettings.classList.remove('hidden');
         } else {
             scheduleSettings.classList.add('hidden');
         }
+
+        generateBtn.innerHTML = enabled
+            ? '<i class="fas fa-calendar-plus mr-2"></i>예약 저장'
+            : '<i class="fas fa-play mr-2"></i>생성하기';
     }
 
     updateScheduleOptions() {
@@ -123,6 +131,11 @@ class NewsletterApp {
     async generateNewsletter() {
         const data = this.collectFormData();
         if (!data) return;
+
+        if (data.schedule) {
+            await this.createSchedule(data);
+            return;
+        }
 
         this.showProgress();
 
@@ -146,6 +159,36 @@ class NewsletterApp {
                 }
             } else {
                 this.showError(result.error || 'Generation failed');
+            }
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
+    }
+
+    async createSchedule(data) {
+        const scheduleRequest = { ...data };
+        delete scheduleRequest.schedule;
+
+        try {
+            const response = await fetch('/api/schedule', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(scheduleRequest)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                this.currentJobId = null;
+                document.getElementById('progressSection').classList.add('hidden');
+                document.getElementById('resultsSection').classList.add('hidden');
+                await this.loadSchedules();
+                this.switchTab('scheduleManageTab');
+                this.showSuccess(`예약이 등록되었습니다. 다음 실행: ${new Date(result.next_run).toLocaleString()}`);
+            } else {
+                this.showError(result.error || 'Schedule creation failed');
             }
         } catch (error) {
             this.showError('Network error: ' + error.message);
@@ -522,14 +565,13 @@ class NewsletterApp {
         alert('오류: ' + message);
     }
 
-    showEmailSuccess(email) {
-        // Create and show success notification
+    showSuccess(message) {
         const notification = document.createElement('div');
         notification.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded shadow-lg z-50';
         notification.innerHTML = `
             <div class="flex items-center">
                 <i class="fas fa-check-circle mr-2"></i>
-                <span>✅ 메일 발송 완료: ${email}</span>
+                <span>${message}</span>
                 <button class="ml-4 text-green-700 hover:text-green-900" onclick="this.parentElement.parentElement.remove()">
                     <i class="fas fa-times"></i>
                 </button>
@@ -538,12 +580,15 @@ class NewsletterApp {
 
         document.body.appendChild(notification);
 
-        // Auto-remove after 5 seconds
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
             }
         }, 5000);
+    }
+
+    showEmailSuccess(email) {
+        this.showSuccess(`메일 발송 완료: ${email}`);
     }
 
     async loadHistory() {
