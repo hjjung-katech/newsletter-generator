@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
-from newsletter.centralized_settings import get_settings
+from newsletter.centralized_settings import (
+    clear_settings_cache,
+    get_settings,
+    is_running_in_pytest,
+)
 
 _SETTING_ALIASES = {
     "POSTMARK_FROM_EMAIL": "email_sender",
@@ -32,6 +37,10 @@ def get_setting_value(name: str, default: Any = None) -> Any:
     key = _normalize_setting_key(name)
     if not key:
         return default
+
+    env_name = str(name or "").strip().upper()
+    if is_running_in_pytest() and env_name and env_name in os.environ:
+        clear_settings_cache()
 
     try:
         value = getattr(get_settings(), key)

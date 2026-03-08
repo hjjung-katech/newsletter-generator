@@ -12,7 +12,6 @@ from newsletter_core.public.settings import (
     get_llm_config,
     get_major_news_sources,
     get_setting_value,
-    get_settings,
 )
 
 _CONFIG_MANAGER_FIELDS = {
@@ -57,7 +56,7 @@ def __getattr__(name: str) -> Any:
     if name == "ALL_MAJOR_NEWS_SOURCES":
         return get_all_major_news_sources()
     if name == "MOCK_MODE":
-        return bool(get_settings().mock_mode)
+        return bool(_cfg(name, False))
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
