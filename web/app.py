@@ -15,11 +15,15 @@ from typing import Any, cast
 
 import redis
 from flask import Flask, jsonify, render_template, request, send_file
-from flask_cors import CORS
 
 # Add current directory to path for local imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
+
+try:
+    from cors_config import configure_cors
+except ImportError:
+    from web.cors_config import configure_cors  # pragma: no cover
 
 try:
     from runtime_paths import (
@@ -89,7 +93,7 @@ app = Flask(
     template_folder=resolve_template_dir(),
     static_folder=resolve_static_dir(),
 )
-CORS(app)  # Enable CORS for frontend-backend communication
+configure_cors(app)
 
 # Enable detailed logging
 logging.basicConfig(
