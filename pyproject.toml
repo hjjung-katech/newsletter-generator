@@ -154,7 +154,7 @@ module = [
 ignore_errors = true
 
 [tool.coverage.run]
-source = ["newsletter"]
+source = ["newsletter", "newsletter_core", "web"]
 omit = [
     "tests/*",
     "newsletter/__main__.py",
@@ -218,6 +218,8 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--cov=newsletter",
+    "--cov=newsletter_core",
+    "--cov=web",
     "--cov-report=term-missing",
     "--cov-report=html",
     "--cov-report=xml",
