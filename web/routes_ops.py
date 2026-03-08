@@ -7,8 +7,33 @@ from flask import Flask, jsonify, render_template
 from flask.typing import ResponseReturnValue
 
 
-def register_ops_routes(app: Flask, database_path: str) -> None:
+def _should_enable_debug_routes(
+    app: Flask, enable_debug_routes: bool | None = None
+) -> bool:
+    """Return whether debug/test helper routes should be exposed."""
+    if enable_debug_routes is not None:
+        return enable_debug_routes
+
+    override = os.getenv("ENABLE_DEBUG_ROUTES")
+    if override is not None:
+        return override.strip().lower() in {"1", "true", "yes", "on"}
+
+    if app.config.get("TESTING"):
+        return True
+
+    app_env = os.getenv("APP_ENV", "").strip().lower()
+    flask_env = os.getenv("FLASK_ENV", "").strip().lower()
+    return app_env == "development" or flask_env == "development"
+
+
+def register_ops_routes(
+    app: Flask,
+    database_path: str,
+    enable_debug_routes: bool | None = None,
+) -> None:
     """Register operational routes on the given Flask app."""
+    if not _should_enable_debug_routes(app, enable_debug_routes):
+        return
 
     @app.route("/debug/history-table")  # type: ignore[untyped-decorator]
     def debug_history_table() -> ResponseReturnValue:
