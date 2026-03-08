@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from typing import Any, cast
 
 from flask import Flask, jsonify, request
 from flask.typing import ResponseReturnValue
@@ -42,10 +43,13 @@ except ImportError:
 logger = logging.getLogger("web.routes_approval")
 
 
-def _parse_json(payload: str | None) -> dict | None:
+def _parse_json(payload: str | None) -> dict[str, Any] | None:
     if not payload:
         return None
-    return json.loads(payload)
+    parsed = json.loads(payload)
+    if isinstance(parsed, dict):
+        return cast(dict[str, Any], parsed)
+    return None
 
 
 def register_approval_routes(app: Flask, database_path: str) -> None:
