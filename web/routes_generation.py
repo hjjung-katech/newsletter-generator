@@ -55,6 +55,11 @@ try:
 except ImportError:
     from web.ops_logging import log_debug, log_exception, log_info  # pragma: no cover
 
+try:
+    from analytics import record_schedule_event
+except ImportError:
+    from web.analytics import record_schedule_event  # pragma: no cover
+
 
 logger = logging.getLogger("web.routes_generation")
 
@@ -768,6 +773,20 @@ def register_generation_routes(
         )
         conn.commit()
         conn.close()
+        record_schedule_event(
+            DATABASE_PATH,
+            event_type="schedule.created",
+            schedule_id=schedule_id,
+            source="api.schedule",
+            status="scheduled",
+            payload={
+                "rrule": rrule_str,
+                "email": data["email"],
+                "is_test": is_test,
+                "require_approval": bool(data.get("require_approval", False)),
+                "expires_at": expires_at,
+            },
+        )
 
         return (
             jsonify(
@@ -826,6 +845,7 @@ def register_generation_routes(
     def run_schedule_now(schedule_id):
         """Immediately execute a scheduled newsletter"""
         try:
+            immediate_job_id = None
             # 스케줄 정보 조회
             conn = sqlite3.connect(DATABASE_PATH)
             cursor = conn.cursor()
@@ -857,6 +877,15 @@ def register_generation_routes(
                 )
             job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
             immediate_job_id = f"schedule_{schedule_id}_{job_suffix}"
+            record_schedule_event(
+                DATABASE_PATH,
+                event_type="schedule.run_now.requested",
+                schedule_id=schedule_id,
+                job_id=immediate_job_id,
+                source="api.schedule_run_now",
+                status="requested",
+                payload={"idempotency_key": idempotency_key},
+            )
 
             # 즉시 뉴스레터 생성 작업 큐에 추가
             if redis_conn and task_queue:
@@ -869,6 +898,15 @@ def register_generation_routes(
                     DATABASE_PATH,
                     job_id=immediate_job_id,
                     job_timeout="10m",
+                )
+                record_schedule_event(
+                    DATABASE_PATH,
+                    event_type="schedule.run_now.queued",
+                    schedule_id=schedule_id,
+                    job_id=immediate_job_id,
+                    source="api.schedule_run_now",
+                    status="queued",
+                    payload={"queue_job_id": job.id},
                 )
 
                 return jsonify(
@@ -888,6 +926,14 @@ def register_generation_routes(
                     idempotency_key if idempotency_enabled else None,
                     DATABASE_PATH,
                 )
+                record_schedule_event(
+                    DATABASE_PATH,
+                    event_type="schedule.run_now.completed",
+                    schedule_id=schedule_id,
+                    job_id=immediate_job_id,
+                    source="api.schedule_run_now",
+                    status=result.get("status"),
+                )
                 return jsonify(
                     {
                         "status": "completed",
@@ -898,5 +944,15 @@ def register_generation_routes(
                 )
 
         except Exception as e:
+            if locals().get("immediate_job_id"):
+                record_schedule_event(
+                    DATABASE_PATH,
+                    event_type="schedule.run_now.failed",
+                    schedule_id=schedule_id,
+                    job_id=locals()["immediate_job_id"],
+                    source="api.schedule_run_now",
+                    status="failed",
+                    payload={"error": str(e)},
+                )
             log_exception(logger, "schedule.run_now.failed", e, schedule_id=schedule_id)
             return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500

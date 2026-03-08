@@ -51,6 +51,21 @@ try:
 except ImportError:
     from web.ops_logging import log_exception, log_info, log_warning  # pragma: no cover
 
+try:
+    from analytics import (
+        record_email_event,
+        record_generation_completed,
+        record_generation_failed,
+        record_generation_started,
+    )
+except ImportError:
+    from web.analytics import (  # pragma: no cover
+        record_email_event,
+        record_generation_completed,
+        record_generation_failed,
+        record_generation_started,
+    )
+
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
 logger = logging.getLogger("web.tasks")
 
@@ -99,6 +114,14 @@ def generate_newsletter_task(
         params=data,
         idempotency_key=idempotency_key,
     )
+    record_generation_started(
+        db_path,
+        job_id=job_id,
+        params=data,
+        send_email=send_email,
+        source="worker",
+        idempotency_key=idempotency_key,
+    )
 
     email = data.get("email", "")
     approval_required = bool(data.get("require_approval")) and bool(email)
@@ -144,10 +167,33 @@ def generate_newsletter_task(
                 response["email_to"] = email
                 response["email_deduplicated"] = bool(send_result.get("skipped", False))
                 response["send_key"] = send_result.get("send_key")
+                record_email_event(
+                    db_path,
+                    event_type=(
+                        "email.deduplicated"
+                        if response["email_deduplicated"]
+                        else "email.sent"
+                    ),
+                    job_id=job_id,
+                    recipient=email,
+                    send_key=response["send_key"],
+                    source="worker",
+                    status="sent",
+                    deduplicated=response["email_deduplicated"],
+                )
             except Exception as exc:
                 response["email_sent"] = False
                 response["email_error"] = str(exc)
                 response["delivery_status"] = DELIVERY_STATUS_SEND_FAILED
+                record_email_event(
+                    db_path,
+                    event_type="email.failed",
+                    job_id=job_id,
+                    recipient=email,
+                    source="worker",
+                    status="failed",
+                    error=str(exc),
+                )
                 log_warning(
                     logger,
                     "worker.email.send_failed",
@@ -175,6 +221,12 @@ def generate_newsletter_task(
             job_id=job_id,
             approval_status=response["approval_status"],
             delivery_status=response["delivery_status"],
+        )
+        record_generation_completed(
+            db_path,
+            job_id=job_id,
+            result=response,
+            source="worker",
         )
         log_info(
             logger,
@@ -205,6 +257,12 @@ def generate_newsletter_task(
             params=data,
             idempotency_key=idempotency_key,
         )
+        record_generation_failed(
+            db_path,
+            job_id=job_id,
+            error=exc,
+            source="worker",
+        )
         log_exception(logger, "worker.job.generation_error", exc, job_id=job_id)
         raise
     except Exception as exc:
@@ -226,6 +284,12 @@ def generate_newsletter_task(
             result=error_response,
             params=data,
             idempotency_key=idempotency_key,
+        )
+        record_generation_failed(
+            db_path,
+            job_id=job_id,
+            error=exc,
+            source="worker",
         )
         log_exception(logger, "worker.job.failed", exc, job_id=job_id)
         raise

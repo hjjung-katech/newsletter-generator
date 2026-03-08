@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
@@ -193,6 +194,23 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     )
 
     cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS analytics_events (
+            id TEXT PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            job_id TEXT,
+            schedule_id TEXT,
+            status TEXT,
+            deduplicated INTEGER NOT NULL DEFAULT 0,
+            duration_seconds REAL,
+            cost_usd REAL,
+            payload JSON,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)"
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_status ON history(status)")
@@ -216,6 +234,18 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_source_policies_type_active ON source_policies(policy_type, is_active)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_events_type_created ON analytics_events(event_type, created_at DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_events_job_id ON analytics_events(job_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_events_schedule_id ON analytics_events(schedule_id)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at ON analytics_events(created_at DESC)"
     )
 
     conn.commit()
@@ -867,5 +897,143 @@ def get_active_source_policies(db_path: str) -> Dict[str, list[str]]:
             elif policy_type == SOURCE_POLICY_BLOCK:
                 blocklist.append(str(pattern))
         return {"allowlist": allowlist, "blocklist": blocklist}
+    finally:
+        conn.close()
+
+
+def _serialize_event_timestamp(value: str | datetime | None) -> str:
+    """Serialize analytics timestamps in UTC ISO format."""
+    if value is None:
+        timestamp = datetime.now(timezone.utc)
+    elif isinstance(value, str):
+        return value
+    elif value.tzinfo is None:
+        timestamp = value.replace(tzinfo=timezone.utc)
+    else:
+        timestamp = value.astimezone(timezone.utc)
+
+    return timestamp.isoformat().replace("+00:00", "Z")
+
+
+def record_analytics_event(
+    db_path: str,
+    event_type: str,
+    *,
+    job_id: str | None = None,
+    schedule_id: str | None = None,
+    status: str | None = None,
+    deduplicated: bool = False,
+    duration_seconds: float | None = None,
+    cost_usd: float | None = None,
+    payload: Dict[str, Any] | None = None,
+    occurred_at: str | datetime | None = None,
+) -> str:
+    """Persist a structured analytics event for later aggregation."""
+    event_id = f"evt_{uuid.uuid4().hex}"
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO analytics_events (
+                id,
+                event_type,
+                job_id,
+                schedule_id,
+                status,
+                deduplicated,
+                duration_seconds,
+                cost_usd,
+                payload,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                event_id,
+                event_type,
+                job_id,
+                schedule_id,
+                status,
+                int(deduplicated),
+                duration_seconds,
+                cost_usd,
+                None if payload is None else canonical_json(payload),
+                _serialize_event_timestamp(occurred_at),
+            ),
+        )
+        conn.commit()
+        return event_id
+    finally:
+        conn.close()
+
+
+def list_analytics_events(
+    db_path: str,
+    *,
+    limit: int = 100,
+    event_type_prefix: str | None = None,
+) -> list[Dict[str, Any]]:
+    """Return recent analytics events for tests and dashboard routes."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        if event_type_prefix:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    event_type,
+                    job_id,
+                    schedule_id,
+                    status,
+                    deduplicated,
+                    duration_seconds,
+                    cost_usd,
+                    payload,
+                    created_at
+                FROM analytics_events
+                WHERE event_type LIKE ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (f"{event_type_prefix}%", limit),
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    event_type,
+                    job_id,
+                    schedule_id,
+                    status,
+                    deduplicated,
+                    duration_seconds,
+                    cost_usd,
+                    payload,
+                    created_at
+                FROM analytics_events
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "event_type": row[1],
+                "job_id": row[2],
+                "schedule_id": row[3],
+                "status": row[4],
+                "deduplicated": bool(row[5]),
+                "duration_seconds": row[6],
+                "cost_usd": row[7],
+                "payload": json.loads(row[8]) if row[8] else None,
+                "created_at": row[9],
+            }
+            for row in rows
+        ]
     finally:
         conn.close()
