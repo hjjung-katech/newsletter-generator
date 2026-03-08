@@ -9,6 +9,19 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+APPROVAL_STATUS_NOT_REQUESTED = "not_requested"
+APPROVAL_STATUS_PENDING = "pending"
+APPROVAL_STATUS_APPROVED = "approved"
+APPROVAL_STATUS_REJECTED = "rejected"
+
+DELIVERY_STATUS_DRAFT = "draft"
+DELIVERY_STATUS_PENDING_APPROVAL = "pending_approval"
+DELIVERY_STATUS_APPROVED = "approved"
+DELIVERY_STATUS_SENT = "sent"
+DELIVERY_STATUS_SEND_FAILED = "send_failed"
+
+_UNSET = object()
+
 
 def is_feature_enabled(env_var: str, default: bool = True) -> bool:
     """Read a boolean feature flag from environment variables."""
@@ -55,6 +68,20 @@ def derive_job_id(idempotency_key: str, prefix: str = "job") -> str:
     return f"{prefix}_{digest}"
 
 
+def derive_history_review_state(
+    params: Dict[str, Any] | None,
+) -> tuple[str, str]:
+    """Derive initial approval and delivery state from request params."""
+    payload = params or {}
+    has_email = bool(str(payload.get("email", "") or "").strip())
+    requires_approval = bool(payload.get("require_approval")) and has_email
+
+    if requires_approval:
+        return APPROVAL_STATUS_PENDING, DELIVERY_STATUS_PENDING_APPROVAL
+
+    return APPROVAL_STATUS_NOT_REQUESTED, DELIVERY_STATUS_DRAFT
+
+
 def _ensure_column(
     cursor: sqlite3.Cursor, table_name: str, column_name: str, column_def: str
 ) -> None:
@@ -86,6 +113,21 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
         cursor, "history", "created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     )
     _ensure_column(cursor, "history", "idempotency_key", "TEXT")
+    _ensure_column(
+        cursor,
+        "history",
+        "approval_status",
+        f"TEXT DEFAULT '{APPROVAL_STATUS_NOT_REQUESTED}'",
+    )
+    _ensure_column(
+        cursor,
+        "history",
+        "delivery_status",
+        f"TEXT DEFAULT '{DELIVERY_STATUS_DRAFT}'",
+    )
+    _ensure_column(cursor, "history", "approved_at", "TEXT")
+    _ensure_column(cursor, "history", "rejected_at", "TEXT")
+    _ensure_column(cursor, "history", "approval_note", "TEXT")
 
     cursor.execute(
         """
@@ -185,6 +227,7 @@ def create_or_get_history_job(
     conn = _connect(db_path)
     try:
         cursor = conn.cursor()
+        approval_status, delivery_status = derive_history_review_state(params)
         if idempotency_key:
             cursor.execute(
                 "SELECT id, status FROM history WHERE idempotency_key = ?",
@@ -196,10 +239,24 @@ def create_or_get_history_job(
 
         cursor.execute(
             """
-            INSERT OR IGNORE INTO history (id, params, status, idempotency_key)
-            VALUES (?, ?, ?, ?)
+            INSERT OR IGNORE INTO history (
+                id,
+                params,
+                status,
+                idempotency_key,
+                approval_status,
+                delivery_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (job_id, canonical_json(params), status, idempotency_key),
+            (
+                job_id,
+                canonical_json(params),
+                status,
+                idempotency_key,
+                approval_status,
+                delivery_status,
+            ),
         )
         conn.commit()
         return job_id, False, status
@@ -218,12 +275,27 @@ def ensure_history_row(
     conn = _connect(db_path)
     try:
         cursor = conn.cursor()
+        approval_status, delivery_status = derive_history_review_state(params)
         cursor.execute(
             """
-            INSERT OR IGNORE INTO history (id, params, status, idempotency_key)
-            VALUES (?, ?, ?, ?)
+            INSERT OR IGNORE INTO history (
+                id,
+                params,
+                status,
+                idempotency_key,
+                approval_status,
+                delivery_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (job_id, canonical_json(params), status, idempotency_key),
+            (
+                job_id,
+                canonical_json(params),
+                status,
+                idempotency_key,
+                approval_status,
+                delivery_status,
+            ),
         )
         conn.commit()
     finally:
@@ -273,7 +345,11 @@ def get_history_row_by_idempotency_key(
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, status, result, params FROM history WHERE idempotency_key = ?",
+            """
+            SELECT id, status, result, params, approval_status, delivery_status
+            FROM history
+            WHERE idempotency_key = ?
+            """,
             (idempotency_key,),
         )
         row = cursor.fetchone()
@@ -284,6 +360,8 @@ def get_history_row_by_idempotency_key(
             "status": row[1],
             "result": row[2],
             "params": row[3],
+            "approval_status": row[4],
+            "delivery_status": row[5],
         }
     finally:
         conn.close()
@@ -295,7 +373,21 @@ def get_history_row(db_path: str, job_id: str) -> Optional[Dict[str, Any]]:
     try:
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT id, status, result, params, idempotency_key FROM history WHERE id = ?",
+            """
+            SELECT
+                id,
+                status,
+                result,
+                params,
+                idempotency_key,
+                approval_status,
+                delivery_status,
+                approved_at,
+                rejected_at,
+                approval_note
+            FROM history
+            WHERE id = ?
+            """,
             (job_id,),
         )
         row = cursor.fetchone()
@@ -307,7 +399,63 @@ def get_history_row(db_path: str, job_id: str) -> Optional[Dict[str, Any]]:
             "result": row[2],
             "params": row[3],
             "idempotency_key": row[4],
+            "approval_status": row[5],
+            "delivery_status": row[6],
+            "approved_at": row[7],
+            "rejected_at": row[8],
+            "approval_note": row[9],
         }
+    finally:
+        conn.close()
+
+
+def update_history_review_state(
+    db_path: str,
+    job_id: str,
+    *,
+    approval_status: str | None = None,
+    delivery_status: str | None = None,
+    approved_at: str | None | object = _UNSET,
+    rejected_at: str | None | object = _UNSET,
+    approval_note: str | None | object = _UNSET,
+) -> None:
+    """Update approval and delivery metadata for a history row."""
+    if (
+        approval_status is None
+        and delivery_status is None
+        and approved_at is _UNSET
+        and rejected_at is _UNSET
+        and approval_note is _UNSET
+    ):
+        return
+
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE history
+            SET
+                approval_status = COALESCE(?, approval_status),
+                delivery_status = COALESCE(?, delivery_status),
+                approved_at = CASE WHEN ? THEN ? ELSE approved_at END,
+                rejected_at = CASE WHEN ? THEN ? ELSE rejected_at END,
+                approval_note = CASE WHEN ? THEN ? ELSE approval_note END
+            WHERE id = ?
+            """,
+            (
+                approval_status,
+                delivery_status,
+                approved_at is not _UNSET,
+                None if approved_at is _UNSET else approved_at,
+                rejected_at is not _UNSET,
+                None if rejected_at is _UNSET else rejected_at,
+                approval_note is not _UNSET,
+                None if approval_note is _UNSET else approval_note,
+                job_id,
+            ),
+        )
+        conn.commit()
     finally:
         conn.close()
 

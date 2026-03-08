@@ -13,6 +13,21 @@ except ImportError:
     from .mail import get_newsletter_subject, send_email_with_outbox  # pragma: no cover
 
 try:
+    from db_state import (
+        APPROVAL_STATUS_APPROVED,
+        APPROVAL_STATUS_NOT_REQUESTED,
+        DELIVERY_STATUS_SENT,
+        update_history_review_state,
+    )
+except ImportError:
+    from web.db_state import (  # pragma: no cover
+        APPROVAL_STATUS_APPROVED,
+        APPROVAL_STATUS_NOT_REQUESTED,
+        DELIVERY_STATUS_SENT,
+        update_history_review_state,
+    )
+
+try:
     from ops_logging import log_exception, log_info
 except ImportError:
     from web.ops_logging import log_exception, log_info  # pragma: no cover
@@ -38,7 +53,12 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             conn = sqlite3.connect(database_path)
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT status, result, params FROM history WHERE id = ?", (job_id,)
+                """
+                SELECT status, result, params, approval_status
+                FROM history
+                WHERE id = ?
+                """,
+                (job_id,),
             )
             row = cursor.fetchone()
             conn.close()
@@ -46,9 +66,16 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             if not row:
                 return jsonify({"error": "작업을 찾을 수 없습니다"}), 404
 
-            status, result_json, params_json = row
+            status, result_json, params_json, approval_status = row
             if status != "completed":
                 return jsonify({"error": "완료되지 않은 작업입니다"}), 400
+
+            if approval_status not in (
+                None,
+                APPROVAL_STATUS_NOT_REQUESTED,
+                APPROVAL_STATUS_APPROVED,
+            ):
+                return jsonify({"error": "승인 대기 중인 작업입니다"}), 409
 
             result = json.loads(result_json) if result_json else {}
             params = json.loads(params_json) if params_json else {}
@@ -68,6 +95,11 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             send_key = send_result["send_key"]
 
             if send_result.get("skipped"):
+                update_history_review_state(
+                    db_path=database_path,
+                    job_id=job_id,
+                    delivery_status=DELIVERY_STATUS_SENT,
+                )
                 log_info(
                     logger,
                     "email.send.deduplicated",
@@ -84,6 +116,11 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
                     }
                 )
 
+            update_history_review_state(
+                db_path=database_path,
+                job_id=job_id,
+                delivery_status=DELIVERY_STATUS_SENT,
+            )
             log_info(
                 logger,
                 "email.send.completed",
