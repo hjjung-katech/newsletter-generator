@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import re
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TypedDict, Union
+from unittest.mock import patch
+
+from langchain.tools import tool
 
 from newsletter import graph, tools
+from newsletter_core.public.source_policies import filter_articles_by_source_policies
 
 
 class NewsletterGenerationError(Exception):
@@ -36,6 +41,8 @@ class GenerateNewsletterRequest:
     email_compatible: bool = False
     period: int = 14
     suggest_count: int = 10
+    source_allowlist: Optional[List[str]] = None
+    source_blocklist: Optional[List[str]] = None
 
 
 def _normalize_keywords(raw: Optional[Union[str, List[str]]]) -> List[str]:
@@ -73,18 +80,55 @@ def _resolve_keywords(request: GenerateNewsletterRequest) -> List[str]:
     raise NewsletterGenerationError("Either keywords or domain must be provided")
 
 
+def _build_filtered_search_tool(
+    allowlist: List[str] | None,
+    blocklist: List[str] | None,
+):
+    original_search_tool = tools.search_news_articles
+
+    @tool
+    def filtered_search_news_articles(
+        keywords: str, num_results: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Search for articles and enforce configured source allow/block policies."""
+        articles = original_search_tool.invoke(
+            {"keywords": keywords, "num_results": num_results}
+        )
+        return filter_articles_by_source_policies(
+            articles,
+            allowlist=allowlist or [],
+            blocklist=blocklist or [],
+        )
+
+    return filtered_search_news_articles
+
+
 def generate_newsletter(request: GenerateNewsletterRequest) -> NewsletterResult:
     """Generate newsletter HTML and return a stable response schema."""
     keywords = _resolve_keywords(request)
 
-    try:
-        html_or_error, status = graph.generate_newsletter(
-            keywords,
-            news_period_days=request.period,
-            domain=request.domain,
-            template_style=request.template_style,
-            email_compatible=request.email_compatible,
+    search_tool_override = (
+        patch.object(
+            tools,
+            "search_news_articles",
+            _build_filtered_search_tool(
+                request.source_allowlist,
+                request.source_blocklist,
+            ),
         )
+        if request.source_allowlist or request.source_blocklist
+        else nullcontext()
+    )
+
+    try:
+        with search_tool_override:
+            html_or_error, status = graph.generate_newsletter(
+                keywords,
+                news_period_days=request.period,
+                domain=request.domain,
+                template_style=request.template_style,
+                email_compatible=request.email_compatible,
+            )
     except Exception as exc:  # pragma: no cover - defensive wrapper
         raise NewsletterGenerationError(str(exc)) from exc
 
@@ -103,6 +147,8 @@ def generate_newsletter(request: GenerateNewsletterRequest) -> NewsletterResult:
         "email_compatible": request.email_compatible,
         "period": request.period,
         "suggest_count": request.suggest_count,
+        "source_allowlist": request.source_allowlist or [],
+        "source_blocklist": request.source_blocklist or [],
     }
 
     if status != "success":

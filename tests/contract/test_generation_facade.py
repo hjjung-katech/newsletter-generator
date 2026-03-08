@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+import newsletter_core.public.generation as generation_module
 from newsletter_core.public.generation import (
     GenerateNewsletterRequest,
     NewsletterGenerationError,
@@ -56,6 +57,42 @@ def test_generation_facade_raises_on_error_status() -> None:
     ):
         with pytest.raises(NewsletterGenerationError):
             generate_newsletter(GenerateNewsletterRequest(keywords="AI"))
+
+
+@pytest.mark.unit
+@pytest.mark.mock_api
+def test_generation_facade_applies_source_policy_override() -> None:
+    html = "<html><head><title>Facade Smoke</title></head><body>ok</body></html>"
+    original_search_tool = generation_module.tools.search_news_articles
+
+    def _fake_generate(*args, **kwargs):
+        assert generation_module.tools.search_news_articles is not original_search_tool
+        assert kwargs == {
+            "news_period_days": 14,
+            "domain": None,
+            "template_style": "compact",
+            "email_compatible": False,
+        }
+        return html, "success"
+
+    with patch(
+        "newsletter_core.public.generation.graph.generate_newsletter",
+        side_effect=_fake_generate,
+    ), patch(
+        "newsletter_core.public.generation.graph.get_last_generation_info",
+        return_value={},
+    ):
+        result = generate_newsletter(
+            GenerateNewsletterRequest(
+                keywords="AI",
+                source_allowlist=["reuters.com"],
+                source_blocklist=["spam.example"],
+            )
+        )
+
+    assert generation_module.tools.search_news_articles is original_search_tool
+    assert result["input_params"]["source_allowlist"] == ["reuters.com"]
+    assert result["input_params"]["source_blocklist"] == ["spam.example"]
 
 
 @pytest.mark.unit
