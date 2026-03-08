@@ -129,13 +129,21 @@ class NewsletterApp {
     }
 
     async generateNewsletter() {
-        const data = this.collectFormData();
+        const data = this.collectFormData({ includeSchedule: true, includeEmail: true });
         if (!data) return;
 
         if (data.schedule) {
             await this.createSchedule(data);
             return;
         }
+
+        await this.submitGeneration(data);
+    }
+
+    async submitGeneration(data) {
+        const requestData = { ...data };
+        delete requestData.schedule;
+        delete requestData.rrule;
 
         this.showProgress();
 
@@ -145,7 +153,7 @@ class NewsletterApp {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify(requestData)
             });
 
             const result = await response.json();
@@ -196,18 +204,16 @@ class NewsletterApp {
     }
 
     async previewNewsletter() {
-        // Similar to generate but without email sending
-        const data = this.collectFormData();
+        const data = this.collectFormData({ includeSchedule: false, includeEmail: false });
         if (!data) return;
 
-        // Remove email from preview
-        delete data.email;
         data.preview_only = true;
-
-        this.generateNewsletter();
+        await this.submitGeneration(data);
     }
 
-    collectFormData() {
+    collectFormData(options = {}) {
+        const includeSchedule = options.includeSchedule !== false;
+        const includeEmail = options.includeEmail !== false;
         const method = document.querySelector('input[name="inputMethod"]:checked').value;
         const data = {};
 
@@ -228,13 +234,13 @@ class NewsletterApp {
         }
 
         const email = document.getElementById('email').value.trim();
-        if (email) {
+        if (includeEmail && email) {
             data.email = email;
         }
 
         // Schedule data
         const enableSchedule = document.getElementById('enableSchedule').checked;
-        if (enableSchedule) {
+        if (includeSchedule && enableSchedule) {
             if (!email) {
                 this.showError('예약 발송을 위해서는 이메일 주소가 필요합니다.');
                 return null;
@@ -266,6 +272,7 @@ class NewsletterApp {
     }
 
     showProgress() {
+        this.stopPolling();
         document.getElementById('progressSection').classList.remove('hidden');
         document.getElementById('resultsSection').classList.add('hidden');
 
@@ -692,6 +699,7 @@ class NewsletterApp {
 
             if (response.ok) {
                 this.loadSchedules(); // Reload schedules
+                this.showSuccess('예약이 취소되었습니다.');
             } else {
                 const result = await response.json();
                 alert('취소 실패: ' + (result.error || 'Unknown error'));
@@ -702,8 +710,38 @@ class NewsletterApp {
     }
 
     async runScheduleNow(scheduleId) {
-        // This would trigger immediate execution of a scheduled newsletter
-        alert('즉시 실행 기능은 추후 구현됩니다.');
+        try {
+            const response = await fetch(`/api/schedule/${scheduleId}/run`, {
+                method: 'POST'
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                this.showError(result.error || 'Immediate execution failed');
+                return;
+            }
+
+            this.switchTab('generateTab');
+
+            if (result.status === 'completed' && result.result) {
+                result.result.job_id = result.job_id;
+                this.currentJobId = result.job_id;
+                this.showResults(result.result);
+                this.showSuccess('예약 작업이 즉시 실행되었습니다.');
+            } else if (result.status === 'queued' && result.job_id) {
+                this.currentJobId = result.job_id;
+                this.showProgress();
+                this.startPolling(result.job_id);
+                this.showSuccess('예약 작업이 큐에 등록되었습니다.');
+            } else {
+                this.showSuccess('예약 작업 실행이 요청되었습니다.');
+            }
+
+            this.loadSchedules();
+        } catch (error) {
+            this.showError('Network error: ' + error.message);
+        }
     }
 
     async viewHistoryItem(itemId) {
