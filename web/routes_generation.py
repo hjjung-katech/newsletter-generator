@@ -75,6 +75,15 @@ class GenerationJobResolution:
     effective_idempotency_key: str | None
 
 
+@dataclass(frozen=True)
+class ScheduleRunResolution:
+    schedule_id: str
+    params: dict[str, Any]
+    immediate_job_id: str
+    idempotency_key: str
+    effective_idempotency_key: str | None
+
+
 def _validate_generate_request(data: dict[str, Any]) -> GenerateNewsletterRequest:
     """Validate generation request payload without runtime dynamic loading."""
     return GenerateNewsletterRequest(**data)
@@ -593,57 +602,73 @@ def register_generation_routes(
             }
             raise e
 
-    @app.route("/api/status/<job_id>")
-    def get_job_status(job_id):
-        """Get status of a newsletter generation job"""
-        # Check in-memory tasks first (for non-Redis mode)
-        if job_id in in_memory_tasks:
-            task = in_memory_tasks[job_id]
-            response = {
-                "job_id": job_id,
-                "status": task["status"],
-                "sent": task.get("sent", False),
-                "idempotency_key": task.get("idempotency_key"),
-            }
+    def _parse_optional_json(
+        raw_value: str | None, *, job_id: str, field_name: str
+    ) -> Any:
+        if not raw_value:
+            return None
+        try:
+            return json.loads(raw_value)
+        except json.JSONDecodeError as exc:
+            log_exception(
+                logger,
+                f"{field_name}.parse_failed",
+                exc,
+                job_id=job_id,
+            )
+            return None
 
-            if "result" in task:
-                response["result"] = task["result"]
-                # Extract sent status from result if available
-                if isinstance(task["result"], dict):
-                    response["sent"] = task["result"].get("sent", False)
-                    response["approval_status"] = task["result"].get("approval_status")
-                    response["delivery_status"] = task["result"].get("delivery_status")
-            if "error" in task:
-                response["error"] = task["error"]
+    def _build_status_response_from_task(
+        job_id: str, task: dict[str, Any]
+    ) -> dict[str, Any]:
+        response = {
+            "job_id": job_id,
+            "status": task["status"],
+            "sent": task.get("sent", False),
+            "idempotency_key": task.get("idempotency_key"),
+        }
 
-            return jsonify(response)
+        result = task.get("result")
+        if isinstance(result, dict):
+            response["result"] = result
+            response["sent"] = result.get("sent", False)
+            response["approval_status"] = result.get("approval_status")
+            response["delivery_status"] = result.get("delivery_status")
+        elif result is not None:
+            response["result"] = result
 
-        # Fallback to database
+        if "error" in task:
+            response["error"] = task["error"]
+        return response
+
+    def _load_job_status_row(job_id: str) -> tuple[Any, ...] | None:
         conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT
-                params,
-                result,
-                status,
-                idempotency_key,
-                approval_status,
-                delivery_status,
-                approved_at,
-                rejected_at,
-                approval_note
-            FROM history
-            WHERE id = ?
-            """,
-            (job_id,),
-        )
-        row = cursor.fetchone()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT
+                    params,
+                    result,
+                    status,
+                    idempotency_key,
+                    approval_status,
+                    delivery_status,
+                    approved_at,
+                    rejected_at,
+                    approval_note
+                FROM history
+                WHERE id = ?
+                """,
+                (job_id,),
+            )
+            return cursor.fetchone()
+        finally:
+            conn.close()
 
-        if not row:
-            return jsonify({"error": "Job not found"}), 404
-
+    def _build_status_response_from_row(
+        job_id: str, row: tuple[Any, ...]
+    ) -> dict[str, Any]:
         (
             params,
             result,
@@ -658,7 +683,9 @@ def register_generation_routes(
         response = {
             "job_id": job_id,
             "status": status,
-            "params": json.loads(params) if params else None,
+            "params": _parse_optional_json(
+                params, job_id=job_id, field_name="status.params"
+            ),
             "sent": False,
             "idempotency_key": idempotency_key,
             "approval_status": approval_status,
@@ -668,27 +695,25 @@ def register_generation_routes(
             "approval_note": approval_note,
         }
 
-        if result:
-            result_data = json.loads(result)
+        result_data = _parse_optional_json(
+            result, job_id=job_id, field_name="status.result"
+        )
+        if isinstance(result_data, dict):
             response["result"] = result_data
-            # Extract sent status from result
-            if isinstance(result_data, dict):
-                response["sent"] = result_data.get("sent", False)
-                if response["approval_status"] is None:
-                    response["approval_status"] = result_data.get("approval_status")
-                if response["delivery_status"] is None:
-                    response["delivery_status"] = result_data.get("delivery_status")
+            response["sent"] = result_data.get("sent", False)
+            if response["approval_status"] is None:
+                response["approval_status"] = result_data.get("approval_status")
+            if response["delivery_status"] is None:
+                response["delivery_status"] = result_data.get("delivery_status")
+        elif result_data is not None:
+            response["result"] = result_data
 
-        return jsonify(response)
+        return response
 
-    @app.route("/api/history")
-    def get_history():
-        """Get recent newsletter generation history"""
+    def _load_recent_history_rows(limit: int = 20) -> list[tuple[Any, ...]]:
+        conn = sqlite3.connect(DATABASE_PATH)
         try:
-            conn = sqlite3.connect(DATABASE_PATH)
             cursor = conn.cursor()
-
-            # 모든 기록을 가져와서 completed 우선, 최신 순으로 정렬
             cursor.execute(
                 """
                 SELECT id, params, result, created_at, status, idempotency_key
@@ -698,61 +723,217 @@ def register_generation_routes(
                     CASE WHEN approval_status = 'pending' THEN 0 ELSE 1 END,
                     CASE WHEN status = 'completed' THEN 0 ELSE 1 END,
                     created_at DESC
-                LIMIT 20
-            """
+                LIMIT ?
+                """,
+                (limit,),
+            )
+            return cursor.fetchall()
+        finally:
+            conn.close()
+
+    def _build_history_entry(row: tuple[Any, ...]) -> dict[str, Any]:
+        (
+            job_id,
+            params,
+            result,
+            created_at,
+            status,
+            idempotency_key,
+            approval_status,
+            delivery_status,
+            approved_at,
+            rejected_at,
+            approval_note,
+        ) = row
+        return {
+            "id": job_id,
+            "params": _parse_optional_json(
+                params, job_id=job_id, field_name="history.params"
+            ),
+            "result": _parse_optional_json(
+                result, job_id=job_id, field_name="history.result"
+            ),
+            "created_at": created_at,
+            "status": status,
+            "idempotency_key": idempotency_key,
+            "approval_status": approval_status,
+            "delivery_status": delivery_status,
+            "approved_at": approved_at,
+            "rejected_at": rejected_at,
+            "approval_note": approval_note,
+        }
+
+    def _compute_schedule_next_run(rrule_str: str) -> datetime:
+        from dateutil.rrule import rrulestr
+
+        now_utc = get_utc_now()
+        rrule = rrulestr(rrule_str, dtstart=now_utc.replace(tzinfo=None))
+        next_run = rrule.after(now_utc.replace(tzinfo=None))
+        if not next_run:
+            raise ValueError("Invalid RRULE: no future occurrences")
+        return to_utc(next_run)
+
+    def _build_schedule_params(data: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "keywords": data.get("keywords"),
+            "domain": data.get("domain"),
+            "email": data["email"],
+            "template_style": data.get("template_style", "compact"),
+            "email_compatible": data.get("email_compatible", True),
+            "period": data.get("period", 14),
+            "send_email": True,
+            "require_approval": bool(data.get("require_approval", False)),
+        }
+
+    def _list_active_schedules() -> list[dict[str, Any]]:
+        conn = sqlite3.connect(DATABASE_PATH)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id, params, rrule, next_run, created_at, enabled FROM schedules WHERE enabled = 1 ORDER BY next_run ASC"
             )
             rows = cursor.fetchall()
+        finally:
             conn.close()
-            log_info(logger, "history.loaded", count=len(rows))
 
+        schedules = []
+        for row in rows:
+            schedule_id, params, rrule, next_run, created_at, enabled = row
+            schedules.append(
+                {
+                    "id": schedule_id,
+                    "params": _parse_optional_json(
+                        params, job_id=schedule_id, field_name="schedule.params"
+                    ),
+                    "rrule": rrule,
+                    "next_run": _serialize_schedule_timestamp(next_run),
+                    "created_at": _serialize_schedule_timestamp(created_at),
+                    "enabled": bool(enabled),
+                }
+            )
+        return schedules
+
+    def _load_schedule_run_payload(
+        schedule_id: str,
+    ) -> tuple[dict[str, Any], int] | None:
+        conn = sqlite3.connect(DATABASE_PATH)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT params, enabled FROM schedules WHERE id = ?", (schedule_id,)
+            )
+            row = cursor.fetchone()
+        finally:
+            conn.close()
+
+        if not row:
+            return None
+
+        params_json, enabled = row
+        params = _parse_optional_json(
+            params_json, job_id=schedule_id, field_name="schedule.run_now.params"
+        )
+        return (params or {}, int(enabled))
+
+    def _resolve_schedule_run(
+        schedule_id: str, params: dict[str, Any]
+    ) -> ScheduleRunResolution:
+        intended_run_at = get_utc_now()
+        idempotency_enabled = is_feature_enabled(
+            "WEB_IDEMPOTENCY_ENABLED", default=True
+        )
+        idempotency_key = build_schedule_idempotency_key(
+            schedule_id=schedule_id,
+            intended_run_at=intended_run_at,
+        )
+        if not idempotency_enabled:
+            idempotency_key = f"schedule:{schedule_id}:{to_iso_utc(intended_run_at)}"
+        job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
+        immediate_job_id = f"schedule_{schedule_id}_{job_suffix}"
+        return ScheduleRunResolution(
+            schedule_id=schedule_id,
+            params=params,
+            immediate_job_id=immediate_job_id,
+            idempotency_key=idempotency_key,
+            effective_idempotency_key=idempotency_key if idempotency_enabled else None,
+        )
+
+    def _dispatch_schedule_run(resolution: ScheduleRunResolution) -> dict[str, Any]:
+        if redis_conn and task_queue:
+            job = task_queue.enqueue(
+                generate_newsletter_task,
+                resolution.params,
+                resolution.immediate_job_id,
+                resolution.params.get("send_email", False),
+                resolution.effective_idempotency_key,
+                DATABASE_PATH,
+                job_id=resolution.immediate_job_id,
+                job_timeout="10m",
+            )
+            record_schedule_event(
+                DATABASE_PATH,
+                event_type="schedule.run_now.queued",
+                schedule_id=resolution.schedule_id,
+                job_id=resolution.immediate_job_id,
+                source="api.schedule_run_now",
+                status="queued",
+                payload={"queue_job_id": job.id},
+            )
+            return {
+                "status": "queued",
+                "job_id": resolution.immediate_job_id,
+                "message": "Newsletter generation started",
+                "idempotency_key": resolution.idempotency_key,
+            }
+
+        result = generate_newsletter_task(
+            resolution.params,
+            resolution.immediate_job_id,
+            resolution.params.get("send_email", False),
+            resolution.effective_idempotency_key,
+            DATABASE_PATH,
+        )
+        record_schedule_event(
+            DATABASE_PATH,
+            event_type="schedule.run_now.completed",
+            schedule_id=resolution.schedule_id,
+            job_id=resolution.immediate_job_id,
+            source="api.schedule_run_now",
+            status=result.get("status"),
+        )
+        return {
+            "status": "completed",
+            "result": result,
+            "job_id": resolution.immediate_job_id,
+            "idempotency_key": resolution.idempotency_key,
+        }
+
+    @app.route("/api/status/<job_id>")
+    def get_job_status(job_id):
+        """Get status of a newsletter generation job"""
+        if job_id in in_memory_tasks:
+            return jsonify(
+                _build_status_response_from_task(job_id, in_memory_tasks[job_id])
+            )
+
+        row = _load_job_status_row(job_id)
+
+        if not row:
+            return jsonify({"error": "Job not found"}), 404
+
+        return jsonify(_build_status_response_from_row(job_id, row))
+
+    @app.route("/api/history")
+    def get_history():
+        """Get recent newsletter generation history"""
+        try:
+            rows = _load_recent_history_rows()
+            log_info(logger, "history.loaded", count=len(rows))
         except Exception as e:
             log_exception(logger, "history.load_failed", e)
             return jsonify({"error": f"Database error: {str(e)}"}), 500
 
-        history = []
-        for row in rows:
-            (
-                job_id,
-                params,
-                result,
-                created_at,
-                status,
-                idempotency_key,
-                approval_status,
-                delivery_status,
-                approved_at,
-                rejected_at,
-                approval_note,
-            ) = row
-
-            try:
-                parsed_params = json.loads(params) if params else None
-            except json.JSONDecodeError as e:
-                log_exception(logger, "history.params_parse_failed", e, job_id=job_id)
-                parsed_params = None
-
-            try:
-                parsed_result = json.loads(result) if result else None
-            except json.JSONDecodeError as e:
-                log_exception(logger, "history.result_parse_failed", e, job_id=job_id)
-                parsed_result = None
-
-            history.append(
-                {
-                    "id": job_id,
-                    "params": parsed_params,
-                    "result": parsed_result,
-                    "created_at": created_at,
-                    "status": status,
-                    "idempotency_key": idempotency_key,
-                    "approval_status": approval_status,
-                    "delivery_status": delivery_status,
-                    "approved_at": approved_at,
-                    "rejected_at": rejected_at,
-                    "approval_note": approval_note,
-                }
-            )
-
+        history = [_build_history_entry(row) for row in rows]
         log_info(logger, "history.returned", count=len(history))
         return jsonify(history)
 
@@ -768,36 +949,14 @@ def register_generation_routes(
         if not data.get("keywords") and not data.get("domain"):
             return jsonify({"error": "Either keywords or domain is required"}), 400
 
+        rrule_str = data["rrule"]
         try:
-            # RRULE 파싱 및 다음 실행 시간 계산
-            from dateutil.rrule import rrulestr
-
-            rrule_str = data["rrule"]
-            now_utc = get_utc_now()
-            rrule = rrulestr(rrule_str, dtstart=now_utc.replace(tzinfo=None))
-            next_run = rrule.after(now_utc.replace(tzinfo=None))
-
-            if not next_run:
-                return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
-
-            next_run_utc = to_utc(next_run)
-
+            next_run_utc = _compute_schedule_next_run(rrule_str)
         except Exception as e:
             return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
 
         schedule_id = str(uuid.uuid4())
-
-        # 스케줄 데이터 준비
-        schedule_params = {
-            "keywords": data.get("keywords"),
-            "domain": data.get("domain"),
-            "email": data["email"],
-            "template_style": data.get("template_style", "compact"),
-            "email_compatible": data.get("email_compatible", True),
-            "period": data.get("period", 14),
-            "send_email": True,
-            "require_approval": bool(data.get("require_approval", False)),
-        }
+        schedule_params = _build_schedule_params(data)
         is_test = bool(data.get("is_test", False))
         expires_at = data.get("expires_at")
 
@@ -848,29 +1007,7 @@ def register_generation_routes(
     @app.route("/api/schedules")
     def get_schedules():
         """Get all active schedules"""
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, params, rrule, next_run, created_at, enabled FROM schedules WHERE enabled = 1 ORDER BY next_run ASC"
-        )
-        rows = cursor.fetchall()
-        conn.close()
-
-        schedules = []
-        for row in rows:
-            schedule_id, params, rrule, next_run, created_at, enabled = row
-            schedules.append(
-                {
-                    "id": schedule_id,
-                    "params": json.loads(params) if params else None,
-                    "rrule": rrule,
-                    "next_run": _serialize_schedule_timestamp(next_run),
-                    "created_at": _serialize_schedule_timestamp(created_at),
-                    "enabled": bool(enabled),
-                }
-            )
-
-        return jsonify(schedules)
+        return jsonify(_list_active_schedules())
 
     @app.route("/api/schedule/<schedule_id>", methods=["DELETE"])
     def delete_schedule(schedule_id):
@@ -891,111 +1028,33 @@ def register_generation_routes(
     def run_schedule_now(schedule_id):
         """Immediately execute a scheduled newsletter"""
         try:
-            immediate_job_id = None
-            # 스케줄 정보 조회
-            conn = sqlite3.connect(DATABASE_PATH)
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT params, enabled FROM schedules WHERE id = ?", (schedule_id,)
-            )
-            row = cursor.fetchone()
-            conn.close()
-
-            if not row:
+            loaded_schedule = _load_schedule_run_payload(schedule_id)
+            if loaded_schedule is None:
                 return jsonify({"error": "Schedule not found"}), 404
 
-            params_json, enabled = row
+            params, enabled = loaded_schedule
             if not enabled:
                 return jsonify({"error": "Schedule is disabled"}), 400
 
-            params = json.loads(params_json)
-            intended_run_at = get_utc_now()
-            idempotency_enabled = is_feature_enabled(
-                "WEB_IDEMPOTENCY_ENABLED", default=True
-            )
-            idempotency_key = build_schedule_idempotency_key(
-                schedule_id=schedule_id,
-                intended_run_at=intended_run_at,
-            )
-            if not idempotency_enabled:
-                idempotency_key = (
-                    f"schedule:{schedule_id}:{to_iso_utc(intended_run_at)}"
-                )
-            job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
-            immediate_job_id = f"schedule_{schedule_id}_{job_suffix}"
+            resolution = _resolve_schedule_run(schedule_id, params)
             record_schedule_event(
                 DATABASE_PATH,
                 event_type="schedule.run_now.requested",
                 schedule_id=schedule_id,
-                job_id=immediate_job_id,
+                job_id=resolution.immediate_job_id,
                 source="api.schedule_run_now",
                 status="requested",
-                payload={"idempotency_key": idempotency_key},
+                payload={"idempotency_key": resolution.idempotency_key},
             )
-
-            # 즉시 뉴스레터 생성 작업 큐에 추가
-            if redis_conn and task_queue:
-                job = task_queue.enqueue(
-                    generate_newsletter_task,
-                    params,
-                    immediate_job_id,
-                    params.get("send_email", False),
-                    idempotency_key if idempotency_enabled else None,
-                    DATABASE_PATH,
-                    job_id=immediate_job_id,
-                    job_timeout="10m",
-                )
-                record_schedule_event(
-                    DATABASE_PATH,
-                    event_type="schedule.run_now.queued",
-                    schedule_id=schedule_id,
-                    job_id=immediate_job_id,
-                    source="api.schedule_run_now",
-                    status="queued",
-                    payload={"queue_job_id": job.id},
-                )
-
-                return jsonify(
-                    {
-                        "status": "queued",
-                        "job_id": immediate_job_id,
-                        "message": "Newsletter generation started",
-                        "idempotency_key": idempotency_key,
-                    }
-                )
-            else:
-                # Redis가 없는 경우 직접 실행
-                result = generate_newsletter_task(
-                    params,
-                    immediate_job_id,
-                    params.get("send_email", False),
-                    idempotency_key if idempotency_enabled else None,
-                    DATABASE_PATH,
-                )
-                record_schedule_event(
-                    DATABASE_PATH,
-                    event_type="schedule.run_now.completed",
-                    schedule_id=schedule_id,
-                    job_id=immediate_job_id,
-                    source="api.schedule_run_now",
-                    status=result.get("status"),
-                )
-                return jsonify(
-                    {
-                        "status": "completed",
-                        "result": result,
-                        "job_id": immediate_job_id,
-                        "idempotency_key": idempotency_key,
-                    }
-                )
+            return jsonify(_dispatch_schedule_run(resolution))
 
         except Exception as e:
-            if locals().get("immediate_job_id"):
+            if locals().get("resolution"):
                 record_schedule_event(
                     DATABASE_PATH,
                     event_type="schedule.run_now.failed",
                     schedule_id=schedule_id,
-                    job_id=locals()["immediate_job_id"],
+                    job_id=locals()["resolution"].immediate_job_id,
                     source="api.schedule_run_now",
                     status="failed",
                     payload={"error": str(e)},
