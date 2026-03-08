@@ -60,6 +60,11 @@ except ImportError:
         log_warning,
     )
 
+try:
+    from analytics import record_schedule_event
+except ImportError:
+    from web.analytics import record_schedule_event  # pragma: no cover
+
 # Configure logging
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -430,9 +435,25 @@ class ScheduleRunner:
                             "schedule.execute.preupdate_failed",
                             schedule_id=schedule_id,
                         )
+                        record_schedule_event(
+                            self.db_path,
+                            event_type="schedule.execute.failed",
+                            schedule_id=schedule_id,
+                            source="schedule_runner",
+                            status="failed",
+                            payload={"reason": "next_run_update_failed"},
+                        )
                         return False
                 else:
                     # 더 이상 실행할 일정이 없으면 비활성화
+                    record_schedule_event(
+                        self.db_path,
+                        event_type="schedule.execute.disabled",
+                        schedule_id=schedule_id,
+                        source="schedule_runner",
+                        status="disabled",
+                        payload={"reason": "no_more_occurrences"},
+                    )
                     log_info(
                         logger,
                         "schedule.execute.no_more_occurrences",
@@ -479,6 +500,15 @@ class ScheduleRunner:
                 status="pending",
                 idempotency_key=idempotency_key,
             )
+            record_schedule_event(
+                self.db_path,
+                event_type="schedule.execute.started",
+                schedule_id=schedule_id,
+                job_id=schedule_job_id,
+                source="schedule_runner",
+                status="processing",
+                payload={"idempotency_key": idempotency_key},
+            )
 
             # 뉴스레터 생성 작업을 큐에 추가
             redis_success = False
@@ -502,6 +532,15 @@ class ScheduleRunner:
                         schedule_id=schedule_id,
                         job_id=job.id,
                     )
+                    record_schedule_event(
+                        self.db_path,
+                        event_type="schedule.execute.enqueued",
+                        schedule_id=schedule_id,
+                        job_id=schedule_job_id,
+                        source="schedule_runner",
+                        status="queued",
+                        payload={"queue_job_id": job.id},
+                    )
                     redis_success = True
                 except Exception as redis_error:
                     # Redis 연결 실패 시 fallback으로 동기 실행
@@ -515,6 +554,15 @@ class ScheduleRunner:
                         logger,
                         "schedule.execute.fallback_sync",
                         schedule_id=schedule_id,
+                    )
+                    record_schedule_event(
+                        self.db_path,
+                        event_type="schedule.execute.redis_failed",
+                        schedule_id=schedule_id,
+                        job_id=schedule_job_id,
+                        source="schedule_runner",
+                        status="fallback_sync",
+                        payload={"error": str(redis_error)},
                     )
 
             if not redis_success:
@@ -535,12 +583,29 @@ class ScheduleRunner:
                     schedule_id=schedule_id,
                     status=result.get("status", "unknown") if result else "no_result",
                 )
+                record_schedule_event(
+                    self.db_path,
+                    event_type="schedule.execute.completed",
+                    schedule_id=schedule_id,
+                    job_id=schedule_job_id,
+                    source="schedule_runner",
+                    status=result.get("status", "unknown") if result else "unknown",
+                )
 
             # 다음 실행 시간은 이미 실행 전에 업데이트됨 (중복 실행 방지)
 
             return True
 
         except Exception as e:
+            record_schedule_event(
+                self.db_path,
+                event_type="schedule.execute.failed",
+                schedule_id=schedule["id"],
+                job_id=locals().get("schedule_job_id"),
+                source="schedule_runner",
+                status="failed",
+                payload={"error": str(e)},
+            )
             log_exception(
                 logger,
                 "schedule.execute.failed",

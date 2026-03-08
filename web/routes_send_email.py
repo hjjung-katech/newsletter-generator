@@ -32,6 +32,11 @@ try:
 except ImportError:
     from web.ops_logging import log_exception, log_info  # pragma: no cover
 
+try:
+    from analytics import record_email_event
+except ImportError:
+    from web.analytics import record_email_event  # pragma: no cover
+
 
 logger = logging.getLogger("web.routes_send_email")
 
@@ -100,6 +105,16 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
                     job_id=job_id,
                     delivery_status=DELIVERY_STATUS_SENT,
                 )
+                record_email_event(
+                    database_path,
+                    event_type="email.deduplicated",
+                    job_id=job_id,
+                    recipient=email,
+                    send_key=send_key,
+                    source="api.send_email",
+                    status="sent",
+                    deduplicated=True,
+                )
                 log_info(
                     logger,
                     "email.send.deduplicated",
@@ -121,6 +136,15 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
                 job_id=job_id,
                 delivery_status=DELIVERY_STATUS_SENT,
             )
+            record_email_event(
+                database_path,
+                event_type="email.sent",
+                job_id=job_id,
+                recipient=email,
+                send_key=send_key,
+                source="api.send_email",
+                status="sent",
+            )
             log_info(
                 logger,
                 "email.send.completed",
@@ -138,6 +162,17 @@ def register_send_email_route(app: Flask, database_path: str) -> None:
             )
 
         except Exception as e:
+            if locals().get("job_id") and locals().get("email"):
+                record_email_event(
+                    database_path,
+                    event_type="email.failed",
+                    job_id=locals()["job_id"],
+                    recipient=locals()["email"],
+                    send_key=locals().get("send_key"),
+                    source="api.send_email",
+                    status="failed",
+                    error=str(e),
+                )
             log_exception(
                 logger,
                 "email.send.failed",
