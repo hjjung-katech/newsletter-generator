@@ -120,6 +120,20 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     )
 
     cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS generation_presets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            params JSON NOT NULL,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at)"
     )
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_history_status ON history(status)")
@@ -134,6 +148,12 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     )
     cursor.execute(
         "CREATE INDEX IF NOT EXISTS idx_email_outbox_status ON email_outbox(status)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_generation_presets_default ON generation_presets(is_default)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_generation_presets_updated_at ON generation_presets(updated_at)"
     )
 
     conn.commit()
@@ -369,5 +389,162 @@ def mark_outbox_failed(db_path: str, send_key: str, error_message: str) -> None:
             (error_message, send_key),
         )
         conn.commit()
+    finally:
+        conn.close()
+
+
+def list_generation_presets(db_path: str) -> list[Dict[str, Any]]:
+    """Return generation presets ordered with defaults first."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, name, description, params, is_default, created_at, updated_at
+            FROM generation_presets
+            ORDER BY is_default DESC, updated_at DESC, created_at DESC
+            """
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "name": row[1],
+                "description": row[2],
+                "params": json.loads(row[3]) if row[3] else {},
+                "is_default": bool(row[4]),
+                "created_at": row[5],
+                "updated_at": row[6],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
+def get_generation_preset(db_path: str, preset_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch a single generation preset."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, name, description, params, is_default, created_at, updated_at
+            FROM generation_presets
+            WHERE id = ?
+            """,
+            (preset_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return {
+            "id": row[0],
+            "name": row[1],
+            "description": row[2],
+            "params": json.loads(row[3]) if row[3] else {},
+            "is_default": bool(row[4]),
+            "created_at": row[5],
+            "updated_at": row[6],
+        }
+    finally:
+        conn.close()
+
+
+def create_generation_preset(
+    db_path: str,
+    preset_id: str,
+    name: str,
+    description: str | None,
+    params: Dict[str, Any],
+    *,
+    is_default: bool = False,
+) -> Dict[str, Any]:
+    """Create a generation preset and return the stored row."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        if is_default:
+            cursor.execute("UPDATE generation_presets SET is_default = 0")
+
+        cursor.execute(
+            """
+            INSERT INTO generation_presets (id, name, description, params, is_default)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                preset_id,
+                name,
+                description,
+                canonical_json(params),
+                int(is_default),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_generation_preset(db_path, preset_id) or {}
+
+
+def update_generation_preset(
+    db_path: str,
+    preset_id: str,
+    name: str,
+    description: str | None,
+    params: Dict[str, Any],
+    *,
+    is_default: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Update a generation preset and return the stored row."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id FROM generation_presets WHERE id = ?",
+            (preset_id,),
+        )
+        if not cursor.fetchone():
+            return None
+
+        if is_default:
+            cursor.execute(
+                "UPDATE generation_presets SET is_default = 0 WHERE id != ?",
+                (preset_id,),
+            )
+
+        cursor.execute(
+            """
+            UPDATE generation_presets
+            SET name = ?,
+                description = ?,
+                params = ?,
+                is_default = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                name,
+                description,
+                canonical_json(params),
+                int(is_default),
+                preset_id,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return get_generation_preset(db_path, preset_id)
+
+
+def delete_generation_preset(db_path: str, preset_id: str) -> bool:
+    """Delete a generation preset."""
+    conn = _connect(db_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM generation_presets WHERE id = ?", (preset_id,))
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()
