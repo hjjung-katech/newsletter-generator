@@ -40,6 +40,16 @@ except ImportError:
         RealNewsletterCLI,
     )
 
+try:
+    from time_utils import get_utc_now, parse_sqlite_timestamp, to_iso_utc, to_utc
+except ImportError:
+    from web.time_utils import (  # pragma: no cover
+        get_utc_now,
+        parse_sqlite_timestamp,
+        to_iso_utc,
+        to_utc,
+    )
+
 
 def register_generation_routes(
     app: Flask,
@@ -64,6 +74,11 @@ def register_generation_routes(
             return newsletter_cli
         resolved = get_newsletter_cli()
         return resolved if resolved is not None else newsletter_cli
+
+    def _serialize_schedule_timestamp(value: str | None) -> str | None:
+        if not value:
+            return None
+        return to_iso_utc(parse_sqlite_timestamp(value))
 
     def run_in_memory_job(
         job_id: str,
@@ -600,11 +615,14 @@ def register_generation_routes(
             from dateutil.rrule import rrulestr
 
             rrule_str = data["rrule"]
-            rrule = rrulestr(rrule_str, dtstart=datetime.now())
-            next_run = rrule.after(datetime.now())
+            now_utc = get_utc_now()
+            rrule = rrulestr(rrule_str, dtstart=now_utc.replace(tzinfo=None))
+            next_run = rrule.after(now_utc.replace(tzinfo=None))
 
             if not next_run:
                 return jsonify({"error": "Invalid RRULE: no future occurrences"}), 400
+
+            next_run_utc = to_utc(next_run)
 
         except Exception as e:
             return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
@@ -635,7 +653,7 @@ def register_generation_routes(
                 schedule_id,
                 json.dumps(schedule_params),
                 rrule_str,
-                next_run.isoformat(),
+                to_iso_utc(next_run_utc),
                 int(is_test),
                 expires_at,
             ),
@@ -648,7 +666,7 @@ def register_generation_routes(
                 {
                     "status": "scheduled",
                     "schedule_id": schedule_id,
-                    "next_run": next_run.isoformat(),
+                    "next_run": to_iso_utc(next_run_utc),
                 }
             ),
             201,
@@ -673,8 +691,8 @@ def register_generation_routes(
                     "id": schedule_id,
                     "params": json.loads(params) if params else None,
                     "rrule": rrule,
-                    "next_run": next_run,
-                    "created_at": created_at,
+                    "next_run": _serialize_schedule_timestamp(next_run),
+                    "created_at": _serialize_schedule_timestamp(created_at),
                     "enabled": bool(enabled),
                 }
             )
@@ -717,7 +735,7 @@ def register_generation_routes(
                 return jsonify({"error": "Schedule is disabled"}), 400
 
             params = json.loads(params_json)
-            intended_run_at = datetime.now()
+            intended_run_at = get_utc_now()
             idempotency_enabled = is_feature_enabled(
                 "WEB_IDEMPOTENCY_ENABLED", default=True
             )
@@ -727,7 +745,7 @@ def register_generation_routes(
             )
             if not idempotency_enabled:
                 idempotency_key = (
-                    f"schedule:{schedule_id}:{intended_run_at.isoformat()}"
+                    f"schedule:{schedule_id}:{to_iso_utc(intended_run_at)}"
                 )
             job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
             immediate_job_id = f"schedule_{schedule_id}_{job_suffix}"
