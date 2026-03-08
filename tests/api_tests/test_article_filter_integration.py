@@ -1,8 +1,7 @@
-import argparse  # Add import for argparse
 import os
 import sys
 import unittest
-from typing import Any, Dict, List
+from pathlib import Path
 from unittest.mock import MagicMock, PropertyMock, call, patch
 
 import pytest
@@ -70,7 +69,7 @@ class TestArticleFilterIntegration(unittest.TestCase):
 
     @patch("newsletter.collect.console")
     @patch("newsletter.article_filter.console")
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     @pytest.mark.skip(
         reason="Complex mocking issues with article collection integration"
     )

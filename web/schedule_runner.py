@@ -17,7 +17,12 @@ from typing import Dict, List, Optional, cast
 import redis
 from dateutil import tz  # type: ignore[import-untyped]
 from dateutil.rrule import rrulestr  # type: ignore[import-untyped]
-from rq import Queue
+
+try:
+    from rq import Queue
+except (ImportError, ValueError):
+    # Support Windows where multiprocessing 'fork' is not available
+    Queue = None
 
 # Add current directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -71,6 +76,8 @@ class ScheduleRunner:
 
         # Redis 연결 설정
         try:
+            if Queue is None:
+                raise ImportError("RQ Queue is not available on this platform")
             self.redis_conn = redis.from_url(self.redis_url)
             self.queue = Queue("default", connection=self.redis_conn)
         except Exception as e:

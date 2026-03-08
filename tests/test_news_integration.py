@@ -57,7 +57,7 @@ class TestNewsIntegration(unittest.TestCase):
         )
 
     @patch("newsletter.collect.requests.request")
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     def test_mocked_integration(self, mock_configure_sources, mock_request):
         """모의 응답을 사용한 통합 테스트"""
         # 모의 응답 설정

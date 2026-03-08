@@ -232,7 +232,7 @@ web_modules = [
     "web.suggest",
     "web.worker",
     "web.schedule_runner",
-    "web.types",
+    "web.api_types",
     "web.graceful_shutdown",
     "web.time_utils",
     # Binary compatibility modules (important!)
@@ -281,7 +281,7 @@ datas = [
     # Environment template (not actual .env for security)
     (os.path.join(project_root, ".env.example"), "."),
     # Essential Python modules only (not development artifacts)
-    (os.path.join(project_root, "web", "types.py"), "web"),
+    (os.path.join(project_root, "web", "api_types.py"), "web"),
     (os.path.join(project_root, "web", "path_manager.py"), "web"),
     (os.path.join(project_root, "web", "binary_compatibility.py"), "web"),
     (os.path.join(project_root, "web", "graceful_shutdown.py"), "web"),
@@ -301,7 +301,7 @@ datas = [(src, dst) for src, dst in datas if os.path.exists(src)]
 
 # Define binary files
 binaries = [
-    (os.path.join(project_root, "web", "types.py"), "web"),
+    (os.path.join(project_root, "web", "api_types.py"), "web"),
     (os.path.join(project_root, "web", "binary_compatibility.py"), "web"),
 ]
 

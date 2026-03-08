@@ -18,6 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from bs4 import BeautifulSoup
+from langchain_core.messages import AIMessage
 
 # 프로젝트 루트를 Python 경로에 추가
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -241,6 +242,11 @@ class TestEmailCompatibilityCore:
         assert main_table_found, "메인 테이블은 100% 너비를 가져야 합니다"
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.environ.get("RUN_INTEGRATION_TESTS"),
+    reason="Integration tests disabled",
+)
 class TestEmailCompatibilityIntegration:
     """Email-Compatible 통합 테스트"""
 
@@ -272,27 +278,31 @@ class TestEmailCompatibilityIntegration:
             "template_style": "detailed",
         }
 
-    @patch("newsletter.chains.get_llm")
+    @patch("newsletter.chains_composition.get_llm")
+    @patch("newsletter.chains_summarization.get_llm")
+    @patch("newsletter.chains_categorization.get_llm")
     def test_full_pipeline_detailed_email_compatible(
-        self, mock_llm, mock_articles_data
+        self, mock_cat_llm, mock_sum_llm, mock_comp_llm, mock_articles_data
     ):
         """Detailed + Email-Compatible 전체 파이프라인 테스트"""
         # LLM 모킹
         mock_llm_instance = MagicMock()
-        mock_llm.return_value = mock_llm_instance
+        mock_cat_llm.return_value = mock_llm_instance
+        mock_sum_llm.return_value = mock_llm_instance
+        mock_comp_llm.return_value = mock_llm_instance
 
         # 카테고리 분류 응답 모킹
         mock_llm_instance.invoke.side_effect = [
             # 카테고리 분류 응답
-            MagicMock(
+            AIMessage(
                 content='{"categories": [{"title": "AI 기술 발전", "article_indices": [1, 2]}]}'
             ),
             # 요약 응답
-            MagicMock(
+            AIMessage(
                 content='{"summary_paragraphs": ["AI 기술이 발전하고 있습니다."], "definitions": [{"term": "AI", "explanation": "인공지능"}], "news_links": [{"title": "AI 기술의 미래", "url": "https://example.com/ai-future", "source_and_date": "TechNews · 2025-05-29"}]}'
             ),
             # 종합 구성 응답
-            MagicMock(
+            AIMessage(
                 content='{"newsletter_topic": "AI 기술", "generation_date": "2025-05-30", "recipient_greeting": "안녕하세요", "introduction_message": "AI 기술 동향입니다", "food_for_thought": {"message": "AI에 대해 생각해봅시다"}, "closing_message": "감사합니다", "editor_signature": "편집자"}'
             ),
         ]
@@ -315,24 +325,28 @@ class TestEmailCompatibilityIntegration:
         assert soup.find("html") is not None
         assert soup.find("body") is not None
 
-    @patch("newsletter.chains.get_llm")
-    def test_full_pipeline_compact_email_compatible(self, mock_llm, mock_articles_data):
+    @patch("newsletter.chains_summarization.get_llm")
+    @patch("newsletter.chains_categorization.get_llm")
+    def test_full_pipeline_compact_email_compatible(
+        self, mock_cat_llm, mock_sum_llm, mock_articles_data
+    ):
         """Compact + Email-Compatible 전체 파이프라인 테스트"""
         # 설정 변경
         mock_articles_data["template_style"] = "compact"
 
         # LLM 모킹
         mock_llm_instance = MagicMock()
-        mock_llm.return_value = mock_llm_instance
+        mock_cat_llm.return_value = mock_llm_instance
+        mock_sum_llm.return_value = mock_llm_instance
 
         # 카테고리 분류 응답 모킹
         mock_llm_instance.invoke.side_effect = [
             # 카테고리 분류 응답
-            MagicMock(
+            AIMessage(
                 content='{"categories": [{"title": "AI 기술 발전", "article_indices": [1, 2]}]}'
             ),
             # 요약 응답 (compact 형식)
-            MagicMock(
+            AIMessage(
                 content='{"intro": "AI 기술 동향입니다", "definitions": [{"term": "AI", "explanation": "인공지능"}], "news_links": [{"title": "AI 기술의 미래", "url": "https://example.com/ai-future", "source_and_date": "TechNews · 2025-05-29"}]}'
             ),
         ]
