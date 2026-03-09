@@ -355,9 +355,10 @@ print(settings.get_config_summary())
 
 ```python
 import os
-from newsletter.centralized_settings import APP_ENV
+from newsletter.centralized_settings import get_settings
 
-print(f"🌍 Current environment: {APP_ENV}")
+settings = get_settings()
+print(f"🌍 Current environment: {settings.app_env}")
 print(f"🔍 Environment variables:")
 for key in ["SERPER_API_KEY", "OPENAI_API_KEY", "APP_ENV"]:
     value = os.getenv(key, "NOT_SET")
@@ -389,7 +390,7 @@ api_key = settings.serper_api_key.get_secret_value()
 ## 📚 추가 참고 자료
 
 - [Pydantic Settings Documentation](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
-- [F-14 구현 상세 (TODOs.md)](../dev/TODOs.md)
+- [F-14 구현 상세 (archive)](../archive/2026-03/F14_COMPLETION_REPORT.md)
 - [환경변수 예시 (.env.example)](../../.env.example)
 - [테스트 예제 (tests/unit_tests/test_centralized_settings.py)](../../tests/unit_tests/test_centralized_settings.py)
 

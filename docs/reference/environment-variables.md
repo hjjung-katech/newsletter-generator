@@ -12,15 +12,17 @@
 | `ANTHROPIC_API_KEY` | LLM 중 하나 필수 | Anthropic 제공자 |
 | `POSTMARK_SERVER_TOKEN` | 이메일 발송 시 필수 | Postmark 서버 토큰 |
 | `EMAIL_SENDER` | 이메일 발송 시 필수 | 발신자 이메일 (인증 필요) |
+| `APP_ENV` | 선택 | canonical runtime environment (`development`/`testing`/`production`) |
 | `SECRET_KEY` | 프로덕션 권장(웹) | Flask 시크릿 키 |
 | `ADMIN_API_TOKEN` | 민감 운영 API 보호 시 필수 | `/api/history`, `/api/schedule*`, `/api/send-email`, `/api/email-config`, `/api/test-email` 보호 토큰 |
 | `REDIS_URL` | worker/scheduler 사용 시 필수 | Redis 연결 |
 | `RQ_QUEUE` | 선택 | RQ 큐 이름 (`default`) |
-| `FLASK_ENV` | 선택 | `development`/`production` |
+| `FLASK_ENV` | 호환용 | legacy web entrypoint dev/prod 토글 |
+| `ENVIRONMENT` | 호환용 | legacy logging/security/runtime fallback |
 | `MOCK_MODE` | 선택 | `true`일 때 mock 데이터 사용 |
 | `TESTING` | 테스트 전용 | 테스트 모드 강제 |
 | `SENTRY_DSN` | 선택 | Sentry 에러 모니터링 |
-| `PORT` | 배포 시 선택 | 웹 포트 (기본 `5000`) |
+| `PORT` | 배포 시 선택 | 웹 포트 (`.env.example` 기준 `8000`, legacy entrypoint는 미설정 시 `5000` fallback 존재) |
 
 ## LLM Key Rule
 
@@ -31,6 +33,12 @@
 
 ## Compatibility Alias
 
+- `FLASK_ENV`
+  - direct `web/app.py` 실행 경로와의 호환용입니다.
+  - 신규 로컬/운영 설정에서는 `APP_ENV` 를 우선 사용하고, 필요 시 같은 값으로 함께 설정합니다.
+- `ENVIRONMENT`
+  - 일부 legacy logging/security 경로의 fallback 입니다.
+  - 신규 설정에서는 `APP_ENV` 를 우선 사용하고, 필요 시 같은 값으로 함께 설정합니다.
 - `POSTMARK_FROM_EMAIL`
   - 읽기 전용 호환 별칭입니다.
   - 신규 설정/문서에서는 사용하지 않습니다.
@@ -55,6 +63,9 @@ POSTMARK_SERVER_TOKEN=ps_xxx
 EMAIL_SENDER=newsletter@example.com
 
 # 웹/운영
+APP_ENV=production
+FLASK_ENV=production
+ENVIRONMENT=production
 SECRET_KEY=replace-me-in-production
 ADMIN_API_TOKEN=replace-me-with-an-ops-token
 REDIS_URL=redis://localhost:6379/0

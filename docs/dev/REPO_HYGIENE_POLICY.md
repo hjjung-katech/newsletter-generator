@@ -36,7 +36,7 @@
 | `output/`, `debug_files/` | ignore | 로컬 생성 디렉터리 (tracked 제외) | 실행 시 자동 생성, 루트 tracked 엔트리 축소 |
 | `config/config.yml` | 유지 | `config/` 내부 정본 | 런타임 설정 파일 위치 정규화 |
 | `config.example.yml` | 이관 완료 | `config/config.example.yml` | 템플릿 파일 위치 정규화 + 루트 엔트리 축소 |
-| `TODOs.md` | 이관 완료 | `docs/dev/TODOs.md` | 루트 문서 혼잡도 완화 |
+| `TODOs.md` | 이관 완료 | `docs/archive/2026-03/F14_COMPLETION_REPORT.md` | 루트 문서 혼잡도 완화 및 문서 의미 정정 |
 | 정책 미정 루트 엔트리 | 검토 | 정책 PR에서 결정 | allowlist/denylist 합의 대상 |
 
 ## Dot Directory Tracking Agreement
