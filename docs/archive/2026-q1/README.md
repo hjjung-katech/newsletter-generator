@@ -15,6 +15,7 @@
 | [`MAIN_INTEGRATION_EXECUTION_PLAN.md`](MAIN_INTEGRATION_EXECUTION_PLAN.md) | 현재 release 실행 기준이 아닌 시점별 통합 계획 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md), [`../../../.github/PULL_REQUEST_TEMPLATE/release_integration.md`](../../../.github/PULL_REQUEST_TEMPLATE/release_integration.md) |
 | [`BRANCH_MAIN_GAP_ANALYSIS.md`](BRANCH_MAIN_GAP_ANALYSIS.md) | 과거 `main` 격차 분석 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md) |
 | [`REFACTORING_EXECUTION_PLAN.md`](REFACTORING_EXECUTION_PLAN.md) | 시점 고정형 리팩토링 배치 계획 | [`../../dev/LONG_TERM_REPO_STRATEGY.md`](../../dev/LONG_TERM_REPO_STRATEGY.md), [`../../dev/REPO_HYGIENE_POLICY.md`](../../dev/REPO_HYGIENE_POLICY.md) |
+| [`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md) | 중복된 아키텍처 개요 문서 | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md), [`../../technical/adr-0001-architecture-boundaries.md`](../../technical/adr-0001-architecture-boundaries.md) |
 
 ## Rollback
 
