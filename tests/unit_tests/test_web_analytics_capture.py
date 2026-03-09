@@ -5,7 +5,8 @@ import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 from flask import Flask
@@ -173,4 +174,120 @@ def test_schedule_runner_records_execution_events(tmp_path: Path) -> None:
     )
     event_types = {event["event_type"] for event in events}
     assert "schedule.execute.started" in event_types
+    assert "schedule.execute.completed" in event_types
+
+
+def test_schedule_runner_records_enqueue_event(tmp_path: Path) -> None:
+    db_path = tmp_path / "storage.db"
+    ensure_database_schema(str(db_path))
+
+    schedule_id = "schedule-enqueued"
+    next_run = datetime.now(timezone.utc).replace(microsecond=0)
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO schedules (id, params, rrule, next_run, enabled)
+        VALUES (?, ?, ?, ?, 1)
+        """,
+        (
+            schedule_id,
+            json.dumps({"keywords": ["AI"], "send_email": False}),
+            "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+            next_run.isoformat().replace("+00:00", "Z"),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    runner = ScheduleRunner(db_path=str(db_path), redis_url="redis://localhost:6379/0")
+    runner.redis_conn = None
+    runner.queue = MagicMock()
+    runner.queue.enqueue.return_value = SimpleNamespace(id="queue-job-1")
+
+    success = runner.execute_schedule(
+        {
+            "id": schedule_id,
+            "params": {"keywords": ["AI"], "send_email": False},
+            "rrule": "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+            "next_run": next_run,
+            "created_at": next_run,
+            "is_test": False,
+        }
+    )
+
+    assert success is True
+    runner.queue.enqueue.assert_called_once()
+    events = list_analytics_events(
+        str(db_path),
+        limit=10,
+        event_type_prefix="schedule.execute",
+    )
+    event_types = {event["event_type"] for event in events}
+    assert "schedule.execute.started" in event_types
+    assert "schedule.execute.enqueued" in event_types
+
+
+def test_schedule_runner_records_redis_failure_before_sync_fallback(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "storage.db"
+    ensure_database_schema(str(db_path))
+
+    schedule_id = "schedule-redis-fallback"
+    next_run = datetime.now(timezone.utc).replace(microsecond=0)
+    conn = sqlite3.connect(str(db_path))
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO schedules (id, params, rrule, next_run, enabled)
+        VALUES (?, ?, ?, ?, 1)
+        """,
+        (
+            schedule_id,
+            json.dumps({"keywords": ["AI"], "send_email": False}),
+            "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+            next_run.isoformat().replace("+00:00", "Z"),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    runner = ScheduleRunner(db_path=str(db_path), redis_url="redis://localhost:6379/0")
+    runner.redis_conn = None
+    runner.queue = MagicMock()
+    runner.queue.enqueue.side_effect = RuntimeError("redis unavailable")
+
+    with patch("schedule_runner.generate_newsletter_task") as generate_mock:
+        generate_mock.return_value = {
+            "status": "success",
+            "html_content": "<html><body>ok</body></html>",
+            "title": "Scheduled Analytics",
+            "generation_stats": {},
+            "input_params": {},
+            "error": None,
+            "sent": False,
+            "email_sent": False,
+        }
+        success = runner.execute_schedule(
+            {
+                "id": schedule_id,
+                "params": {"keywords": ["AI"], "send_email": False},
+                "rrule": "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+                "next_run": next_run,
+                "created_at": next_run,
+                "is_test": False,
+            }
+        )
+
+    assert success is True
+    runner.queue.enqueue.assert_called_once()
+    generate_mock.assert_called_once()
+    events = list_analytics_events(
+        str(db_path),
+        limit=10,
+        event_type_prefix="schedule.execute",
+    )
+    event_types = {event["event_type"] for event in events}
+    assert "schedule.execute.redis_failed" in event_types
     assert "schedule.execute.completed" in event_types
