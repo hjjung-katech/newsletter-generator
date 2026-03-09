@@ -2,7 +2,7 @@
 
 > Historical note (2026-03-09): 이 문서는 `1e93460..HEAD` 구간을 기준으로 작성된 과거 분석 문서입니다.
 > 현재는 여러 RR가 직접 `main`에 순차 머지되었으므로, 실제 실행 기준은
-> `docs/dev/MAIN_INTEGRATION_EXECUTION_PLAN.md`를 따릅니다.
+> `docs/dev/CI_CD_GUIDE.md` 와 `.github/PULL_REQUEST_TEMPLATE/release_integration.md` 를 따릅니다.
 > 이 문서는 배경/의사결정 근거 보존용으로만 유지합니다.
 
 > 기준 정보: 현재 로컬 저장소에는 `main` 브랜치/remote가 없어, **분석 기준선을 `1e93460`(워크플로우 통합 리팩터링 직후 커밋)**으로 설정했습니다.
