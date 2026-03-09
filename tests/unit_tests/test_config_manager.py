@@ -1,6 +1,4 @@
-import os
 import sys
-import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import mock_open, patch
@@ -10,7 +8,7 @@ project_root = Path(__file__).parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from newsletter.config_manager import ConfigManager
+from newsletter.config_manager import ConfigManager  # noqa: E402
 
 
 class TestConfigManager(unittest.TestCase):
@@ -218,13 +216,26 @@ llm_settings:
             patch("pathlib.Path.exists", return_value=True),
             patch("builtins.open", mock_open(read_data="test: value")) as mock_file,
         ):
-
             # 첫 번째 호출
             config1 = manager.load_config_file("test.yml")
             # 두 번째 호출
             config2 = manager.load_config_file("test.yml")
 
             # 캐시에서 가져왔으므로 파일은 한 번만 열려야 함
+            mock_file.assert_called_once()
+            self.assertEqual(config1, config2)
+
+    def test_default_config_aliases_share_resolved_cache(self):
+        """기본 설정 경로 alias가 동일한 캐시 엔트리를 재사용해야 한다."""
+        manager = ConfigManager()
+
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data="test: value")) as mock_file,
+        ):
+            config1 = manager.load_config_file("config.yml")
+            config2 = manager.load_config_file("config/config.yml")
+
             mock_file.assert_called_once()
             self.assertEqual(config1, config2)
 
