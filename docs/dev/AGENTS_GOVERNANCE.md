@@ -1,6 +1,6 @@
-# Codex Instruction Layout
+# AGENTS Governance
 
-Purpose: keep instructions enforceable, not bloated.
+Purpose: keep repository agent policy enforceable, discoverable, and not bloated.
 
 ## Load/Override Order
 1. `~/.codex/AGENTS.md` (global working style)
