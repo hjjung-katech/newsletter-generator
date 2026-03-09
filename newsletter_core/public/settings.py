@@ -10,6 +10,13 @@ from newsletter.centralized_settings import (
     get_settings,
     is_running_in_pytest,
 )
+from newsletter.config_manager import get_config_manager as _get_config_manager
+from newsletter.config_manager import get_llm_config as _get_llm_config
+from newsletter.config_manager import get_major_news_sources as _get_major_news_sources
+from newsletter.config_manager import (
+    get_newsletter_settings as _get_newsletter_settings,
+)
+from newsletter.config_manager import validate_email_config as _validate_email_config
 
 _SETTING_ALIASES = {
     "POSTMARK_FROM_EMAIL": "email_sender",
@@ -55,11 +62,11 @@ def get_setting_value(name: str, default: Any = None) -> Any:
 
 
 def get_llm_config() -> dict[str, Any]:
-    return get_config_manager().get_llm_config()
+    return _get_llm_config()
 
 
 def get_major_news_sources() -> dict[str, Any]:
-    return get_config_manager().get_major_news_sources()
+    return _get_major_news_sources()
 
 
 def get_all_major_news_sources() -> list[str]:
@@ -68,7 +75,7 @@ def get_all_major_news_sources() -> list[str]:
 
 
 def get_newsletter_settings() -> dict[str, Any]:
-    return get_config_manager().get_newsletter_settings()
+    return _get_newsletter_settings()
 
 
 def get_email_config() -> tuple[str | None, str | None]:
@@ -79,12 +86,10 @@ def get_email_config() -> tuple[str | None, str | None]:
 
 
 def validate_email_config() -> dict[str, bool]:
-    return get_config_manager().validate_email_config()
+    return _validate_email_config()
 
 
 def get_config_manager() -> Any:
-    from newsletter.config_manager import get_config_manager as _get_config_manager
-
     return _get_config_manager()
 
 
