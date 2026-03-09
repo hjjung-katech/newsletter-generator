@@ -1,48 +1,19 @@
 # Agent/Skill Request Playbook
 
-This document standardizes work as `RR -> Branch -> Commit -> PR -> CI -> Merge`.
+This document complements the canonical workflow in `docs/dev/CI_CD_GUIDE.md`.
+Use it when you need skill-specific request wording rather than the base RR/PR process.
 
 ## Purpose
 
-- Manage work as clear PR-sized delivery units.
-- Split CI failure handling and review-comment handling into dedicated skills.
-- Standardize request wording so long-running work stays reproducible.
+- Route specialized requests to the right skill or agent.
+- Keep CI failure handling and review-comment handling distinct from general RR execution.
+- Reuse concise request patterns without duplicating the full workflow standard.
 
-## Basic Execution Contract
+## Canonical Workflow Boundary
 
-Include the following nine requirements in the request by default.
-
-1. Create an RR (Review Request) first: `.github/ISSUE_TEMPLATE/review-request.yml`
-2. Require a `Delivery Unit ID` in the RR, and keep a strict 1:1 mapping between RR and PR
-3. Use the branch pattern `<type>/<scope>-<topic>` such as `codex/workflow-template-standard`
-4. Use `.gitmessage.txt` as the commit-message template and split commits by meaning
-5. Keep commit count in the default `1-6` range (exempt labels: `docs-only`, `trivial`, `hotfix`)
-6. Run local gates: `make check`, `make check-full`, and `make repo-audit` when needed
-7. Include the `## Delivery Unit` section in `.github/pull_request_template.md`
-8. Check GitHub Actions results and report status
-9. When a check fails, classify the cause and add a follow-up fix commit; avoid force-push unless there is a strong reason
-
-## Enforcement Principles
-
-- Codex/agents follow the repository root `AGENTS.md` first.
-- Use CI policy checks so the same governance applies to human contributors.
-- CI enforcement: `.github/workflows/pr-policy-check.yml`
-- Delivery Unit validator: `scripts/ci/validate_delivery_unit.py`
-- RR auto-close after merge: `.github/workflows/rr-lifecycle-close.yml` (parses `RR: #<n>`)
-
-## Standard Template Locations
-
-- RR template: `.github/ISSUE_TEMPLATE/review-request.yml`
-- Commit template: `.gitmessage.txt`
-- PR template: `.github/pull_request_template.md`
-- Consolidated workflow guide: `docs/dev/WORKFLOW_TEMPLATES.md`
-- Delivery Unit check: `scripts/ci/validate_delivery_unit.py`
-
-Set the local commit template once:
-
-```bash
-git config commit.template .gitmessage.txt
-```
+- RR/branch/commit/PR/merge 운영 표준은 `docs/dev/CI_CD_GUIDE.md` 가 정본입니다.
+- `AGENTS.md` 와 `docs/dev/AGENTS_GOVERNANCE.md` 는 agent policy precedence를 다룹니다.
+- 이 문서는 위 정본을 대체하지 않고, skill 사용 시의 요청 문장 예시만 제공합니다.
 
 ## Skill Selection
 
@@ -57,7 +28,7 @@ git config commit.template .gitmessage.txt
 
 ## Request Templates
 
-### 1) Structure improvement request
+### 1) PR-sized structure improvement request
 
 ```text
 Handle this as a PR-sized unit of work.
@@ -83,12 +54,12 @@ Use $gh-address-comments to collect PR comments for the current branch.
 List the comment items first, then apply only the ones I select.
 ```
 
-## PR Completion Report
+## Output Reminder
 
-Use this format when work is complete.
+When a skill-assisted task completes, report:
 
-1. Commit list (hash + summary)
+1. commit hash or commit list
 2. PR link
-3. Local validation results (`make check`, `make check-full`, and any extras)
-4. GitHub Actions status (success/failure, and the failure cause if applicable)
-5. Risk and rollback note
+3. local validation results
+4. GitHub Actions status
+5. risk and rollback note

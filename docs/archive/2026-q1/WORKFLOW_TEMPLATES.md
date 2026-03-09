@@ -1,5 +1,8 @@
 # Workflow Templates (RR / Branch / Commit / PR)
 
+> Historical note (2026-03-09): RR-07에서 active docs tree 밖으로 이관된 문서입니다.
+> 현재 contributor workflow 정본은 `docs/dev/CI_CD_GUIDE.md` 입니다.
+
 이 문서는 작업 요청(RR)부터 브랜치/커밋/PR/머지까지 하나의 운영 표준으로 맞추기 위한 템플릿 모음입니다.
 
 ## 1) RR(Review Request) 템플릿

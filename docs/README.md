@@ -15,11 +15,8 @@
 | 리포 구조/운영 전략 | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md) | 장기 구조 개편/운영 플레이북 |
 | Repo hygiene 정책 | [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | 루트 분류/soft gate/dot 추적 범위 |
 | 문서 전수조사표 | [`DOCUMENT_INVENTORY.md`](DOCUMENT_INVENTORY.md) | 문서 상태/owner/disposition 정리 |
-| Agent/Skill 요청 표준 | [`dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`](dev/AGENT_SKILL_REQUEST_PLAYBOOK.md) | commit/PR/CI 중심 실행 요청 템플릿 |
 | AGENTS/Skill 거버넌스 | [`dev/AGENTS_GOVERNANCE.md`](dev/AGENTS_GOVERNANCE.md) | 글로벌/레포/하위 AGENTS precedence와 skill 경계 |
-| RR 요청 템플릿 | [`dev/RR_REQUEST_TEMPLATE.md`](dev/RR_REQUEST_TEMPLATE.md) | 작업 요청 문장 표준 |
 | PR/Commit/Branch 프로세스 | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | 템플릿 경로 + PR policy check gate |
-| 워크플로 템플릿 종합 | [`dev/WORKFLOW_TEMPLATES.md`](dev/WORKFLOW_TEMPLATES.md) | RR/브랜치/커밋/PR/머지 운영 표준 |
 
 ## Audience Paths
 
@@ -38,8 +35,6 @@
   - [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md)
   - [`dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`](dev/AGENT_SKILL_REQUEST_PLAYBOOK.md)
   - [`dev/AGENTS_GOVERNANCE.md`](dev/AGENTS_GOVERNANCE.md)
-  - [`dev/RR_REQUEST_TEMPLATE.md`](dev/RR_REQUEST_TEMPLATE.md)
-  - [`dev/WORKFLOW_TEMPLATES.md`](dev/WORKFLOW_TEMPLATES.md)
   - [`developer/CENTRALIZED_SETTINGS_GUIDE.md`](developer/CENTRALIZED_SETTINGS_GUIDE.md)
   - [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md)
 
@@ -85,5 +80,7 @@
   - [`archive/2026-q1/FIXES_SUMMARY.md`](archive/2026-q1/FIXES_SUMMARY.md)
   - [`archive/2026-q1/PROJECT_STRUCTURE.md`](archive/2026-q1/PROJECT_STRUCTURE.md)
   - [`archive/2026-q1/CODE_QUALITY.md`](archive/2026-q1/CODE_QUALITY.md)
+  - [`archive/2026-q1/RR_REQUEST_TEMPLATE.md`](archive/2026-q1/RR_REQUEST_TEMPLATE.md)
+  - [`archive/2026-q1/WORKFLOW_TEMPLATES.md`](archive/2026-q1/WORKFLOW_TEMPLATES.md)
   - [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)
   - [`archive/webservice-prd.md`](archive/webservice-prd.md)

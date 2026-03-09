@@ -114,6 +114,61 @@ python scripts/repo_audit.py \
 - 형식: `<type>(<scope>): <summary>`
 - summary 최대 72자
 
+## Contributor Workflow Standard
+
+기여자 workflow 정본은 이 섹션을 기준으로 유지합니다.
+
+1. RR 생성
+- GitHub RR 템플릿: `.github/ISSUE_TEMPLATE/review-request.yml`
+- RR 1건은 기본적으로 PR 1건과 1:1로 대응합니다.
+- `Delivery Unit ID` 를 RR과 PR 모두에 유지합니다.
+
+2. 브랜치 네이밍
+- 기본 패턴: `<type>/<scope>-<topic>`
+- 허용 type: `feat|fix|chore|docs|refactor|release|codex`
+
+3. 커밋 메시지
+- 기본 패턴: `<type>(<scope>): <summary>`
+- summary는 72자 이하, 명령형, 마침표 없이 작성합니다.
+- 기본 커밋 수는 PR당 `1-6` 범위를 권장합니다.
+
+4. PR 본문
+- `.github/pull_request_template.md` 의 필수 섹션을 모두 채웁니다.
+- `## Delivery Unit` 섹션에 `RR`, `Delivery Unit ID`, merge/rollback boundary를 명시합니다.
+
+5. Merge 정책
+- 기본 merge 방식: squash merge
+- merge 전 조건: `make check-full` 및 GitHub required checks green
+- hotfix 등 예외는 `## Not Run` 에 사유를 남깁니다.
+
+## Request Entry Patterns
+
+### Standard RR request
+
+```text
+이번 작업은 PR 단위로 끝까지 진행해줘.
+- 목표: <목표>
+- 범위: <in-scope / out-of-scope>
+- 브랜치: <type>/<scope>-<topic>
+- 필수 게이트: make check, make check-full
+- 선택 게이트: make repo-audit (구조/정책 변경 시)
+- 산출물: 커밋 해시, PR 링크, CI 상태, merge 결과, 롤백 메모
+```
+
+### CI failure request
+
+```text
+Use $gh-fix-ci to inspect the failing checks on the current PR.
+Summarize the root cause and proposed fix plan first, then implement after approval.
+```
+
+### Review-comment request
+
+```text
+Use $gh-address-comments to collect PR comments for the current branch.
+List the comment items first, then apply only the ones I select.
+```
+
 ## Strict Gate Policy
 
 - `mypy` 실패 시 CI 실패
@@ -142,5 +197,5 @@ make check-full
 - Repo hygiene/구조 정리 PR: `.github/PULL_REQUEST_TEMPLATE/repo_hygiene.md`
 - 릴리즈 통합 PR: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
 - Commit 템플릿: `.gitmessage.txt`
-- 워크플로 템플릿 가이드: `docs/dev/WORKFLOW_TEMPLATES.md`
+- skill 요청 예시: `docs/dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`
 - 로컬 템플릿 설정: `./scripts/devtools/setup_git_message_template.sh`
