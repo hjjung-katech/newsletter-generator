@@ -43,7 +43,7 @@
 
 - `web/routes_generation.py`는 아직 `importlib.util.spec_from_file_location` 기반 동적 로딩을 사용한다.
 - `web/app.py`는 `sys.path` 조작과 fallback import가 반복된다.
-- `docs/archive/2026-03/F14_COMPLETION_REPORT.md`에는 당시 Settings 작업 완료 보고서와 미완료 항목 이력이 함께 남아 있다.
+- `docs/archive/2026-q1/F14_COMPLETION_REPORT.md`에는 당시 Settings 작업 완료 보고서와 미완료 항목 이력이 함께 남아 있다.
 
 ## 3. 우선순위 기준과 근거
 

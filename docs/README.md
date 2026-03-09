@@ -58,7 +58,8 @@
 ## Governance
 
 - 문서 상태/owner/disposition 기준: [`DOCUMENT_INVENTORY.md`](DOCUMENT_INVENTORY.md)
-- 2026-03 archive 인덱스: [`archive/2026-03/README.md`](archive/2026-03/README.md)
+- archive 정책: [`archive/README.md`](archive/README.md)
+- 2026-Q1 archive 인덱스: [`archive/2026-q1/README.md`](archive/2026-q1/README.md)
 
 ## Rules
 
@@ -75,9 +76,9 @@
   - [`dev/BRANCH_MAIN_GAP_ANALYSIS.md`](dev/BRANCH_MAIN_GAP_ANALYSIS.md)
   - [`dev/MAIN_INTEGRATION_EXECUTION_PLAN.md`](dev/MAIN_INTEGRATION_EXECUTION_PLAN.md)
 - archive location:
-  - [`archive/2026-03/REPO_HYGIENE_STATUS_2026-02-24.md`](archive/2026-03/REPO_HYGIENE_STATUS_2026-02-24.md)
-  - [`archive/2026-03/F14_COMPLETION_REPORT.md`](archive/2026-03/F14_COMPLETION_REPORT.md)
-  - [`archive/2026-03/FIXES_SUMMARY.md`](archive/2026-03/FIXES_SUMMARY.md)
-  - [`archive/2026-03/PROJECT_STRUCTURE.md`](archive/2026-03/PROJECT_STRUCTURE.md)
-  - [`archive/2026-03/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-03/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)
+  - [`archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md`](archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md)
+  - [`archive/2026-q1/F14_COMPLETION_REPORT.md`](archive/2026-q1/F14_COMPLETION_REPORT.md)
+  - [`archive/2026-q1/FIXES_SUMMARY.md`](archive/2026-q1/FIXES_SUMMARY.md)
+  - [`archive/2026-q1/PROJECT_STRUCTURE.md`](archive/2026-q1/PROJECT_STRUCTURE.md)
+  - [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)
   - [`archive/webservice-prd.md`](archive/webservice-prd.md)

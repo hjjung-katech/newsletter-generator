@@ -16,7 +16,7 @@
   - 예: `build_web_exe.py`, `fix_env_setup.py`, `cleanup_debug_files.py`, `run_tests.py`
 - 루트 문서와 `docs/` 문서의 역할이 일부 중복되어 진입점이 분산됩니다.
 - 숨김 폴더(`.agents`, `.release`) 중 일부는 유지 가치가 있으나, 유지 근거가 기여자 관점에서 충분히 드러나지 않습니다.
-- `docs/archive/2026-03/PROJECT_STRUCTURE.md`는 과거 스냅샷 성격이라 현재 구조 판단에 직접 사용하면 신뢰도가 떨어질 수 있습니다.
+- `docs/archive/2026-q1/PROJECT_STRUCTURE.md`는 과거 스냅샷 성격이라 현재 구조 판단에 직접 사용하면 신뢰도가 떨어질 수 있습니다.
 
 ### 이미 잘 되어 있는 기반
 
@@ -268,7 +268,7 @@ Delivery KPI:
 - Week 16 실행 반영:
   - `rr-lifecycle-close.yml` 추가로 머지 후 RR 이슈 자동 종료(Delivery Unit 수명주기 자동화)
 - Week 17 실행 반영:
-  - 작업 마감/재시작용 상태 스냅샷 문서 추가 (`docs/archive/2026-03/REPO_HYGIENE_STATUS_2026-02-24.md`)
+  - 작업 마감/재시작용 상태 스냅샷 문서 추가 (`docs/archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md`)
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 

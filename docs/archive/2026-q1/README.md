@@ -1,6 +1,6 @@
-# Archive Index (2026-03)
+# Archive Index (2026-Q1)
 
-이 디렉터리는 2026-03 문서 전수조사에서 active docs tree에서 분리한 이력성 문서를 보관합니다.
+이 디렉터리는 2026-Q1 문서 전수조사에서 active docs tree에서 분리한 이력성 문서를 보관합니다.
 운영 정본으로 사용하지 않습니다.
 
 ## Archived in This Pass
