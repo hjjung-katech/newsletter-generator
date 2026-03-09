@@ -65,6 +65,23 @@ try:
 except ImportError:
     from web.analytics import record_schedule_event  # pragma: no cover
 
+try:
+    from schedule_scan import calculate_next_run as calculate_schedule_next_run
+    from schedule_scan import disable_schedule as disable_schedule_entry
+    from schedule_scan import get_pending_schedules as get_pending_schedule_entries
+    from schedule_scan import parse_iso_datetime as parse_schedule_iso_datetime
+    from schedule_scan import update_schedule_next_run as update_schedule_entry_next_run
+except ImportError:
+    from web.schedule_scan import (
+        calculate_next_run as calculate_schedule_next_run,  # pragma: no cover
+    )
+    from web.schedule_scan import disable_schedule as disable_schedule_entry
+    from web.schedule_scan import get_pending_schedules as get_pending_schedule_entries
+    from web.schedule_scan import parse_iso_datetime as parse_schedule_iso_datetime
+    from web.schedule_scan import (
+        update_schedule_next_run as update_schedule_entry_next_run,
+    )
+
 # Configure logging
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
@@ -85,6 +102,8 @@ class ScheduleRunner:
         self.redis_url = redis_url or os.environ.get(
             "REDIS_URL", "redis://localhost:6379/0"
         )
+        self.redis_conn: redis.Redis | None = None
+        self.queue: Queue | None = None
 
         # Redis 연결 설정
         try:
@@ -92,321 +111,44 @@ class ScheduleRunner:
             self.queue = Queue("default", connection=self.redis_conn)
         except Exception as e:
             log_exception(logger, "schedule.redis.connection_failed", e)
-            self.redis_conn = None
-            self.queue = None
 
     def _parse_iso_datetime(self, iso_string: str) -> datetime:
         """Parse ISO datetime string, handling Z suffix properly"""
-        if iso_string.endswith("Z"):
-            # Remove Z and add UTC timezone
-            return REAL_DATETIME.fromisoformat(iso_string[:-1]).replace(
-                tzinfo=timezone.utc
-            )
-        else:
-            return REAL_DATETIME.fromisoformat(iso_string)
+        return cast(datetime, parse_schedule_iso_datetime(iso_string))
 
     def get_pending_schedules(self) -> List[Dict]:
         """실행 대기 중인 스케줄 목록을 가져옵니다."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            now = datetime.now(timezone.utc)
-            log_debug(
-                logger,
-                "schedule.scan.started",
-                db_path=self.db_path,
-                db_exists=os.path.exists(self.db_path),
+        now = datetime.now(timezone.utc)
+        return cast(
+            List[Dict],
+            get_pending_schedule_entries(
+                self.db_path,
                 now=now,
-            )
-
-            # Import time utilities and convert current time
-            try:
-                from web.time_utils import to_iso_utc  # PyInstaller
-            except ImportError:
-                from time_utils import to_iso_utc  # Development
-            now_iso = to_iso_utc(now)
-
-            # 만료된 테스트 스케줄 정리
-            cursor.execute(
-                "UPDATE schedules SET enabled = 0 WHERE is_test = 1 AND expires_at IS NOT NULL AND expires_at <= ?",
-                (now_iso,),
-            )
-            expired_count = cursor.rowcount
-            if expired_count > 0:
-                log_info(
-                    logger,
-                    "schedule.expired_tests.disabled",
-                    count=expired_count,
-                )
-
-            # 모든 활성 스케줄 조회
-            cursor.execute(
-                "SELECT id, params, rrule, next_run, created_at, is_test FROM schedules WHERE enabled = 1"
-            )
-            all_schedules = cursor.fetchall()
-            log_debug(
-                logger, "schedule.scan.loaded_active", active_count=len(all_schedules)
-            )
-
-            # 스케줄 실행 대기열과 만료된 스케줄 분리 처리
-            ready_for_execution = []
-            updated_count = 0
-
-            # 정규 스케줄: 30분 윈도우, 테스트 스케줄: 10분 윈도우
-            regular_window = timedelta(minutes=30)
-            test_window = timedelta(minutes=10)
-
-            for schedule in all_schedules:
-                (
-                    schedule_id,
-                    params,
-                    rrule_str,
-                    next_run_str,
-                    created_at,
-                    is_test,
-                ) = schedule
-
-                try:
-                    # 스케줄의 다음 실행 시간 파싱
-                    next_run = self._parse_iso_datetime(next_run_str)
-                    time_diff = now - next_run
-
-                    # 실행 창 설정 (테스트 vs 정규)
-                    execution_window = test_window if is_test else regular_window
-
-                    log_debug(
-                        logger,
-                        "schedule.scan.evaluating",
-                        schedule_id=schedule_id,
-                        next_run=next_run_str,
-                        time_diff_seconds=round(time_diff.total_seconds(), 1),
-                        window_seconds=execution_window.total_seconds(),
-                    )
-
-                    # 실행 창 내에 있는 스케줄 (즉시 실행 대상)
-                    if timedelta(0) <= time_diff <= execution_window:
-                        log_debug(
-                            logger,
-                            "schedule.scan.ready",
-                            schedule_id=schedule_id,
-                            window_minutes=round(
-                                execution_window.total_seconds() / 60, 1
-                            ),
-                        )
-                        ready_for_execution.append(schedule)
-
-                    # 실행 창을 넘어선 과거 스케줄 (다음 주기로 업데이트)
-                    elif time_diff > execution_window:
-                        log_info(
-                            logger,
-                            "schedule.scan.expired",
-                            schedule_id=schedule_id,
-                            missed_window_minutes=round(
-                                time_diff.total_seconds() / 60, 1
-                            ),
-                        )
-
-                        # 다음 실행 시간 계산
-                        next_run_calculated = self.calculate_next_run(rrule_str, now)
-
-                        if next_run_calculated:
-                            cursor.execute(
-                                "UPDATE schedules SET next_run = ? WHERE id = ?",
-                                (to_iso_utc(next_run_calculated), schedule_id),
-                            )
-                            updated_count += 1
-                            log_info(
-                                logger,
-                                "schedule.scan.expired_rescheduled",
-                                schedule_id=schedule_id,
-                                previous_next_run=next_run_str,
-                                next_run=to_iso_utc(next_run_calculated),
-                            )
-                        else:
-                            cursor.execute(
-                                "UPDATE schedules SET enabled = 0 WHERE id = ?",
-                                (schedule_id,),
-                            )
-                            log_info(
-                                logger,
-                                "schedule.scan.disabled_no_more_occurrences",
-                                schedule_id=schedule_id,
-                            )
-
-                    # 미래 스케줄 (아직 실행 시간이 아님)
-                    else:
-                        log_debug(
-                            logger,
-                            "schedule.scan.future",
-                            schedule_id=schedule_id,
-                            run_in_minutes=round(
-                                abs(time_diff.total_seconds()) / 60, 1
-                            ),
-                        )
-
-                except Exception as parse_error:
-                    log_exception(
-                        logger,
-                        "schedule.scan.parse_failed",
-                        parse_error,
-                        schedule_id=schedule_id,
-                    )
-                    continue
-
-            if expired_count > 0 or updated_count > 0:
-                conn.commit()
-            if updated_count > 0:
-                log_info(
-                    logger,
-                    "schedule.scan.expired_updates_committed",
-                    updated_count=updated_count,
-                )
-
-            # 실행 준비 완료된 스케줄들을 반환 형식으로 변환
-            log_debug(
-                logger,
-                "schedule.scan.ready_summary",
-                ready_count=len(ready_for_execution),
-            )
-
-            # Ensure deterministic execution order (oldest next_run first).
-            ready_for_execution.sort(
-                key=lambda schedule_data: self._parse_iso_datetime(schedule_data[3])
-            )
-
-            schedules = []
-            for schedule_data in ready_for_execution:
-                (
-                    schedule_id,
-                    params,
-                    rrule_str,
-                    next_run_str,
-                    created_at,
-                    is_test,
-                ) = schedule_data
-                is_test_bool = bool(is_test)
-
-                log_debug(
-                    logger,
-                    "schedule.queue.ready_entry",
-                    schedule_id=schedule_id,
-                    schedule_type="test" if is_test_bool else "regular",
-                    next_run=next_run_str,
-                )
-
-                schedules.append(
-                    {
-                        "id": schedule_id,
-                        "params": json.loads(params),
-                        "rrule": rrule_str,
-                        "next_run": self._parse_iso_datetime(next_run_str),
-                        "created_at": self._parse_iso_datetime(created_at),
-                        "is_test": is_test_bool,
-                    }
-                )
-
-            conn.close()
-            return schedules
-
-        except Exception as e:
-            log_exception(logger, "schedule.scan.failed", e, db_path=self.db_path)
-            return []
+                parse_datetime=self._parse_iso_datetime,
+                calculate_next_run_fn=self.calculate_next_run,
+            ),
+        )
 
     def calculate_next_run(
         self, rrule_str: str, after: datetime | None = None
     ) -> Optional[datetime]:
         """RRULE을 기반으로 다음 실행 시간을 계산합니다."""
-        try:
-            if after is None:
-                after = REAL_DATETIME.now(timezone.utc)
-
-            # after가 timezone-aware인 경우 naive로 변환
-            if after.tzinfo is not None:
-                after_naive = after.replace(tzinfo=None)
-            else:
-                after_naive = after
-
-            # RRULE 파싱
-            rrule = rrulestr(rrule_str, dtstart=after_naive)
-
-            # 다음 실행 시간 찾기 (naive datetime 반환)
-            next_occurrence_naive = rrule.after(after_naive)
-
-            # UTC timezone을 추가하여 aware datetime으로 변환
-            if next_occurrence_naive is not None:
-                next_occurrence = cast(datetime, next_occurrence_naive).replace(
-                    tzinfo=timezone.utc
-                )
-                return next_occurrence
-            else:
-                return None
-
-        except Exception as e:
-            log_exception(
-                logger,
-                "schedule.next_run.calculate_failed",
-                e,
-                rrule=rrule_str,
-            )
-            return None
+        return cast(Optional[datetime], calculate_schedule_next_run(rrule_str, after))
 
     def update_schedule_next_run(self, schedule_id: str, next_run: datetime) -> bool:
         """스케줄의 다음 실행 시간을 업데이트합니다."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                UPDATE schedules
-                SET next_run = ?
-                WHERE id = ?
-            """,
-                (to_iso_utc(next_run), schedule_id),
-            )
-
-            conn.commit()
-            conn.close()
-
-            log_info(
-                logger,
-                "schedule.next_run.updated",
-                schedule_id=schedule_id,
-                next_run=next_run,
-            )
-            return True
-
-        except Exception as e:
-            log_exception(
-                logger, "schedule.next_run.update_failed", e, schedule_id=schedule_id
-            )
-            return False
+        return cast(
+            bool,
+            update_schedule_entry_next_run(
+                self.db_path,
+                schedule_id,
+                next_run,
+            ),
+        )
 
     def disable_schedule(self, schedule_id: str) -> bool:
         """스케줄을 비활성화합니다."""
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-
-            cursor.execute(
-                """
-                UPDATE schedules
-                SET enabled = 0
-                WHERE id = ?
-            """,
-                (schedule_id,),
-            )
-
-            conn.commit()
-            conn.close()
-
-            log_info(logger, "schedule.disabled", schedule_id=schedule_id)
-            return True
-
-        except Exception as e:
-            log_exception(logger, "schedule.disable_failed", e, schedule_id=schedule_id)
-            return False
+        return cast(bool, disable_schedule_entry(self.db_path, schedule_id))
 
     def execute_schedule(self, schedule: Dict) -> bool:
         """스케줄을 실행합니다."""
