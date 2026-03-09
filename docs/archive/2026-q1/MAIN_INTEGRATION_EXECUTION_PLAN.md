@@ -1,16 +1,20 @@
 # Main 통합 실행 계획 (현재 상태 기준)
 
-본 문서는 2026년 3월 9일 기준으로 release 통합 계획을 다시 정리한 현재판입니다.
+> Historical note (2026-03-09): RR-2에서 archive로 이관된 문서입니다.
+> 현재 release 실행 기준은 `docs/dev/CI_CD_GUIDE.md` 와
+> `.github/PULL_REQUEST_TEMPLATE/release_integration.md` 를 따릅니다.
+
+본 문서는 2026년 3월 9일 기준으로 release 통합 계획을 정리한 시점 문서입니다.
 이전 문서의 전제였던 `baseline/main-equivalent` 기준 분리 통합은 더 이상 기본 실행 경로가 아닙니다.
 현재 `main`에는 release/quality/scheduler 관련 RR가 직접 순차 머지되어 있으므로, 이 문서는
-`무엇이 이미 main에 흡수되었는지`와 `앞으로 무엇을 새 RR로 다시 열어야 하는지`를 정리합니다.
+`무엇이 이미 main에 흡수되었는지`와 `앞으로 무엇을 새 RR로 다시 열어야 하는지`를 배경 정보로 보존합니다.
 
 ## 0) 현재 판단
 
 1. `release/*` 브랜치를 `baseline/main-equivalent`에서 다시 시작하지 않습니다.
 2. 기존 release 스트림 대부분은 이미 `main`에 흡수되어 별도 branch integration 작업이 의미를 잃었습니다.
 3. 앞으로 release 관련 작업이 필요하면 반드시 **현재 `main` 기준 새 RR/새 branch/새 manifest 검증**으로 다시 엽니다.
-4. historical reasoning이 필요하면 `docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md`를 참고하되, 실행 기준은 이 문서를 따릅니다.
+4. historical reasoning이 필요하면 `docs/archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md`를 참고합니다.
 
 ## 1) 상태 스냅샷
 

@@ -2,8 +2,12 @@
 
 기준일: 2026-03-08
 
-이 문서는 현재 코드 상태를 기준으로 리팩토링 업무단위, 단계, 우선순위 근거를 다시 정리한 실행 문서입니다.
-장기 방향은 `docs/dev/LONG_TERM_REPO_STRATEGY.md`를 따르고, 본 문서는 그 전략을 당장 실행 가능한 작업 배치로 쪼개는 데 목적이 있습니다.
+> Historical note (2026-03-09): RR-2에서 archive로 이관된 시점 고정형 실행 계획입니다.
+> 현재 구조/위생 축의 active planning 기준은 `docs/dev/LONG_TERM_REPO_STRATEGY.md` 와
+> `docs/dev/REPO_HYGIENE_POLICY.md` 를 따릅니다.
+
+이 문서는 2026-03-08 시점의 코드 상태를 기준으로 리팩토링 업무단위, 단계, 우선순위 근거를 다시 정리한 실행 문서입니다.
+장기 방향은 `docs/dev/LONG_TERM_REPO_STRATEGY.md`를 따르고, 본 문서는 그 전략을 당시 실행 가능한 작업 배치로 쪼개는 데 목적이 있습니다.
 
 ## 1. 실행 기준
 

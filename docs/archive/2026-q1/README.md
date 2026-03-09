@@ -12,6 +12,9 @@
 | [`MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](MULTI_LLM_IMPLEMENTATION_SUMMARY.md) | 구현 완료 보고서 성격 | [`../../technical/LLM_CONFIGURATION.md`](../../technical/LLM_CONFIGURATION.md), [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) |
 | [`REPO_HYGIENE_STATUS_2026-02-24.md`](REPO_HYGIENE_STATUS_2026-02-24.md) | 날짜 박힌 상태 스냅샷 | [`../../dev/REPO_HYGIENE_POLICY.md`](../../dev/REPO_HYGIENE_POLICY.md) |
 | [`F14_COMPLETION_REPORT.md`](F14_COMPLETION_REPORT.md) | 이름과 실제 내용이 다른 완료 보고서 | [`../../developer/CENTRALIZED_SETTINGS_GUIDE.md`](../../developer/CENTRALIZED_SETTINGS_GUIDE.md) |
+| [`MAIN_INTEGRATION_EXECUTION_PLAN.md`](MAIN_INTEGRATION_EXECUTION_PLAN.md) | 현재 release 실행 기준이 아닌 시점별 통합 계획 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md), [`../../../.github/PULL_REQUEST_TEMPLATE/release_integration.md`](../../../.github/PULL_REQUEST_TEMPLATE/release_integration.md) |
+| [`BRANCH_MAIN_GAP_ANALYSIS.md`](BRANCH_MAIN_GAP_ANALYSIS.md) | 과거 `main` 격차 분석 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md) |
+| [`REFACTORING_EXECUTION_PLAN.md`](REFACTORING_EXECUTION_PLAN.md) | 시점 고정형 리팩토링 배치 계획 | [`../../dev/LONG_TERM_REPO_STRATEGY.md`](../../dev/LONG_TERM_REPO_STRATEGY.md), [`../../dev/REPO_HYGIENE_POLICY.md`](../../dev/REPO_HYGIENE_POLICY.md) |
 
 ## Rollback
 

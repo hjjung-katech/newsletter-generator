@@ -49,10 +49,10 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`dev/RR_REQUEST_TEMPLATE.md`](dev/RR_REQUEST_TEMPLATE.md) | supporting | Contributor Workflow | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | keep |
 | [`dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`](dev/AGENT_SKILL_REQUEST_PLAYBOOK.md) | supporting | Contributor Workflow | [`../AGENTS.md`](../AGENTS.md) | keep |
 | [`dev/CODEX_INSTRUCTION_LAYOUT.md`](dev/CODEX_INSTRUCTION_LAYOUT.md) | supporting | Repo Governance | [`../AGENTS.md`](../AGENTS.md) | keep |
-| [`dev/MAIN_INTEGRATION_EXECUTION_PLAN.md`](dev/MAIN_INTEGRATION_EXECUTION_PLAN.md) | supporting | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | keep |
-| [`dev/BRANCH_MAIN_GAP_ANALYSIS.md`](dev/BRANCH_MAIN_GAP_ANALYSIS.md) | supporting | Release/Ops | [`dev/MAIN_INTEGRATION_EXECUTION_PLAN.md`](dev/MAIN_INTEGRATION_EXECUTION_PLAN.md) | keep |
-| [`dev/REFACTORING_EXECUTION_PLAN.md`](dev/REFACTORING_EXECUTION_PLAN.md) | supporting | Repo Hygiene | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md) | keep |
 | [`dev/langsmith_setup.md`](dev/langsmith_setup.md) | supporting | Runtime Config | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) | keep |
+| [`archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md`](archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md) | historical | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md), [`dev/WORKFLOW_TEMPLATES.md`](dev/WORKFLOW_TEMPLATES.md) | archive |
+| [`archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md`](archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md) | historical | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | archive |
+| [`archive/2026-q1/REFACTORING_EXECUTION_PLAN.md`](archive/2026-q1/REFACTORING_EXECUTION_PLAN.md) | historical | Repo Hygiene | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md), [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
 | [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md) | historical | Architecture | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) | archive |
 | [`archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md`](archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md) | historical | Repo Hygiene | [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
 | [`archive/2026-q1/F14_COMPLETION_REPORT.md`](archive/2026-q1/F14_COMPLETION_REPORT.md) | historical | Runtime Config | [`developer/CENTRALIZED_SETTINGS_GUIDE.md`](developer/CENTRALIZED_SETTINGS_GUIDE.md) | archive |
@@ -104,3 +104,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 2. archive-first 정책과 버킷 명명 규칙은 [`archive/README.md`](archive/README.md) 에서 관리합니다.
 3. 허브 문서와 루트 README에는 인벤토리 링크를 추가해 문서 탐색 시작점을 단일화했습니다.
 4. 환경변수 정본과 `.env.example` 의 용어를 맞추기 위해 canonical key와 compatibility key를 분리해 명시했습니다.
+5. 구조/위생 축의 과거 실행 계획 문서는 canonical 참조를 제거한 뒤 [`archive/2026-q1/`](archive/2026-q1/README.md) 로 이관했습니다.
