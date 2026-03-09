@@ -5,16 +5,18 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
-
 from newsletter.date_utils import extract_source_and_date, format_date_for_display
 from newsletter.utils.logger import get_logger
 
-from .compose_context import build_render_context, load_newsletter_settings
 from .compose_inputs import (
     NewsletterConfig,
     normalize_compose_input,
     resolve_style_config,
+)
+from .compose_renderer import (
+    render_compact_wrapper,
+    render_detailed_wrapper,
+    render_newsletter_template,
 )
 from .compose_sections import (
     add_emoji_to_section_title,
@@ -123,113 +125,19 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
     )
 
 
-def render_newsletter_template(
-    data: Dict[str, Any],
-    template_dir: str,
-    config: Dict[str, Any],
-    top_articles: List[Dict[str, Any]],
-    grouped_sections: List[Dict[str, Any]],
-    definitions: List[Dict[str, str]],
-    food_for_thought: Any,
-) -> str:
-    """템플릿을 렌더링하여 최종 HTML 생성"""
-    env = Environment(
-        loader=FileSystemLoader(template_dir),
-        autoescape=select_autoescape(["html", "xml"]),
-    )
-
-    template_name = config["template_name"]
-    logger.debug(f"템플릿 로딩 중: {template_name}")
-    template = env.get_template(template_name)
-    logger.debug(f"템플릿 로딩 완료: {template_name}")
-    context = build_render_context(
-        data=data,
-        config=config,
-        top_articles=top_articles,
-        grouped_sections=grouped_sections,
-        definitions=definitions,
-        food_for_thought=food_for_thought,
-    )
-    return template.render(context)
-
-
 # 기존 함수들을 새로운 통합 함수로 래핑
 def compose_newsletter_html(data, template_dir: str, template_name: str) -> str:
     """기존 detailed 뉴스레터 생성 함수 (호환성 유지)"""
-    # 템플릿 이름이 지정된 경우 사용, 아닌 경우 기본값 사용
-    if template_name and template_name != "newsletter_template.html":
-        # 사용자 정의 템플릿 처리
-        env = Environment(
-            loader=FileSystemLoader(template_dir),
-            autoescape=select_autoescape(["html", "xml"]),
-        )
-        template = env.get_template(template_name)  # 여기서 TemplateNotFound 예외 발생 가능
-
-        # 현재 날짜와 시간 가져오기
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        current_time = datetime.now().strftime("%H:%M:%S")
-
-        generation_date = data.get(
-            "generation_date", os.environ.get("GENERATION_DATE", current_date)
-        )
-        generation_timestamp = data.get(
-            "generation_timestamp", os.environ.get("GENERATION_TIMESTAMP", current_time)
-        )
-
-        # 간단한 컨텍스트로 렌더링
-        context = {
-            "newsletter_topic": data.get("newsletter_topic", "주간 산업 동향"),
-            "newsletter_title": data.get(
-                "newsletter_title",
-                data.get("newsletter_topic", "주간 산업 동향 뉴스 클리핑"),
-            ),
-            "generation_date": generation_date,
-            "generation_timestamp": generation_timestamp,
-            "sections": data.get("sections", []),
-            "recipient_greeting": data.get("recipient_greeting"),
-            "introduction_message": data.get("introduction_message"),
-            "closing_message": data.get("closing_message"),
-            "editor_signature": data.get("editor_signature"),
-            "company_name": data.get("company_name"),
-            "top_articles": data.get("top_articles", []),
-            "food_for_thought": data.get("food_for_thought"),
-            "search_keywords": data.get("search_keywords"),
-        }
-
-        # 검색 키워드 처리 (리스트를 문자열로 변환)
-        if context["search_keywords"] and isinstance(context["search_keywords"], list):
-            context["search_keywords"] = ", ".join(context["search_keywords"])
-
-        return template.render(context)
-
-    return compose_newsletter(data, template_dir, "detailed")
+    return render_detailed_wrapper(
+        data, template_dir, template_name, compose_newsletter
+    )
 
 
 def compose_compact_newsletter_html(
     data, template_dir: str, template_name: str = "newsletter_template_compact.html"
 ) -> str:
     """기존 compact 뉴스레터 생성 함수 (호환성 유지)"""
-    # 템플릿 이름이 지정된 경우 직접 로딩해서 예외 확인
-    if template_name != "newsletter_template_compact.html":
-        # 사용자 정의 템플릿 처리 - 여기서 예외가 발생할 수 있음
-        env = Environment(
-            loader=FileSystemLoader(template_dir),
-            autoescape=select_autoescape(["html", "xml"]),
-        )
-        template = env.get_template(template_name)  # 여기서 TemplateNotFound 예외 발생 가능
-
-        # 간단한 컨텍스트로 렌더링
-        context = {
-            "newsletter_title": data.get("newsletter_topic", "주간 산업 동향 뉴스 클리핑"),
-            "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
-            "generation_date": data.get(
-                "generation_date", datetime.now().strftime("%Y-%m-%d")
-            ),
-            "definitions": data.get("definitions", []),
-        }
-        return template.render(context)
-
-    return compose_newsletter(data, template_dir, "compact")
+    return render_compact_wrapper(data, template_dir, template_name, compose_newsletter)
 
 
 def save_newsletter_with_config(
