@@ -1,5 +1,9 @@
 # RR (Request/Review) Template
 
+> Historical note (2026-03-09): RR-07에서 active docs tree 밖으로 이관된 문서입니다.
+> 현재 RR 요청 정본은 `.github/ISSUE_TEMPLATE/review-request.yml` 와
+> `docs/dev/CI_CD_GUIDE.md` 의 request entry 패턴을 기준으로 유지합니다.
+
 이 문서는 에이전트 작업 요청(RR)을 표준화하기 위한 템플릿입니다.
 GitHub 이슈 기반 RR의 정본은 `.github/ISSUE_TEMPLATE/review-request.yml`입니다.
 

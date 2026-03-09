@@ -17,6 +17,8 @@
 | [`REFACTORING_EXECUTION_PLAN.md`](REFACTORING_EXECUTION_PLAN.md) | 시점 고정형 리팩토링 배치 계획 | [`../../dev/LONG_TERM_REPO_STRATEGY.md`](../../dev/LONG_TERM_REPO_STRATEGY.md), [`../../dev/REPO_HYGIENE_POLICY.md`](../../dev/REPO_HYGIENE_POLICY.md) |
 | [`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md) | 중복된 아키텍처 개요 문서 | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md), [`../../technical/adr-0001-architecture-boundaries.md`](../../technical/adr-0001-architecture-boundaries.md) |
 | [`CODE_QUALITY.md`](CODE_QUALITY.md) | 현재 게이트 구성과 어긋난 예전 코드 품질 안내 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md), [`../../dev/LOCAL_CI_GUIDE.md`](../../dev/LOCAL_CI_GUIDE.md) |
+| [`RR_REQUEST_TEMPLATE.md`](RR_REQUEST_TEMPLATE.md) | GitHub RR 템플릿과 중복된 요청 예시 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md), [`../../../.github/ISSUE_TEMPLATE/review-request.yml`](../../../.github/ISSUE_TEMPLATE/review-request.yml) |
+| [`WORKFLOW_TEMPLATES.md`](WORKFLOW_TEMPLATES.md) | contributor workflow 정본과 중복된 템플릿 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md) |
 
 ## Rollback
 
