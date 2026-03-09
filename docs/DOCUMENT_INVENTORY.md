@@ -48,7 +48,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`dev/WORKFLOW_TEMPLATES.md`](dev/WORKFLOW_TEMPLATES.md) | supporting | Contributor Workflow | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | keep |
 | [`dev/RR_REQUEST_TEMPLATE.md`](dev/RR_REQUEST_TEMPLATE.md) | supporting | Contributor Workflow | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | keep |
 | [`dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`](dev/AGENT_SKILL_REQUEST_PLAYBOOK.md) | supporting | Contributor Workflow | [`../AGENTS.md`](../AGENTS.md) | keep |
-| [`dev/CODEX_INSTRUCTION_LAYOUT.md`](dev/CODEX_INSTRUCTION_LAYOUT.md) | supporting | Repo Governance | [`../AGENTS.md`](../AGENTS.md) | keep |
+| [`dev/AGENTS_GOVERNANCE.md`](dev/AGENTS_GOVERNANCE.md) | supporting | Repo Governance | [`../AGENTS.md`](../AGENTS.md) | keep |
 | [`dev/langsmith_setup.md`](dev/langsmith_setup.md) | supporting | Runtime Config | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) | keep |
 | [`archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md`](archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md) | historical | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md), [`dev/WORKFLOW_TEMPLATES.md`](dev/WORKFLOW_TEMPLATES.md) | archive |
 | [`archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md`](archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md) | historical | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | archive |
@@ -107,3 +107,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 5. 구조/위생 축의 과거 실행 계획 문서는 canonical 참조를 제거한 뒤 [`archive/2026-q1/`](archive/2026-q1/README.md) 로 이관했습니다.
 6. 아키텍처 축은 [`ARCHITECTURE.md`](ARCHITECTURE.md) 1개 정본과 ADR/마이그레이션 로그 보조 구조로 정리하고, 중복 개요 문서는 archive 로 이관했습니다.
 7. 환경 샘플은 root `.env.example`(canonical runtime) 과 `apps/experimental/.env.example`(experimental runtime) 로 분리했습니다.
+8. `docs/dev/CODEX_INSTRUCTION_LAYOUT.md` 는 활성 거버넌스 문서 역할에 맞게 [`dev/AGENTS_GOVERNANCE.md`](dev/AGENTS_GOVERNANCE.md) 로 rename 했습니다.
