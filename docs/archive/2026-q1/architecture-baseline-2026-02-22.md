@@ -1,5 +1,9 @@
 # Architecture Baseline (2026-02-22)
 
+> Historical note (RR-09): active architecture guidance remains in
+> `../../technical/adr-0001-architecture-boundaries.md` and
+> `../../technical/architecture-migration-log.md`.
+
 ## Snapshot Scope
 - Repository: `newsletter-generator-codex-skills-agents`
 - Date: 2026-02-22

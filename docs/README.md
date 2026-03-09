@@ -83,5 +83,6 @@
   - [`archive/2026-q1/RR_REQUEST_TEMPLATE.md`](archive/2026-q1/RR_REQUEST_TEMPLATE.md)
   - [`archive/2026-q1/WORKFLOW_TEMPLATES.md`](archive/2026-q1/WORKFLOW_TEMPLATES.md)
   - [`archive/2026-q1/langsmith_setup.md`](archive/2026-q1/langsmith_setup.md)
+  - [`archive/2026-q1/architecture-baseline-2026-02-22.md`](archive/2026-q1/architecture-baseline-2026-02-22.md)
   - [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)
   - [`archive/webservice-prd.md`](archive/webservice-prd.md)

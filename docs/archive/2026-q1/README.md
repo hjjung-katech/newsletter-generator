@@ -20,6 +20,7 @@
 | [`RR_REQUEST_TEMPLATE.md`](RR_REQUEST_TEMPLATE.md) | GitHub RR 템플릿과 중복된 요청 예시 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md), [`../../../.github/ISSUE_TEMPLATE/review-request.yml`](../../../.github/ISSUE_TEMPLATE/review-request.yml) |
 | [`WORKFLOW_TEMPLATES.md`](WORKFLOW_TEMPLATES.md) | contributor workflow 정본과 중복된 템플릿 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md) |
 | [`langsmith_setup.md`](langsmith_setup.md) | LangSmith/비용 추적 standalone 가이드가 정본 문서와 중복 | [`../../technical/LLM_CONFIGURATION.md`](../../technical/LLM_CONFIGURATION.md), [`../../reference/environment-variables.md`](../../reference/environment-variables.md) |
+| [`architecture-baseline-2026-02-22.md`](architecture-baseline-2026-02-22.md) | 날짜가 고정된 구조 기준선 스냅샷 | [`../../technical/adr-0001-architecture-boundaries.md`](../../technical/adr-0001-architecture-boundaries.md), [`../../technical/architecture-migration-log.md`](../../technical/architecture-migration-log.md) |
 
 ## Rollback
 
