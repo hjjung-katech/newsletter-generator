@@ -105,6 +105,11 @@ python scripts/devtools/run_tests.py integration
 python tests/deployment/smoke_test.py --railway
 ```
 
+## Historical Reports
+
+- archived QA summary: [`archive/RESULTS_SUMMARY.md`](archive/RESULTS_SUMMARY.md)
+- historical reports are not the current execution standard; use this guide and [`TEST_EXECUTION_GUIDE.md`](TEST_EXECUTION_GUIDE.md) first.
+
 ## 🏷️ 테스트 마커 시스템
 
 프로젝트에서 사용하는 pytest 마커:
