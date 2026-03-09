@@ -17,14 +17,9 @@ except ImportError:
     from time_utils import to_iso_utc  # Development
 
 try:
-    from ops_logging import log_debug, log_error, log_exception, log_info
+    from ops_logging import log_debug, log_exception, log_info
 except ImportError:
-    from web.ops_logging import (  # pragma: no cover
-        log_debug,
-        log_error,
-        log_exception,
-        log_info,
-    )
+    from web.ops_logging import log_debug, log_exception, log_info  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
