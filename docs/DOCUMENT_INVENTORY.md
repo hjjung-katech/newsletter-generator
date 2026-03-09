@@ -84,7 +84,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`developer/CENTRALIZED_SETTINGS_GUIDE.md`](developer/CENTRALIZED_SETTINGS_GUIDE.md) | supporting | Runtime Config | [`reference/environment-variables.md`](reference/environment-variables.md) | keep |
 | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) | canonical | Runtime Config | - | keep |
 | [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md) | canonical | Architecture | - | keep |
-| [`technical/architecture-baseline-2026-02-22.md`](technical/architecture-baseline-2026-02-22.md) | historical | Architecture | [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md) | keep |
+| [`archive/2026-q1/architecture-baseline-2026-02-22.md`](archive/2026-q1/architecture-baseline-2026-02-22.md) | historical | Architecture | [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md), [`technical/architecture-migration-log.md`](technical/architecture-migration-log.md) | archive |
 | [`technical/architecture-migration-log.md`](technical/architecture-migration-log.md) | historical | Architecture | [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md) | keep |
 | [`technical/shim-deprecation-schedule.md`](technical/shim-deprecation-schedule.md) | supporting | Architecture | [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md) | keep |
 
@@ -111,3 +111,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 9. stale 상태였던 `docs/dev/CODE_QUALITY.md` 는 [`archive/2026-q1/CODE_QUALITY.md`](archive/2026-q1/CODE_QUALITY.md) 로 이관하고, active 품질 기준은 [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) 로 흡수했습니다.
 10. contributor workflow 중복 문서는 [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) 정본으로 통합하고, `WORKFLOW_TEMPLATES` 및 `RR_REQUEST_TEMPLATE` 는 archive 로 이관했습니다.
 11. LangSmith/cost-tracking standalone 문서는 [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) 와 [`reference/environment-variables.md`](reference/environment-variables.md) 로 흡수하고 archive-first 로 이관했습니다.
+12. 날짜가 박힌 architecture baseline snapshot 은 [`archive/2026-q1/architecture-baseline-2026-02-22.md`](archive/2026-q1/architecture-baseline-2026-02-22.md) 로 이관하고, active 구조 기준은 ADR + migration log 조합으로 유지했습니다.
