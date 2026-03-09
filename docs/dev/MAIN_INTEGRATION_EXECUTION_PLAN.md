@@ -1,116 +1,114 @@
-# Main 통합 실행 계획 (즉시 실행 버전)
+# Main 통합 실행 계획 (현재 상태 기준)
 
-본 문서는 `docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md`의 전략을 실제 실행 순서로 옮긴 플레이북입니다.
+본 문서는 2026년 3월 9일 기준으로 release 통합 계획을 다시 정리한 현재판입니다.
+이전 문서의 전제였던 `baseline/main-equivalent` 기준 분리 통합은 더 이상 기본 실행 경로가 아닙니다.
+현재 `main`에는 release/quality/scheduler 관련 RR가 직접 순차 머지되어 있으므로, 이 문서는
+`무엇이 이미 main에 흡수되었는지`와 `앞으로 무엇을 새 RR로 다시 열어야 하는지`를 정리합니다.
 
-## 0) 실패 재발 방지 원칙 (필수)
+## 0) 현재 판단
 
-1. 기준선 고정: `baseline/main-equivalent` 태그에서만 release 브랜치 시작
-2. 범위 고정: 릴리즈별 manifest(포함 파일 목록) 기반 반영
-3. 환경 고정: `make preflight-release` 통과 전 테스트/PR 진행 금지
-4. 메타데이터 고정: PR 본문 기재 + GitHub 라벨/리뷰어 실제 적용
+1. `release/*` 브랜치를 `baseline/main-equivalent`에서 다시 시작하지 않습니다.
+2. 기존 release 스트림 대부분은 이미 `main`에 흡수되어 별도 branch integration 작업이 의미를 잃었습니다.
+3. 앞으로 release 관련 작업이 필요하면 반드시 **현재 `main` 기준 새 RR/새 branch/새 manifest 검증**으로 다시 엽니다.
+4. historical reasoning이 필요하면 `docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md`를 참고하되, 실행 기준은 이 문서를 따릅니다.
 
-## 1) 통합 순서
+## 1) 상태 스냅샷
 
-1. `release/ci-platform`
-2. `release/runtime-binary`
-3. `release/scheduler-reliability`
+- 기준 날짜: 2026년 3월 9일
+- 로컬/원격 상태: `main`이 존재하고 `origin/main`과 동기화 가능
+- `release/*` 로컬/원격 브랜치: 현재 없음
+- open RR 이슈 정리 결과: release/refactor 관련 stale RR는 모두 닫혔고, 남은 open follow-up은 `#209` 하나입니다.
 
-각 단계는 이전 단계가 `main`에 머지되고 24시간 관측 윈도우를 통과한 뒤 진행합니다.
+## 2) release 스트림 상태
 
-## 2) 브랜치 생성/동기화
+| 스트림 | 현재 상태 | 근거 | 결론 |
+|---|---|---|---|
+| `release/ci-platform` | 별도 branch 통합 불필요 | CI/policy/preflight 관련 변경이 이미 `main`에 직접 반영됨. manifest는 유지하되 경로는 현재 구조로 보정함. | `merged / superseded as separate release branch` |
+| `release/runtime-binary-bootstrap` | 별도 branch 통합 불필요 | `web/runtime_paths.py`, `web/app.py`, runtime bootstrap 관련 파일이 이미 `main`에 존재 | `merged / keep as reference manifest` |
+| `release/runtime-binary` | 기반 작업은 main 반영, 전용 release 실행은 미계획 | Windows artifact/signing 관련 스크립트와 문서가 `main`에 존재하고 기존 RR도 완료됨. 다만 현재 `main` 기준 실제 Windows release dry-run은 별도 업무로 다시 열어야 함 | `partially actionable only when a Windows release is scheduled` |
+| `release/scheduler-reliability` | 별도 branch 통합 불필요 | `schedule_runner`, `shutdown_manager`, 관련 테스트/게이트가 이미 `main`에 직접 반영됨 | `merged / superseded as separate release branch` |
+
+## 3) manifest 상태
+
+### `release-ci-platform`
+
+- 현재도 참고용 manifest로 유지합니다.
+- 2026년 3월 9일 기준으로 죽은 경로 2개를 현재 경로로 보정했습니다.
+  - `LOCAL_CI_GUIDE.md` -> `docs/dev/LOCAL_CI_GUIDE.md`
+  - `check_quality.py` -> `scripts/devtools/check_quality.py`
+
+### `release-runtime-binary-bootstrap`
+
+- 모든 manifest 경로가 현재 `main`에서 유효합니다.
+- 다만 이 manifest는 "과거 분리 통합 계획의 참고 기준"이지 즉시 branch cut 지시서는 아닙니다.
+
+### `release-runtime-binary`
+
+- manifest 경로는 현재도 모두 유효합니다.
+- 실제 release 대상으로 다시 사용할 경우, 현재 `main` 기준 Windows signing/release dry-run RR를 새로 열어 재검증해야 합니다.
+
+### `release-scheduler-reliability`
+
+- manifest 경로는 현재도 모두 유효합니다.
+- 별도 release branch 계획은 종료하고, 이후 scheduler work는 일반 RR 흐름으로 다룹니다.
+
+## 4) issue 정리 결과
+
+2026년 3월 9일에 다음 stale RR 이슈를 실제 merged PR 기준으로 닫았습니다.
+
+- repo/release hygiene: `#106 #108 #110 #112 #114 #116 #118 #137 #138 #140`
+- runtime/config/web refactor: `#179 #182 #205 #206 #210 #212 #220 #221 #223 #224 #225 #226 #227 #228 #229`
+- product follow-up already delivered: `#195 #197`
+
+현재 release/ops 후속으로 열려 있는 것은 아래 하나뿐입니다.
+
+- `#209` Follow-up: phase 2 operational security hardening
+
+## 5) 지금부터의 실행 원칙
+
+1. release 관련 새 작업은 과거 RR 재사용 없이 새 RR로 엽니다.
+2. branch를 만든다면 출발점은 항상 **현재 `main`** 입니다.
+3. 새 release RR는 아래 세 조건을 모두 만족할 때만 엽니다.
+   - 현재 `main`에 아직 없는 결과물이 명확함
+   - manifest가 현재 경로 기준으로 유효함
+   - `make preflight-release`, `make check`, `make check-full` 실행 계획이 먼저 정의됨
+
+## 6) 바로 남은 일
+
+### A. 지금 즉시 할 일
+
+- release branch를 추가로 만들 필요는 없습니다.
+- release 문서의 실행 기준은 이 문서로 단일화합니다.
+
+### B. 다음에 새 RR로 열 수 있는 일
+
+1. Windows binary release dry-run from current `main`
+   - 조건: 실제 Windows release를 다시 추진할 때만
+   - 방식: 현재 `main`에서 새 RR 생성 후 signing/dry-run 증적을 다시 수집
+2. `#209` phase 2 operational security hardening
+   - stronger auth
+   - centralized/distributed throttling
+   - quota/abuse policy
+
+## 7) future release branch가 정말 필요할 때의 최소 절차
 
 ```bash
-# baseline 태그가 없으면 1회 생성 (예: 워크플로우 통합 기준 커밋)
-git tag baseline/main-equivalent 1e93460
-```
+# always cut from current main, not from baseline/main-equivalent
+git checkout main
+git pull --ff-only origin main
+git checkout -b release/<topic>
 
-```bash
-# baseline 태그를 기준으로 시작
-git checkout -b release/ci-platform baseline/main-equivalent
-git checkout -b release/runtime-binary baseline/main-equivalent
-git checkout -b release/scheduler-reliability baseline/main-equivalent
-```
-
-## 3) PR 생성 전 공통 체크
-
-```bash
-# 사전 점검 (필수)
 make preflight-release
-
-# quick gate
-make test-quick
-
-# full gate
-make test-full
-
-# scheduler/runtime 고위험 변경 시
-make test-nightly
+make check
+make check-full
 ```
-
-- `run_ci_checks.py` 기본 검사 소스는 `staged`입니다.
-  - 릴리즈 전에 포함할 파일을 스테이징한 상태에서 게이트를 실행해야 합니다.
-  - 문서/CI 스크립트만 스테이징된 경우, `test-full`의 단위 테스트는 스킵됩니다.
-  - 런타임 코드(`newsletter/`, `web/`)가 스테이징된 경우 단위 테스트가 실행됩니다.
 
 - PR 템플릿: `.github/PULL_REQUEST_TEMPLATE/release_integration.md`
-- 리뷰어: 코드 오너 + 운영 담당
-- 머지 방식: 기본 squash merge (필요 시 merge commit)
+- 메타데이터 적용: `make apply-pr-metadata PR=<number>`
+- 머지 방식: 기본 squash merge
 
-## 4) release/ci-platform 반영 방식 (manifest)
+## 8) 결론
 
-- 원칙: 커밋 단위 선별보다 파일 목록 선별을 우선
-- 예시 명령:
-
-```bash
-# 포함 파일 목록을 확인 후 work에서 가져오기
-git restore --source=work -- \
-  .github/workflows/ \
-  .pre-commit-config.yaml \
-  scripts/devtools/hooks/pre-push \
-  scripts/devtools/setup_pre_push_hook.sh \
-  run_ci_checks.py \
-  scripts/devtools/check_quality.py \
-  Makefile \
-  docs/dev/LOCAL_CI_GUIDE.md
-
-# 범위 검증 (manifest 외 파일 유입 방지)
-make validate-ci-manifest
-```
-
-## 5) 머지 후 운영
-
-1. 태그 발행 (`vX.Y.Z`)
-2. `CHANGELOG.md` 업데이트
-3. 24시간 KPI 관측
-   - CI First Pass Rate
-   - 스케줄 누락/중복
-   - 비정상 종료율
-4. 이상 징후 시 태그 기준 즉시 롤백
-
-## 6) 이번 주 시작 작업(착수)
-
-- [x] PR 템플릿 추가
-- [x] quick/full/nightly 실행 타겟 정리 (`Makefile`)
-- [x] preflight 스크립트 추가 (`scripts/release_preflight.py`)
-- [ ] `release/ci-platform` 브랜치 분리 및 PR 생성
-- [ ] `release/runtime-binary` 브랜치 분리 및 PR 생성
-- [ ] `release/scheduler-reliability` 브랜치 분리 및 PR 생성
-
-
-## 7) PR 메타데이터 실제 적용(자동화)
-
-본문 체크리스트만으로는 라벨/리뷰어가 반영되지 않으므로, PR 생성 직후 아래를 실행합니다.
-
-```bash
-# 권장: 역할 파일(.release/reviewer_roles.json) 사용
-make apply-pr-metadata PR=<number>
-
-# 필요 시 명시적 핸들 override
-make apply-pr-metadata PR=<number> REVIEWERS=<code_owner,ops_owner>
-```
-
-- 기본 라벨: `release`, `risk:medium`, `area:ci`
-- 기본 역할 파일: `.release/reviewer_roles.json`
-  - `code_owner`: 실제 GitHub handle
-  - `ops_owner`: 실제 handle 또는 `virtual:*` 허용
-- `virtual:*`가 포함되거나 단일 관리자 저장소인 경우, PR 템플릿의 `PR Metadata Applied` 섹션을 운영 승인 기록으로 사용
+release 통합 계획의 핵심은 더 이상 "예전 baseline에서 branch를 다시 자르는 것"이 아닙니다.
+현재 기준으로는 대부분의 release stream이 이미 `main`에 흡수되었고, 남은 실질 후속은
+`Windows release를 다시 실제로 추진할지 여부`와 `#209 보안 hardening`뿐입니다.
