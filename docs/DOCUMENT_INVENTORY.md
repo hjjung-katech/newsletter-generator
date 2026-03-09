@@ -2,7 +2,7 @@
 
 문서 정합성 전수조사 기준일: 2026-03-09
 
-이 문서는 현재 추적 중인 Markdown 문서 54개를 대상으로 `canonical`, `supporting`, `historical`, `obsolete` 상태를 지정한 인벤토리입니다.
+이 문서는 현재 추적 중인 Markdown 문서 55개를 대상으로 `canonical`, `supporting`, `historical`, `obsolete` 상태를 지정한 인벤토리입니다.
 owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 
 ## Status Definitions
@@ -30,9 +30,10 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | canonical | Architecture | - | keep |
 | [`PRD.md`](PRD.md) | supporting | Product | - | keep |
 | [`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md) | supporting | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) | keep |
+| [`archive/README.md`](archive/README.md) | canonical | Repo Hygiene | - | keep |
 | [`archive/webservice-prd.md`](archive/webservice-prd.md) | historical | Product | [`PRD.md`](PRD.md) | keep in archive |
-| [`archive/2026-03/FIXES_SUMMARY.md`](archive/2026-03/FIXES_SUMMARY.md) | obsolete | Release/Ops | [`../CHANGELOG.md`](../CHANGELOG.md), [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | archive |
-| [`archive/2026-03/PROJECT_STRUCTURE.md`](archive/2026-03/PROJECT_STRUCTURE.md) | obsolete | Repo Hygiene | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md), [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
+| [`archive/2026-q1/FIXES_SUMMARY.md`](archive/2026-q1/FIXES_SUMMARY.md) | obsolete | Release/Ops | [`../CHANGELOG.md`](../CHANGELOG.md), [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | archive |
+| [`archive/2026-q1/PROJECT_STRUCTURE.md`](archive/2026-q1/PROJECT_STRUCTURE.md) | obsolete | Repo Hygiene | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md), [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
 
 ## Dev Docs
 
@@ -52,9 +53,9 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`dev/BRANCH_MAIN_GAP_ANALYSIS.md`](dev/BRANCH_MAIN_GAP_ANALYSIS.md) | supporting | Release/Ops | [`dev/MAIN_INTEGRATION_EXECUTION_PLAN.md`](dev/MAIN_INTEGRATION_EXECUTION_PLAN.md) | keep |
 | [`dev/REFACTORING_EXECUTION_PLAN.md`](dev/REFACTORING_EXECUTION_PLAN.md) | supporting | Repo Hygiene | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md) | keep |
 | [`dev/langsmith_setup.md`](dev/langsmith_setup.md) | supporting | Runtime Config | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) | keep |
-| [`archive/2026-03/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-03/MULTI_LLM_IMPLEMENTATION_SUMMARY.md) | historical | Architecture | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) | archive |
-| [`archive/2026-03/REPO_HYGIENE_STATUS_2026-02-24.md`](archive/2026-03/REPO_HYGIENE_STATUS_2026-02-24.md) | historical | Repo Hygiene | [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
-| [`archive/2026-03/F14_COMPLETION_REPORT.md`](archive/2026-03/F14_COMPLETION_REPORT.md) | historical | Runtime Config | [`developer/CENTRALIZED_SETTINGS_GUIDE.md`](developer/CENTRALIZED_SETTINGS_GUIDE.md) | archive |
+| [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md) | historical | Architecture | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md), [`ARCHITECTURE.md`](ARCHITECTURE.md) | archive |
+| [`archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md`](archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md) | historical | Repo Hygiene | [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
+| [`archive/2026-q1/F14_COMPLETION_REPORT.md`](archive/2026-q1/F14_COMPLETION_REPORT.md) | historical | Runtime Config | [`developer/CENTRALIZED_SETTINGS_GUIDE.md`](developer/CENTRALIZED_SETTINGS_GUIDE.md) | archive |
 
 ## Reference, Setup, and User Docs
 
@@ -99,6 +100,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 
 ## Immediate Actions Applied in This RR
 
-1. `obsolete` 또는 날짜가 박힌 완료 보고서 중 현재 운영 정본이 아닌 문서는 [`archive/2026-03/`](archive/2026-03/README.md) 로 이관했습니다.
-2. 허브 문서와 루트 README에는 인벤토리 링크를 추가해 문서 탐색 시작점을 단일화했습니다.
-3. 환경변수 정본과 `.env.example` 의 용어를 맞추기 위해 canonical key와 compatibility key를 분리해 명시했습니다.
+1. `obsolete` 또는 날짜가 박힌 완료 보고서 중 현재 운영 정본이 아닌 문서는 [`archive/2026-q1/`](archive/2026-q1/README.md) 로 이관했습니다.
+2. archive-first 정책과 버킷 명명 규칙은 [`archive/README.md`](archive/README.md) 에서 관리합니다.
+3. 허브 문서와 루트 README에는 인벤토리 링크를 추가해 문서 탐색 시작점을 단일화했습니다.
+4. 환경변수 정본과 `.env.example` 의 용어를 맞추기 위해 canonical key와 compatibility key를 분리해 명시했습니다.
