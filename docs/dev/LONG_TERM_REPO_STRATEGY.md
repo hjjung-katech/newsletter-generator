@@ -269,6 +269,9 @@ Delivery KPI:
   - `rr-lifecycle-close.yml` 추가로 머지 후 RR 이슈 자동 종료(Delivery Unit 수명주기 자동화)
 - Week 17 실행 반영:
   - 작업 마감/재시작용 상태 스냅샷 문서 추가 (`docs/archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md`)
+- Week 19 실행 반영:
+  - `config/template_config.json` 제거, 템플릿 메타데이터를 `config/config.yml`의 `newsletter_settings`로 통합
+  - `config/`를 런타임 설정 전용 디렉터리로 고정
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 
