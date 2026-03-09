@@ -1,5 +1,8 @@
 # Newsletter Generator Filtering Implementation Results
 
+> Historical note (RR-10): current QA execution guidance remains in
+> `../README.md`.
+
 ## What We Implemented
 
 1. **Article Filtering Module (`article_filter.py`)**

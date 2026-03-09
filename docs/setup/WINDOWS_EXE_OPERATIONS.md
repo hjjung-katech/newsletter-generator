@@ -126,4 +126,4 @@ make github-windows-release-controls
 
 ## 8) 실행 로그
 
-- 2026-02-24 실행 로그: `docs/setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`
+- 2026-02-24 실행 로그(archive): [`docs/archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](../archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md)

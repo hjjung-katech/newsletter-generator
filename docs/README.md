@@ -42,7 +42,6 @@
   - [`setup/RAILWAY_DEPLOYMENT.md`](setup/RAILWAY_DEPLOYMENT.md)
   - [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md)
   - [`setup/WINDOWS_EXE_UPDATE_CHANNEL.md`](setup/WINDOWS_EXE_UPDATE_CHANNEL.md)
-  - [`setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md)
   - [`reference/web-api.md`](reference/web-api.md)
   - [`reference/environment-variables.md`](reference/environment-variables.md)
 
@@ -52,6 +51,7 @@
   - [`technical/architecture-migration-log.md`](technical/architecture-migration-log.md)
   - [`technical/shim-deprecation-schedule.md`](technical/shim-deprecation-schedule.md)
   - [`PRD.md`](PRD.md)
+  - `technical/architecture-migration-log.md` 는 shim 제거가 완료될 때까지 active 참고 문서로 유지합니다.
 
 ## Governance
 
@@ -84,5 +84,6 @@
   - [`archive/2026-q1/WORKFLOW_TEMPLATES.md`](archive/2026-q1/WORKFLOW_TEMPLATES.md)
   - [`archive/2026-q1/langsmith_setup.md`](archive/2026-q1/langsmith_setup.md)
   - [`archive/2026-q1/architecture-baseline-2026-02-22.md`](archive/2026-q1/architecture-baseline-2026-02-22.md)
+  - [`archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md)
   - [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)
   - [`archive/webservice-prd.md`](archive/webservice-prd.md)

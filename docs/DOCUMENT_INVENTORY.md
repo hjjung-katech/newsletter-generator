@@ -2,7 +2,7 @@
 
 문서 정합성 전수조사 기준일: 2026-03-09
 
-이 문서는 현재 추적 중인 Markdown 문서 55개를 대상으로 `canonical`, `supporting`, `historical`, `obsolete` 상태를 지정한 인벤토리입니다.
+이 문서는 현재 추적 중인 Markdown 문서 56개를 대상으로 `canonical`, `supporting`, `historical`, `obsolete` 상태를 지정한 인벤토리입니다.
 owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 
 ## Status Definitions
@@ -71,7 +71,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) | canonical | Setup/Deploy | - | keep |
 | [`setup/WINDOWS_EXE_SMOKE_PLAYBOOK.md`](setup/WINDOWS_EXE_SMOKE_PLAYBOOK.md) | supporting | Setup/Deploy | [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) | keep |
 | [`setup/WINDOWS_EXE_UPDATE_CHANNEL.md`](setup/WINDOWS_EXE_UPDATE_CHANNEL.md) | supporting | Setup/Deploy | [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) | keep |
-| [`setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](setup/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md) | historical | Setup/Deploy | [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) | keep |
+| [`archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md) | historical | Setup/Deploy | [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) | archive |
 | [`user/USER_GUIDE.md`](user/USER_GUIDE.md) | canonical | User Docs | - | keep |
 | [`user/CLI_REFERENCE.md`](user/CLI_REFERENCE.md) | canonical | User Docs | - | keep |
 | [`user/MULTI_LLM_GUIDE.md`](user/MULTI_LLM_GUIDE.md) | supporting | User Docs | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) | keep |
@@ -93,10 +93,11 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | Path | Status | Owner | Canonical Replacement | Disposition |
 |---|---|---|---|---|
 | [`../tests/README.md`](../tests/README.md) | supporting | QA | [`dev/LOCAL_CI_GUIDE.md`](dev/LOCAL_CI_GUIDE.md) | keep |
+| [`../tests/archive/README.md`](../tests/archive/README.md) | supporting | QA | [`../tests/README.md`](../tests/README.md) | keep |
 | [`../tests/TEST_EXECUTION_GUIDE.md`](../tests/TEST_EXECUTION_GUIDE.md) | supporting | QA | [`../tests/README.md`](../tests/README.md) | keep |
 | [`../tests/TEST_REPORT_COMPACT_DEFINITIONS.md`](../tests/TEST_REPORT_COMPACT_DEFINITIONS.md) | supporting | QA | [`../tests/README.md`](../tests/README.md) | keep |
 | [`../tests/TEST_CLASSIFICATION_SUMMARY.md`](../tests/TEST_CLASSIFICATION_SUMMARY.md) | supporting | QA | [`../tests/README.md`](../tests/README.md) | keep |
-| [`../tests/RESULTS_SUMMARY.md`](../tests/RESULTS_SUMMARY.md) | historical | QA | [`../tests/README.md`](../tests/README.md) | keep |
+| [`../tests/archive/RESULTS_SUMMARY.md`](../tests/archive/RESULTS_SUMMARY.md) | historical | QA | [`../tests/README.md`](../tests/README.md) | archive |
 
 ## Immediate Actions Applied in This RR
 
@@ -112,3 +113,6 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 10. contributor workflow 중복 문서는 [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) 정본으로 통합하고, `WORKFLOW_TEMPLATES` 및 `RR_REQUEST_TEMPLATE` 는 archive 로 이관했습니다.
 11. LangSmith/cost-tracking standalone 문서는 [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) 와 [`reference/environment-variables.md`](reference/environment-variables.md) 로 흡수하고 archive-first 로 이관했습니다.
 12. 날짜가 박힌 architecture baseline snapshot 은 [`archive/2026-q1/architecture-baseline-2026-02-22.md`](archive/2026-q1/architecture-baseline-2026-02-22.md) 로 이관하고, active 구조 기준은 ADR + migration log 조합으로 유지했습니다.
+13. 날짜가 고정된 Windows release admin log 는 [`archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md) 로 이관하고, active 운영 기준은 [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) 로 유지했습니다.
+14. historical QA summary 는 `tests/archive/` 규칙을 만들고 [`../tests/archive/RESULTS_SUMMARY.md`](../tests/archive/RESULTS_SUMMARY.md) 로 이관했습니다.
+15. [`technical/architecture-migration-log.md`](technical/architecture-migration-log.md) 는 shim 제거 일정이 아직 열려 있으므로 active 참고 문서로 유지합니다.

@@ -1,5 +1,8 @@
 # Windows Release Admin Log (2026-02-24)
 
+> Historical note (RR-10): active Windows release guidance remains in
+> `../../setup/WINDOWS_EXE_OPERATIONS.md`.
+
 ## 목적
 
 - Windows EXE release 제어 항목을 운영 환경에 적용한 이력을 남깁니다.
