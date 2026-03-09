@@ -49,7 +49,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`archive/2026-q1/RR_REQUEST_TEMPLATE.md`](archive/2026-q1/RR_REQUEST_TEMPLATE.md) | obsolete | Contributor Workflow | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md), [`../.github/ISSUE_TEMPLATE/review-request.yml`](../.github/ISSUE_TEMPLATE/review-request.yml) | archive |
 | [`dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`](dev/AGENT_SKILL_REQUEST_PLAYBOOK.md) | supporting | Contributor Workflow | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md), [`../AGENTS.md`](../AGENTS.md) | keep |
 | [`dev/AGENTS_GOVERNANCE.md`](dev/AGENTS_GOVERNANCE.md) | supporting | Repo Governance | [`../AGENTS.md`](../AGENTS.md) | keep |
-| [`dev/langsmith_setup.md`](dev/langsmith_setup.md) | supporting | Runtime Config | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) | keep |
+| [`archive/2026-q1/langsmith_setup.md`](archive/2026-q1/langsmith_setup.md) | obsolete | Runtime Config | [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md), [`reference/environment-variables.md`](reference/environment-variables.md) | archive |
 | [`archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md`](archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md) | historical | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md), [`dev/AGENT_SKILL_REQUEST_PLAYBOOK.md`](dev/AGENT_SKILL_REQUEST_PLAYBOOK.md) | archive |
 | [`archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md`](archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md) | historical | Release/Ops | [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | archive |
 | [`archive/2026-q1/REFACTORING_EXECUTION_PLAN.md`](archive/2026-q1/REFACTORING_EXECUTION_PLAN.md) | historical | Repo Hygiene | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md), [`dev/REPO_HYGIENE_POLICY.md`](dev/REPO_HYGIENE_POLICY.md) | archive |
@@ -110,3 +110,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 8. `docs/dev/CODEX_INSTRUCTION_LAYOUT.md` 는 활성 거버넌스 문서 역할에 맞게 [`dev/AGENTS_GOVERNANCE.md`](dev/AGENTS_GOVERNANCE.md) 로 rename 했습니다.
 9. stale 상태였던 `docs/dev/CODE_QUALITY.md` 는 [`archive/2026-q1/CODE_QUALITY.md`](archive/2026-q1/CODE_QUALITY.md) 로 이관하고, active 품질 기준은 [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) 로 흡수했습니다.
 10. contributor workflow 중복 문서는 [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) 정본으로 통합하고, `WORKFLOW_TEMPLATES` 및 `RR_REQUEST_TEMPLATE` 는 archive 로 이관했습니다.
+11. LangSmith/cost-tracking standalone 문서는 [`technical/LLM_CONFIGURATION.md`](technical/LLM_CONFIGURATION.md) 와 [`reference/environment-variables.md`](reference/environment-variables.md) 로 흡수하고 archive-first 로 이관했습니다.

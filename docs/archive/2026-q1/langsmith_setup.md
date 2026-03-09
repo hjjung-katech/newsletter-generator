@@ -1,5 +1,9 @@
 # LangSmith 연동 및 비용 추적 가이드
 
+> Historical note (RR-08): active LangSmith and cost-tracking guidance moved to
+> `../../technical/LLM_CONFIGURATION.md` and
+> `../../reference/environment-variables.md`.
+
 이 문서는 뉴스레터 생성기에서 LangSmith 연동 및 Google Generative AI 비용 추적을 설정하는 방법을 안내합니다.
 
 ## `.env` 파일을 사용한 환경 변수 설정
