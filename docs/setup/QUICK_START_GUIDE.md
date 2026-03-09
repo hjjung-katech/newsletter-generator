@@ -1,6 +1,7 @@
 # Newsletter Generator 빠른 시작 (5분)
 
 이 문서는 최소 실행 경로만 제공합니다. 상세 설정은 정본 문서로 이동하세요.
+아래 명령은 저장소 루트(`newsletter-generator/`) 기준입니다.
 
 ## 1. 저장소 준비
 
@@ -41,13 +42,12 @@ EMAIL_SENDER=newsletter@example.com
 ## 4. 웹 실행
 
 ```bash
-cd web
-python init_database.py
-python app.py
+python web/init_database.py
+python apps/web/main.py
 ```
 
-브라우저: `http://localhost:5000`
-헬스체크: `http://localhost:5000/health`
+브라우저: `http://localhost:8000`
+헬스체크: `http://localhost:8000/health`
 
 ## 5. 확인 포인트
 

@@ -12,7 +12,12 @@ from web.app import app  # noqa: E402
 
 
 def main() -> None:
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+    app_env = os.getenv("APP_ENV") or os.getenv("FLASK_ENV") or "production"
+    app.run(
+        host=os.getenv("HOST", "0.0.0.0"),
+        port=int(os.getenv("PORT", "8000")),
+        debug=app_env == "development",
+    )
 
 
 if __name__ == "__main__":

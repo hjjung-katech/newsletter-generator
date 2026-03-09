@@ -426,7 +426,8 @@ def problematic_function():
             "name": "Debug Newsletter CLI",
             "type": "python",
             "request": "launch",
-            "module": "newsletter.cli",
+            "program": "${workspaceFolder}/apps/cli/main.py",
+            "cwd": "${workspaceFolder}",
             "args": ["run", "--keywords", "AI", "--output-format", "html"],
             "console": "integratedTerminal",
             "env": {
