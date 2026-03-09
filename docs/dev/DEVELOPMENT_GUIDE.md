@@ -616,7 +616,7 @@ pip install -r requirements-dev.txt --upgrade
 ## 추가 리소스
 
 - [CI/CD 가이드](CI_CD_GUIDE.md) - GitHub Actions 워크플로우
-- [코드 품질 가이드](CODE_QUALITY.md) - 품질 관리 도구
+- [로컬 CI 가이드](LOCAL_CI_GUIDE.md) - 로컬 게이트와 반복 검증 루프
 - [테스트 가이드](../../tests/TEST_EXECUTION_GUIDE.md) - 테스트 작성 및 실행
 - [아키텍처 문서](../ARCHITECTURE.md) - 시스템 설계
 - [CLI 참조](../user/CLI_REFERENCE.md) - 명령어 및 옵션 참조
