@@ -4,11 +4,11 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from newsletter.template_manager import TemplateManager
+from newsletter.template_manager import TemplateManager  # noqa: E402
 
 
 class TestTemplateIntegration(unittest.TestCase):
@@ -40,12 +40,19 @@ class TestTemplateIntegration(unittest.TestCase):
         # Clean up test directory
         shutil.rmtree(self.test_dir)
 
-    def test_template_manager_integration(self):
+    @patch(
+        "newsletter.template_manager.get_newsletter_settings",
+        return_value={
+            "company_name": "Test Company",
+            "editor_signature": "Test Editorial Team",
+            "footer_disclaimer": "Test Disclaimer Text",
+            "audience_description": "Test Experts",
+        },
+    )
+    def test_template_manager_integration(self, _mock_settings):
         """Test template manager basic integration"""
 
-        # Get template manager
-        with patch("os.getcwd", return_value=self.test_dir):
-            manager = TemplateManager.get_instance()
+        manager = TemplateManager.get_instance()
 
         # Verify config is loaded properly
         self.assertEqual(manager.get("company.name"), "Test Company")

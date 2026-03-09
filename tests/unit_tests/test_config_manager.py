@@ -116,6 +116,8 @@ llm_settings:
 
         self.assertEqual(settings["newsletter_title"], "주간 산업 동향 뉴스 클리핑")
         self.assertEqual(settings["editor_title"], "편집자")
+        self.assertEqual(settings["editor_signature"], "OSP 뉴스레터 편집팀 드림")
+        self.assertEqual(settings["primary_color"], "#3498db")
 
     def test_get_newsletter_settings_with_config(self):
         """설정 파일이 있는 경우 뉴스레터 설정 테스트"""
@@ -124,6 +126,7 @@ llm_settings:
             "newsletter_settings": {
                 "newsletter_title": "Custom Newsletter",
                 "editor_name": "Custom Editor",
+                "editor_signature": "Custom Signature",
             }
         }
 
@@ -132,6 +135,7 @@ llm_settings:
 
         self.assertEqual(settings["newsletter_title"], "Custom Newsletter")
         self.assertEqual(settings["editor_name"], "Custom Editor")
+        self.assertEqual(settings["editor_signature"], "Custom Signature")
         # 기본값은 유지되어야 함
         self.assertEqual(settings["editor_title"], "편집자")
 

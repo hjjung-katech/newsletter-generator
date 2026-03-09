@@ -4,13 +4,13 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader  # noqa: E402
 
-from newsletter.template_manager import TemplateManager
+from newsletter.template_manager import TemplateManager  # noqa: E402
 
 
 class TestTemplateManager(unittest.TestCase):
@@ -31,21 +31,27 @@ class TestTemplateManager(unittest.TestCase):
         # 테스트 디렉토리 정리
         shutil.rmtree(self.test_dir)
 
-    def test_default_config_creation(self):
-        """기본 설정 생성 테스트"""
-        # 설정 파일이 없을 때 기본 설정이 생성되는지 테스트
-        with patch("os.getcwd", return_value=self.test_dir):
+    @patch(
+        "newsletter.template_manager.get_newsletter_settings",
+        return_value={
+            "company_name": "테스트 기관",
+            "editor_signature": "테스트 편집팀 드림",
+            "footer_contact": "문의: test@example.com",
+        },
+    )
+    def test_default_runtime_config_loading(self, _mock_settings):
+        """기본 경로는 canonical runtime 설정을 사용해야 한다."""
+        with patch("newsletter.template_manager.date") as mock_date:
+            mock_date.today.return_value = mock_date
+            mock_date.year = 2026
             manager = TemplateManager.get_instance()
-            self.assertTrue(os.path.exists(self.config_path))
-
-            # 기본 설정값 확인
-            self.assertEqual(manager.get("company.name"), "산업통상자원 R&D 전략기획단")
-            self.assertEqual(
-                manager.get("editor.signature"), "OSP 뉴스레터 편집팀 드림"
-            )
+        self.assertEqual(manager.get("company.name"), "테스트 기관")
+        self.assertEqual(manager.get("editor.signature"), "테스트 편집팀 드림")
+        self.assertEqual(manager.get("footer.contact_info"), "문의: test@example.com")
+        self.assertEqual(manager.get("company.copyright_year"), "2026")
 
     def test_custom_config_loading(self):
-        """사용자 정의 설정 로드 테스트"""
+        """명시 경로는 legacy JSON 템플릿 설정도 계속 로드해야 한다."""
         # 사용자 정의 설정 파일 생성
         custom_config = {
             "company": {"name": "테스트 회사"},
@@ -62,6 +68,15 @@ class TestTemplateManager(unittest.TestCase):
         # 사용자 정의 설정값 확인
         self.assertEqual(manager.get("company.name"), "테스트 회사")
         self.assertEqual(manager.get("editor.signature"), "테스트 편집팀")
+
+    def test_missing_explicit_config_falls_back_to_default(self):
+        """명시 경로가 없으면 파일 생성 없이 기본값으로 fallback 해야 한다."""
+        manager = TemplateManager()
+        manager.load_config(os.path.join(self.test_dir, "missing.json"))
+
+        self.assertFalse(os.path.exists(os.path.join(self.test_dir, "missing.json")))
+        self.assertEqual(manager.get("company.name"), "산업통상자원 R&D 전략기획단")
+        self.assertEqual(manager.get("editor.signature"), "OSP 뉴스레터 편집팀 드림")
 
     def test_template_rendering_with_config(self):
         """Test if template settings are correctly applied to rendering"""

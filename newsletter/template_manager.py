@@ -1,6 +1,13 @@
-import json
-import os
+from __future__ import annotations
 
+import json
+from datetime import date
+from pathlib import Path
+from typing import Any, ClassVar
+
+import yaml  # type: ignore[import-untyped]
+
+from .config_manager import get_newsletter_settings
 from .utils.logger import get_logger
 
 # 로거 초기화
@@ -10,48 +17,45 @@ logger = get_logger()
 class TemplateManager:
     """템플릿 설정 관리를 담당하는 클래스"""
 
-    _instance = None
-    _config = None
+    _instance: ClassVar[TemplateManager | None] = None
+    _config: dict[str, Any] | None = None
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls) -> TemplateManager:
         """싱글톤 패턴으로 인스턴스 반환"""
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
 
-    def __init__(self):
+    def __init__(self) -> None:
         """설정 파일 로드"""
         self.load_config()
 
-    def load_config(self, config_path=None):
-        """지정된 경로 또는 기본 경로에서 설정 파일 로드"""
+    def load_config(self, config_path: str | Path | None = None) -> None:
+        """지정된 경로 또는 canonical runtime 설정에서 템플릿 설정 로드"""
         if config_path is None:
-            # 기본 경로 설정
-            config_path = os.path.join(os.getcwd(), "config", "template_config.json")
-
-        # 디렉토리 확인 및 생성
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
-
-        # 파일 존재 확인
-        if not os.path.exists(config_path):
-            # 기본 설정 생성
-            self._config = self._default_config()
-            # 파일 저장
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(self._config, f, ensure_ascii=False, indent=2)
-            print(f"기본 설정 파일 생성됨: {config_path}")
-        else:
-            # 기존 설정 로드
             try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    self._config = json.load(f)
-                logger.info(f"설정 파일 로드됨: {config_path}")
+                self._config = self._build_runtime_config(get_newsletter_settings())
+                logger.info("Runtime newsletter settings loaded for template manager")
             except Exception as e:
-                logger.error(f"설정 파일 로드 실패: {e}")
+                logger.error(f"Runtime newsletter settings load failed: {e}")
                 self._config = self._default_config()
+            return
 
-    def _default_config(self):
+        path = Path(config_path)
+        if not path.exists():
+            logger.warning(f"설정 파일이 없어 기본 템플릿 설정을 사용합니다: {path}")
+            self._config = self._default_config()
+            return
+
+        try:
+            self._config = self._load_explicit_config(path)
+            logger.info(f"설정 파일 로드됨: {path}")
+        except Exception as e:
+            logger.error(f"설정 파일 로드 실패: {e}")
+            self._config = self._default_config()
+
+    def _default_config(self) -> dict[str, Any]:
         """기본 설정 제공"""
         return {
             "company": {
@@ -84,7 +88,70 @@ class TemplateManager:
             },
         }
 
-    def get(self, path, default=None):
+    def _build_runtime_config(
+        self, newsletter_settings: dict[str, Any]
+    ) -> dict[str, Any]:
+        config = self._default_config()
+        mapping = {
+            "company.name": "company_name",
+            "company.copyright_year": "copyright_year",
+            "company.tagline": "company_tagline",
+            "company.logo_url": "company_logo_url",
+            "company.website": "company_website",
+            "editor.name": "editor_name",
+            "editor.title": "editor_title",
+            "editor.email": "editor_email",
+            "editor.signature": "editor_signature",
+            "footer.disclaimer": "footer_disclaimer",
+            "footer.contact_info": "footer_contact",
+            "header.title_prefix": "title_prefix",
+            "header.greeting_prefix": "greeting_prefix",
+            "audience.description": "audience_description",
+            "audience.organization": "audience_organization",
+            "style.primary_color": "primary_color",
+            "style.secondary_color": "secondary_color",
+            "style.font_family": "font_family",
+        }
+
+        for path, setting_key in mapping.items():
+            value = newsletter_settings.get(setting_key)
+            if value is None and path == "company.copyright_year":
+                value = str(date.today().year)
+            if value is not None:
+                self._set_nested_value(config, path, value)
+
+        return config
+
+    def _load_explicit_config(self, config_path: Path) -> dict[str, Any]:
+        if config_path.suffix.lower() in {".yml", ".yaml"}:
+            with open(config_path, "r", encoding="utf-8") as file_obj:
+                config_data = yaml.safe_load(file_obj) or {}
+            if not isinstance(config_data, dict):
+                return self._default_config()
+            newsletter_settings = config_data.get("newsletter_settings", {})
+            if isinstance(newsletter_settings, dict):
+                return self._build_runtime_config(newsletter_settings)
+            return self._default_config()
+
+        with open(config_path, "r", encoding="utf-8") as file_obj:
+            config_data = json.load(file_obj)
+        if isinstance(config_data, dict):
+            return config_data
+        return self._default_config()
+
+    @staticmethod
+    def _set_nested_value(config: dict[str, Any], path: str, value: Any) -> None:
+        parts = path.split(".")
+        current: dict[str, Any] = config
+        for part in parts[:-1]:
+            next_value = current.get(part)
+            if not isinstance(next_value, dict):
+                next_value = {}
+                current[part] = next_value
+            current = next_value
+        current[parts[-1]] = value
+
+    def get(self, path: str, default: Any = None) -> Any:
         """경로로 설정값 가져오기 (점 표기법)"""
         if not self._config:
             return default
@@ -100,6 +167,6 @@ class TemplateManager:
 
         return current
 
-    def set_config(self, config):
+    def set_config(self, config: dict[str, Any]) -> None:
         """테스트용: 설정을 직접 설정"""
         self._config = config
