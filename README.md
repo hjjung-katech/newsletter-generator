@@ -28,6 +28,9 @@ cp .env.example .env
 make check
 ```
 
+Experimental FastAPI entrypoint uses a separate sample at
+[`apps/experimental/.env.example`](apps/experimental/.env.example).
+
 웹 실행/CLI/배포 절차는 아래 정본 문서를 사용하세요.
 
 ## Docs Hub
