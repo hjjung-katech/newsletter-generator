@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, cast
 
 try:
     import db_core as _db_core
@@ -28,6 +28,16 @@ try:
 except ImportError:
     from web import db_analytics as _db_analytics  # pragma: no cover
 
+try:
+    import db_presets as _db_presets
+except ImportError:
+    from web import db_presets as _db_presets  # pragma: no cover
+
+try:
+    import db_source_policies as _db_source_policies
+except ImportError:
+    from web import db_source_policies as _db_source_policies  # pragma: no cover
+
 APPROVAL_STATUS_NOT_REQUESTED = _db_history.APPROVAL_STATUS_NOT_REQUESTED
 APPROVAL_STATUS_PENDING = _db_history.APPROVAL_STATUS_PENDING
 APPROVAL_STATUS_APPROVED = _db_history.APPROVAL_STATUS_APPROVED
@@ -39,8 +49,8 @@ DELIVERY_STATUS_APPROVED = _db_history.DELIVERY_STATUS_APPROVED
 DELIVERY_STATUS_SENT = _db_history.DELIVERY_STATUS_SENT
 DELIVERY_STATUS_SEND_FAILED = _db_history.DELIVERY_STATUS_SEND_FAILED
 
-SOURCE_POLICY_ALLOW = "allow"
-SOURCE_POLICY_BLOCK = "block"
+SOURCE_POLICY_ALLOW = _db_source_policies.SOURCE_POLICY_ALLOW
+SOURCE_POLICY_BLOCK = _db_source_policies.SOURCE_POLICY_BLOCK
 
 
 def is_feature_enabled(env_var: str, default: bool = True) -> bool:
@@ -75,6 +85,17 @@ search_archive_entries = _db_archive.search_archive_entries
 record_analytics_event = _db_analytics.record_analytics_event
 list_analytics_events = _db_analytics.list_analytics_events
 get_analytics_dashboard_data = _db_analytics.get_analytics_dashboard_data
+list_generation_presets = _db_presets.list_generation_presets
+get_generation_preset = _db_presets.get_generation_preset
+create_generation_preset = _db_presets.create_generation_preset
+update_generation_preset = _db_presets.update_generation_preset
+delete_generation_preset = _db_presets.delete_generation_preset
+list_source_policies = _db_source_policies.list_source_policies
+get_source_policy = _db_source_policies.get_source_policy
+create_source_policy = _db_source_policies.create_source_policy
+update_source_policy = _db_source_policies.update_source_policy
+delete_source_policy = _db_source_policies.delete_source_policy
+get_active_source_policies = _db_source_policies.get_active_source_policies
 
 
 def _connect(db_path: str) -> sqlite3.Connection:
@@ -163,315 +184,5 @@ def mark_outbox_failed(db_path: str, send_key: str, error_message: str) -> None:
             (error_message, send_key),
         )
         conn.commit()
-    finally:
-        conn.close()
-
-
-def list_generation_presets(db_path: str) -> list[Dict[str, Any]]:
-    """Return generation presets ordered with defaults first."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, name, description, params, is_default, created_at, updated_at
-            FROM generation_presets
-            ORDER BY is_default DESC, updated_at DESC, created_at DESC
-            """
-        )
-        rows = cursor.fetchall()
-        return [
-            {
-                "id": row[0],
-                "name": row[1],
-                "description": row[2],
-                "params": json.loads(row[3]) if row[3] else {},
-                "is_default": bool(row[4]),
-                "created_at": row[5],
-                "updated_at": row[6],
-            }
-            for row in rows
-        ]
-    finally:
-        conn.close()
-
-
-def get_generation_preset(db_path: str, preset_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch a single generation preset."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, name, description, params, is_default, created_at, updated_at
-            FROM generation_presets
-            WHERE id = ?
-            """,
-            (preset_id,),
-        )
-        row = cursor.fetchone()
-        if not row:
-            return None
-        return {
-            "id": row[0],
-            "name": row[1],
-            "description": row[2],
-            "params": json.loads(row[3]) if row[3] else {},
-            "is_default": bool(row[4]),
-            "created_at": row[5],
-            "updated_at": row[6],
-        }
-    finally:
-        conn.close()
-
-
-def create_generation_preset(
-    db_path: str,
-    preset_id: str,
-    name: str,
-    description: str | None,
-    params: Dict[str, Any],
-    *,
-    is_default: bool = False,
-) -> Dict[str, Any]:
-    """Create a generation preset and return the stored row."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        if is_default:
-            cursor.execute("UPDATE generation_presets SET is_default = 0")
-
-        cursor.execute(
-            """
-            INSERT INTO generation_presets (id, name, description, params, is_default)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                preset_id,
-                name,
-                description,
-                canonical_json(params),
-                int(is_default),
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    return get_generation_preset(db_path, preset_id) or {}
-
-
-def update_generation_preset(
-    db_path: str,
-    preset_id: str,
-    name: str,
-    description: str | None,
-    params: Dict[str, Any],
-    *,
-    is_default: bool = False,
-) -> Optional[Dict[str, Any]]:
-    """Update a generation preset and return the stored row."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id FROM generation_presets WHERE id = ?",
-            (preset_id,),
-        )
-        if not cursor.fetchone():
-            return None
-
-        if is_default:
-            cursor.execute(
-                "UPDATE generation_presets SET is_default = 0 WHERE id != ?",
-                (preset_id,),
-            )
-
-        cursor.execute(
-            """
-            UPDATE generation_presets
-            SET name = ?,
-                description = ?,
-                params = ?,
-                is_default = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (
-                name,
-                description,
-                canonical_json(params),
-                int(is_default),
-                preset_id,
-            ),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    return get_generation_preset(db_path, preset_id)
-
-
-def delete_generation_preset(db_path: str, preset_id: str) -> bool:
-    """Delete a generation preset."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM generation_presets WHERE id = ?", (preset_id,))
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
-
-
-def list_source_policies(db_path: str) -> list[Dict[str, Any]]:
-    """Return source policy rows ordered by type and recency."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, pattern, policy_type, is_active, created_at, updated_at
-            FROM source_policies
-            ORDER BY policy_type ASC, updated_at DESC, created_at DESC
-            """
-        )
-        rows = cursor.fetchall()
-        return [
-            {
-                "id": row[0],
-                "pattern": row[1],
-                "policy_type": row[2],
-                "is_active": bool(row[3]),
-                "created_at": row[4],
-                "updated_at": row[5],
-            }
-            for row in rows
-        ]
-    finally:
-        conn.close()
-
-
-def get_source_policy(db_path: str, policy_id: str) -> Optional[Dict[str, Any]]:
-    """Fetch a single source policy row."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT id, pattern, policy_type, is_active, created_at, updated_at
-            FROM source_policies
-            WHERE id = ?
-            """,
-            (policy_id,),
-        )
-        row = cursor.fetchone()
-        if not row:
-            return None
-        return {
-            "id": row[0],
-            "pattern": row[1],
-            "policy_type": row[2],
-            "is_active": bool(row[3]),
-            "created_at": row[4],
-            "updated_at": row[5],
-        }
-    finally:
-        conn.close()
-
-
-def create_source_policy(
-    db_path: str,
-    policy_id: str,
-    pattern: str,
-    policy_type: str,
-    *,
-    is_active: bool = True,
-) -> Dict[str, Any]:
-    """Create a source policy row and return it."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO source_policies (id, pattern, policy_type, is_active)
-            VALUES (?, ?, ?, ?)
-            """,
-            (policy_id, pattern, policy_type, int(is_active)),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    return get_source_policy(db_path, policy_id) or {}
-
-
-def update_source_policy(
-    db_path: str,
-    policy_id: str,
-    pattern: str,
-    policy_type: str,
-    *,
-    is_active: bool = True,
-) -> Optional[Dict[str, Any]]:
-    """Update an existing source policy row."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM source_policies WHERE id = ?", (policy_id,))
-        if not cursor.fetchone():
-            return None
-
-        cursor.execute(
-            """
-            UPDATE source_policies
-            SET pattern = ?,
-                policy_type = ?,
-                is_active = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-            """,
-            (pattern, policy_type, int(is_active), policy_id),
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    return get_source_policy(db_path, policy_id)
-
-
-def delete_source_policy(db_path: str, policy_id: str) -> bool:
-    """Delete a source policy row."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM source_policies WHERE id = ?", (policy_id,))
-        conn.commit()
-        return cursor.rowcount > 0
-    finally:
-        conn.close()
-
-
-def get_active_source_policies(db_path: str) -> Dict[str, list[str]]:
-    """Return active source policy patterns grouped by allow/block type."""
-    conn = _connect(db_path)
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT pattern, policy_type
-            FROM source_policies
-            WHERE is_active = 1
-            ORDER BY policy_type ASC, updated_at DESC
-            """
-        )
-        allowlist: list[str] = []
-        blocklist: list[str] = []
-        for pattern, policy_type in cursor.fetchall():
-            if policy_type == SOURCE_POLICY_ALLOW:
-                allowlist.append(str(pattern))
-            elif policy_type == SOURCE_POLICY_BLOCK:
-                blocklist.append(str(pattern))
-        return {"allowlist": allowlist, "blocklist": blocklist}
     finally:
         conn.close()
