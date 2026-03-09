@@ -9,6 +9,8 @@ from newsletter.compose import (
     compose_compact_newsletter_html,
     compose_newsletter,
     compose_newsletter_html,
+    extract_key_definitions_for_compact,
+    process_compact_newsletter_data,
 )
 from newsletter_core.application.generation.compose import (
     compose_compact_newsletter_html as core_compose_compact_newsletter_html,
@@ -18,6 +20,12 @@ from newsletter_core.application.generation.compose import (
 )
 from newsletter_core.application.generation.compose import (
     compose_newsletter_html as core_compose_newsletter_html,
+)
+from newsletter_core.application.generation.compose import (
+    extract_key_definitions_for_compact as core_extract_key_definitions_for_compact,
+)
+from newsletter_core.application.generation.compose import (
+    process_compact_newsletter_data as core_process_compact_newsletter_data,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -81,6 +89,13 @@ def test_compose_shim_exposes_core_entrypoints():
     assert compose_newsletter is core_compose_newsletter
     assert compose_newsletter_html is core_compose_newsletter_html
     assert compose_compact_newsletter_html is core_compose_compact_newsletter_html
+
+
+def test_compose_shim_exposes_helper_exports():
+    assert (
+        extract_key_definitions_for_compact is core_extract_key_definitions_for_compact
+    )
+    assert process_compact_newsletter_data is core_process_compact_newsletter_data
 
 
 def test_detailed_wrapper_matches_default_compose_output(sample_newsletter_data):

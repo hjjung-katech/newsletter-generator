@@ -1,9 +1,5 @@
-# flake8: noqa
 # Placeholder for newsletter composition logic
-import json
-import os
-from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any
 
 from newsletter.date_utils import extract_source_and_date, format_date_for_display
 from newsletter.utils.logger import get_logger
@@ -19,20 +15,33 @@ from .compose_renderer import (
     render_newsletter_template,
 )
 from .compose_sections import (
-    add_emoji_to_section_title,
     create_grouped_sections,
     extract_and_prepare_top_articles,
     extract_definitions,
     extract_food_for_thought,
     extract_key_definitions_for_compact,
-    extract_top_articles_from_sections,
-    format_compact_source_date,
-    prepare_grouped_sections_for_compact,
-    prepare_top_articles_for_compact,
+)
+from .compose_support import (
+    process_compact_newsletter_data,
+    save_newsletter_with_config,
 )
 
 # 로거 초기화
 logger = get_logger()
+
+__all__ = [
+    "NewsletterConfig",
+    "compose_compact_newsletter_html",
+    "compose_newsletter",
+    "compose_newsletter_html",
+    "create_grouped_sections",
+    "extract_and_prepare_top_articles",
+    "extract_definitions",
+    "extract_food_for_thought",
+    "extract_key_definitions_for_compact",
+    "process_compact_newsletter_data",
+    "save_newsletter_with_config",
+]
 
 
 def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") -> str:
@@ -138,230 +147,3 @@ def compose_compact_newsletter_html(
 ) -> str:
     """기존 compact 뉴스레터 생성 함수 (호환성 유지)"""
     return render_compact_wrapper(data, template_dir, template_name, compose_newsletter)
-
-
-def save_newsletter_with_config(
-    data: Dict[str, Any], config_data: Dict[str, Any], output_path: str
-) -> None:
-    """
-    Save the newsletter data with embedded test configuration.
-
-    Args:
-        data: Newsletter content data
-        config_data: Configuration data to embed
-        output_path: Path where to save the data
-    """
-    # Create a copy to avoid modifying the original
-    data_to_save = data.copy()
-
-    # Embed the configuration
-    data_to_save["_test_config"] = config_data
-
-    # Ensure the directory exists
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    # Save the file
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data_to_save, f, indent=2, ensure_ascii=False)
-
-    print(f"Saved newsletter data with embedded config to {output_path}")
-
-
-def process_compact_newsletter_data(newsletter_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    기존 뉴스레터 데이터를 간결한 버전으로 변환합니다.
-
-    Args:
-        newsletter_data: 원본 뉴스레터 데이터
-
-    Returns:
-        Dict: 간결한 버전용으로 변환된 데이터
-    """
-    logger.debug(
-        f"process_compact_newsletter_data 입력 키들: {list(newsletter_data.keys())}"
-    )
-
-    compact_data = {
-        "newsletter_title": newsletter_data.get("newsletter_topic", "주간 산업 동향 브리프"),
-        "tagline": "이번 주, 주요 산업 동향을 미리 만나보세요.",
-        "company_name": newsletter_data.get("company_name", "Your Company"),
-        "generation_date": newsletter_data.get("generation_date"),
-        "issue_no": newsletter_data.get("issue_no"),
-    }
-
-    # 상위 중요 기사 처리 (최대 3개)
-    top_articles = newsletter_data.get("top_articles", [])
-    logger.debug(f"상위 기사를 찾았습니다: {len(top_articles)}개")
-
-    if not top_articles and "sections" in newsletter_data:
-        # top_articles가 없으면 각 섹션에서 첫 번째 기사들을 선택
-        logger.debug("상위 기사가 없어 섹션에서 추출합니다")
-        top_articles = extract_top_articles_from_sections(newsletter_data["sections"])
-
-    # 상위 3개로 제한하고 요약 추가
-    compact_data["top_articles"] = prepare_top_articles_for_compact(top_articles[:3])
-
-    # Check if grouped_sections already exist in the input data
-    if "grouped_sections" in newsletter_data:
-        logger.debug(f"기존 그룹화된 섹션을 사용합니다: {len(newsletter_data['grouped_sections'])}개")
-        compact_data["grouped_sections"] = newsletter_data["grouped_sections"]
-    else:
-        logger.debug("섹션에서 그룹화된 섹션을 생성합니다")
-        # 나머지 기사들을 그룹별로 정리
-        compact_data["grouped_sections"] = prepare_grouped_sections_for_compact(
-            newsletter_data.get("sections", []),
-            top_articles[:3],  # 이미 선택된 상위 기사들 제외
-        )
-
-    # 용어 설명 처리 (최대 3개까지만)
-    if "definitions" in newsletter_data:
-        logger.debug(f"기존 정의를 사용합니다: {len(newsletter_data['definitions'])}개")
-        compact_data["definitions"] = newsletter_data["definitions"]
-    else:
-        logger.debug("섹션에서 정의를 생성합니다")
-        compact_data["definitions"] = extract_key_definitions_for_compact(
-            newsletter_data.get("sections", [])
-        )
-
-    # 생각해볼 거리 처리
-    food_for_thought = newsletter_data.get("food_for_thought")
-    if food_for_thought:
-        if isinstance(food_for_thought, dict):
-            # 딕셔너리 형태 그대로 유지 (템플릿에서 .message로 접근)
-            compact_data["food_for_thought"] = food_for_thought
-        else:
-            # 문자열인 경우 딕셔너리로 변환
-            compact_data["food_for_thought"] = {"message": str(food_for_thought)}
-
-    return compact_data
-
-
-# Example usage (for testing purposes):
-if __name__ == "__main__":
-    # This is a simplified example. In a real scenario,
-    # 'data' would be populated by other parts of your application (e.g., data collection, summarization).
-    example_data = {
-        "newsletter_topic": "AI 신약 개발, 디지털 치료제, 세포 유전자 치료제, 마이크로바이옴, 합성생물학",
-        "generation_date": datetime.now().strftime("%Y-%m-%d"),
-        "generation_timestamp": datetime.now().strftime("%H:%M:%S"),
-        "recipient_greeting": "안녕하세요, 전략프로젝트팀의 젊은 팀원과 수석전문위원 여러분.",
-        "introduction_message": "이번 주 주요 산업 동향과 기술 발전 현황을 정리하여 보내드립니다. 함께 살펴보시고 R&D 전략 수립에 참고하시면 좋겠습니다.",
-        "sections": [
-            {
-                "title": "AI 신약 개발",
-                "summary_paragraphs": [
-                    "AI를 활용한 신약 개발은 업계의 큰 관심을 받고 있으며, 개발 시간 단축 및 성공률 증가에 기여할 것으로 기대됩니다. 다만, 아직 극복해야 할 과제들이 존재하며, 관련 교육 플랫폼 및 생태계 조성이 중요합니다."
-                ],
-                "definitions": [
-                    {
-                        "term": "AI 신약 개발",
-                        "explanation": "인공지능 기술을 활용하여 신약 후보물질 발굴, 약물 설계, 임상시험 최적화 등의 과정을 개선하는 연구 분야입니다.",
-                    }
-                ],
-                "news_links": [
-                    {
-                        "title": "[PDF] AI를 활용한 혁신 신약개발의 동향 및 정책 시사점",
-                        "url": "https://www.kistep.re.kr/boardDownload.es?bid=0031&list_no=94091&seq=1",
-                        "source_and_date": "KISTEP",
-                    },
-                    {
-                        "title": '제약바이오, AI 신약개발 박차…"패러다임 바뀐다"',
-                        "url": "https://www.kpanews.co.kr/article/show.asp?idx=256331&category=D",
-                        "source_and_date": "KPA News",
-                    },
-                ],
-            },
-            {
-                "title": "디지털 치료제",
-                "summary_paragraphs": [
-                    "디지털 치료제는 약물이 아닌 소프트웨어를 기반으로 질병을 예방, 관리, 치료하는 새로운 형태의 치료제입니다. 불면증, 우울증 등 다양한 질환에 적용 가능성을 보이며, 관련 규제 및 법적 기준 마련이 필요한 시점입니다."
-                ],
-                "definitions": [
-                    {
-                        "term": "디지털 치료제",
-                        "explanation": "소프트웨어 형태의 의료기기로, 질병의 예방, 관리, 치료를 목적으로 합니다. 주로 앱, 게임, 웨어러블 기기 등을 통해 제공됩니다.",
-                    }
-                ],
-                "news_links": [
-                    {
-                        "title": "디지털 치료제 - 나무위키",
-                        "url": "https://namu.wiki/w/%EB%94%94%EC%A7%80%ED%84%B8%20%EC%B9%98%EB%A3%8C%EC%A0%9C",
-                        "source_and_date": "Namuwiki",
-                    }
-                ],
-            },
-            # ... more sections ...
-        ],
-        "food_for_thought": {
-            "quote": "미래는 예측하는 것이 아니라 만들어가는 것이다.",
-            "author": "피터 드러커",
-            "message": "위에 언급된 다섯 가지 기술은 모두 미래 의료 패러다임을 변화시킬 잠재력을 가지고 있습니다. 각 기술의 발전 동향을 꾸준히 주시하고, 상호 연관성을 고려하여 R&D 전략을 수립한다면, 혁신적인 성과 창출과 국민 건강 증진에 기여할 수 있을 것입니다. 각 기술의 발전 속도, 시장 경쟁 환경, 규제 동향 등을 종합적으로 분석하여 우리나라가 글로벌 바이오헬스 시장을 선도할 수 있는 전략을 모색해야 할 시점입니다.",
-        },
-        "closing_message": "다음 주에 더 유익한 정보로 찾아뵙겠습니다. 감사합니다.",
-        "editor_signature": "편집자 드림",
-        "company_name": "전략프로젝트팀",
-    }
-
-    # Sample test config
-    example_config = {
-        "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
-        "keywords": ["AI", "신약", "디지털치료제", "마이크로바이옴", "합성생물학"],
-        "topic": "바이오 기술 동향",
-        "language": "ko",
-        "date_range": 7,
-    }
-
-    # Define template directory and name (assuming this script is in newsletter/ and templates/ is a sibling)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(
-        current_dir
-    )  # Moves up one level to the project root
-    template_directory = os.path.join(project_root, "templates")
-    template_file = "newsletter_template.html"
-
-    # Check if template directory and file exist
-    if not os.path.isdir(template_directory):
-        print(f"Error: Template directory not found at {template_directory}")
-    elif not os.path.exists(os.path.join(template_directory, template_file)):
-        print(
-            f"Error: Template file not found at {os.path.join(template_directory, template_file)}"
-        )
-    else:
-        print(f"Template directory: {template_directory}")
-        print(f"Template file: {template_file}")
-        try:
-            # Combine data and config
-            example_data_with_config = example_data.copy()
-            example_data_with_config["_test_config"] = example_config
-
-            # Generate HTML
-            html_output = compose_newsletter_html(
-                example_data_with_config, template_directory, template_file
-            )
-
-            # Save HTML
-            timestamp = example_config["timestamp"]
-            output_filename = os.path.join(
-                project_root,
-                "output",
-                f"composed_newsletter_test_{timestamp}.html",
-            )
-            os.makedirs(os.path.join(project_root, "output"), exist_ok=True)
-            with open(output_filename, "w", encoding="utf-8") as f:
-                f.write(html_output)
-            print(f"Test newsletter saved to {output_filename}")
-
-            # Save data with config for testing
-            json_filename = os.path.join(
-                project_root,
-                "output/intermediate_processing",
-                f"render_data_{timestamp}_test.json",
-            )
-            os.makedirs(
-                os.path.join(project_root, "output/intermediate_processing"),
-                exist_ok=True,
-            )
-            save_newsletter_with_config(example_data, example_config, json_filename)
-
-        except Exception as e:
-            print(f"An error occurred during test composition: {e}")
