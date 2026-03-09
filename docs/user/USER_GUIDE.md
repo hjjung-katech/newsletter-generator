@@ -408,7 +408,7 @@ newsletter run --keywords "AI" --period 7
 
 ```bash
 # 상세한 로그 출력
-PYTHONPATH=. python -m newsletter.cli run --keywords "AI" --verbose
+newsletter run --keywords "AI" --verbose
 
 # 중간 결과 저장
 newsletter run --keywords "AI" --save-intermediate

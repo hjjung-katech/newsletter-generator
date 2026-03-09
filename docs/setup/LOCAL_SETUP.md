@@ -2,6 +2,7 @@
 
 > 빠른 실행이 목적이라면 먼저 `QUICK_START_GUIDE.md`를 사용하세요.
 > 이 문서는 로컬 개발/디버깅/운영 시뮬레이션(Redis, worker, scheduler) 상세 절차를 다룹니다.
+> 아래 명령은 별도 언급이 없으면 저장소 루트(`newsletter-generator/`) 기준입니다.
 
 ## 1. 프로젝트 클론 및 기본 설정
 
@@ -68,17 +69,14 @@ FLASK_ENV=development
 웹 인터페이스를 사용하려면 SQLite 데이터베이스를 초기화해야 합니다:
 
 ```bash
-# web 디렉토리로 이동
-cd web
-
 # 데이터베이스 초기화
-python init_database.py
+python web/init_database.py
 
 # 또는 강제 재생성 (기존 DB 백업 후 새로 생성)
-python init_database.py --force
+python web/init_database.py --force
 
 # 데이터베이스 상태 확인
-python init_database.py --verify-only
+python web/init_database.py --verify-only
 ```
 
 초기화 완료 후 다음 테이블들이 생성됩니다:
@@ -91,12 +89,11 @@ python init_database.py --verify-only
 
 ```bash
 # 웹 애플리케이션만 실행 (권장)
-cd web
-python app.py
+python apps/web/main.py
 ```
 
 웹 서버가 시작되면:
-- **브라우저에서 http://localhost:5000 접속**
+- **브라우저에서 http://localhost:8000 접속**
 - Windows에서는 자동으로 Redis 없이 동작 (in-memory 처리)
 - 백그라운드 작업은 별도 스레드로 처리
 
@@ -156,26 +153,23 @@ redis-server
 
 #### 2단계: 백그라운드 워커 실행 (별도 터미널)
 ```bash
-cd web
-python worker.py
+python apps/worker/main.py
 ```
 
 #### 3단계: 스케줄러 실행 (별도 터미널, 선택사항)
 ```bash
-cd web
-python schedule_runner.py
+python apps/scheduler/main.py
 ```
 
 #### 4단계: 웹 애플리케이션 실행
 ```bash
-cd web
-python app.py
+python apps/web/main.py
 ```
 
 ## 7. 실행 모드별 특징
 
 ### 단독 실행 모드 (기본, 권장)
-- **명령어**: `python web/app.py`
+- **명령어**: `python apps/web/main.py`
 - **특징**:
   - Redis 불필요
   - 즉시 실행 가능
@@ -183,7 +177,7 @@ python app.py
   - Windows에서 자동으로 적용됨
 
 ### Redis + 워커 모드 (고급)
-- **명령어**: Redis + `python web/worker.py` + `python web/app.py`
+- **명령어**: Redis + `python apps/worker/main.py` + `python apps/web/main.py`
 - **특징**:
   - Redis 서버 필요
   - 백그라운드 작업을 별도 프로세스로 처리
@@ -230,28 +224,25 @@ newsletter-generator/
 ### CLI 모드
 ```bash
 # 뉴스레터 생성
-python -m newsletter.cli generate --keywords "AI,반도체" --email "your@email.com"
+python apps/cli/main.py run --keywords "AI,반도체" --to "your@email.com"
 ```
 
 ### 웹 애플리케이션 모드
 ```bash
-cd web
-python app.py
-# 브라우저에서 http://localhost:5000 접속
+python apps/web/main.py
+# 브라우저에서 http://localhost:8000 접속
 ```
 
 ## 11. 데이터베이스 관리
 
 ### 데이터베이스 백업
 ```bash
-cd web
-cp storage.db storage.db.backup_$(date +%Y%m%d_%H%M%S)
+cp web/storage.db web/storage.db.backup_$(date +%Y%m%d_%H%M%S)
 ```
 
 ### 데이터베이스 재설정
 ```bash
-cd web
-python init_database.py --force
+python web/init_database.py --force
 ```
 
 ### 히스토리 정리 (선택사항)
@@ -279,9 +270,8 @@ python scripts/devtools/cleanup_debug_files.py --action delete
 ### 데이터베이스 관련 오류
 ```bash
 # 데이터베이스 재생성
-cd web
-rm -f storage.db
-python init_database.py
+rm -f web/storage.db
+python web/init_database.py
 ```
 
 ### 권한 관련 오류 (Windows)
@@ -340,32 +330,27 @@ redis-server
 ### 웹 서버 포트 충돌
 ```bash
 # 다른 포트로 실행
-cd web
-PORT=8000 python app.py
-# 또는
-python app.py --port 8000
+PORT=8001 python apps/web/main.py
 ```
 
 ## 추가 팁
 
 ### 개발 중 자동 재로드
 ```bash
-# Flask 개발 서버의 자동 재로드 기능 사용
-cd web
-FLASK_ENV=development python app.py
+# canonical web wrapper에서 개발 모드 실행
+APP_ENV=development python apps/web/main.py
 ```
 
 ### 로그 레벨 조정
 ```bash
 # 상세한 로그 확인
-cd web
-LOG_LEVEL=DEBUG python app.py
+LOG_LEVEL=DEBUG python apps/web/main.py
 ```
 
 ### API 테스트
 ```bash
 # 간단한 API 테스트
-curl -X POST http://localhost:5000/api/generate \
+curl -X POST http://localhost:8000/api/generate \
   -H "Idempotency-Key: local-smoke-001" \
   -H "Content-Type: application/json" \
   -d '{"keywords": ["AI", "기술"], "period": 7}'
@@ -375,5 +360,5 @@ curl -X POST http://localhost:5000/api/generate \
 
 운영 안전성 스모크(멱등성/아웃박스)는 자동 스크립트로 점검할 수 있습니다.
 ```bash
-BASE_URL=http://localhost:5000 make ops-safety-smoke
+BASE_URL=http://localhost:8000 make ops-safety-smoke
 ```
