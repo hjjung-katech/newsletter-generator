@@ -9,6 +9,7 @@
 - Week 5 반영: CI hard gate(`REPO_HYGIENE_STRICT=true`) 기본 활성화
 - Week 10 반영: 루트 `.coveragerc`, `.python-version` 제거
 - Week 11 반영: 루트 `config.yml`을 `config/config.yml`로 이관
+- Week 18 반영: 로컬 scratch 산출물 기본 경로를 루트 `.local/`로 정규화
 
 ## Scope
 
@@ -31,9 +32,9 @@
 | `pyinstaller_hooks/` | 이관 완료 | `scripts/devtools/pyinstaller_hooks/` | 빌드 유틸 범주로 통합 |
 | `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
 | `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
-| `.coverage`, `coverage.xml`, `coverage_html_report/` | ignore | 로컬 산출물 | 재생성 가능 산출물 |
+| `.local/` | ignore | 로컬 scratch workspace (`artifacts/`, `coverage/`, `debug_files/`) | 재생성 가능 산출물과 디버그 출력은 숨김 경계로 격리 |
 | `.venv/`, `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 개인/런타임 캐시 |
-| `output/`, `debug_files/` | ignore | 로컬 생성 디렉터리 (tracked 제외) | 실행 시 자동 생성, 루트 tracked 엔트리 축소 |
+| `output/` | ignore | 사용자 생성 결과물 디렉터리 (tracked 제외) | 실행 결과 확인용이므로 루트 유지 |
 | `config/config.yml` | 유지 | `config/` 내부 정본 | 런타임 설정 파일 위치 정규화 |
 | `config.example.yml` | 이관 완료 | `config/config.example.yml` | 템플릿 파일 위치 정규화 + 루트 엔트리 축소 |
 | `TODOs.md` | 이관 완료 | `docs/archive/2026-q1/F14_COMPLETION_REPORT.md` | 루트 문서 혼잡도 완화 및 문서 의미 정정 |
@@ -72,17 +73,18 @@
 
 - 위치: `.github/workflows/main-ci.yml`의 `quality-checks` stage
 - 실행 명령:
-  - `python scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir artifacts/repo-audit --check-policy`
+  - `python scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir .local/artifacts/repo-audit --check-policy`
 - strict 토글:
   - `REPO_HYGIENE_STRICT=true`(기본): `--strict` 활성화, warning 발견 시 CI 실패(hard gate)
   - `REPO_HYGIENE_STRICT=false`: 임시 soft gate override(경고만 출력)
 - 산출물(artifact):
-  - `artifacts/repo-audit/repo_audit_report.md`
-  - `artifacts/repo-audit/repo_audit_report.json`
-  - `artifacts/repo-audit/policy_warnings.md`
+  - `.local/artifacts/repo-audit/repo_audit_report.md`
+  - `.local/artifacts/repo-audit/repo_audit_report.json`
+  - `.local/artifacts/repo-audit/policy_warnings.md`
 - 운영 원칙:
   - Week 1~4: warning-only soft gate로 준비 단계 운영
   - Week 5+: hard gate 기본 운영, 예외 시에만 일시 override 검토
+  - root에서 ignore된 엔트리도 정책 allowlist(`.local/`, `output/`, 캐시 디렉터리) 밖이면 strict gate에서 경고합니다.
 
 ### Shim Policy (Week 4)
 
@@ -95,7 +97,7 @@
 ```bash
 python scripts/repo_audit.py \
   --policy scripts/repo_hygiene_policy.json \
-  --output-dir artifacts/repo-audit \
+  --output-dir .local/artifacts/repo-audit \
   --check-policy
 ```
 
@@ -104,7 +106,7 @@ strict 모드(CI 기본):
 ```bash
 python scripts/repo_audit.py \
   --policy scripts/repo_hygiene_policy.json \
-  --output-dir artifacts/repo-audit \
+  --output-dir .local/artifacts/repo-audit \
   --check-policy \
   --strict
 ```

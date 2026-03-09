@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -122,6 +123,18 @@ def allowed_root_entry(name: str, entry_type: str, root_policy: dict[str, Any]) 
     return False
 
 
+def allowed_ignored_root_entry(
+    name: str, entry_type: str, root_policy: dict[str, Any]
+) -> bool:
+    if entry_type == "file":
+        globs = root_policy.get("ignore_file_globs", [])
+        return match_any(name, globs)
+    if entry_type == "directory":
+        names = root_policy.get("ignore_directory_names", [])
+        return name in names
+    return False
+
+
 @dataclass(frozen=True)
 class RootEntry:
     name: str
@@ -228,6 +241,15 @@ def policy_warnings(
         if entry.action == "ignore_or_remove_local":
             continue
         warnings.append(f"[local-only] {entry.name} is untracked at repository root")
+
+    for entry in entries:
+        if entry.git_state != "ignored":
+            continue
+        if allowed_ignored_root_entry(entry.name, entry.entry_type, root_policy):
+            continue
+        warnings.append(
+            f"[ignored-root] {entry.name} is ignored at repository root but not policy-approved"
+        )
 
     warnings.extend(dot_scope_warnings(repo_root, policy))
     return warnings
@@ -364,7 +386,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--output-dir",
-        default="artifacts/repo-audit",
+        default="",
         help="Directory where reports are written",
     )
     parser.add_argument(
@@ -407,7 +429,10 @@ def main() -> int:
 
     entries = collect_root_entries(repo_root, policy)
     warnings = policy_warnings(entries, policy, repo_root) if args.check_policy else []
-    output_dir = (repo_root / args.output_dir).resolve()
+    output_dir_arg = args.output_dir or os.environ.get(
+        "REPO_AUDIT_OUTPUT_DIR", ".local/artifacts/repo-audit"
+    )
+    output_dir = (repo_root / output_dir_arg).resolve()
 
     markdown_path = output_dir / "repo_audit_report.md"
     json_path = output_dir / "repo_audit_report.json"

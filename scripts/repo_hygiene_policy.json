@@ -53,20 +53,17 @@
     ],
     "shim_file_names": [],
     "ignore_file_globs": [
-      ".coverage",
-      "coverage.xml",
+      ".DS_Store",
       "*.zip"
     ],
     "ignore_directory_names": [
+      ".local",
       ".mypy_cache",
       ".pytest_cache",
       ".venv",
       ".vscode",
       ".githooks",
       "__pycache__",
-      "artifacts",
-      "coverage_html_report",
-      "debug_files",
       "output"
     ]
   },

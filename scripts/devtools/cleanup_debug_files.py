@@ -11,6 +11,8 @@ from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DEBUG_DIR = PROJECT_ROOT / ".local" / "debug_files"
+DEFAULT_DEBUG_ARCHIVE_DIR = PROJECT_ROOT / ".local" / "debug_archives"
 
 
 def main():
@@ -23,8 +25,13 @@ def main():
     )
     parser.add_argument(
         "--target-dir",
-        default="debug_archives",
+        default=str(DEFAULT_DEBUG_ARCHIVE_DIR),
         help="Directory to move files to (when action is 'move')",
+    )
+    parser.add_argument(
+        "--source-dir",
+        default=os.getenv("NEWSLETTER_DEBUG_DIR", str(DEFAULT_DEBUG_DIR)),
+        help="Directory to scan for debug files",
     )
     parser.add_argument(
         "--pattern", default="template_debug_", help="File pattern to match for cleanup"
@@ -32,14 +39,15 @@ def main():
 
     args = parser.parse_args()
 
-    # 레거시와 동일하게 저장소 루트 기준에서 동작하도록 고정
-    os.chdir(PROJECT_ROOT)
+    source_dir = Path(args.source_dir)
+    if not source_dir.exists():
+        print(f"Source directory does not exist: {source_dir}")
+        return
 
-    # 현재 디렉토리 내의 모든 파일 가져오기
-    files = [f for f in os.listdir() if os.path.isfile(f)]
+    files = [path for path in source_dir.iterdir() if path.is_file()]
 
     # 패턴과 일치하는 파일 필터링
-    debug_files = [f for f in files if args.pattern in f]
+    debug_files = [path for path in files if args.pattern in path.name]
 
     if not debug_files:
         print(f"No files matching pattern '{args.pattern}' found.")
@@ -61,15 +69,14 @@ def main():
 
         # 파일 이동
         for file in debug_files:
-            src = Path(file)
-            dst = date_dir / src.name
-            shutil.move(str(src), str(dst))
+            dst = date_dir / file.name
+            shutil.move(str(file), str(dst))
 
         print(f"Moved {len(debug_files)} files to {date_dir}")
 
     else:  # delete
         for file in debug_files:
-            os.remove(file)
+            file.unlink()
         print(f"Deleted {len(debug_files)} files")
 
 

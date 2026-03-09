@@ -5,6 +5,7 @@
 import os
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 
@@ -32,10 +33,10 @@ def get_safe_filename(topic: str) -> str:
 def generate_unified_newsletter_filename(
     topic: str,
     style: str = "detailed",
-    timestamp: str = None,
+    timestamp: Optional[str] = None,
     use_current_date: bool = True,
     generation_type: str = "original",  # "original", "regenerated", "test"
-    source_timestamp: str = None,  # 원본 파일의 타임스탬프 (재생성시 사용)
+    source_timestamp: Optional[str] = None,  # 원본 파일의 타임스탬프 (재생성시 사용)
 ) -> str:
     """
     통일된 뉴스레터 파일명 생성 함수
@@ -144,7 +145,7 @@ def _parse_and_standardize_timestamp(
     return date_part, time_part
 
 
-def generate_newsletter_filename(topic: str, timestamp: str = None) -> str:
+def generate_newsletter_filename(topic: str, timestamp: Optional[str] = None) -> str:
     """
     뉴스레터 HTML 파일의 경로를 생성 (기존 함수 - 호환성 유지)
 
@@ -270,16 +271,17 @@ def ensure_debug_directory() -> str:
     Returns:
         str: debug_files 디렉토리의 절대 경로
     """
-    # 프로젝트 루트를 기준으로 debug_files 디렉토리 경로 생성
-    project_root = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
-    debug_dir = os.path.join(project_root, "debug_files")
+    configured_dir = os.getenv("NEWSLETTER_DEBUG_DIR")
+    if configured_dir:
+        debug_dir = Path(configured_dir).expanduser()
+    else:
+        project_root = Path(__file__).resolve().parents[2]
+        debug_dir = project_root / ".local" / "debug_files"
 
     # 디렉토리가 없으면 생성
     os.makedirs(debug_dir, exist_ok=True)
 
-    return debug_dir
+    return str(debug_dir.resolve())
 
 
 def generate_debug_filename(
@@ -344,9 +346,9 @@ def save_debug_file(
     except Exception as e:
         # 로깅이 가능한 경우 로그 남김
         try:
-            from ..utils.logger import logger
+            from ..utils.logger import get_logger
 
-            logger.error(f"Debug 파일 저장 중 오류: {e}")
+            get_logger().error(f"Debug 파일 저장 중 오류: {e}")
         except ImportError:
             print(f"Debug 파일 저장 중 오류: {e}")
         raise

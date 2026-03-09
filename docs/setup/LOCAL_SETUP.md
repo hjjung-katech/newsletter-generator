@@ -213,7 +213,10 @@ newsletter-generator/
 │   ├── intermediate_processing/  # 중간 처리 파일
 │   ├── email_tests/            # 이메일 테스트 결과
 │   └── test_results/           # 테스트 결과
-├── debug_files/                # 디버그 파일 (자동 생성)
+├── .local/                     # 로컬 scratch 산출물
+│   ├── coverage/               # coverage 리포트/데이터
+│   ├── artifacts/              # repo audit, Windows burn-in 등 점검 산출물
+│   └── debug_files/            # 디버그 파일 (자동 생성)
 └── web/
     ├── storage.db              # 웹앱 데이터베이스 (자동 생성)
     ├── app.py                  # 메인 웹 애플리케이션
@@ -258,6 +261,8 @@ sqlite3 storage.db "DELETE FROM history WHERE created_at < datetime('now', '-30 
 ```
 
 ## 12. 디버그 파일 정리
+
+기본 디버그 파일 경로는 `.local/debug_files/` 입니다.
 
 디버그 파일이 과도하게 쌓인 경우:
 
