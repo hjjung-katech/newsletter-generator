@@ -6,9 +6,18 @@
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
 PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+LOCAL_DIR ?= $(PROJECT_ROOT)/.local
+ARTIFACTS_DIR ?= $(LOCAL_DIR)/artifacts
+REPO_AUDIT_DIR ?= $(ARTIFACTS_DIR)/repo-audit
+WINDOWS_CI_BURNIN_REPORT ?= $(ARTIFACTS_DIR)/windows-ci-burnin.json
+WINDOWS_RELEASE_CONTROLS_REPORT ?= $(ARTIFACTS_DIR)/windows-release-controls.json
+COVERAGE_DIR ?= $(LOCAL_DIR)/coverage
+DEBUG_DIR ?= $(LOCAL_DIR)/debug_files
+NEWSLETTER_DEBUG_DIR ?= $(DEBUG_DIR)
 VENV_PYTHON := $(PROJECT_ROOT)/.venv/bin/python
 PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
 PIP := $(PYTHON) -m pip
+export NEWSLETTER_DEBUG_DIR
 
 # 디렉토리 설정
 SRC_DIRS := newsletter tests web scripts apps newsletter_core
@@ -139,11 +148,11 @@ windows-update-manifest: ## Generate update-manifest.json (WINDOWS_UPDATE_BASE_U
 
 windows-ci-burnin-report: ## Measure latest Windows CI burn-in success rate
 	@echo "📈 Windows CI burn-in 리포트 생성 중..."
-	$(PYTHON) scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95 --output artifacts/windows-ci-burnin.json
+	$(PYTHON) scripts/devtools/windows_ci_burnin_report.py --workflow "Main CI Pipeline" --branch main --limit 10 --min-success-rate 95 --output $(WINDOWS_CI_BURNIN_REPORT)
 
 github-windows-release-controls: ## Verify GitHub release controls (branch protection/vars/secrets)
 	@echo "🧭 GitHub Windows release control 점검 중..."
-	$(PYTHON) scripts/devtools/check_github_windows_release_controls.py --repo hjjung-katech/newsletter-generator --output artifacts/windows-release-controls.json
+	$(PYTHON) scripts/devtools/check_github_windows_release_controls.py --repo hjjung-katech/newsletter-generator --output $(WINDOWS_RELEASE_CONTROLS_REPORT)
 
 test-quick: preflight-release ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
 	@echo "⚡ Quick 게이트 실행 중..."
@@ -185,7 +194,7 @@ test-all: ## 모든 테스트 실행
 
 test-coverage: ## 커버리지 포함 테스트
 	@echo "📊 커버리지 측정 중..."
-	MOCK_MODE=true $(PYTHON) -m pytest -m unit --cov=newsletter --cov=newsletter_core --cov=web --cov-report=html --cov-report=term
+	MOCK_MODE=true $(PYTHON) -m pytest -m unit --cov=newsletter --cov=newsletter_core --cov=web --cov-report=html:$(COVERAGE_DIR)/htmlcov --cov-report=term
 
 ci-check: ## CI 검사 실행 (GitHub Actions와 동일)
 	@echo "🚀 CI 검사 실행 중..."
@@ -261,13 +270,13 @@ docs-check: ## Markdown 링크/스타일 무결성 검사
 
 repo-audit: ## 루트 인벤토리/Repo hygiene soft gate 리포트 생성
 	@echo "🧹 Repo audit 실행 중..."
-	$(PYTHON) scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir artifacts/repo-audit --check-policy
-	@echo "✅ repo-audit 완료 (artifacts/repo-audit)"
+	$(PYTHON) scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir $(REPO_AUDIT_DIR) --check-policy
+	@echo "✅ repo-audit 완료 ($(REPO_AUDIT_DIR))"
 
 repo-audit-strict: ## 루트 인벤토리/Repo hygiene strict gate 리허설
 	@echo "🧱 Repo audit strict 실행 중..."
-	$(PYTHON) scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir artifacts/repo-audit --check-policy --strict
-	@echo "✅ repo-audit-strict 완료 (artifacts/repo-audit)"
+	$(PYTHON) scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir $(REPO_AUDIT_DIR) --check-policy --strict
+	@echo "✅ repo-audit-strict 완료 ($(REPO_AUDIT_DIR))"
 
 runtime-ascii-guard: ## Ensure runtime print/logger literals stay ASCII-safe
 	@echo "🔡 Runtime ASCII 출력 가드 실행 중..."
@@ -302,7 +311,12 @@ clean: ## 캐시 및 임시 파일 정리
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	find . -type f -name "*.pyo" -delete 2>/dev/null || true
 	find . -type f -name ".coverage" -delete 2>/dev/null || true
+	rm -f coverage.xml 2>/dev/null || true
+	rm -rf artifacts/ 2>/dev/null || true
+	rm -rf coverage_html_report/ 2>/dev/null || true
 	rm -rf htmlcov/ 2>/dev/null || true
+	rm -rf $(ARTIFACTS_DIR)/ 2>/dev/null || true
+	rm -rf $(COVERAGE_DIR)/ 2>/dev/null || true
 	rm -rf .pytest_cache/ 2>/dev/null || true
 	rm -rf .mypy_cache/ 2>/dev/null || true
 	rm -rf dist/ build/ *.egg-info 2>/dev/null || true

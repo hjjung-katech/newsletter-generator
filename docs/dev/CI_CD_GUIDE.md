@@ -72,9 +72,10 @@ make repo-audit-strict
 
 ## Coverage Reporting
 
-- 커버리지는 `pytest-cov` 리포트(`coverage.xml`, `htmlcov/`)로 계속 수집합니다.
+- 커버리지는 `pytest-cov` 리포트(`.local/coverage/coverage.xml`, `.local/coverage/htmlcov/`)로 계속 수집합니다.
 - 현재 contributor gate는 "고정 퍼센트 임계치" 문서보다 `make check-full` 통과와 테스트 리포트 정합성을 우선 기준으로 사용합니다.
 - 커버리지 개선 작업은 별도 RR/PR 단위로 분리합니다.
+- repo audit, coverage, debug 같은 로컬 scratch 산출물은 기본적으로 루트 `.local/` 아래에 격리합니다.
 
 ## Repo Hygiene Gate
 
@@ -83,16 +84,16 @@ make repo-audit-strict
 ```bash
 python scripts/repo_audit.py \
   --policy scripts/repo_hygiene_policy.json \
-  --output-dir artifacts/repo-audit \
+  --output-dir .local/artifacts/repo-audit \
   --check-policy
 ```
 
 - 현재 기본 운영: `REPO_HYGIENE_STRICT=true` (hard gate)
 - 임시 예외 경로: `REPO_HYGIENE_STRICT=false`로 soft gate override 가능(권장하지 않음)
 - CI artifact:
-  - `artifacts/repo-audit/repo_audit_report.md`
-  - `artifacts/repo-audit/repo_audit_report.json`
-  - `artifacts/repo-audit/policy_warnings.md`
+  - `.local/artifacts/repo-audit/repo_audit_report.md`
+  - `.local/artifacts/repo-audit/repo_audit_report.json`
+  - `.local/artifacts/repo-audit/policy_warnings.md`
 
 ## PR Policy Check Gate
 

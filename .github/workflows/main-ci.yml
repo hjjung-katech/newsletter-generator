@@ -23,6 +23,10 @@ env:
   CACHE_VERSION: v1
   # Hard gate is enabled by default; allow temporary override only if needed.
   REPO_HYGIENE_STRICT: 'true'
+  REPO_AUDIT_DIR: .local/artifacts/repo-audit
+  COVERAGE_DIR: .local/coverage
+  DEBUG_DIR: .local/debug_files
+  WINDOWS_CI_BURNIN_REPORT: .local/artifacts/windows-ci-burnin.json
 
 jobs:
   # ========================================
@@ -159,17 +163,17 @@ jobs:
           fi
           python scripts/repo_audit.py \
             --policy scripts/repo_hygiene_policy.json \
-            --output-dir artifacts/repo-audit \
+            --output-dir "${REPO_AUDIT_DIR}" \
             --check-policy \
             "${STRICT_ARGS[@]}"
-          cat artifacts/repo-audit/policy_warnings.md >> "$GITHUB_STEP_SUMMARY"
+          cat "${REPO_AUDIT_DIR}/policy_warnings.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload repo audit artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: repo-audit-${{ github.run_id }}
-          path: artifacts/repo-audit/
+          path: ${{ env.REPO_AUDIT_DIR }}/
 
       - name: Type checking (mypy)
         shell: bash
@@ -257,7 +261,8 @@ jobs:
         run: |
           mkdir -p output
           mkdir -p output/test_results
-          mkdir -p debug_files
+          mkdir -p "${DEBUG_DIR}"
+          mkdir -p "${COVERAGE_DIR}"
           mkdir -p templates
         shell: bash
 
@@ -266,6 +271,7 @@ jobs:
           MOCK_MODE: 'true'
           TESTING: '1'
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
           # Dummy test environment variables
           OPENAI_API_KEY: test-key
           SERPER_API_KEY: test-key
@@ -274,7 +280,7 @@ jobs:
           POSTMARK_SERVER_TOKEN: dummy-token
           EMAIL_SENDER: test@example.com
         run: |
-          pytest -m unit --tb=short --junitxml=test-results-unit.xml --cov=newsletter --cov=newsletter_core --cov=web --cov-report=xml --cov-report=html
+          pytest -m unit --tb=short --junitxml=test-results-unit.xml
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -283,8 +289,8 @@ jobs:
           name: test-results-unit-${{ matrix.os }}-${{ matrix.python-version }}
           path: |
             test-results-*.xml
-            coverage.xml
-            htmlcov/
+            ${{ env.COVERAGE_DIR }}/coverage.xml
+            ${{ env.COVERAGE_DIR }}/htmlcov/
 
   # ========================================
   # Stage 3: Mock API Tests
@@ -312,7 +318,7 @@ jobs:
       - name: Create required directories
         run: |
           mkdir -p output
-          mkdir -p debug_files
+          mkdir -p "${DEBUG_DIR}"
           mkdir -p templates
 
       - name: Run mock API tests
@@ -320,6 +326,7 @@ jobs:
           MOCK_MODE: 'true'
           TESTING: '1'
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
           OPENAI_API_KEY: test-key
           SERPER_API_KEY: test-key
           GEMINI_API_KEY: test-key
@@ -375,7 +382,7 @@ jobs:
       - name: Create required directories
         run: |
           mkdir -p output
-          mkdir -p debug_files
+          mkdir -p "${DEBUG_DIR}"
           mkdir -p templates
 
       - name: Run scheduler integration contracts (always)
@@ -383,6 +390,7 @@ jobs:
           RUN_INTEGRATION_TESTS: '1'
           TESTING: '1'
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
           OPENAI_API_KEY: test-key
           SERPER_API_KEY: test-key
           GEMINI_API_KEY: test-key
@@ -398,6 +406,7 @@ jobs:
           RUN_INTEGRATION_TESTS: '1'
           TESTING: '1'
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY || '' }}
           SERPER_API_KEY: ${{ secrets.SERPER_API_KEY || '' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY || '' }}
@@ -450,7 +459,7 @@ jobs:
         run: |
           echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "### Coverage Report" >> $GITHUB_STEP_SUMMARY
-          if [ -f coverage.xml ]; then
+          if [ -f "${COVERAGE_DIR}/coverage.xml" ]; then
             echo "✅ Coverage report generated successfully" >> $GITHUB_STEP_SUMMARY
           else
             echo "⚠️ Coverage report not found" >> $GITHUB_STEP_SUMMARY
@@ -678,12 +687,12 @@ jobs:
             --branch main \
             --limit 10 \
             --min-success-rate 95 \
-            --output artifacts/windows-ci-burnin.json
+            --output "${WINDOWS_CI_BURNIN_REPORT}"
 
       - name: Upload windows burn-in artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-ci-burnin-${{ github.run_id }}
-          path: artifacts/windows-ci-burnin.json
+          path: ${{ env.WINDOWS_CI_BURNIN_REPORT }}
           if-no-files-found: error

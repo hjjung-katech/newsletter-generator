@@ -23,6 +23,9 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  DEBUG_DIR: .local/debug_files
+
 jobs:
   # ========================================
   # Generate Newsletter
@@ -49,7 +52,7 @@ jobs:
         run: |
           mkdir -p output
           mkdir -p config
-          mkdir -p debug_files
+          mkdir -p "${DEBUG_DIR}"
           mkdir -p templates
 
       - name: Configure environment
@@ -79,6 +82,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
         run: |
           echo "🚀 Generating newsletter with real APIs"
           python -m newsletter run --keywords "AI,기술뉴스,개발" --template-style compact

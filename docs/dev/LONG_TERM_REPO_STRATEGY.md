@@ -260,7 +260,7 @@ Delivery KPI:
 - Week 12 실행 반영:
   - `packages/newsletter_core/src/newsletter_core`를 `newsletter_core/`로 평탄화
 - Week 13 실행 반영:
-  - `output/`, `debug_files/`를 local-only 생성 디렉터리로 전환(`.gitkeep` 추적 제거)
+  - `output/`은 사용자 생성 결과물로 루트 유지, 디버그/점검/coverage 산출물 기본 경로는 `.local/`로 숨김 정리
 - Week 14 실행 반영:
   - `.vscode/`를 local-only(추적 제외)로 전환
 - Week 15 실행 반영:
