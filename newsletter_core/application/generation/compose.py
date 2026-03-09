@@ -3,7 +3,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -15,47 +15,15 @@ from newsletter.date_utils import (
 )
 from newsletter.utils.logger import get_logger
 
+from .compose_inputs import (
+    NewsletterConfig,
+    extract_test_config,
+    normalize_compose_input,
+    resolve_style_config,
+)
+
 # 로거 초기화
 logger = get_logger()
-
-
-# 뉴스레터 스타일 설정
-class NewsletterConfig:
-    """뉴스레터 설정 클래스"""
-
-    @staticmethod
-    def get_config(style: str = "detailed") -> Dict[str, Any]:
-        """스타일별 뉴스레터 설정 반환"""
-        configs = {
-            "compact": {
-                "max_articles": 10,  # 총 기사 수
-                "top_articles_count": 3,  # 상위 기사 수
-                "max_groups": 3,  # 최대 그룹 수
-                "max_definitions": 3,  # 최대 용어 정의 수
-                "summary_style": "brief",  # 요약 스타일
-                "template_name": "newsletter_template_compact.html",
-                "title_default": "주간 산업 동향 뉴스 클리핑",
-            },
-            "detailed": {
-                "max_articles": None,  # 모든 필터된 기사
-                "top_articles_count": 3,  # 상위 기사 수
-                "max_groups": 6,  # 최대 그룹 수
-                "max_definitions": None,  # 그룹별 0-2개, 중복 없음
-                "summary_style": "detailed",  # 요약 스타일
-                "template_name": "newsletter_template.html",
-                "title_default": "주간 산업 동향 뉴스 클리핑",
-            },
-            "email_compatible": {
-                "max_articles": None,  # 모든 필터된 기사 (detailed 스타일 기본값)
-                "top_articles_count": 3,  # 상위 기사 수
-                "max_groups": 6,  # 최대 그룹 수
-                "max_definitions": None,  # 그룹별 0-2개, 중복 없음
-                "summary_style": "detailed",  # 요약 스타일 (detailed 스타일 기본값)
-                "template_name": "newsletter_template_email_compatible.html",
-                "title_default": "주간 산업 동향 뉴스 클리핑",
-            },
-        }
-        return configs.get(style, configs["detailed"])
 
 
 def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") -> str:
@@ -70,72 +38,16 @@ def compose_newsletter(data: Any, template_dir: str, style: str = "detailed") ->
     Returns:
         str: 렌더링된 HTML 뉴스레터
     """
-    # 테스트 설정 추출
-    if isinstance(data, dict):
-        data, test_config = extract_test_config(data)
+    data, test_config = normalize_compose_input(data)
 
-    # 리스트 형태의 데이터를 딕셔너리로 변환 (기존 호환성 유지)
-    if isinstance(data, list):
-        # 리스트 형태로 제공된 경우 구조화된 데이터로 변환
-        newsletter_data = {
-            "newsletter_topic": "주간 산업 동향",
-            "sections": [
-                {
-                    "title": "주요 기술 동향",
-                    "summary_paragraphs": ["다음은 지난 한 주간의 주요 기술 동향 요약입니다."],
-                    "news_links": [],
-                }
-            ],
-        }
-
-        for article in data:
-            article_title = article.get("title", "제목 없음")
-            article_url = article.get("url", "#")
-            article_source = article.get("source", "출처 미상")
-            article_date = article.get("date", "날짜 미상")
-
-            # 링크 정보 추가
-            link_info = {
-                "title": article_title,
-                "url": article_url,
-                "source_and_date": f"{article_source}, {article_date}",
-            }
-            newsletter_data["sections"][0]["news_links"].append(link_info)
-
-            # 첫 번째 기사 내용을 요약 본문으로 사용
-            if len(newsletter_data["sections"][0]["summary_paragraphs"]) == 1:
-                summary = article.get("summary_text") or article.get("content", "")
-                # 간단한 문단 나누기 (실제로는 더 정교한 처리가 필요할 수 있음)
-                paragraphs = summary.split("\n\n")
-                newsletter_data["sections"][0]["summary_paragraphs"] = paragraphs[
-                    :3
-                ]  # 최대 3개 문단
-
-        data = newsletter_data
-
-    # email_compatible인 경우 template_style 정보를 확인하여 적절한 설정 적용
     if style == "email_compatible":
-        # 데이터에서 원래 template_style 확인 (graph.py에서 전달됨)
         original_template_style = data.get("template_style", "detailed")
-
-        # email_compatible 기본 설정을 가져옴
-        config = NewsletterConfig.get_config(style)
-
-        # 원래 template_style의 설정을 일부 적용
-        base_config = NewsletterConfig.get_config(original_template_style)
-
-        # 중요한 설정들을 원래 스타일에서 가져옴
-        config["max_articles"] = base_config["max_articles"]
-        config["max_groups"] = base_config["max_groups"]
-        config["max_definitions"] = base_config["max_definitions"]
-        config["summary_style"] = base_config["summary_style"]
-
+        config = resolve_style_config(data, style)
         print(
             f"Composing email-compatible newsletter with {original_template_style} content style..."
         )
     else:
-        # 설정 가져오기
-        config = NewsletterConfig.get_config(style)
+        config = resolve_style_config(data, style)
         print(
             f"Composing {style} newsletter for topic: {data.get('newsletter_topic', 'N/A')}..."
         )
@@ -636,27 +548,6 @@ def compose_compact_newsletter_html(
         return template.render(context)
 
     return compose_newsletter(data, template_dir, "compact")
-
-
-def extract_test_config(data: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """
-    Extract test configuration from data if present.
-
-    Args:
-        data: Dictionary possibly containing embedded test configuration
-
-    Returns:
-        Tuple of (newsletter_data, test_config)
-    """
-    # Create a copy to avoid modifying the original
-    newsletter_data = data.copy()
-    test_config = {}
-
-    # Extract test config if present
-    if "_test_config" in newsletter_data:
-        test_config = newsletter_data.pop("_test_config")
-
-    return newsletter_data, test_config
 
 
 def save_newsletter_with_config(
