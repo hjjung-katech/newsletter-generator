@@ -1,6 +1,10 @@
 # 코드 품질 관리 가이드
 
-이 문서는 Newsletter Generator 프로젝트의 코드 품질을 관리하는 방법에 대한 가이드입니다.
+> Historical note (2026-03-09): RR-06에서 active docs tree 밖으로 이관된 문서입니다.
+> 현재 코드 품질/검증의 정본은 `docs/dev/CI_CD_GUIDE.md` 와
+> `docs/dev/LOCAL_CI_GUIDE.md` 를 기준으로 유지합니다.
+
+이 문서는 당시 코드 품질 운영 메모를 보존하기 위한 archive 사본입니다.
 
 ## 코드 포맷팅
 

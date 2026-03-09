@@ -53,6 +53,29 @@ make repo-audit-strict
 - `make repo-audit-strict`: CI hard gate와 동일(strict) 경로 점검
 - dev 유틸 실행 스크립트는 `scripts/devtools/`를 기본 경로로 사용합니다.
 
+## Quality Toolchain
+
+현재 품질 게이트는 아래 도구 조합을 기준으로 운영합니다.
+
+| Area | Primary Tool | Canonical Entry |
+|---|---|---|
+| formatting | `black` | `make check`, `make check-full`, `make format` |
+| import ordering | `isort` | `make check`, `make check-full`, `make format` |
+| lint | `flake8` | `make check`, `make check-full` |
+| type check | `mypy` | `make check-full` |
+| security scan | `bandit` | `make check-full` |
+| unit/integration test | `pytest` | `make check`, `make check-full` |
+| docs integrity | Markdown link/style checks | `make docs-check` |
+| repo hygiene | `scripts/repo_audit.py` | `make repo-audit`, `make repo-audit-strict` |
+
+직접 도구를 개별 실행할 수도 있지만, contributor-facing 기준 명령은 Makefile 엔트리를 우선 사용합니다.
+
+## Coverage Reporting
+
+- 커버리지는 `pytest-cov` 리포트(`coverage.xml`, `htmlcov/`)로 계속 수집합니다.
+- 현재 contributor gate는 "고정 퍼센트 임계치" 문서보다 `make check-full` 통과와 테스트 리포트 정합성을 우선 기준으로 사용합니다.
+- 커버리지 개선 작업은 별도 RR/PR 단위로 분리합니다.
+
 ## Repo Hygiene Gate
 
 `main-ci.yml`의 `quality-checks` 단계에서 repo hygiene gate를 실행합니다.

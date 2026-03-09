@@ -84,5 +84,6 @@
   - [`archive/2026-q1/F14_COMPLETION_REPORT.md`](archive/2026-q1/F14_COMPLETION_REPORT.md)
   - [`archive/2026-q1/FIXES_SUMMARY.md`](archive/2026-q1/FIXES_SUMMARY.md)
   - [`archive/2026-q1/PROJECT_STRUCTURE.md`](archive/2026-q1/PROJECT_STRUCTURE.md)
+  - [`archive/2026-q1/CODE_QUALITY.md`](archive/2026-q1/CODE_QUALITY.md)
   - [`archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md`](archive/2026-q1/MULTI_LLM_IMPLEMENTATION_SUMMARY.md)
   - [`archive/webservice-prd.md`](archive/webservice-prd.md)

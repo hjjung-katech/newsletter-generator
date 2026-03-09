@@ -16,6 +16,7 @@
 | [`BRANCH_MAIN_GAP_ANALYSIS.md`](BRANCH_MAIN_GAP_ANALYSIS.md) | 과거 `main` 격차 분석 문서 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md) |
 | [`REFACTORING_EXECUTION_PLAN.md`](REFACTORING_EXECUTION_PLAN.md) | 시점 고정형 리팩토링 배치 계획 | [`../../dev/LONG_TERM_REPO_STRATEGY.md`](../../dev/LONG_TERM_REPO_STRATEGY.md), [`../../dev/REPO_HYGIENE_POLICY.md`](../../dev/REPO_HYGIENE_POLICY.md) |
 | [`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md) | 중복된 아키텍처 개요 문서 | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md), [`../../technical/adr-0001-architecture-boundaries.md`](../../technical/adr-0001-architecture-boundaries.md) |
+| [`CODE_QUALITY.md`](CODE_QUALITY.md) | 현재 게이트 구성과 어긋난 예전 코드 품질 안내 | [`../../dev/CI_CD_GUIDE.md`](../../dev/CI_CD_GUIDE.md), [`../../dev/LOCAL_CI_GUIDE.md`](../../dev/LOCAL_CI_GUIDE.md) |
 
 ## Rollback
 
