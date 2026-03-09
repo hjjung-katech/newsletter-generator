@@ -106,3 +106,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 4. 환경변수 정본과 `.env.example` 의 용어를 맞추기 위해 canonical key와 compatibility key를 분리해 명시했습니다.
 5. 구조/위생 축의 과거 실행 계획 문서는 canonical 참조를 제거한 뒤 [`archive/2026-q1/`](archive/2026-q1/README.md) 로 이관했습니다.
 6. 아키텍처 축은 [`ARCHITECTURE.md`](ARCHITECTURE.md) 1개 정본과 ADR/마이그레이션 로그 보조 구조로 정리하고, 중복 개요 문서는 archive 로 이관했습니다.
+7. 환경 샘플은 root `.env.example`(canonical runtime) 과 `apps/experimental/.env.example`(experimental runtime) 로 분리했습니다.
