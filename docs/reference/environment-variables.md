@@ -48,8 +48,10 @@
 | 변수 | 필수 여부 | 용도 |
 |---|---|---|
 | `LANGCHAIN_API_KEY` | LangSmith 사용 시 선택 | LangSmith API key |
-| `LANGCHAIN_TRACING_V2` | LangSmith 사용 시 선택 | tracing 토글 |
+| `LANGCHAIN_TRACING_V2` | LangSmith 사용 시 선택 | tracing 토글 (`true`/`1`) |
 | `LANGCHAIN_PROJECT` | LangSmith 사용 시 선택 | tracing project name |
+| `ENABLE_COST_TRACKING` | 비용 추적 사용 시 선택 | provider cost callback 활성화 (`--track-cost` 와 동일 목적) |
+| `DEBUG_COST_TRACKING` | 로컬 디버깅 시 선택 | LangSmith/cost tracking 초기화 디버그 로그 |
 | `DATABASE_URL` | DB persistence 사용 시 선택 | 애플리케이션 DB 연결 문자열 |
 | `REDIS_URL` | worker/scheduler 사용 시 필수 | Redis 연결 |
 | `RQ_QUEUE` | 선택 | RQ 큐 이름 (`default`) |
@@ -114,6 +116,11 @@
 SERPER_API_KEY=...
 GEMINI_API_KEY=...
 APP_ENV=development
+LANGCHAIN_API_KEY=...
+LANGCHAIN_TRACING_V2=1
+LANGCHAIN_PROJECT=...
+ENABLE_COST_TRACKING=false
+DEBUG_COST_TRACKING=false
 
 # 이메일 발송 포함
 POSTMARK_SERVER_TOKEN=ps_xxx

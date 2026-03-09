@@ -159,6 +159,40 @@ provider_models:
 3. 사용 불가능한 경우 사용 가능한 다른 제공자로 자동 전환
 4. 모든 제공자가 사용 불가능한 경우 오류 발생
 
+## Observability and Cost Tracking
+
+LangSmith tracing and provider cost tracking are optional features. The current
+runtime implementation lives in `newsletter/cost_tracking.py`, and CLI
+entrypoints can enable cost tracking per invocation.
+
+### Runtime contract
+
+- `LANGCHAIN_API_KEY`: LangSmith API key
+- `LANGCHAIN_TRACING_V2`: `true` or `1` when tracing should initialize
+- `LANGCHAIN_PROJECT`: optional project name, defaults to `default-project`
+- `ENABLE_COST_TRACKING`: `true` or `1` to add provider cost callbacks
+- `DEBUG_COST_TRACKING`: optional debug logging for tracing initialization
+
+Use `../reference/environment-variables.md` as the canonical variable list and
+`../../.env.example` as the default sample. `LANGCHAIN_ENDPOINT` is not part of
+the current runtime contract and should not be added to active samples unless
+the implementation starts reading it.
+
+### CLI behavior
+
+- `newsletter run --track-cost`
+- `newsletter test ... --track-cost`
+
+The `--track-cost` flag sets `ENABLE_COST_TRACKING=1` for the current process.
+If `LANGCHAIN_TRACING_V2` and `LANGCHAIN_API_KEY` are both set, LangSmith
+tracing initializes alongside provider cost callbacks.
+
+### Operational guidance
+
+- Use `DEBUG_COST_TRACKING=1` only for local debugging because it increases
+  tracing setup logs.
+- Keep end-user quick-start material in `../user/MULTI_LLM_GUIDE.md`.
+
 ## 비용 최적화 팁
 
 ### 1. 작업 특성에 맞는 모델 선택
