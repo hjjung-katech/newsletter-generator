@@ -78,8 +78,9 @@ def test(
 
             # 템플릿 스타일에 따른 compose_newsletter 함수 사용
             from .compose import compose_newsletter
+            from .template_paths import get_newsletter_template_dir
 
-            template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+            template_dir = get_newsletter_template_dir()
 
             # email_compatible인 경우 데이터에 template_style 정보 추가
             if email_compatible:

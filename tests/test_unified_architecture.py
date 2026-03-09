@@ -20,7 +20,7 @@ import pytest
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from newsletter.compose import (
+from newsletter.compose import (  # noqa: E402
     NewsletterConfig,
     compose_newsletter,
     create_grouped_sections,
@@ -28,6 +28,7 @@ from newsletter.compose import (
     extract_definitions,
     extract_food_for_thought,
 )
+from newsletter.template_paths import get_newsletter_template_dir  # noqa: E402
 
 
 def create_test_data() -> Dict[str, Any]:
@@ -199,7 +200,7 @@ class TestUnifiedArchitecture:
         print("Step 9: Food for thought 생성 ✅")
 
         # Step 10: 최종 생성 (템플릿 테스트는 선택적)
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = get_newsletter_template_dir()
         if os.path.exists(template_dir):
             try:
                 final_html = compose_newsletter(self.test_data, template_dir, "compact")
@@ -253,9 +254,7 @@ class TestUnifiedArchitecture:
         )
         assert len(detailed_groups) <= detailed_config["max_groups"]
 
-        print(
-            f"✅ Compact: {len(compact_definitions)}개 정의, {len(compact_groups)}개 그룹"
-        )
+        print(f"✅ Compact: {len(compact_definitions)}개 정의, {len(compact_groups)}개 그룹")
         print(
             f"✅ Detailed: {len(detailed_definitions)}개 정의, {len(detailed_groups)}개 그룹"
         )

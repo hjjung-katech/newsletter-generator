@@ -123,7 +123,7 @@
 
                     <!-- Main Sections -->
                     {% set is_compact_style = template_style == 'compact' %}
-                    
+
                     {% if is_compact_style and grouped_sections %}
                     <!-- Compact style: use grouped_sections -->
                     {% for group in grouped_sections %}
@@ -132,7 +132,7 @@
                             <h2 style="margin: 0 0 15px 0; color: #0d47a1; font-size: 18px; font-weight: bold;">
                                 {{ group.heading }}
                             </h2>
-                            
+
                             {% if group.intro %}
                             <p style="margin: 0 0 10px 0; color: #333333; font-size: 14px; line-height: 1.6;">
                                 {{ group.intro }}
@@ -169,7 +169,7 @@
                         </td>
                     </tr>
                     {% endfor %}
-                    
+
                     {% else %}
                     <!-- Detailed style: use sections -->
                     {% for section in sections %}
@@ -178,7 +178,7 @@
                             <h2 style="margin: 0 0 15px 0; color: #0d47a1; font-size: 18px; font-weight: bold;">
                                 {{ section.title }}
                             </h2>
-                            
+
                             {% if section.summary_paragraphs %}
                             {% for paragraph in section.summary_paragraphs %}
                             <p style="margin: 0 0 10px 0; color: #333333; font-size: 14px; line-height: 1.6;">
@@ -335,4 +335,4 @@
         </tr>
     </table>
 </body>
-</html> 
+</html>

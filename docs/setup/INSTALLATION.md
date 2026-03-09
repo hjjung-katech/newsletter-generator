@@ -118,7 +118,7 @@ newsletter-generator/
 ├── .env                    # 환경 변수 설정
 ├── .env.example           # 환경 변수 예제
 ├── newsletter/            # 메인 패키지
-├── templates/             # HTML 템플릿
+│   └── templates/         # 패키지 내부 HTML 템플릿
 ├── output/               # 생성된 파일들
 ├── docs/                 # 문서
 ├── tests/                # 테스트 파일

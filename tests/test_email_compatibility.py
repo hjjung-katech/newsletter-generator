@@ -11,7 +11,6 @@ Email Compatibility 테스트 모듈
 """
 
 import os
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,8 +18,9 @@ from bs4 import BeautifulSoup
 
 from newsletter.chains import get_newsletter_chain
 from newsletter.compose import compose_newsletter
+from newsletter.template_paths import get_newsletter_template_dir
 
-project_root = str(Path(__file__).resolve().parents[1])
+TEMPLATE_DIR = get_newsletter_template_dir()
 
 
 class TestEmailCompatibilityCore:
@@ -97,7 +97,7 @@ class TestEmailCompatibilityCore:
 
     def test_email_compatible_template_selection(self, sample_data):
         """Email-compatible 템플릿이 올바르게 선택되는지 테스트"""
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
 
         # email_compatible = True인 경우
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
@@ -119,7 +119,7 @@ class TestEmailCompatibilityCore:
 
     def test_inline_css_processing(self, sample_data):
         """CSS가 인라인으로 처리되는지 테스트"""
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         soup = BeautifulSoup(html_content, "html.parser")
@@ -134,7 +134,7 @@ class TestEmailCompatibilityCore:
 
     def test_template_style_handling(self, sample_data):
         """template_style에 따른 다른 콘텐츠 처리 테스트"""
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
 
         # Detailed style 테스트
         sample_data["template_style"] = "detailed"
@@ -156,7 +156,7 @@ class TestEmailCompatibilityCore:
 
     def test_required_email_fields(self, sample_data):
         """Email-compatible 템플릿에 필요한 필드들이 포함되는지 테스트"""
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         # 필수 필드들이 포함되었는지 확인
@@ -175,7 +175,7 @@ class TestEmailCompatibilityCore:
 
     def test_content_integrity(self, sample_data):
         """콘텐츠 무결성 테스트 - 모든 데이터가 손실 없이 포함되는지"""
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         # 기사 제목들이 포함되었는지 확인
@@ -198,7 +198,7 @@ class TestEmailCompatibilityCore:
 
     def test_mobile_responsiveness(self, sample_data):
         """모바일 반응형 디자인 테스트"""
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         soup = BeautifulSoup(html_content, "html.parser")
@@ -406,7 +406,7 @@ class TestEmailCompatibilityValidation:
             "top_articles": [],
         }
 
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         soup = BeautifulSoup(html_content, "html.parser")
@@ -432,7 +432,7 @@ class TestEmailCompatibilityValidation:
             "top_articles": [],
         }
 
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         # 지원되지 않는 CSS 속성 확인
@@ -468,7 +468,7 @@ class TestEmailCompatibilityValidation:
             "top_articles": [],
         }
 
-        template_dir = os.path.join(project_root, "templates")
+        template_dir = TEMPLATE_DIR
         html_content = compose_newsletter(sample_data, template_dir, "email_compatible")
 
         soup = BeautifulSoup(html_content, "html.parser")

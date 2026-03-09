@@ -1,11 +1,7 @@
-import json
-import os
 from datetime import datetime
-from pathlib import Path
-
-import pytest
 
 from newsletter.compose import compose_newsletter_html
+from newsletter.template_paths import get_newsletter_template_dir
 
 
 def test_search_keywords_in_template():
@@ -20,9 +16,7 @@ def test_search_keywords_in_template():
         "sections": [
             {
                 "title": "생성형 AI 발전",
-                "summary_paragraphs": [
-                    "최근 생성형 AI 기술이 빠르게 발전하고 있습니다."
-                ],
+                "summary_paragraphs": ["최근 생성형 AI 기술이 빠르게 발전하고 있습니다."],
                 "news_links": [
                     {
                         "title": "ChatGPT 4.0 출시",
@@ -37,12 +31,7 @@ def test_search_keywords_in_template():
         "company_name": "Tech News Co.",
     }
 
-    # Get the template directory
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(
-        os.path.dirname(current_dir)
-    )  # Go up two levels to the project root
-    template_dir = os.path.join(project_root, "templates")
+    template_dir = get_newsletter_template_dir()
     template_file = "newsletter_template.html"
 
     # Create the newsletter HTML
@@ -73,19 +62,12 @@ def test_search_keywords_rendering_with_multiple_formats():
         "sections": [
             {
                 "title": "생성형 AI 발전",
-                "summary_paragraphs": [
-                    "최근 생성형 AI 기술이 빠르게 발전하고 있습니다."
-                ],
+                "summary_paragraphs": ["최근 생성형 AI 기술이 빠르게 발전하고 있습니다."],
             }
         ],
     }
 
-    # Get the template directory
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(
-        os.path.dirname(current_dir)
-    )  # Go up two levels to the project root
-    template_dir = os.path.join(project_root, "templates")
+    template_dir = get_newsletter_template_dir()
     template_file = "newsletter_template.html"
 
     # Test case 1: String keywords

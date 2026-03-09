@@ -1,10 +1,10 @@
 import os
 import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 from newsletter.compose import compose_newsletter_html
+from newsletter.template_paths import get_newsletter_template_dir
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 # 현재 파일의 디렉토리(tests)의 부모 디렉토리(프로젝트 루트)를 경로에 추가
@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 
 class TestCompose(unittest.TestCase):
-    template_dir = str(Path(__file__).resolve().parents[1] / "templates")
+    template_dir = get_newsletter_template_dir()
 
     def test_compose_newsletter_html_success(self):
         summaries = [

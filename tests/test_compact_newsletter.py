@@ -7,7 +7,6 @@ Compact 뉴스레터 단위 테스트
 
 import os
 import sys
-from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -15,11 +14,14 @@ import pytest
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from newsletter.chains import get_newsletter_chain
-from newsletter.compose import (
+from newsletter.chains import get_newsletter_chain  # noqa: E402
+from newsletter.compose import (  # noqa: E402
     compose_compact_newsletter_html,
     extract_key_definitions_for_compact,
 )
+from newsletter.template_paths import get_newsletter_template_dir  # noqa: E402
+
+TEMPLATE_DIR = get_newsletter_template_dir()
 
 
 class TestCompactNewsletterUnit:
@@ -138,29 +140,22 @@ class TestCompactNewsletterUnit:
                     "articles": [],
                 }
             ],
-            "definitions": [
-                {"term": "테스트용어", "explanation": "테스트를 위한 용어입니다."}
-            ],
+            "definitions": [{"term": "테스트용어", "explanation": "테스트를 위한 용어입니다."}],
             "food_for_thought": "테스트 질문입니다.",
             "company_name": "Test Company",
         }
 
-        template_dir = os.path.join(project_root, "templates")
         html = compose_compact_newsletter_html(
-            test_data, template_dir, "newsletter_template_compact.html"
+            test_data, TEMPLATE_DIR, "newsletter_template_compact.html"
         )
 
         # 검증 - 실제 렌더링되는 제목으로 수정
         assert html is not None and len(html) > 0, "HTML이 생성되지 않았습니다"
-        assert (
-            "자율주행 주간 산업 동향 뉴스 클리핑" in html
-        ), "제목이 렌더링되지 않았습니다"
+        assert "자율주행 주간 산업 동향 뉴스 클리핑" in html, "제목이 렌더링되지 않았습니다"
         assert "📖 이런 뜻이에요" in html, "정의 섹션이 렌더링되지 않았습니다"
         assert "테스트용어" in html, "용어가 렌더링되지 않았습니다"
         assert "테스트를 위한 용어입니다" in html, "용어 설명이 렌더링되지 않았습니다"
-        assert (
-            "이번 주, 주요 산업 동향을 미리 만나보세요" in html
-        ), "태그라인이 렌더링되지 않았습니다"
+        assert "이번 주, 주요 산업 동향을 미리 만나보세요" in html, "태그라인이 렌더링되지 않았습니다"
 
         print("✅ Compact 템플릿 렌더링 테스트 통과!")
 
@@ -176,9 +171,7 @@ class TestCompactNewsletterUnit:
         # definitions 필드가 없는 섹션 테스트
         no_definitions_sections = [{"title": "테스트 섹션", "articles": []}]
         definitions = extract_key_definitions_for_compact(no_definitions_sections)
-        assert (
-            definitions == []
-        ), "definitions 필드가 없는 섹션에서 정의가 생성되었습니다"
+        assert definitions == [], "definitions 필드가 없는 섹션에서 정의가 생성되었습니다"
 
         # 빈 definitions 필드가 있는 섹션 테스트
         empty_definitions_sections = [{"title": "테스트 섹션", "definitions": []}]
@@ -198,23 +191,17 @@ class TestCompactNewsletterUnit:
             "definitions": [],
         }
 
-        template_dir = os.path.join(project_root, "templates")
-
         try:
             html = compose_compact_newsletter_html(
-                minimal_data, template_dir, "newsletter_template_compact.html"
+                minimal_data, TEMPLATE_DIR, "newsletter_template_compact.html"
             )
 
             # 기본 HTML 구조는 생성되어야 함
-            assert (
-                html is not None and len(html) > 0
-            ), "최소 데이터로 HTML이 생성되지 않았습니다"
+            assert html is not None and len(html) > 0, "최소 데이터로 HTML이 생성되지 않았습니다"
             assert "<!DOCTYPE html>" in html, "유효한 HTML 형식이 아닙니다"
             # compose_compact_newsletter_html은 newsletter_topic을 newsletter_title로 매핑함
             assert "테스트 뉴스 클리핑" in html, "제목이 렌더링되지 않았습니다"
-            assert (
-                "이번 주, 주요 산업 동향을 미리 만나보세요" in html
-            ), "태그라인이 렌더링되지 않았습니다"
+            assert "이번 주, 주요 산업 동향을 미리 만나보세요" in html, "태그라인이 렌더링되지 않았습니다"
 
             print("✅ 템플릿 데이터 검증 테스트 통과!")
 
@@ -232,13 +219,11 @@ class TestCompactNewsletterUnit:
             "definitions": [],
         }
 
-        template_dir = os.path.join(project_root, "templates")
-
         try:
             # 존재하지 않는 템플릿 파일 - 이제 예외가 발생해야 함
             with pytest.raises(Exception):  # Jinja2 TemplateNotFound 예외 예상
-                html = compose_compact_newsletter_html(
-                    test_data, template_dir, "non_existent_template.html"
+                compose_compact_newsletter_html(
+                    test_data, TEMPLATE_DIR, "non_existent_template.html"
                 )
             print("✅ 에러 처리 테스트 통과!")
 
@@ -282,9 +267,7 @@ class TestCompactNewsletterUnit:
             assert term.strip() == term, "용어에 불필요한 공백이 있습니다"
             assert explanation.strip() == explanation, "설명에 불필요한 공백이 있습니다"
 
-        print(
-            f"✅ Definitions 내용 검증 테스트 통과! 선택된 정의: {[d['term'] for d in definitions]}"
-        )
+        print(f"✅ Definitions 내용 검증 테스트 통과! 선택된 정의: {[d['term'] for d in definitions]}")
 
 
 def test_compact_newsletter_unit_standalone():
@@ -311,9 +294,7 @@ if __name__ == "__main__":
         assert chain is not None, "체인 생성 실패"
 
         print("\n🎉 모든 독립 단위 테스트가 통과했습니다!")
-        print(
-            "전체 단위 테스트를 실행하려면: python -m pytest tests/test_compact_newsletter.py -v"
-        )
+        print("전체 단위 테스트를 실행하려면: python -m pytest tests/test_compact_newsletter.py -v")
     except Exception as e:
         print(f"\n❌ 일부 단위 테스트가 실패했습니다: {e}")
         sys.exit(1)
