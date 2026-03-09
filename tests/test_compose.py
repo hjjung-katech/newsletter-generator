@@ -1,7 +1,8 @@
 import os
 import sys
 import unittest
-from unittest.mock import mock_open, patch
+from pathlib import Path
+from unittest.mock import patch
 
 from newsletter.compose import compose_newsletter_html
 
@@ -11,6 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 
 class TestCompose(unittest.TestCase):
+    template_dir = str(Path(__file__).resolve().parents[1] / "templates")
 
     def test_compose_newsletter_html_success(self):
         summaries = [
@@ -29,7 +31,6 @@ class TestCompose(unittest.TestCase):
                 "date": "2025-01-02",
             },
         ]
-        template_dir = "c:\\Development\\newsletter-generator\\templates"
         template_name = "newsletter_template.html"
 
         # Mocking os.getenv to control generation_date and generation_timestamp
@@ -38,7 +39,7 @@ class TestCompose(unittest.TestCase):
             {"GENERATION_DATE": "2025-05-10", "GENERATION_TIMESTAMP": "12:34:56"},
         ):
             html_content = compose_newsletter_html(
-                summaries, template_dir, template_name
+                summaries, self.template_dir, template_name
             )
 
         # Test that the basic structure is correct
@@ -63,14 +64,13 @@ class TestCompose(unittest.TestCase):
 
     def test_compose_newsletter_html_empty_summaries(self):
         summaries = []
-        template_dir = "c:\\Development\\newsletter-generator\\templates"
         template_name = "newsletter_template.html"
         with patch.dict(
             os.environ,
             {"GENERATION_DATE": "2025-05-10", "GENERATION_TIMESTAMP": "12:34:56"},
         ):
             html_content = compose_newsletter_html(
-                summaries, template_dir, template_name
+                summaries, self.template_dir, template_name
             )
         self.assertIn("2025-05-10", html_content)
         self.assertIn(
@@ -90,13 +90,12 @@ class TestCompose(unittest.TestCase):
                 "summary_text": "Summary 1",
             }
         ]
-        template_dir = "c:\\Development\\newsletter-generator\\templates"
         template_name = "non_existent_template.html"
 
         with self.assertRaises(
             Exception
         ):  # Expecting a Jinja2 TemplateNotFound error, but Exception is broader
-            compose_newsletter_html(summaries, template_dir, template_name)
+            compose_newsletter_html(summaries, self.template_dir, template_name)
 
 
 if __name__ == "__main__":
