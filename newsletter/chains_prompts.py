@@ -1,9 +1,6 @@
-"""
-Newsletter Generator prompt and template constants.
-"""
+"""Newsletter Generator prompt and template constants."""
 
-import os
-
+from .template_paths import get_newsletter_template_path
 from .utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -11,9 +8,7 @@ logger = get_logger(__name__)
 
 def load_html_template() -> str:
     """HTML 템플릿 파일을 로드합니다."""
-    template_path = os.path.join(
-        os.path.dirname(__file__), "..", "templates", "newsletter_template.html"
-    )
+    template_path = get_newsletter_template_path("newsletter_template.html")
     try:
         with open(template_path, "r", encoding="utf-8") as f:
             return f.read()

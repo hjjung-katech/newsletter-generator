@@ -13,6 +13,7 @@ from newsletter.article_filter import select_top_articles
 from .chains_prompts import HTML_TEMPLATE
 from .compose import compose_newsletter
 from .template_manager import TemplateManager
+from .template_paths import get_newsletter_template_dir
 from .utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -163,7 +164,7 @@ def _render_with_template(
             "편집자 드림",
         )
 
-        template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+        template_dir = get_newsletter_template_dir()
         rendered_html = compose_newsletter(
             combined_data, template_dir, "email_compatible"
         )

@@ -98,7 +98,6 @@ newsletter-generator/
 │   ├── tools.py               # 유틸리티 도구
 │   ├── cost_tracking.py       # 비용 추적
 │   └── utils/                 # 유틸리티 모듈
-├── templates/                  # HTML 템플릿
 ├── tests/                      # 테스트 파일
 │   ├── unit_tests/            # 단위 테스트
 │   ├── api_tests/             # API 테스트
@@ -308,7 +307,7 @@ class TestComposeNewsletter:
             "articles": [{"title": "Test", "content": "Content"}],
             "keywords": ["AI"]
         }
-        template_dir = "templates"
+        template_dir = get_newsletter_template_dir()
 
         # When
         result = compose_newsletter(mock_data, template_dir, "detailed")

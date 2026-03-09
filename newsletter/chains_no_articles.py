@@ -3,7 +3,6 @@ Fallback generation flow when no articles were collected.
 """
 
 import datetime
-import os
 from typing import Any
 
 from langchain_core.messages import HumanMessage
@@ -11,6 +10,7 @@ from langchain_core.messages import HumanMessage
 from .chains_llm_utils import get_llm
 from .compose import compose_newsletter
 from .template_manager import TemplateManager
+from .template_paths import get_newsletter_template_dir
 from .utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -175,7 +175,7 @@ R&D 전략기획단 전문위원들을 대상으로, 해당 주제 분야의 전
     }
 
     logger.info("키워드 기반 뉴스레터 생성: %s", newsletter_topic)
-    template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+    template_dir = get_newsletter_template_dir()
 
     if email_compatible:
         logger.info("Email-compatible 템플릿 사용")

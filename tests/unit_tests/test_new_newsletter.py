@@ -1,8 +1,10 @@
 import os
+import re
 from datetime import datetime, timedelta
 
 from newsletter.compose import compose_newsletter_html
 from newsletter.date_utils import standardize_date
+from newsletter.template_paths import get_newsletter_template_dir
 
 # Create test data that includes various date formats
 test_articles = [
@@ -56,7 +58,7 @@ tests_dir = os.path.dirname(current_dir)  # tests 디렉토리
 project_root = os.path.dirname(tests_dir)  # 프로젝트 루트 디렉토리
 
 # 템플릿 디렉토리 및 파일 경로 설정
-template_directory = os.path.join(project_root, "templates")
+template_directory = get_newsletter_template_dir()
 template_file = "newsletter_template.html"
 
 print(f"템플릿 디렉토리 경로: {template_directory}")
@@ -79,17 +81,12 @@ with open(output_filename, "w", encoding="utf-8") as f:
 
 print(f"테스트 뉴스레터 저장 경로: {output_filename}")
 
-# 뉴스레터 HTML에서 중요한 부분만 출력
-import re
-
 # 날짜 정보가 있는 부분 추출
 source_date_pattern = r'<span class="source">\((.*?)\)</span>'
 source_dates = re.findall(source_date_pattern, html_output)
 
 print("\n== 뉴스 기사 소스 및 날짜 정보 ==")
 for idx, source_date in enumerate(source_dates):
-    print(f"기사 {idx+1}: {source_date}")
+    print(f"기사 {idx + 1}: {source_date}")
 
-print(
-    "\n테스트 완료: 뉴스레터의 날짜 형식이 모두 YYYY-MM-DD 형식으로 표준화되었습니다."
-)
+print("\n테스트 완료: 뉴스레터의 날짜 형식이 모두 YYYY-MM-DD 형식으로 표준화되었습니다.")

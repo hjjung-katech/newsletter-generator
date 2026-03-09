@@ -3,7 +3,6 @@ Compact-mode newsletter flow helpers.
 """
 
 import datetime
-import os
 from typing import Any
 
 from langchain_core.messages import HumanMessage
@@ -11,6 +10,7 @@ from langchain_core.messages import HumanMessage
 from .chains_llm_utils import get_llm
 from .compose import NewsletterConfig, compose_newsletter, create_grouped_sections
 from .template_manager import TemplateManager
+from .template_paths import get_newsletter_template_dir
 from .utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -228,7 +228,7 @@ def build_compact_newsletter_result(
     logger.step("HTML 템플릿 렌더링", "rendering")
     logger.info("Composing compact newsletter for topic: %s", newsletter_topic)
 
-    template_dir = os.path.join(os.path.dirname(__file__), "..", "templates")
+    template_dir = get_newsletter_template_dir()
     result_data["email_compatible"] = data.get("email_compatible", False)
     result_data["template_style"] = data.get("template_style", "compact")
 

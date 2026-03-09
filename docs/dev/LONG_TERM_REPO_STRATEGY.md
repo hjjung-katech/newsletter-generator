@@ -272,6 +272,9 @@ Delivery KPI:
 - Week 19 실행 반영:
   - `config/template_config.json` 제거, 템플릿 메타데이터를 `config/config.yml`의 `newsletter_settings`로 통합
   - `config/`를 런타임 설정 전용 디렉터리로 고정
+- Week 20 실행 반영:
+  - 루트 `templates/`를 `newsletter/templates/`로 이관하고 패키지 상대 경로 helper로 통일
+  - repo hygiene policy에서 루트 `templates/` 허용을 제거
 
 ## 10) 요청 표준(Agent/Skill + PR 중심)
 

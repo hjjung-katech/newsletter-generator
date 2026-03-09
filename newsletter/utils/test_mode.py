@@ -5,8 +5,6 @@ Utilities for running the newsletter generator in test mode.
 import json
 import logging
 import os
-import sys
-from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -25,6 +23,10 @@ def load_intermediate_data(file_path: str) -> Dict[str, Any]:
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Intermediate data file must contain a JSON object: {file_path}"
+            )
         logger.info(f"Successfully loaded intermediate data from {file_path}")
         return data
     except Exception as e:
@@ -173,9 +175,8 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         logger.info(f"Using timestamp from config: {timestamp}")
 
     # 3. 콘텐츠 데이터에서 타임스탬프 확인
-    generation_timestamp = None
-    if not timestamp and content_data.get("generation_timestamp"):
-        generation_timestamp = content_data.get("generation_timestamp")
+    generation_timestamp = content_data.get("generation_timestamp")
+    if not timestamp and isinstance(generation_timestamp, str):
         # HH:MM:SS 형식을 HHMMSS로 변환
         if ":" in generation_timestamp:
             hour, minute, second = generation_timestamp.split(":")
@@ -185,7 +186,7 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
                 "generation_date", datetime.datetime.now().strftime("%Y-%m-%d")
             )
             # 2025-05-16 형식을 20250516으로 변환
-            if "-" in generation_date:
+            if isinstance(generation_date, str) and "-" in generation_date:
                 year, month, day = generation_date.split("-")
                 timestamp_date = f"{year}{month}{day}"
                 timestamp = f"{timestamp_date}_{timestamp_time}"
@@ -202,9 +203,9 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         if timestamp and len(timestamp) >= 8:
             date_part = timestamp.split("_")[0] if "_" in timestamp else timestamp[:8]
             if len(date_part) == 8:
-                content_data["generation_date"] = (
-                    f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
-                )
+                content_data[
+                    "generation_date"
+                ] = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]}"
 
         if "generation_date" not in content_data:
             content_data["generation_date"] = datetime.datetime.now().strftime(
@@ -216,9 +217,9 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         if timestamp and "_" in timestamp:
             time_part = timestamp.split("_")[1]
             if len(time_part) >= 6:
-                content_data["generation_timestamp"] = (
-                    f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
-                )
+                content_data[
+                    "generation_timestamp"
+                ] = f"{time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
 
         if "generation_timestamp" not in content_data:
             content_data["generation_timestamp"] = datetime.datetime.now().strftime(
@@ -256,10 +257,12 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         )
 
     # 템플릿 디렉토리 설정
-    current_dir = os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    from ..template_paths import (
+        get_newsletter_template_dir,
+        get_newsletter_template_path,
     )
-    template_dir = os.path.join(current_dir, "templates")
+
+    template_dir = get_newsletter_template_dir()
     template_name = "newsletter_template.html"
 
     # 템플릿 디렉토리 존재 확인
@@ -268,7 +271,7 @@ def run_in_test_mode(data_file: str, output_html_path: Optional[str] = None) -> 
         os.makedirs(template_dir, exist_ok=True)
 
     # 템플릿 파일 존재 확인
-    template_path = os.path.join(template_dir, template_name)
+    template_path = get_newsletter_template_path(template_name)
     if not os.path.exists(template_path):
         logger.warning(f"Template file not found: {template_path}")
         # 기본 템플릿 생성
