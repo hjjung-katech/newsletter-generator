@@ -29,7 +29,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 | [`DOCUMENT_INVENTORY.md`](DOCUMENT_INVENTORY.md) | canonical | Docs/Onboarding | - | keep |
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | canonical | Architecture | - | keep |
 | [`PRD.md`](PRD.md) | supporting | Product | - | keep |
-| [`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md) | supporting | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) | keep |
+| [`archive/2026-q1/UNIFIED_ARCHITECTURE.md`](archive/2026-q1/UNIFIED_ARCHITECTURE.md) | historical | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md), [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md) | archive |
 | [`archive/README.md`](archive/README.md) | canonical | Repo Hygiene | - | keep |
 | [`archive/webservice-prd.md`](archive/webservice-prd.md) | historical | Product | [`PRD.md`](PRD.md) | keep in archive |
 | [`archive/2026-q1/FIXES_SUMMARY.md`](archive/2026-q1/FIXES_SUMMARY.md) | obsolete | Release/Ops | [`../CHANGELOG.md`](../CHANGELOG.md), [`dev/CI_CD_GUIDE.md`](dev/CI_CD_GUIDE.md) | archive |
@@ -105,3 +105,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 3. 허브 문서와 루트 README에는 인벤토리 링크를 추가해 문서 탐색 시작점을 단일화했습니다.
 4. 환경변수 정본과 `.env.example` 의 용어를 맞추기 위해 canonical key와 compatibility key를 분리해 명시했습니다.
 5. 구조/위생 축의 과거 실행 계획 문서는 canonical 참조를 제거한 뒤 [`archive/2026-q1/`](archive/2026-q1/README.md) 로 이관했습니다.
+6. 아키텍처 축은 [`ARCHITECTURE.md`](ARCHITECTURE.md) 1개 정본과 ADR/마이그레이션 로그 보조 구조로 정리하고, 중복 개요 문서는 archive 로 이관했습니다.

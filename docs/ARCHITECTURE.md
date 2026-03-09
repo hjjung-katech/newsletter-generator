@@ -4,6 +4,13 @@
 
 본 문서는 뉴스레터 생성기의 기능, 아키텍처 구조, 그리고 핵심 작성 방식에 대해 설명합니다. 뉴스레터 생성기는 사용자가 제공한 키워드 또는 관심 도메인을 기반으로 다양한 소스에서 최신 뉴스를 수집하고, 이를 **멀티 LLM(Large Language Model) 시스템**을 활용하여 요약 및 편집하여 HTML 형식의 뉴스레터를 생성하고 이메일 발송 또는 Google Drive에 저장하는 기능을 제공하는 Python CLI 도구입니다.
 
+## 문서 역할
+
+- 이 문서는 현재 시스템 구조의 정본(SSOT)입니다.
+- 구조 경계와 CI 강제 규칙은 `docs/technical/adr-0001-architecture-boundaries.md` 를 따릅니다.
+- 변경 이력과 단계별 이관 기록은 `docs/technical/architecture-migration-log.md` 에 남깁니다.
+- shim 제거 계획은 `docs/technical/shim-deprecation-schedule.md` 에서 관리합니다.
+
 ## 0. Multi-LLM 시스템 아키텍처
 
 ### 0.1. 지원되는 LLM 제공자
@@ -148,6 +155,18 @@ html_generation: gemini-pro      # 복잡한 작업에만 고성능 모델
 *   **워크플로우 실행 (`newsletter.graph.generate_newsletter`):**
     *   초기 상태(`NewsletterState`)를 설정하고, 정의된 LangGraph 워크플로우를 실행(`graph.invoke(initial_state)`)합니다.
     *   최종 상태에서 뉴스레터 HTML과 성공/실패 상태를 반환합니다.
+
+### 1.2.1. 통합 Compose 계층
+
+- 현재 뉴스레터 조합 단계는 `compose_newsletter()` 중심의 공용 경로를 사용합니다.
+- 스타일별 차이는 별도 구현 복제가 아니라 설정과 템플릿 선택으로 처리합니다.
+- 공용 조합 단계는 다음 책임을 공유합니다.
+    * 상위 기사 추출
+    * 주제별 그룹화
+    * 용어 정의/부가 콘텐츠 추출
+    * 최종 템플릿 렌더링
+- `newsletter.graph` 와 `newsletter.chains` 는 이 공용 조합 경로를 호출하고, 레거시 wrapper는 호환성 유지를 위해 얇게 남아 있습니다.
+- 현재 지원 스타일과 API 계약은 `docs/reference/web-api.md` 와 `docs/user/CLI_REFERENCE.md` 를 우선 기준으로 봅니다.
 
 ### 1.3. 출력 및 전달 (Delivery)
 

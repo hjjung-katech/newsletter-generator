@@ -51,7 +51,9 @@
 
 - 아키텍처/배경
   - [`ARCHITECTURE.md`](ARCHITECTURE.md)
-  - [`UNIFIED_ARCHITECTURE.md`](UNIFIED_ARCHITECTURE.md)
+  - [`technical/adr-0001-architecture-boundaries.md`](technical/adr-0001-architecture-boundaries.md)
+  - [`technical/architecture-migration-log.md`](technical/architecture-migration-log.md)
+  - [`technical/shim-deprecation-schedule.md`](technical/shim-deprecation-schedule.md)
   - [`PRD.md`](PRD.md)
 
 ## Governance
@@ -75,6 +77,7 @@
   - [`archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md`](archive/2026-q1/MAIN_INTEGRATION_EXECUTION_PLAN.md)
   - [`archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md`](archive/2026-q1/BRANCH_MAIN_GAP_ANALYSIS.md)
   - [`archive/2026-q1/REFACTORING_EXECUTION_PLAN.md`](archive/2026-q1/REFACTORING_EXECUTION_PLAN.md)
+  - [`archive/2026-q1/UNIFIED_ARCHITECTURE.md`](archive/2026-q1/UNIFIED_ARCHITECTURE.md)
   - [`archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md`](archive/2026-q1/REPO_HYGIENE_STATUS_2026-02-24.md)
   - [`archive/2026-q1/F14_COMPLETION_REPORT.md`](archive/2026-q1/F14_COMPLETION_REPORT.md)
   - [`archive/2026-q1/FIXES_SUMMARY.md`](archive/2026-q1/FIXES_SUMMARY.md)

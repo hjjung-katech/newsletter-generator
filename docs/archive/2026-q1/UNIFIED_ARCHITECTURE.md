@@ -1,5 +1,10 @@
 # Newsletter Generator - Unified Architecture Summary
 
+> Historical note (2026-03-09): RR-3에서 archive 로 이관된 아키텍처 개요 문서입니다.
+> 현재 아키텍처 정본은 `docs/ARCHITECTURE.md` 이며, 구조 경계와 이관 이력은
+> `docs/technical/adr-0001-architecture-boundaries.md`,
+> `docs/technical/architecture-migration-log.md` 를 따릅니다.
+
 ## Overview
 
 The newsletter generation system has been successfully refactored from separate compact and detailed implementations to a **unified architecture** that shares common logic while maintaining distinct output characteristics. This document summarizes the implementation, benefits, and usage of the new unified system.
