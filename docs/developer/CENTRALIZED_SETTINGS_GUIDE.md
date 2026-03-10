@@ -400,4 +400,4 @@ api_key = settings.serper_api_key.get_secret_value()
 
 - **구현 버전**: v0.6.0
 - **최종 업데이트**: 2025-06-11
-- **호환성**: Python 3.10+, Pydantic 2.0+
+- **호환성**: Pydantic 2.0+, Python runtime 지원 범위는 `../reference/support-policy.md`를 따름

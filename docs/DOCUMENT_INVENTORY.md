@@ -2,7 +2,7 @@
 
 문서 정합성 전수조사 기준일: 2026-03-09
 
-이 문서는 현재 추적 중인 Markdown 문서 56개를 대상으로 `canonical`, `supporting`, `historical`, `obsolete` 상태를 지정한 인벤토리입니다.
+이 문서는 현재 추적 중인 Markdown 문서 57개를 대상으로 `canonical`, `supporting`, `historical`, `obsolete` 상태를 지정한 인벤토리입니다.
 owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 
 ## Status Definitions
@@ -61,6 +61,7 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 
 | Path | Status | Owner | Canonical Replacement | Disposition |
 |---|---|---|---|---|
+| [`reference/support-policy.md`](reference/support-policy.md) | canonical | Release/Ops | - | keep |
 | [`reference/environment-variables.md`](reference/environment-variables.md) | canonical | Runtime Config | - | keep |
 | [`reference/web-api.md`](reference/web-api.md) | canonical | Web Runtime | - | keep |
 | [`setup/INSTALLATION.md`](setup/INSTALLATION.md) | canonical | Setup/Deploy | - | keep |

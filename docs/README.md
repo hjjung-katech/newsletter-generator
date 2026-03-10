@@ -10,6 +10,7 @@
 | 로컬 개발 | [`setup/LOCAL_SETUP.md`](setup/LOCAL_SETUP.md) | 개발/디버깅/로컬 실행 |
 | 배포 | [`setup/RAILWAY_DEPLOYMENT.md`](setup/RAILWAY_DEPLOYMENT.md) | Railway 멀티서비스 운영 |
 | CLI 사용법 | [`user/CLI_REFERENCE.md`](user/CLI_REFERENCE.md) | 옵션/명령/예시 |
+| 지원 정책 | [`reference/support-policy.md`](reference/support-policy.md) | OS/Python/artifact 지원 계약 |
 | 환경변수 계약 | [`reference/environment-variables.md`](reference/environment-variables.md) | canonical env + 호환/폐기 정책 |
 | Web API 계약 | [`reference/web-api.md`](reference/web-api.md) | Flask API 스키마/엔드포인트 |
 | 리포 구조/운영 전략 | [`dev/LONG_TERM_REPO_STRATEGY.md`](dev/LONG_TERM_REPO_STRATEGY.md) | 장기 구조 개편/운영 플레이북 |
@@ -42,6 +43,7 @@
   - [`setup/RAILWAY_DEPLOYMENT.md`](setup/RAILWAY_DEPLOYMENT.md)
   - [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md)
   - [`setup/WINDOWS_EXE_UPDATE_CHANNEL.md`](setup/WINDOWS_EXE_UPDATE_CHANNEL.md)
+  - [`reference/support-policy.md`](reference/support-policy.md)
   - [`reference/web-api.md`](reference/web-api.md)
   - [`reference/environment-variables.md`](reference/environment-variables.md)
 

@@ -3,10 +3,11 @@
 ## Overview
 
 이 문서는 현재 운영 중인 CI/CD 파이프라인의 정본 가이드입니다.
+지원 정책 정본은 `../reference/support-policy.md`를 기준으로 유지합니다.
 
 ## Active GitHub Actions Workflows
 
-현재 운영 워크플로우는 아래 6개입니다.
+현재 운영 워크플로우는 아래 7개입니다.
 
 1. `main-ci.yml`
 - 코드 품질, 테스트, 빌드 검증
@@ -32,6 +33,16 @@
 6. `pr-policy-check.yml`
 - PR 정책 검증(브랜치명/템플릿/커밋 메시지)
 - PR 이벤트(opened/edited/synchronize/reopened)에서 실행
+
+7. `rr-lifecycle-close.yml`
+- 머지된 PR 본문의 `RR: #<n>`를 기준으로 RR 이슈 자동 종료
+- PR closed(merged only) 이벤트에서 실행
+
+## Current Verification Truth
+
+- Linux: `main-ci.yml`에서 Ubuntu 기반 unit/mock/integration/package build가 실행됩니다.
+- Windows: `main-ci.yml`에서 PyInstaller build, EXE smoke, release artifact validation이 실행됩니다.
+- macOS: 2026-03-10 기준 dedicated CI가 없습니다. 지원 계약은 `support-policy.md`에 따르되, CI parity 확장은 후속 PR 범위입니다.
 
 ## Local Gate Commands
 

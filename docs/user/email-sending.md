@@ -114,11 +114,11 @@ EMAIL_SENDER=noreply@yourdomain.com
 
 ## API 사용법
 
-프로그래밍 방식으로 이메일 발송을 원하는 경우:
+프로그래밍 방식으로 이메일 발송을 원하는 경우(로컬 source runtime 기준 포트 `8000`):
 
 ```bash
 # 이메일과 함께 뉴스레터 생성
-curl -X POST http://localhost:5000/api/generate \
+curl -X POST http://localhost:8000/api/generate \
   -H "Idempotency-Key: email-flow-001" \
   -H "Content-Type: application/json" \
   -d '{
@@ -137,7 +137,7 @@ curl -X POST http://localhost:5000/api/generate \
 }
 
 # 상태 확인 (sent 필드 포함)
-curl http://localhost:5000/api/status/uuid-here
+curl http://localhost:8000/api/status/uuid-here
 
 # 응답
 {

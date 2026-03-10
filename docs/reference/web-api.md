@@ -2,7 +2,10 @@
 
 이 문서는 Flask Web API 계약의 정본(SSOT)입니다.
 
-Base URL (local): `http://localhost:5000`
+Base URL (local source runtime): `http://localhost:8000`
+
+Windows EXE bundle은 packaging entrypoint의 compatibility default로 `http://localhost:5000`을 사용할 수 있습니다.
+source runtime contract와 API 예제의 기준 포트는 `8000`입니다.
 
 ## Stable Public Endpoints
 

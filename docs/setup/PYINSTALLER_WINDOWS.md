@@ -5,8 +5,11 @@
 ## 1. 준비 사항
 
 - Windows 10/11
-- Python 3.12 이상 설치
+- Python 3.12 설치 권장 (현재 `main` CI의 기본 Windows build interpreter)
 - Git 설치 (선택 사항)
+
+지원 정책상 정식 Python 범위는 3.11/3.12이며, 3.13은 experimental source-only 입니다.
+정확한 지원 계약은 `../reference/support-policy.md`를 기준으로 유지합니다.
 
 ## 2. 저장소 클론 및 의존성 설치
 
@@ -38,7 +41,8 @@ python scripts/devtools/build_web_exe_enhanced.py
 
 ## 4. 실행 및 데이터베이스 초기화
 
-생성된 `newsletter_web.exe` 를 실행하면 같은 폴더에 `storage.db` 파일이 생성되며, 웹 서버가 기본 포트 5000에서 시작됩니다.
+생성된 `newsletter_web.exe` 를 실행하면 같은 폴더에 `storage.db` 파일이 생성되며, packaging entrypoint의 compatibility default 포트 `5000`에서 시작됩니다.
+source runtime 문서의 canonical local port는 `8000`이며, Windows EXE 예외는 `../reference/support-policy.md`를 따릅니다.
 
 ```powershell
 ./dist/newsletter_web.exe

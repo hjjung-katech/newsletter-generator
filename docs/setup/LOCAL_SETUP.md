@@ -3,6 +3,7 @@
 > 빠른 실행이 목적이라면 먼저 `QUICK_START_GUIDE.md`를 사용하세요.
 > 이 문서는 로컬 개발/디버깅/운영 시뮬레이션(Redis, worker, scheduler) 상세 절차를 다룹니다.
 > 아래 명령은 별도 언급이 없으면 저장소 루트(`newsletter-generator/`) 기준입니다.
+> 지원 정책 정본은 `../reference/support-policy.md`를 기준으로 유지합니다.
 
 ## 1. 프로젝트 클론 및 기본 설정
 
@@ -103,6 +104,9 @@ python -m web.app
 
 ### 고급 설정 (프로덕션 환경 시뮬레이션)
 
+아래 모드는 Linux canonical production topology를 로컬에서 흉내 내는 시뮬레이션 절차입니다.
+Windows/macOS에서도 디버깅용으로 실행할 수 있지만, production parity support를 의미하지는 않습니다.
+
 Redis와 백그라운드 워커를 함께 실행하려면:
 
 #### 1단계: Redis 서버 설치 및 실행
@@ -186,7 +190,7 @@ python -m web.app
   - Redis 서버 필요
   - 백그라운드 작업을 별도 프로세스로 처리
   - 스케줄링 기능 사용 가능
-  - 프로덕션 환경과 동일
+  - Linux canonical production topology와 유사
 
 ## 8. 웹 인터페이스 사용법
 
