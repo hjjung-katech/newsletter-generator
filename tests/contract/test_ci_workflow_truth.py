@@ -26,6 +26,8 @@ def test_main_ci_enforces_release_and_platform_contracts() -> None:
         "python scripts/release_preflight.py",
         "python scripts/validate_release_manifest.py",
         "python -m scripts.devtools.dev_entrypoint smoke web",
+        "fetch-depth: 0",
+        "fetch-tags: true",
         "tests/contract/test_packaging_release_truth.py",
         "tests/contract/test_support_policy_consistency.py",
         "tests/contract/test_ci_workflow_truth.py",
