@@ -106,7 +106,6 @@ newsletter-generator/
 ├── config/                     # 설정 파일
 ├── requirements.txt            # 프로덕션 의존성
 ├── requirements-dev.txt        # 개발 의존성
-├── requirements-minimal.txt    # 최소 의존성
 ├── pyproject.toml             # 프로젝트 설정
 ├── .pre-commit-config.yaml    # pre-commit 설정
 └── scripts/devtools/run_tests.py               # 테스트 실행 스크립트

@@ -61,9 +61,11 @@ SERPER_API_KEY=your-serper-api-key-here
 POSTMARK_SERVER_TOKEN=your-postmark-server-token-here
 EMAIL_SENDER=newsletter@yourdomain.com
 
-# Flask 설정 (선택사항)
+# Runtime 설정 (선택사항)
 SECRET_KEY=your-secret-key-here
-FLASK_ENV=development
+APP_ENV=development
+# optional compatibility alias
+# FLASK_ENV=development
 ```
 
 ## 5. 웹 애플리케이션 데이터베이스 초기화

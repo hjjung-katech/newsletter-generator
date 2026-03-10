@@ -46,10 +46,12 @@ EMAIL_SENDER=newsletter@yourdomain.com
 GOOGLE_NEWS_API_KEY=xxx  # News API 키
 ```
 
-### 4. Flask 설정
+### 4. Runtime 설정
 ```bash
 SECRET_KEY=your-secret-key-here
-FLASK_ENV=production
+APP_ENV=production
+# optional compatibility alias
+# FLASK_ENV=production
 ```
 
 ### 5. Redis 연결 (자동 설정됨)
@@ -83,7 +85,7 @@ services:
 - `POSTMARK_SERVER_TOKEN`
 - `EMAIL_SENDER`
 - `SECRET_KEY`
-- `FLASK_ENV=production`
+- `APP_ENV=production`
 
 **worker 서비스:**
 - `OPENAI_API_KEY`

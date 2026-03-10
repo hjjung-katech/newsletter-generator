@@ -9,63 +9,41 @@ import shutil
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_SAMPLE_PATH = PROJECT_ROOT / ".env.example"
+DEFAULT_ENV_VALUES = {
+    "SERPER_API_KEY": "your_serper_api_key_here",
+    "GEMINI_API_KEY": "your_gemini_api_key_here",
+    "OPENAI_API_KEY": "your_openai_api_key_here",
+    "ANTHROPIC_API_KEY": "your_anthropic_api_key_here",
+    "POSTMARK_SERVER_TOKEN": "your_postmark_server_token_here",
+    "EMAIL_SENDER": "your_verified_email@yourdomain.com",
+    "NAVER_CLIENT_ID": "your_naver_client_id_here",
+    "NAVER_CLIENT_SECRET": "your_naver_client_secret_here",
+    "GOOGLE_APPLICATION_CREDENTIALS": "path/to/your/credentials.json",
+    "GOOGLE_CLIENT_ID": "your_google_client_id_here",
+    "GOOGLE_CLIENT_SECRET": "your_google_client_secret_here",
+    "ADDITIONAL_RSS_FEEDS": "",
+}
 
-# 환경변수 템플릿
-ENV_TEMPLATE = """# Newsletter Generator 환경변수 설정
-# =============================================
-# 이 파일을 .env로 저장하고 실제 값들로 변경하세요.
 
-# API 키 설정 (필수)
-# =============================================
-# 구글 Serper API (뉴스 검색용) - 필수
-# https://serper.dev에서 무료 API 키 발급 (월 2,500회 무료)
-SERPER_API_KEY={serper_key}
+def render_env_content(overrides):
+    """Render .env content from the canonical sample with selected overrides."""
+    template = ENV_SAMPLE_PATH.read_text(encoding="utf-8")
+    rendered_lines = []
 
-# AI 모델 API 키들
-# Google Gemini API - https://aistudio.google.com (무료 할당량 있음)
-GEMINI_API_KEY={gemini_key}
+    for line in template.splitlines():
+        if not line or line.lstrip().startswith("#") or "=" not in line:
+            rendered_lines.append(line)
+            continue
 
-# 추가 AI 모델 API 키들 (선택사항)
-# OpenAI API - https://platform.openai.com
-OPENAI_API_KEY={openai_key}
-# Anthropic API - https://console.anthropic.com
-ANTHROPIC_API_KEY={anthropic_key}
+        key, _, _ = line.partition("=")
+        key = key.strip()
+        if key in overrides:
+            rendered_lines.append(f"{key}={overrides[key]}")
+        else:
+            rendered_lines.append(line)
 
-# 이메일 발송 설정 (필수 - 이메일 발송용)
-# =============================================
-# Postmark 서버 토큰 - https://postmarkapp.com에서 발급
-# 새 계정 시 월 100개 이메일 무료
-POSTMARK_SERVER_TOKEN={postmark_token}
-
-# 이메일 발송자 주소 (Postmark에서 인증된 도메인/주소여야 함)
-# CLI와 웹 인터페이스 모두에서 사용됨
-EMAIL_SENDER={email_sender}
-# 웹 인터페이스 호환성을 위한 별칭 (EMAIL_SENDER와 동일하게 설정)
-POSTMARK_FROM_EMAIL={email_sender}
-
-# 추가 API 설정 (선택사항)
-# =============================================
-# 네이버 뉴스 API (선택사항) - https://developers.naver.com
-NAVER_CLIENT_ID={naver_id}
-NAVER_CLIENT_SECRET={naver_secret}
-
-# Google Drive 업로드용 (선택사항)
-GOOGLE_APPLICATION_CREDENTIALS={google_creds}
-GOOGLE_CLIENT_ID={google_client_id}
-GOOGLE_CLIENT_SECRET={google_client_secret}
-
-# 추가 RSS 피드 URL (쉼표로 구분, 선택사항)
-ADDITIONAL_RSS_FEEDS={rss_feeds}
-
-# 개발 환경 설정
-# =============================================
-# Flask 환경 (development/production)
-FLASK_ENV=development
-# 디버그 모드
-DEBUG=true
-# 포트 설정
-PORT=5000
-"""
+    return "\n".join(rendered_lines) + "\n"
 
 
 def print_header():
@@ -154,20 +132,22 @@ def setup_env_interactive():
     )
     rss_feeds = get_user_input("추가 RSS 피드 URL (쉼표로 구분)", "")
 
-    # .env 파일 생성
-    env_content = ENV_TEMPLATE.format(
-        serper_key=serper_key,
-        gemini_key=gemini_key,
-        openai_key=openai_key,
-        anthropic_key=anthropic_key,
-        postmark_token=postmark_token,
-        email_sender=email_sender,
-        naver_id=naver_id,
-        naver_secret=naver_secret,
-        google_creds=google_creds,
-        google_client_id=google_client_id,
-        google_client_secret=google_client_secret,
-        rss_feeds=rss_feeds,
+    env_content = render_env_content(
+        {
+            **DEFAULT_ENV_VALUES,
+            "SERPER_API_KEY": serper_key,
+            "GEMINI_API_KEY": gemini_key,
+            "OPENAI_API_KEY": openai_key,
+            "ANTHROPIC_API_KEY": anthropic_key,
+            "POSTMARK_SERVER_TOKEN": postmark_token,
+            "EMAIL_SENDER": email_sender,
+            "NAVER_CLIENT_ID": naver_id,
+            "NAVER_CLIENT_SECRET": naver_secret,
+            "GOOGLE_APPLICATION_CREDENTIALS": google_creds,
+            "GOOGLE_CLIENT_ID": google_client_id,
+            "GOOGLE_CLIENT_SECRET": google_client_secret,
+            "ADDITIONAL_RSS_FEEDS": rss_feeds,
+        }
     )
 
     # 파일 저장
@@ -180,20 +160,7 @@ def setup_env_interactive():
 
 def create_simple_env():
     """간단한 템플릿 .env 파일 생성"""
-    env_content = ENV_TEMPLATE.format(
-        serper_key="your_serper_api_key_here",
-        gemini_key="your_gemini_api_key_here",
-        openai_key="your_openai_api_key_here",
-        anthropic_key="your_anthropic_api_key_here",
-        postmark_token="your_postmark_server_token_here",
-        email_sender="your_verified_email@yourdomain.com",
-        naver_id="your_naver_client_id_here",
-        naver_secret="your_naver_client_secret_here",
-        google_creds="path/to/your/credentials.json",
-        google_client_id="your_google_client_id_here",
-        google_client_secret="your_google_client_secret_here",
-        rss_feeds="",
-    )
+    env_content = render_env_content(DEFAULT_ENV_VALUES)
 
     with open(".env", "w", encoding="utf-8") as f:
         f.write(env_content)
@@ -239,6 +206,11 @@ def main():
 
     print_header()
 
+    if not ENV_SAMPLE_PATH.exists():
+        print("❌ canonical .env.example 파일을 찾을 수 없습니다.")
+        print("   저장소 루트의 .env.example을 복구한 뒤 다시 실행하세요.")
+        return
+
     if not check_existing_env():
         return
 
@@ -271,7 +243,7 @@ def main():
     print("1. .env 파일에서 API 키들을 실제 값으로 변경")
     print("2. 이메일 발송 테스트: python -m newsletter test-email --to your@email.com")
     print("3. 뉴스레터 생성 테스트: python -m newsletter run")
-    print("4. 웹 인터페이스 실행: python test_server.py")
+    print("4. 웹 인터페이스 실행: python -m web.app")
     print()
 
 

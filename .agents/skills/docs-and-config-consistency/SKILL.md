@@ -8,7 +8,7 @@ description: Reconcile docs, env samples, and runtime config to a single source 
 1. Scan runtime + docs drift:
    - `newsletter/centralized_settings.py`
    - `newsletter/config_manager.py`
-   - `README.md`, `docs/`, `web/.env.example`
+   - `README.md`, `docs/`, `.env.example`, `apps/experimental/.env.example`
 2. Enforce canonical env contract:
    - canonical: `POSTMARK_SERVER_TOKEN`, `EMAIL_SENDER`
    - alias-only: `POSTMARK_FROM_EMAIL`

@@ -12,6 +12,7 @@
 - Week 18 반영: 로컬 scratch 산출물 기본 경로를 루트 `.local/`로 정규화
 - Week 19 반영: 로컬 가상환경 canonical 경로를 `.local/venv/`로 정규화, cache cleanup target 분리
 - Week 20 반영: canonical runtime entrypoint를 `python -m ...` 모듈 실행으로 정규화, `apps/`는 `experimental/`만 유지
+- Week 21 반영: root `.env.example` 단일 정본 유지, `web/.env.example` 및 `requirements-minimal.txt` 제거
 
 ## Scope
 
@@ -26,7 +27,7 @@
 | Entry or Pattern | 결정 | 목표 위치/상태 | 근거 |
 |---|---|---|---|
 | `README.md`, `LICENSE`, `CHANGELOG.md`, `CODEOWNERS` | 유지 | 루트 유지 | 프로젝트 메타 |
-| `pyproject.toml`, `requirements*.txt`, `Makefile` | 유지 | 루트 유지 | 빌드/패키징 |
+| `pyproject.toml`, `requirements.txt`, `requirements-dev.txt`, `Makefile` | 유지 | 루트 유지 | 빌드/패키징 |
 | `setup.cfg`, `setup.py` | 제거 완료 | `pyproject.toml` 단일 경로 | 패키징 설정 중복 제거 |
 | `run_ci_checks.py` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 |
 | `.github/`, `.release/`, `docs/`, `scripts/`, `newsletter/`, `newsletter_core/`, `web/`, `tests/` | 유지 | 루트 유지 | 핵심 운영/도메인 디렉터리 |
