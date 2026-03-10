@@ -338,6 +338,33 @@ class CIChecker:
             print(stderr[:2000])
         return False
 
+    def check_legacy_newsletter_surface(self) -> bool:
+        """newsletter 레거시 패키지 surface ratchet 검사"""
+        self.print_header("Legacy newsletter surface 검사")
+
+        cmd = [
+            sys.executable,
+            "scripts/architecture/check_legacy_newsletter_surface.py",
+        ]
+        returncode, stdout, stderr = self.run_command(cmd)
+
+        if returncode == 0:
+            self.print_status("Legacy newsletter surface 검사", True)
+            if stdout and self.verbose:
+                print(stdout[:2000])
+            return True
+
+        self.print_status(
+            "Legacy newsletter surface 검사",
+            False,
+            "newsletter/ 경계에 승인되지 않은 신규 Python 파일이 추가되었습니다",
+        )
+        if stdout:
+            print(stdout[:2000])
+        if stderr and self.verbose:
+            print(stderr[:2000])
+        return False
+
     def check_mypy(self) -> bool:
         """MyPy 타입 검사"""
         self.print_header("MyPy 타입 검사")
@@ -563,6 +590,7 @@ class CIChecker:
             ("Flake8 린팅", self.check_flake8),
             ("Import 경계 검사", self.check_import_boundaries),
             ("Import 사이클 검사", self.check_import_cycles),
+            ("Legacy newsletter surface 검사", self.check_legacy_newsletter_surface),
         ]
 
         # 추가 검사들

@@ -116,3 +116,4 @@ owner는 개인 이름이 아니라 기능 영역 기준 관리 책임입니다.
 13. 날짜가 고정된 Windows release admin log 는 [`archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md`](archive/2026-q1/WINDOWS_RELEASE_ADMIN_LOG_2026-02-24.md) 로 이관하고, active 운영 기준은 [`setup/WINDOWS_EXE_OPERATIONS.md`](setup/WINDOWS_EXE_OPERATIONS.md) 로 유지했습니다.
 14. historical QA summary 는 `tests/archive/` 규칙을 만들고 [`../tests/archive/RESULTS_SUMMARY.md`](../tests/archive/RESULTS_SUMMARY.md) 로 이관했습니다.
 15. [`technical/architecture-migration-log.md`](technical/architecture-migration-log.md) 는 shim 제거 일정이 아직 열려 있으므로 active 참고 문서로 유지합니다.
+16. `newsletter_core` 정본화 이후 `newsletter/` 경계가 다시 커지지 않도록 legacy surface manifest 와 CI guard 를 추가했습니다.

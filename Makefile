@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor print-python print-venv check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean clean-caches clean-local clean-venv install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
+.PHONY: help bootstrap doctor print-python print-venv check check-full format format-check lint architecture-check architecture-baseline legacy-newsletter-surface-guard test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean clean-caches clean-local clean-venv install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -115,10 +115,15 @@ architecture-check: ## 아키텍처 경계/사이클 검사
 	@echo "🏗️ 아키텍처 경계 검사 실행 중..."
 	$(PYTHON) scripts/architecture/check_import_boundaries.py --mode ratchet
 	$(PYTHON) scripts/architecture/check_import_cycles.py
+	$(PYTHON) scripts/architecture/check_legacy_newsletter_surface.py
 
 architecture-baseline: ## 현재 import 위반을 baseline으로 갱신
 	@echo "🧭 아키텍처 baseline 갱신 중..."
 	$(PYTHON) scripts/architecture/check_import_boundaries.py --update-baseline
+
+legacy-newsletter-surface-guard: ## newsletter 레거시 표면 신규 파일 유입 검사
+	@echo "🧱 레거시 newsletter 표면 검사 실행 중..."
+	$(PYTHON) scripts/architecture/check_legacy_newsletter_surface.py
 
 test: ## 단위 테스트 실행
 	@echo "🧪 단위 테스트 실행 중..."
