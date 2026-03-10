@@ -239,7 +239,7 @@ def run_newsletter_smoke(paths: RepoPaths) -> None:
 def run_web_smoke(paths: RepoPaths) -> None:
     python = resolve_python(paths)
     run_checked(
-        [str(python), "-m", "pytest", "tests/test_web_api.py", "-q"],
+        [str(python), "scripts/devtools/web_health_smoke.py", "--mode", "source"],
         cwd=paths.repo_root,
         env=merged_env(MOCK_ENV),
     )

@@ -26,6 +26,7 @@ python -m scripts.devtools.dev_entrypoint check --full
 | `python -m scripts.devtools.dev_entrypoint doctor` | 작업 경로/인터프리터 전제 조건 검증 | 새 터미널 시작 시 |
 | `python -m scripts.devtools.dev_entrypoint check` | 빠른 표준 게이트 (`test-quick + docs-check + skills-check`) | 개발 중 반복 |
 | `python -m scripts.devtools.dev_entrypoint check --full` | 전체 PR 게이트 (`test-full + docs-check + skills-check`) | 푸시/PR 전 |
+| `python -m scripts.devtools.dev_entrypoint smoke web` | cross-platform source web smoke | CI smoke 재현 시 |
 | `make ci-fix` | 포맷 자동 수정 포함 CI 스크립트 실행 | 코드 정리 필요 시 |
 | `make docs-check` | Markdown 링크/스타일 검증 | 문서 변경 시 |
 | `make clean-caches` | 재생성 가능한 cache/coverage 삭제 | gate 전후 root 정리 |

@@ -55,3 +55,32 @@ def test_check_file_for_tokens_rejects_forbidden_alias(tmp_path):
 
     with pytest.raises(SystemExit, match="FROM_EMAIL"):
         dev_entrypoint.check_file_for_tokens(sample)
+
+
+def test_run_web_smoke_uses_python_source_health_harness(tmp_path, monkeypatch):
+    paths = dev_entrypoint.repo_paths(tmp_path)
+    python_path = _touch(dev_entrypoint.venv_python(paths.default_venv_dir))
+    recorded: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        dev_entrypoint, "resolve_python", lambda *_args, **_kwargs: python_path
+    )
+
+    def fake_run_checked(cmd, *, cwd=None, env=None):
+        recorded["cmd"] = cmd
+        recorded["cwd"] = cwd
+        recorded["env"] = env
+
+    monkeypatch.setattr(dev_entrypoint, "run_checked", fake_run_checked)
+
+    dev_entrypoint.run_web_smoke(paths)
+
+    assert recorded["cmd"] == [
+        str(python_path),
+        "scripts/devtools/web_health_smoke.py",
+        "--mode",
+        "source",
+    ]
+    assert recorded["cwd"] == paths.repo_root
+    assert recorded["env"]["MOCK_MODE"] == "true"
+    assert recorded["env"]["TESTING"] == "1"
