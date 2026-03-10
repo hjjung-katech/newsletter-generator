@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from scripts.devtools import setup_env
 
 
