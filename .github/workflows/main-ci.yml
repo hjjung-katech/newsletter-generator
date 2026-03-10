@@ -306,6 +306,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Fetch baseline tags
+        run: |
+          git fetch --force --tags origin
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
