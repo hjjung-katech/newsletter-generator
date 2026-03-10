@@ -8,18 +8,12 @@
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
-python -m venv .local/venv
-source .local/venv/bin/activate  # Windows: .local\\venv\\Scripts\\activate
+python -m scripts.devtools.dev_entrypoint bootstrap
 ```
 
-## 2. 의존성 설치
+`make bootstrap`는 같은 Python 엔트리포인트를 호출하는 thin wrapper입니다.
 
-```bash
-pip install -r requirements.txt
-pip install -r web/requirements.txt
-```
-
-## 3. 환경변수 설정
+## 2. 환경변수 설정
 
 ```bash
 cp .env.example .env
@@ -39,17 +33,17 @@ POSTMARK_SERVER_TOKEN=ps_xxx
 EMAIL_SENDER=newsletter@example.com
 ```
 
-## 4. 웹 실행
+## 3. 웹 실행
 
 ```bash
 python web/init_database.py
-python -m web.app
+python -m scripts.devtools.dev_entrypoint run web
 ```
 
 브라우저: `http://localhost:8000`
 헬스체크: `http://localhost:8000/health`
 
-## 5. 확인 포인트
+## 4. 확인 포인트
 
 - Generate 요청이 성공하면 HTML 결과가 표시됩니다.
 - 이메일 발송은 `POSTMARK_SERVER_TOKEN` + `EMAIL_SENDER`가 모두 있을 때만 활성 동작합니다.

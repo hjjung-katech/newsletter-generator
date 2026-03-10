@@ -12,7 +12,7 @@
 - Linux는 canonical production server다.
 - Windows는 canonical native desktop bundle 대상이다.
 - macOS는 2차 지원이며 source-based development와 smoke 중심이다.
-- contributor-facing canonical entrypoint는 Python module entrypoint다.
+- contributor-facing canonical entrypoint는 `python -m scripts.devtools.dev_entrypoint`다.
 - Makefile과 shell script는 현재 contributor automation wrapper로 남아 있지만, 아키텍처 계약의 정본은 아니다.
 - CI coverage는 이 문서의 지원 계약과 동일하지 않다. 현재 자동 검증 수준은 아래 표에 사실대로 적고, parity 확장은 후속 PR 범위다.
 
@@ -37,8 +37,9 @@
 
 | 사용처 | 정본 | 현재 저장소 기준 truth |
 |---|---|---|
-| 개발(공통) | source checkout + Python entrypoint | `python -m web.app`, `python -m newsletter ...` |
-| 로컬 source 웹 런타임 | Flask source runtime | 기본 포트는 `8000` (`web.app`, `.env.example`) |
+| 개발(공통) | source checkout + Python entrypoint | `python -m scripts.devtools.dev_entrypoint <bootstrap|check|run ...>` |
+| 로컬 source 웹 런타임 | Flask source runtime | contributor-facing run surface는 `python -m scripts.devtools.dev_entrypoint run web`이며, 실제 런타임 엔트리포인트는 `python -m web.app`다. 기본 포트는 `8000` (`web.app`, `.env.example`) |
+| 로컬 source CLI 런타임 | newsletter CLI | contributor-facing run surface는 `python -m scripts.devtools.dev_entrypoint run newsletter -- ...`이며, 실제 런타임 엔트리포인트는 `python -m newsletter ...`다 |
 | Linux server 운영 | Flask/Gunicorn on Linux | canonical production server. 현재 repo-managed 배포는 Railway/Nixpacks source deploy가 truth이며, promoted Docker image는 아직 정식 릴리즈 artifact가 아니다 |
 | Windows desktop 배포 | PyInstaller EXE | `dist/newsletter_web.exe`, `release-metadata.json`, `support-bundle.zip`, 선택적 `update-manifest.json` |
 | PyPI package | 비정본 | PyPI는 정식 end-user 릴리즈 채널이 아니다 |

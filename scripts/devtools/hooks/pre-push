@@ -12,18 +12,14 @@
 echo "🔍 Pre-push CI 검증 시작..."
 
 # Python 실행 파일 찾기
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON=python3
-elif command -v python >/dev/null 2>&1; then
-    PYTHON=python
-else
+if ! command -v python >/dev/null 2>&1; then
     echo "❌ Python이 설치되지 않았습니다."
     exit 1
 fi
 
 # CI 검사 스크립트 실행
 echo "📋 코드 품질 검사 중..."
-$PYTHON run_ci_checks.py --quick
+python -m scripts.devtools.dev_entrypoint check
 
 if [ $? -ne 0 ]; then
     echo ""
@@ -31,7 +27,7 @@ if [ $? -ne 0 ]; then
     echo "   코드를 수정한 후 다시 시도하세요."
     echo ""
     echo "💡 자동 수정 시도:"
-    echo "   python run_ci_checks.py --fix"
+    echo "   python -m scripts.devtools.dev_entrypoint ci --fix"
     echo ""
     echo "⚠️  강제 푸시 (권장하지 않음):"
     echo "   git push --no-verify"

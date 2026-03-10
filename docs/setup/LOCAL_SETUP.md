@@ -12,7 +12,16 @@ git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
 ```
 
-## 2. 가상환경 설정
+## 2. canonical 개발 bootstrap
+
+```bash
+python -m scripts.devtools.dev_entrypoint bootstrap
+python -m scripts.devtools.dev_entrypoint doctor
+```
+
+기본 로컬 가상환경 경로는 `.local/venv/` 입니다. 기존 루트 `.venv/` 가 있는 clone도 호환되지만 신규 생성은 권장하지 않습니다.
+
+## 3. 수동 가상환경/의존성 설치 (예외 경로)
 
 ```bash
 python -m venv .local/venv
@@ -22,19 +31,13 @@ python -m venv .local/venv
 
 # macOS/Linux
 source .local/venv/bin/activate
-```
 
-## 3. 의존성 설치
-
-```bash
-# 기본 패키지 설치
+pip install --upgrade pip
 pip install -r requirements.txt
-
-# 웹 애플리케이션 의존성 추가 설치
-pip install -r web/requirements.txt
+pip install -r requirements-dev.txt
 ```
 
-기본 로컬 가상환경 경로는 `.local/venv/` 입니다. 기존 루트 `.venv/` 가 있는 clone도 호환되지만 신규 생성은 권장하지 않습니다.
+일상적인 contributor workflow는 수동 설치보다 `python -m scripts.devtools.dev_entrypoint bootstrap`을 우선 사용합니다.
 
 ## 4. 환경 변수 설정
 
@@ -94,7 +97,7 @@ python web/init_database.py --verify-only
 
 ```bash
 # 웹 애플리케이션만 실행 (권장)
-python -m web.app
+python -m scripts.devtools.dev_entrypoint run web
 ```
 
 웹 서버가 시작되면:
@@ -161,23 +164,23 @@ redis-server
 
 #### 2단계: 백그라운드 워커 실행 (별도 터미널)
 ```bash
-python -m web.worker
+python -m scripts.devtools.dev_entrypoint run worker
 ```
 
 #### 3단계: 스케줄러 실행 (별도 터미널, 선택사항)
 ```bash
-python -m web.schedule_runner
+python -m scripts.devtools.dev_entrypoint run scheduler
 ```
 
 #### 4단계: 웹 애플리케이션 실행
 ```bash
-python -m web.app
+python -m scripts.devtools.dev_entrypoint run web
 ```
 
 ## 7. 실행 모드별 특징
 
 ### 단독 실행 모드 (기본, 권장)
-- **명령어**: `python -m web.app`
+- **명령어**: `python -m scripts.devtools.dev_entrypoint run web`
 - **특징**:
   - Redis 불필요
   - 즉시 실행 가능
@@ -185,7 +188,7 @@ python -m web.app
   - Windows에서 자동으로 적용됨
 
 ### Redis + 워커 모드 (고급)
-- **명령어**: Redis + `python -m web.worker` + `python -m web.app`
+- **명령어**: Redis + `python -m scripts.devtools.dev_entrypoint run worker` + `python -m scripts.devtools.dev_entrypoint run web`
 - **특징**:
   - Redis 서버 필요
   - 백그라운드 작업을 별도 프로세스로 처리
@@ -234,12 +237,12 @@ newsletter-generator/
 ### CLI 모드
 ```bash
 # 뉴스레터 생성
-python -m newsletter run --keywords "AI,반도체" --to "your@email.com"
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "AI,반도체" --to "your@email.com"
 ```
 
 ### 웹 애플리케이션 모드
 ```bash
-python -m web.app
+python -m scripts.devtools.dev_entrypoint run web
 # 브라우저에서 http://localhost:8000 접속
 ```
 
@@ -348,7 +351,7 @@ redis-server
 ### 웹 서버 포트 충돌
 ```bash
 # 다른 포트로 실행
-PORT=8001 python -m web.app
+PORT=8001 python -m scripts.devtools.dev_entrypoint run web
 ```
 
 ## 추가 팁
@@ -356,13 +359,13 @@ PORT=8001 python -m web.app
 ### 개발 중 자동 재로드
 ```bash
 # canonical web module에서 개발 모드 실행
-APP_ENV=development python -m web.app
+APP_ENV=development python -m scripts.devtools.dev_entrypoint run web
 ```
 
 ### 로그 레벨 조정
 ```bash
 # 상세한 로그 확인
-LOG_LEVEL=DEBUG python -m web.app
+LOG_LEVEL=DEBUG python -m scripts.devtools.dev_entrypoint run web
 ```
 
 ### API 테스트
