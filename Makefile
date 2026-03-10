@@ -1,12 +1,10 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor print-python print-venv check check-full format format-check lint architecture-check architecture-baseline legacy-newsletter-surface-guard test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean clean-caches clean-local clean-venv install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
+.PHONY: help bootstrap doctor print-python print-venv check check-full format format-check lint architecture-check architecture-baseline legacy-newsletter-surface-guard test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean clean-caches clean-local clean-venv install pre-commit pre-commit-run pre-push-hook setup-local-git skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
 
 # 실행 경로/인터프리터 설정
-EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
-PROJECT_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-LOCAL_DIR ?= $(PROJECT_ROOT)/.local
+LOCAL_DIR ?= .local
 ARTIFACTS_DIR ?= $(LOCAL_DIR)/artifacts
 REPO_AUDIT_DIR ?= $(ARTIFACTS_DIR)/repo-audit
 WINDOWS_CI_BURNIN_REPORT ?= $(ARTIFACTS_DIR)/windows-ci-burnin.json
@@ -15,20 +13,13 @@ COVERAGE_DIR ?= $(LOCAL_DIR)/coverage
 DEBUG_DIR ?= $(LOCAL_DIR)/debug_files
 NEWSLETTER_DEBUG_DIR ?= $(DEBUG_DIR)
 DEFAULT_VENV_DIR ?= $(LOCAL_DIR)/venv
-LEGACY_VENV_DIR ?= $(PROJECT_ROOT)/.venv
-BOOTSTRAP_VENV_DIR ?= $(DEFAULT_VENV_DIR)
-VENV_DIR ?= $(DEFAULT_VENV_DIR)
-ifeq ($(origin VENV_DIR), file)
-  ifeq ($(wildcard $(DEFAULT_VENV_DIR)/bin/python)$(wildcard $(DEFAULT_VENV_DIR)/Scripts/python.exe),)
-    ifneq ($(wildcard $(LEGACY_VENV_DIR)/bin/python)$(wildcard $(LEGACY_VENV_DIR)/Scripts/python.exe),)
-      VENV_DIR := $(LEGACY_VENV_DIR)
-    endif
-  endif
-endif
-BOOTSTRAP_VENV_PYTHON := $(if $(wildcard $(BOOTSTRAP_VENV_DIR)/Scripts/python.exe),$(BOOTSTRAP_VENV_DIR)/Scripts/python.exe,$(BOOTSTRAP_VENV_DIR)/bin/python)
-VENV_PYTHON := $(if $(wildcard $(VENV_DIR)/Scripts/python.exe),$(VENV_DIR)/Scripts/python.exe,$(VENV_DIR)/bin/python)
-PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
+LEGACY_VENV_DIR ?= .venv
+LOCAL_VENV_PYTHON := $(if $(wildcard $(DEFAULT_VENV_DIR)/Scripts/python.exe),$(DEFAULT_VENV_DIR)/Scripts/python.exe,$(wildcard $(DEFAULT_VENV_DIR)/bin/python))
+LEGACY_VENV_PYTHON := $(if $(wildcard $(LEGACY_VENV_DIR)/Scripts/python.exe),$(LEGACY_VENV_DIR)/Scripts/python.exe,$(wildcard $(LEGACY_VENV_DIR)/bin/python))
+VENV_PYTHON := $(if $(LOCAL_VENV_PYTHON),$(LOCAL_VENV_PYTHON),$(LEGACY_VENV_PYTHON))
+PYTHON ?= $(if $(VENV_PYTHON),$(VENV_PYTHON),python)
 PIP := $(PYTHON) -m pip
+DEV_ENTRYPOINT := $(PYTHON) -m scripts.devtools.dev_entrypoint
 export NEWSLETTER_DEBUG_DIR
 
 # 디렉토리 설정
@@ -49,50 +40,25 @@ help: ## 도움말 표시
 	@echo "  make test        # 테스트 실행"
 
 bootstrap: ## 로컬 가상환경/의존성/훅 설치
-	@echo "🧱 로컬 개발 환경 bootstrap 중..."
-	python3 -m venv $(BOOTSTRAP_VENV_DIR)
-	$(BOOTSTRAP_VENV_PYTHON) -m pip install --upgrade pip
-	$(BOOTSTRAP_VENV_PYTHON) -m pip install -r requirements.txt
-	$(BOOTSTRAP_VENV_PYTHON) -m pip install -r requirements-dev.txt
-	$(BOOTSTRAP_VENV_PYTHON) -m pre_commit install
-	@echo "✅ bootstrap 완료"
+	$(DEV_ENTRYPOINT) bootstrap
 
 doctor: ## 작업 경로/인터프리터 전제 조건 검증
-	@echo "🩺 환경 점검 중..."
-	@current_dir="$$(pwd)"; \
-	if [ "$$current_dir" != "$(EXPECTED_CWD)" ]; then \
-		echo "❌ 잘못된 작업 경로: $$current_dir"; \
-		echo "   올바른 경로: $(EXPECTED_CWD)"; \
-		exit 1; \
-	fi
-	@repo_root="$$(git rev-parse --show-toplevel 2>/dev/null || true)"; \
-	if [ "$$repo_root" != "$(EXPECTED_CWD)" ]; then \
-		echo "❌ Git 루트 불일치: $$repo_root"; \
-		echo "   예상 루트: $(EXPECTED_CWD)"; \
-		exit 1; \
-	fi
-	@if [ ! -x "$(VENV_PYTHON)" ]; then \
-		echo "❌ 가상환경 Python 없음: $(VENV_PYTHON)"; \
-		echo "   기본 경로는 $(DEFAULT_VENV_DIR) 입니다. 먼저 'make bootstrap'을 실행하세요."; \
-		exit 1; \
-	fi
-	@echo "✅ 환경 점검 통과 (PYTHON=$(PYTHON), VENV_DIR=$(VENV_DIR))"
+	$(DEV_ENTRYPOINT) doctor
 
 print-python: ## 현재 선택된 Python 인터프리터 경로 출력
-	@echo "$(PYTHON)"
+	$(DEV_ENTRYPOINT) print-python
 
 print-venv: ## 현재 선택된 가상환경 디렉터리 경로 출력
-	@echo "$(VENV_DIR)"
+	$(DEV_ENTRYPOINT) print-venv
 
-check: doctor test-quick docs-check skills-check ## 표준 로컬 게이트
-	@echo "✅ check 완료"
+check: ## 표준 로컬 게이트
+	$(DEV_ENTRYPOINT) check
 
-check-full: doctor test-full docs-check skills-check ops-safety-check ## PR 전 전체 게이트
-	@echo "✅ check-full 완료"
+check-full: ## PR 전 전체 게이트
+	$(DEV_ENTRYPOINT) check --full
 
 install: ## 의존성 설치
-	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-dev.txt
+	$(DEV_ENTRYPOINT) install
 
 format: ## 코드 포맷팅 (Black + isort)
 	@echo "🎨 코드 포맷팅 중..."
@@ -177,18 +143,11 @@ github-windows-release-controls: ## Verify GitHub release controls (branch prote
 	@echo "🧭 GitHub Windows release control 점검 중..."
 	$(PYTHON) scripts/devtools/check_github_windows_release_controls.py --repo hjjung-katech/newsletter-generator --output $(WINDOWS_RELEASE_CONTROLS_REPORT)
 
-test-quick: preflight-release ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
-	@echo "⚡ Quick 게이트 실행 중..."
-	$(PYTHON) run_ci_checks.py --quick
-	@if git diff --name-only --cached | grep -E '^(newsletter|web)/.*\.py$$' >/dev/null; then \
-		MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest -m "unit" --maxfail=1 --tb=short; \
-	else \
-		echo "ℹ️  staged 런타임 Python 변경이 없어 quick pytest를 건너뜁니다."; \
-	fi
+test-quick: ## 빠른 게이트 (5분 이내 목표: 포맷/린트/핵심 단위)
+	$(DEV_ENTRYPOINT) test --quick
 
-test-full: preflight-release ## PR 게이트 (전체 CI + 테스트)
-	@echo "🚦 Full 게이트 실행 중..."
-	$(PYTHON) run_ci_checks.py --full
+test-full: ## PR 게이트 (전체 CI + 테스트)
+	$(DEV_ENTRYPOINT) test --full
 
 test-nightly: ## 야간 장기 시나리오 (스케줄/종료 회귀)
 	@echo "🌙 Nightly 게이트 실행 중..."
@@ -220,36 +179,28 @@ test-coverage: ## 커버리지 포함 테스트
 	MOCK_MODE=true $(PYTHON) -m pytest -m unit --cov=newsletter --cov=newsletter_core --cov=web --cov-report=html:$(COVERAGE_DIR)/htmlcov --cov-report=term
 
 ci-check: ## CI 검사 실행 (GitHub Actions와 동일)
-	@echo "🚀 CI 검사 실행 중..."
-	$(PYTHON) run_ci_checks.py
+	$(DEV_ENTRYPOINT) ci
 
 ci-fix: ## CI 검사 + 자동 수정
-	@echo "🔧 CI 검사 및 자동 수정 중..."
-	$(PYTHON) run_ci_checks.py --fix
+	$(DEV_ENTRYPOINT) ci --fix
 
 ci-full: ## 전체 CI 검사 (테스트 포함)
-	@echo "🚀 전체 CI 검사 실행 중..."
-	$(PYTHON) run_ci_checks.py --full
+	$(DEV_ENTRYPOINT) ci --full
 
 skill-ci-gate: ## Skill: ci-gate
-	@echo "🧠 Skill ci-gate 실행 중..."
-	$(PYTHON) run_ci_checks.py --fix --full
+	$(DEV_ENTRYPOINT) ci --fix --full
 
 skill-docs-and-config-consistency: ## Skill: docs-and-config-consistency
-	@echo "🧠 Skill docs-and-config-consistency 검증 중..."
-	@! rg -nP 'SENDGRID_API_KEY|(?<!POSTMARK_)FROM_EMAIL=|POSTMARK_TOKEN|POSTMARK_API_TOKEN' README.md docs/setup .env.example apps/experimental/.env.example web/requirements.txt
+	$(DEV_ENTRYPOINT) docs-consistency
 
 skill-newsletter-smoke: ## Skill: newsletter-smoke
-	@echo "🧠 Skill newsletter-smoke 실행 중..."
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -c "from unittest.mock import patch; from newsletter_core.public.generation import GenerateNewsletterRequest, generate_newsletter; sample='<html><head><title>Smoke</title></head><body>ok</body></html>'; info={'step_times': {'collect': 0.1}, 'total_time': 0.2}; p1=patch('newsletter_core.public.generation.graph.generate_newsletter', return_value=(sample, 'success')); p2=patch('newsletter_core.public.generation.graph.get_last_generation_info', return_value=info); p1.start(); p2.start(); r=generate_newsletter(GenerateNewsletterRequest(keywords='AI', period=7)); p2.stop(); p1.stop(); assert r['status']=='success'; assert r['title']=='Smoke'; assert '<html' in r['html_content'].lower(); print('newsletter-smoke: ok')"
+	$(DEV_ENTRYPOINT) smoke newsletter
 
 skill-web-smoke: ## Skill: web-smoke
-	@echo "🧠 Skill web-smoke 실행 중..."
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/test_web_api.py -q
+	$(DEV_ENTRYPOINT) smoke web
 
 skill-scheduler-debug: ## Skill: scheduler-debug
-	@echo "🧠 Skill scheduler-debug 실행 중..."
-	MOCK_MODE=true TESTING=1 $(PYTHON) -m pytest tests/integration/test_schedule_execution.py tests/unit_tests/test_schedule_time_sync.py -q
+	$(DEV_ENTRYPOINT) smoke scheduler
 
 skill-release-integration: ## Skill: release-integration
 	@echo "🧠 Skill release-integration 실행 중..."
@@ -263,13 +214,7 @@ skills-check: skill-docs-and-config-consistency skill-newsletter-smoke skill-web
 	@echo "✅ skills-check 완료"
 
 ops-safety-check: ## Run operational-safety required tests
-	@echo "🛡️ Ops-safety 게이트 실행 중..."
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/unit_tests/test_config_import_side_effects.py -q
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/test_web_api.py -q
-	RUN_INTEGRATION_TESTS=1 MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/integration/test_schedule_execution.py -q
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/unit_tests/test_schedule_time_sync.py -q
-	MOCK_MODE=true TESTING=1 OPENAI_API_KEY=test-key SERPER_API_KEY=test-key GEMINI_API_KEY=test-key ANTHROPIC_API_KEY=test-key POSTMARK_SERVER_TOKEN=dummy-token EMAIL_SENDER=test@example.com $(PYTHON) -m pytest tests/contract/test_web_email_routes_contract.py -q
-	@echo "✅ ops-safety-check 완료"
+	$(DEV_ENTRYPOINT) ops-safety-check
 
 ops-safety-smoke: ## Run deployed idempotency/outbox smoke checks (BASE_URL required)
 	@echo "🧪 Ops-safety smoke 실행 중..."
@@ -286,10 +231,7 @@ ops-safety-report: ## Generate operational safety release report
 	@echo "✅ ops-safety-report 완료"
 
 docs-check: ## Markdown 링크/스타일 무결성 검사
-	@echo "🧾 문서 품질 검사 중..."
-	$(PYTHON) scripts/check_markdown_links.py
-	$(PYTHON) scripts/check_markdown_style.py
-	@echo "✅ docs-check 완료"
+	$(DEV_ENTRYPOINT) docs-check
 
 repo-audit: ## 루트 인벤토리/Repo hygiene soft gate 리포트 생성
 	@echo "🧹 Repo audit 실행 중..."
@@ -312,14 +254,10 @@ legacy-web-types-guard: ## Ensure only runtime compatibility files mention legac
 	@echo "✅ legacy-web-types-guard 완료"
 
 pre-commit: ## Pre-commit hooks 설치
-	@echo "🔗 Pre-commit hooks 설치 중..."
-	pre-commit install
-	@echo "✅ Pre-commit hooks 설치 완료!"
+	$(DEV_ENTRYPOINT) pre-commit-install
 
 pre-push-hook: ## Local pre-push hook 설치
-	@echo "🔗 Pre-push hook 설치 중..."
-	./scripts/devtools/setup_pre_push_hook.sh
-	@echo "✅ Pre-push hook 설치 완료!"
+	$(DEV_ENTRYPOINT) pre-push-hook
 
 setup-local-git: pre-commit pre-push-hook ## 로컬 Git 훅(커밋/푸시) 설치
 	@echo "✅ 로컬 Git hook 설치 완료!"

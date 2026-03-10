@@ -2,6 +2,12 @@
 
 이 디렉터리는 루트에서 이관된 개발/운영 유틸 스크립트의 정식 위치입니다.
 
+## Canonical Contributor Entrypoint
+
+- `python -m scripts.devtools.dev_entrypoint`
+- `bootstrap`, `doctor`, `check`, `check --full`, `run`, `smoke` 같은 contributor-facing 공통 명령은 이 엔트리포인트를 기준으로 유지합니다.
+- `Makefile`과 shell hook은 backward-compatible wrapper로만 유지합니다.
+
 ## Migrated in Week 2
 
 - `build_web_exe.py` (compatibility shim)

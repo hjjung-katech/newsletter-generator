@@ -34,19 +34,14 @@ cd newsletter-generator
 # 2. 업스트림 리모트 추가
 git remote add upstream https://github.com/original-org/newsletter-generator.git
 
-# 3. 가상환경 생성 및 활성화
-python -m venv .local/venv
-source .local/venv/bin/activate  # Linux/macOS
-.local\venv\Scripts\activate     # Windows
+# 3. canonical 개발 bootstrap
+python -m scripts.devtools.dev_entrypoint bootstrap
 
-# 4. 개발 의존성 설치
-pip install --upgrade pip
-pip install -r requirements-dev.txt
-pip install -e .
-
-# 5. pre-commit 훅 설치
-pre-commit install
+# 4. 작업 환경 점검
+python -m scripts.devtools.dev_entrypoint doctor
 ```
+
+`make bootstrap`, `make doctor`, `make check`, `make check-full`는 같은 Python 엔트리포인트를 호출하는 thin wrapper입니다.
 
 ### IDE 설정
 
@@ -198,7 +193,7 @@ refactor(graph): simplify workflow state management
 
 ```bash
 # 모든 품질 검사 실행
-python run_ci_checks.py --quick
+python -m scripts.devtools.dev_entrypoint check
 
 # 개별 도구 실행
 black newsletter tests                    # 포맷팅
@@ -599,7 +594,7 @@ echo "Release $VERSION completed"
 source .local/venv/bin/activate
 
 # 코드 품질 검사
-python run_ci_checks.py --quick
+python -m scripts.devtools.dev_entrypoint check
 
 # 테스트 실행
 python scripts/devtools/run_tests.py dev

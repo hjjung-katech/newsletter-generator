@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 로컬 CI 검증 스크립트
@@ -6,10 +6,10 @@ GitHub Actions CI에서 실행되는 모든 검사를 로컬에서 미리 실행
 CI 실패를 방지하기 위한 종합적인 사전 검증 도구입니다.
 
 사용법:
-  python run_ci_checks.py          # 모든 검사 실행
-  python run_ci_checks.py --fix    # 자동 수정 가능한 문제 해결
-  python run_ci_checks.py --quick  # 빠른 검사만 (포맷팅, 린팅)
-  python run_ci_checks.py --full   # 전체 검사 + 테스트
+  python -m scripts.devtools.dev_entrypoint ci
+  python -m scripts.devtools.dev_entrypoint ci --fix
+  python -m scripts.devtools.dev_entrypoint ci --quick
+  python -m scripts.devtools.dev_entrypoint ci --full
 """
 
 import argparse
@@ -652,16 +652,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 예시:
-  python run_ci_checks.py              # 모든 검사 실행 (검사만)
-  python run_ci_checks.py --fix        # 자동 수정 가능한 문제 해결
-  python run_ci_checks.py --quick      # 빠른 검사 (포맷팅, 린팅만)
-  python run_ci_checks.py --full       # 전체 검사 + 테스트
-  python run_ci_checks.py --fix --full # 자동 수정 + 전체 검사
+  python -m scripts.devtools.dev_entrypoint ci
+  python -m scripts.devtools.dev_entrypoint ci --fix
+  python -m scripts.devtools.dev_entrypoint ci --quick
+  python -m scripts.devtools.dev_entrypoint ci --full
+  python -m scripts.devtools.dev_entrypoint ci --fix --full
 
 권장 워크플로우:
-  1. 개발 중: make check
-  2. 푸시 전: make check-full
-  3. PR 전: make check-full (필요 시 이 스크립트에 --verbose 사용)
+  1. 개발 중: python -m scripts.devtools.dev_entrypoint check
+  2. 푸시 전: python -m scripts.devtools.dev_entrypoint check --full
+  3. Make wrapper가 필요하면 make check / make check-full 사용
         """,
     )
 

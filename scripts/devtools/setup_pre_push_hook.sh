@@ -1,7 +1,7 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 SOURCE_HOOK="$ROOT_DIR/scripts/devtools/hooks/pre-push"
 TARGET_HOOK="$ROOT_DIR/.git/hooks/pre-push"
 

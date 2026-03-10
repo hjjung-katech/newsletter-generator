@@ -15,7 +15,7 @@
 2. 지원 정책(SSOT): [`docs/reference/support-policy.md`](docs/reference/support-policy.md)
 3. 환경변수 계약(SSOT): [`docs/reference/environment-variables.md`](docs/reference/environment-variables.md)
 4. 로컬 개발 가이드: [`docs/setup/LOCAL_SETUP.md`](docs/setup/LOCAL_SETUP.md)
-5. 품질 게이트: `make check`, `make check-full`
+5. 품질 게이트: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
 
 루트는 개요와 진입 링크만 유지하고, 상세 설명은 `docs/` 정본 문서로 관리합니다.
 공식 지원 범위는 Python 3.11/3.12, Linux canonical production server, Windows source development + native bundle, macOS source/smoke 중심입니다.
@@ -25,10 +25,12 @@
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
-make bootstrap
+python -m scripts.devtools.dev_entrypoint bootstrap
 cp .env.example .env
-make check
+python -m scripts.devtools.dev_entrypoint check
 ```
+
+기존 `make bootstrap`, `make check`, `make check-full`는 backward-compatible thin wrapper로 유지됩니다.
 
 Experimental FastAPI entrypoint uses a separate sample at
 [`apps/experimental/.env.example`](apps/experimental/.env.example).
@@ -36,9 +38,9 @@ Experimental FastAPI entrypoint uses a separate sample at
 소스 체크아웃 기준 canonical entrypoints:
 
 ```bash
+python -m scripts.devtools.dev_entrypoint run web
 python web/init_database.py
-python -m web.app
-python -m newsletter run --keywords "AI"
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "AI"
 ```
 
 웹 실행/CLI/배포 절차는 아래 정본 문서를 사용하세요.

@@ -46,23 +46,24 @@
 
 ## Local Gate Commands
 
-표준 로컬 게이트는 Makefile 엔트리로 고정합니다.
+표준 로컬 게이트의 정본은 Python entrypoint이며, Makefile은 backward-compatible wrapper로 유지합니다.
 
 ```bash
-cd /Users/hojungjung/development/newsletter-generator
-make bootstrap
-make doctor
-make check
-make check-full
+cd newsletter-generator
+python -m scripts.devtools.dev_entrypoint bootstrap
+python -m scripts.devtools.dev_entrypoint doctor
+python -m scripts.devtools.dev_entrypoint check
+python -m scripts.devtools.dev_entrypoint check --full
 make repo-audit
 make repo-audit-strict
 ```
 
-- `make check`: 빠른 로컬 게이트
-- `make check-full`: PR 전 전체 게이트
+- `python -m scripts.devtools.dev_entrypoint check`: 빠른 로컬 게이트
+- `python -m scripts.devtools.dev_entrypoint check --full`: PR 전 전체 게이트
 - `make repo-audit`: 루트 인벤토리 + repo hygiene soft gate 리포트 생성
 - `make repo-audit-strict`: CI hard gate와 동일(strict) 경로 점검
 - dev 유틸 실행 스크립트는 `scripts/devtools/`를 기본 경로로 사용합니다.
+- `make bootstrap`, `make doctor`, `make check`, `make check-full`는 같은 Python 엔트리포인트를 호출합니다.
 
 ## Quality Toolchain
 
@@ -70,21 +71,21 @@ make repo-audit-strict
 
 | Area | Primary Tool | Canonical Entry |
 |---|---|---|
-| formatting | `black` | `make check`, `make check-full`, `make format` |
-| import ordering | `isort` | `make check`, `make check-full`, `make format` |
-| lint | `flake8` | `make check`, `make check-full` |
-| type check | `mypy` | `make check-full` |
-| security scan | `bandit` | `make check-full` |
-| unit/integration test | `pytest` | `make check`, `make check-full` |
+| formatting | `black` | `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`, `make format` |
+| import ordering | `isort` | `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`, `make format` |
+| lint | `flake8` | `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full` |
+| type check | `mypy` | `python -m scripts.devtools.dev_entrypoint check --full` |
+| security scan | `bandit` | `python -m scripts.devtools.dev_entrypoint check --full` |
+| unit/integration test | `pytest` | `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full` |
 | docs integrity | Markdown link/style checks | `make docs-check` |
 | repo hygiene | `scripts/repo_audit.py` | `make repo-audit`, `make repo-audit-strict` |
 
-직접 도구를 개별 실행할 수도 있지만, contributor-facing 기준 명령은 Makefile 엔트리를 우선 사용합니다.
+직접 도구를 개별 실행할 수도 있지만, contributor-facing 기준 명령은 `python -m scripts.devtools.dev_entrypoint ...` 입니다.
 
 ## Coverage Reporting
 
 - 커버리지는 `pytest-cov` 리포트(`.local/coverage/coverage.xml`, `.local/coverage/htmlcov/`)로 계속 수집합니다.
-- 현재 contributor gate는 "고정 퍼센트 임계치" 문서보다 `make check-full` 통과와 테스트 리포트 정합성을 우선 기준으로 사용합니다.
+- 현재 contributor gate는 "고정 퍼센트 임계치" 문서보다 `python -m scripts.devtools.dev_entrypoint check --full` 통과와 테스트 리포트 정합성을 우선 기준으로 사용합니다.
 - 커버리지 개선 작업은 별도 RR/PR 단위로 분리합니다.
 - repo audit, coverage, debug 같은 로컬 scratch 산출물은 기본적으로 루트 `.local/` 아래에 격리합니다.
 
@@ -150,7 +151,7 @@ python scripts/repo_audit.py \
 
 5. Merge 정책
 - 기본 merge 방식: squash merge
-- merge 전 조건: `make check-full` 및 GitHub required checks green
+- merge 전 조건: `python -m scripts.devtools.dev_entrypoint check --full` 및 GitHub required checks green
 - hotfix 등 예외는 `## Not Run` 에 사유를 남깁니다.
 
 ## Request Entry Patterns
@@ -162,7 +163,7 @@ python scripts/repo_audit.py \
 - 목표: <목표>
 - 범위: <in-scope / out-of-scope>
 - 브랜치: <type>/<scope>-<topic>
-- 필수 게이트: make check, make check-full
+- 필수 게이트: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
 - 선택 게이트: make repo-audit (구조/정책 변경 시)
 - 산출물: 커밋 해시, PR 링크, CI 상태, merge 결과, 롤백 메모
 ```
@@ -195,7 +196,7 @@ python scripts/release_preflight.py
 python scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged
 python scripts/validate_release_manifest.py --manifest .release/manifests/release-scheduler-reliability.txt --source staged
 python scripts/validate_release_manifest.py --manifest .release/manifests/release-runtime-binary-bootstrap.txt --source staged
-make check-full
+python -m scripts.devtools.dev_entrypoint check --full
 ```
 
 ## Workflow Directory Contract
