@@ -15,6 +15,7 @@
 - contributor-facing canonical entrypoint는 `python -m scripts.devtools.dev_entrypoint`다.
 - Makefile과 shell script는 현재 contributor automation wrapper로 남아 있지만, 아키텍처 계약의 정본은 아니다.
 - CI gate는 이 문서의 지원 계약을 비대칭적으로 집행한다. Linux는 full unit/package/container 검증, Windows는 source smoke + EXE release surface, macOS는 source smoke + runtime subset을 기준으로 유지한다.
+- `main` branch protection required check 목록은 `docs/dev/CI_CD_GUIDE.md`와 `.github/workflows/README.md`에 verbatim으로 유지한다.
 
 ## OS Support Contract
 

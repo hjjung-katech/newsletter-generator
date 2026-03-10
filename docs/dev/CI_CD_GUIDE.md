@@ -102,6 +102,10 @@ make repo-audit-strict
 
 ### PR Gate
 
+아래 12개 check는 `main` branch protection required check 기준이다.
+
+- `policy-check`
+- `docs-quality`
 - `Code Quality & Security`
 - `Unit Tests - ubuntu-latest-py3.11`
 - `Unit Tests - ubuntu-latest-py3.12`
@@ -109,10 +113,13 @@ make repo-audit-strict
 - `Source Smoke (ubuntu-latest)`
 - `Source Smoke (macos-latest)`
 - `Source Smoke (windows-latest)`
-- `Mock API Tests`
 - `Build Check (ubuntu-latest)`
 - `Build Check (windows-latest)`
 - `Container Smoke (ubuntu-latest)`
+
+추가 PR validation:
+- `Mock API Tests`
+  - PR에서 계속 실행하지만 현재 branch protection required check에는 포함하지 않는다.
 
 ### Long Gate
 
