@@ -368,30 +368,36 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Create required directories
+        run: >
+          python -c "from pathlib import Path; [Path(path).mkdir(parents=True, exist_ok=True) for path in ['.local/state/web', 'output', 'output/test_results', '.local/debug_files', '.local/coverage', 'templates']]"
+
       - name: Run runtime boundary regression subset
         env:
           MOCK_MODE: 'true'
           TESTING: '1'
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
           OPENAI_API_KEY: test-key
           SERPER_API_KEY: test-key
           GEMINI_API_KEY: test-key
           ANTHROPIC_API_KEY: test-key
           POSTMARK_SERVER_TOKEN: dummy-token
           EMAIL_SENDER: test@example.com
-        run: |
-          pytest \
-            tests/unit_tests/web/test_runtime_paths.py \
-            tests/unit_tests/web/test_runtime_hook_bootstrap.py \
-            tests/unit_tests/test_web_import_side_effects.py \
-            tests/contract/test_web_runtime_contract.py \
-            -q
+        run: >
+          python -m pytest
+          tests/unit_tests/web/test_runtime_paths.py
+          tests/unit_tests/web/test_runtime_hook_bootstrap.py
+          tests/unit_tests/test_web_import_side_effects.py
+          tests/contract/test_web_runtime_contract.py
+          -q
 
       - name: Run source web smoke
         env:
           MOCK_MODE: 'true'
           TESTING: '1'
           PYTHONPATH: ${{ github.workspace }}
+          NEWSLETTER_DEBUG_DIR: ${{ env.DEBUG_DIR }}
           OPENAI_API_KEY: test-key
           SERPER_API_KEY: test-key
           GEMINI_API_KEY: test-key
