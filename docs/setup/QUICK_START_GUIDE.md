@@ -8,8 +8,8 @@
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+python -m venv .local/venv
+source .local/venv/bin/activate  # Windows: .local\\venv\\Scripts\\activate
 ```
 
 ## 2. 의존성 설치

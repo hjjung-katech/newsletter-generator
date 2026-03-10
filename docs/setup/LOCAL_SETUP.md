@@ -14,13 +14,13 @@ cd newsletter-generator
 ## 2. 가상환경 설정
 
 ```bash
-python -m venv .venv
+python -m venv .local/venv
 
 # Windows
-.venv\Scripts\activate
+.local\venv\Scripts\activate
 
 # macOS/Linux
-source .venv/bin/activate
+source .local/venv/bin/activate
 ```
 
 ## 3. 의존성 설치
@@ -32,6 +32,8 @@ pip install -r requirements.txt
 # 웹 애플리케이션 의존성 추가 설치
 pip install -r web/requirements.txt
 ```
+
+기본 로컬 가상환경 경로는 `.local/venv/` 입니다. 기존 루트 `.venv/` 가 있는 clone도 호환되지만 신규 생성은 권장하지 않습니다.
 
 ## 4. 환경 변수 설정
 
@@ -263,6 +265,14 @@ python scripts/devtools/cleanup_debug_files.py --action move
 
 # 디버그 파일 완전 삭제
 python scripts/devtools/cleanup_debug_files.py --action delete
+```
+
+## 13. 로컬 캐시/가상환경 정리
+
+```bash
+make clean-caches   # __pycache__, .pytest_cache, .mypy_cache, coverage 정리
+make clean-local    # cache + .local/artifacts, .local/coverage, .local/debug_files 정리
+make clean-venv     # .local/venv 및 legacy .venv 제거
 ```
 
 ## 문제 해결

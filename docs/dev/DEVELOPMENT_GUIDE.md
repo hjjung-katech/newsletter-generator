@@ -33,9 +33,9 @@ cd newsletter-generator
 git remote add upstream https://github.com/original-org/newsletter-generator.git
 
 # 3. 가상환경 생성 및 활성화
-python -m venv .venv
-source .venv/bin/activate  # Linux/macOS
-.venv\Scripts\activate     # Windows
+python -m venv .local/venv
+source .local/venv/bin/activate  # Linux/macOS
+.local\venv\Scripts\activate     # Windows
 
 # 4. 개발 의존성 설치
 pip install --upgrade pip
@@ -54,7 +54,7 @@ pre-commit install
 
 ```json
 {
-    "python.defaultInterpreterPath": "./.venv/bin/python",
+    "python.defaultInterpreterPath": "./.local/venv/bin/python",
     "python.linting.enabled": true,
     "python.linting.flake8Enabled": true,
     "python.linting.mypyEnabled": true,
@@ -589,7 +589,7 @@ echo "Release $VERSION completed"
 
 ```bash
 # 개발 환경 활성화
-source .venv/bin/activate
+source .local/venv/bin/activate
 
 # 코드 품질 검사
 python run_ci_checks.py --quick

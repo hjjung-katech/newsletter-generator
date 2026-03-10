@@ -1,7 +1,7 @@
 # Newsletter Generator - Makefile
 # 개발 워크플로우 자동화를 위한 Makefile
 
-.PHONY: help bootstrap doctor check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
+.PHONY: help bootstrap doctor print-python print-venv check check-full format format-check lint architecture-check architecture-baseline test test-quick test-full test-nightly preflight-release validate-ci-manifest validate-scheduler-manifest validate-runtime-bootstrap-manifest apply-pr-metadata ci-check ci-fix clean clean-caches clean-local clean-venv install pre-commit pre-commit-run skill-ci-gate skill-docs-and-config-consistency skill-newsletter-smoke skill-web-smoke skill-scheduler-debug skill-release-integration skills-check docs-check repo-audit repo-audit-strict runtime-ascii-guard legacy-web-types-guard ops-safety-check ops-safety-smoke ops-safety-report build-web-exe windows-release-artifacts verify-windows-artifact-checksum support-bundle windows-sign-exe validate-windows-release-artifacts windows-update-manifest windows-ci-burnin-report github-windows-release-controls
 
 # 실행 경로/인터프리터 설정
 EXPECTED_CWD ?= /Users/hojungjung/development/newsletter-generator
@@ -14,7 +14,19 @@ WINDOWS_RELEASE_CONTROLS_REPORT ?= $(ARTIFACTS_DIR)/windows-release-controls.jso
 COVERAGE_DIR ?= $(LOCAL_DIR)/coverage
 DEBUG_DIR ?= $(LOCAL_DIR)/debug_files
 NEWSLETTER_DEBUG_DIR ?= $(DEBUG_DIR)
-VENV_PYTHON := $(PROJECT_ROOT)/.venv/bin/python
+DEFAULT_VENV_DIR ?= $(LOCAL_DIR)/venv
+LEGACY_VENV_DIR ?= $(PROJECT_ROOT)/.venv
+BOOTSTRAP_VENV_DIR ?= $(DEFAULT_VENV_DIR)
+VENV_DIR ?= $(DEFAULT_VENV_DIR)
+ifeq ($(origin VENV_DIR), file)
+  ifeq ($(wildcard $(DEFAULT_VENV_DIR)/bin/python)$(wildcard $(DEFAULT_VENV_DIR)/Scripts/python.exe),)
+    ifneq ($(wildcard $(LEGACY_VENV_DIR)/bin/python)$(wildcard $(LEGACY_VENV_DIR)/Scripts/python.exe),)
+      VENV_DIR := $(LEGACY_VENV_DIR)
+    endif
+  endif
+endif
+BOOTSTRAP_VENV_PYTHON := $(if $(wildcard $(BOOTSTRAP_VENV_DIR)/Scripts/python.exe),$(BOOTSTRAP_VENV_DIR)/Scripts/python.exe,$(BOOTSTRAP_VENV_DIR)/bin/python)
+VENV_PYTHON := $(if $(wildcard $(VENV_DIR)/Scripts/python.exe),$(VENV_DIR)/Scripts/python.exe,$(VENV_DIR)/bin/python)
 PYTHON ?= $(if $(wildcard $(VENV_PYTHON)),$(VENV_PYTHON),python3)
 PIP := $(PYTHON) -m pip
 export NEWSLETTER_DEBUG_DIR
@@ -38,11 +50,11 @@ help: ## 도움말 표시
 
 bootstrap: ## 로컬 가상환경/의존성/훅 설치
 	@echo "🧱 로컬 개발 환경 bootstrap 중..."
-	python3 -m venv .venv
-	$(VENV_PYTHON) -m pip install --upgrade pip
-	$(VENV_PYTHON) -m pip install -r requirements.txt
-	$(VENV_PYTHON) -m pip install -r requirements-dev.txt
-	$(VENV_PYTHON) -m pre_commit install
+	python3 -m venv $(BOOTSTRAP_VENV_DIR)
+	$(BOOTSTRAP_VENV_PYTHON) -m pip install --upgrade pip
+	$(BOOTSTRAP_VENV_PYTHON) -m pip install -r requirements.txt
+	$(BOOTSTRAP_VENV_PYTHON) -m pip install -r requirements-dev.txt
+	$(BOOTSTRAP_VENV_PYTHON) -m pre_commit install
 	@echo "✅ bootstrap 완료"
 
 doctor: ## 작업 경로/인터프리터 전제 조건 검증
@@ -61,10 +73,16 @@ doctor: ## 작업 경로/인터프리터 전제 조건 검증
 	fi
 	@if [ ! -x "$(VENV_PYTHON)" ]; then \
 		echo "❌ 가상환경 Python 없음: $(VENV_PYTHON)"; \
-		echo "   먼저 'make bootstrap'을 실행하세요."; \
+		echo "   기본 경로는 $(DEFAULT_VENV_DIR) 입니다. 먼저 'make bootstrap'을 실행하세요."; \
 		exit 1; \
 	fi
-	@echo "✅ 환경 점검 통과 (PYTHON=$(PYTHON))"
+	@echo "✅ 환경 점검 통과 (PYTHON=$(PYTHON), VENV_DIR=$(VENV_DIR))"
+
+print-python: ## 현재 선택된 Python 인터프리터 경로 출력
+	@echo "$(PYTHON)"
+
+print-venv: ## 현재 선택된 가상환경 디렉터리 경로 출력
+	@echo "$(VENV_DIR)"
 
 check: doctor test-quick docs-check skills-check ## 표준 로컬 게이트
 	@echo "✅ check 완료"
@@ -305,9 +323,10 @@ pre-commit-run: ## Pre-commit 수동 실행
 	@echo "🔍 Pre-commit 검사 실행 중..."
 	pre-commit run --all-files
 
-clean: ## 캐시 및 임시 파일 정리
-	@echo "🧹 정리 중..."
+clean-caches: ## 재생성 가능한 캐시/coverage 정리
+	@echo "🧽 캐시 정리 중..."
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d \( -name ".pytest_cache" -o -name ".mypy_cache" -o -name ".ruff_cache" -o -name ".hypothesis" -o -name ".tox" -o -name ".nox" -o -name ".pytype" \) -prune -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	find . -type f -name "*.pyo" -delete 2>/dev/null || true
 	find . -type f -name ".coverage" -delete 2>/dev/null || true
@@ -317,8 +336,21 @@ clean: ## 캐시 및 임시 파일 정리
 	rm -rf htmlcov/ 2>/dev/null || true
 	rm -rf $(ARTIFACTS_DIR)/ 2>/dev/null || true
 	rm -rf $(COVERAGE_DIR)/ 2>/dev/null || true
-	rm -rf .pytest_cache/ 2>/dev/null || true
-	rm -rf .mypy_cache/ 2>/dev/null || true
+	@echo "✅ 캐시 정리 완료!"
+
+clean-local: clean-caches ## .local scratch 산출물 정리 (output/과 venv 제외)
+	@echo "🧹 로컬 scratch 정리 중..."
+	rm -rf $(DEBUG_DIR)/ 2>/dev/null || true
+	@echo "✅ 로컬 scratch 정리 완료!"
+
+clean-venv: ## 로컬 가상환경 정리 (.local/venv + legacy .venv)
+	@echo "🗑️ 가상환경 정리 중..."
+	rm -rf $(DEFAULT_VENV_DIR) 2>/dev/null || true
+	rm -rf $(LEGACY_VENV_DIR) 2>/dev/null || true
+	@echo "✅ 가상환경 정리 완료!"
+
+clean: clean-local ## 캐시 및 임시 파일 정리
+	@echo "🧹 추가 빌드 산출물 정리 중..."
 	rm -rf dist/ build/ *.egg-info 2>/dev/null || true
 	@echo "✅ 정리 완료!"
 

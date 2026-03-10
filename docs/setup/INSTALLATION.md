@@ -50,14 +50,14 @@ git clone https://github.com/username/newsletter-generator.git
 cd newsletter-generator
 
 # 2. 가상환경 생성
-python -m venv .venv
+python -m venv .local/venv
 
 # 3. 가상환경 활성화
 # Windows
-.venv\Scripts\activate
+.local\venv\Scripts\activate
 
 # macOS/Linux
-source .venv/bin/activate
+source .local/venv/bin/activate
 
 # 4. 의존성 설치
 pip install --upgrade pip
@@ -117,6 +117,8 @@ notepad .env  # Windows
 newsletter-generator/
 ├── .env                    # 환경 변수 설정
 ├── .env.example           # 환경 변수 예제
+├── .local/
+│   └── venv/              # 로컬 가상환경 (canonical)
 ├── newsletter/            # 메인 패키지
 │   └── templates/         # 패키지 내부 HTML 템플릿
 ├── output/               # 생성된 파일들
@@ -327,9 +329,9 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 # 가상환경 재생성
 deactivate
-rm -rf .venv  # Linux/macOS
-rmdir /s .venv  # Windows
-python -m venv .venv
+rm -rf .local/venv  # Linux/macOS
+rmdir /s .local\venv  # Windows
+python -m venv .local/venv
 ```
 
 #### 4. 권한 문제
