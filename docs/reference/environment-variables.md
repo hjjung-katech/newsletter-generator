@@ -2,6 +2,8 @@
 
 이 문서는 환경변수 계약의 정본(SSOT)입니다.
 
+지원 범위와 OS별 artifact 계약은 [`support-policy.md`](support-policy.md)를 기준으로 유지합니다.
+
 ## Sample Files
 
 - 루트 [`../../.env.example`](../../.env.example)는 canonical Flask/CLI runtime 샘플입니다.
@@ -20,7 +22,7 @@
 | `ENVIRONMENT` | 호환용 | legacy logging/security/runtime fallback |
 | `DEBUG` | 선택 | 개발 편의용 디버그 플래그 |
 | `HOST` | 선택 | 웹 바인딩 호스트 |
-| `PORT` | 배포 시 선택 | 웹 포트 (`.env.example` 기준 `8000`) |
+| `PORT` | 배포 시 선택 | canonical source runtime 웹 포트 (`.env.example` 기준 `8000`, Windows EXE packaging entrypoint는 현재 compatibility default `5000`) |
 | `LOG_LEVEL` | 선택 | runtime/application log level |
 | `LOG_FORMAT` | 선택 | logging format (`standard`/`json`) |
 | `SECRET_KEY` | 프로덕션 권장(웹) | Flask 시크릿 키 |
