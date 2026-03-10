@@ -1,8 +1,12 @@
 # Architecture Migration Log
 
+이 문서는 active migration 사실만 기록합니다.
+현재 저장소에 존재하지 않는 경로나 채택되지 않은 실험안은 future checkpoint로 남기지 않습니다.
+
 ## 2026-02-22
 
 ### Completed
+
 - Added architecture guardrails:
   - `scripts/architecture/check_import_boundaries.py`
   - `scripts/architecture/check_import_cycles.py`
@@ -12,61 +16,43 @@
   - `run_ci_checks.py`
   - `.github/workflows/main-ci.yml`
   - `Makefile` (`architecture-check`, `architecture-baseline`)
-- Introduced runtime/package skeleton:
-  - `apps/cli`, `apps/web`, `apps/worker`, `apps/scheduler`
-  - `newsletter_core/{public,application,domain,infrastructure,internal}`
-- Migrated first generation slice to new location:
-  - `collect.py`, `summarize.py`, `compose.py`, `deliver.py`
-  - legacy shims left under `newsletter/`
-- Added public facade:
-  - `newsletter_core.public.generation`
-  - `newsletter_core.public.settings`
-  - `newsletter_core.public.lifecycle`
-- Switched CLI runtime path to consume `newsletter_core.public.generation`.
-- Added contract coverage:
-  - `tests/contract/test_generation_facade.py`
-  - updated `tests/integration/test_cli_integration.py`
+- Introduced `newsletter_core/{public,application,domain,infrastructure,internal}` as the gradual migration target.
+- Migrated the first generation slice behind `newsletter_core.public` facade.
+- Switched active runtime paths to consume `newsletter_core.public.generation`.
+- Added contract coverage for public facade and web/runtime behavior.
 
-### Merged PR stack (remote)
-- PR-0: `#40` merged at `2026-02-22T04:50:59Z`
-- PR-1: `#41` merged at `2026-02-22T04:51:33Z`
-- PR-2: `#42` merged at `2026-02-22T04:51:48Z`
-- PR-3: `#43` merged at `2026-02-22T04:52:02Z`
-- PR-4: `#44` merged at `2026-02-22T04:52:12Z`
-- PR-5: `#45` merged at `2026-02-22T04:53:09Z`
-- Aggregate stack PR: `#46` merged at `2026-02-22T04:53:10Z`
+### Historical correction
 
-### Main CI confirmation (post-merge)
-- Final merge commit CI set completed with `success`:
-  - Main CI Pipeline: run `22270734622`
-  - Deployment Pipeline: run `22270734616`
+- 초기 구조 이행 과정에서 wrapper-style runtime experiment가 있었지만 현재 active 구조로 유지되지는 않았습니다.
+- 현재 저장소에서 `apps/` 는 `apps/experimental/` 만 유지합니다.
+- contributor-facing run surface의 정본은 `python -m scripts.devtools.dev_entrypoint` 입니다.
 
-### Post-merge hardening (started)
-- `web -> newsletter` architecture rule tightened from allowlist to full forbid.
-- `web` runtime guidance updated to use `newsletter_core.public.generation`.
-- Legacy shim deprecation schedule documented in:
-  - `docs/technical/shim-deprecation-schedule.md`
+## 2026-03-10
 
-### Compatibility policy
-- Legacy compatibility shims retained for 2 release cycles.
-- `newsletter.api` now emits `DeprecationWarning` and re-exports from `newsletter_core.public.generation`.
+### Current active state
+
+- `newsletter_core/` 는 신규 기능과 점진적 구조 이동의 목표 영역으로 유지합니다.
+- `newsletter/` 는 legacy surface manifest와 ADR guardrail 아래에서 고정하며, 신규 Python 모듈 유입을 허용하지 않습니다.
+- web runtime은 `newsletter_core.public.generation` 경유 계약을 유지합니다.
+- 현재 구조 부채의 중심은 root cleanup이 아니라 legacy hotspot 축소입니다.
+
+### Active burn-down targets
+
+- `web/routes_generation.py`
+- `newsletter/tools.py`
+- `newsletter/llm_factory.py`
+- `newsletter/graph.py`
+- `web/static/js/app.js`
 
 ### Next checkpoints
-- Switch deployment/runtime commands to `apps/*` wrappers as primary entrypoints.
-- Track and enforce shim removal milestones by release tags.
-- Remove legacy shims at the third release tag after introduction.
 
-### Verification snapshot (local)
-- Environment bootstrap:
-  - `.venv` created and dependencies installed from `requirements.txt` and `requirements-dev.txt`.
-- Passed:
-  - `python3 scripts/architecture/check_import_boundaries.py --mode ratchet`
-  - `python3 scripts/architecture/check_import_cycles.py`
-  - `make check`
-  - `.venv/bin/python -m pytest tests/contract/test_generation_facade.py -q`
-  - `.venv/bin/python -m pytest tests/test_web_api.py -q`
-  - `.venv/bin/python -m pytest tests/unit_tests/test_schedule_time_sync.py -q`
-  - `RUN_INTEGRATION_TESTS=1 GEMINI_API_KEY=dummy SERPER_API_KEY=dummy POSTMARK_SERVER_TOKEN=dummy .venv/bin/python -m pytest tests/integration/test_cli_integration.py -q`
-  - `RUN_INTEGRATION_TESTS=1 GEMINI_API_KEY=dummy SERPER_API_KEY=dummy POSTMARK_SERVER_TOKEN=dummy .venv/bin/python -m pytest tests/integration/test_schedule_execution.py -q`
-- Note:
-  - without API keys, integration-marked suites are skipped by `tests/conftest.py`.
+1. hotspot reduction은 small-batch extraction으로만 진행합니다.
+2. extraction 전에 contract / ops-safety suite를 먼저 고정합니다.
+3. `newsletter/` 확장이 아니라 `newsletter_core/` 경계 강화가 다음 구조 목표입니다.
+4. 현재 runtime entrypoint, support policy, CI contract는 변경하지 않습니다.
+
+### Current validation commands
+
+- `python3 scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir .local/artifacts/repo-audit --check-policy --strict`
+- `make check`
+- `python -m scripts.devtools.dev_entrypoint check --full`

@@ -60,6 +60,8 @@
       ".vscode",
       ".githooks",
       "__pycache__",
+      "build",
+      "newsletter_generator.egg-info",
       "output"
     ]
   },
