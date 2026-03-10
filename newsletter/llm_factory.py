@@ -751,7 +751,8 @@ class LLMFactory:
 
     def _get_default_model(self, provider_name: str) -> str:
         """제공자별 기본 모델명을 반환합니다."""
-        return cast(str, get_default_model(self.llm_config, provider_name))
+        default_model: str = get_default_model(self.llm_config, provider_name)
+        return default_model
 
     def get_available_providers(self) -> List[str]:
         """사용 가능한 제공자 목록을 반환합니다."""
@@ -764,10 +765,12 @@ class LLMFactory:
         availability = {
             name: provider.is_available() for name, provider in self.providers.items()
         }
-        return cast(
-            Dict[str, Dict[str, Any]],
-            build_provider_info(self.llm_config, self.providers.keys(), availability),
+        provider_info: Dict[str, Dict[str, Any]] = build_provider_info(
+            self.llm_config,
+            self.providers.keys(),
+            availability,
         )
+        return provider_info
 
 
 _llm_factory_instance: LLMFactory | None = None
