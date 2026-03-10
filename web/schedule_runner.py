@@ -75,19 +75,25 @@ except ImportError:
         run_sync_fallback,
     )
 
+try:
+    from runtime_paths import resolve_database_path
+except ImportError:
+    from web.runtime_paths import resolve_database_path  # pragma: no cover
+
 # Configure logging
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+DEFAULT_DATABASE_PATH = resolve_database_path()
 
 
 class ScheduleRunner:
     """RRULE 기반 스케줄 실행기"""
 
-    def __init__(self, db_path: str = "storage.db", redis_url: str | None = None):
-        self.db_path = db_path
+    def __init__(self, db_path: str | None = None, redis_url: str | None = None):
+        self.db_path = db_path or DEFAULT_DATABASE_PATH
         ensure_database_schema(self.db_path)
         self.redis_url = redis_url or os.environ.get(
             "REDIS_URL", "redis://localhost:6379/0"
@@ -305,7 +311,11 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Newsletter Schedule Runner")
-    parser.add_argument("--db-path", default="storage.db", help="Database file path")
+    parser.add_argument(
+        "--db-path",
+        default=DEFAULT_DATABASE_PATH,
+        help="Database file path",
+    )
     parser.add_argument("--redis-url", help="Redis URL (default: from REDIS_URL env)")
     parser.add_argument("--once", action="store_true", help="Run once and exit")
     parser.add_argument(

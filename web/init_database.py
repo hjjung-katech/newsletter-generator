@@ -2,7 +2,8 @@
 """
 웹 애플리케이션 데이터베이스 초기화 스크립트
 
-이 스크립트는 storage.db가 없거나 손상된 경우 새로운 데이터베이스를 생성합니다.
+이 스크립트는 기본 웹 런타임 데이터베이스 경로 또는 지정한 경로에
+SQLite 데이터베이스를 생성합니다.
 개발 환경 설정이나 프로덕션 배포 시 사용할 수 있습니다.
 """
 
@@ -13,11 +14,16 @@ from datetime import datetime
 
 try:
     from db_state import ensure_database_schema
+    from runtime_paths import resolve_database_path
 except ImportError:
     from web.db_state import ensure_database_schema  # pragma: no cover
+    from web.runtime_paths import resolve_database_path  # pragma: no cover
 
 
-def create_database(db_path: str = "storage.db") -> bool:
+DEFAULT_DATABASE_PATH = resolve_database_path()
+
+
+def create_database(db_path: str = DEFAULT_DATABASE_PATH) -> bool:
     """
     SQLite 데이터베이스와 필요한 테이블들을 생성합니다.
 
@@ -40,7 +46,7 @@ def create_database(db_path: str = "storage.db") -> bool:
     return True
 
 
-def verify_database(db_path: str = "storage.db") -> bool:
+def verify_database(db_path: str = DEFAULT_DATABASE_PATH) -> bool:
     """
     데이터베이스가 올바르게 생성되었는지 확인합니다.
 
@@ -86,7 +92,11 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="웹 애플리케이션 데이터베이스 초기화")
-    parser.add_argument("--db-path", default="storage.db", help="데이터베이스 파일 경로")
+    parser.add_argument(
+        "--db-path",
+        default=DEFAULT_DATABASE_PATH,
+        help="데이터베이스 파일 경로",
+    )
     parser.add_argument("--verify-only", action="store_true", help="검증만 수행 (생성하지 않음)")
     parser.add_argument("--force", action="store_true", help="기존 데이터베이스 강제 재생성")
 

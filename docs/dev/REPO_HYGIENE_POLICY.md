@@ -35,7 +35,7 @@
 | `pyinstaller_hooks/` | 이관 완료 | `scripts/devtools/pyinstaller_hooks/` | 빌드 유틸 범주로 통합 |
 | `build_web_exe.py`, `build_web_exe_enhanced.py`, `cleanup_debug_files.py`, `fix_env_setup.py`, `run_tests.py` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
 | `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
-| `.local/` | ignore | 로컬 scratch workspace (`artifacts/`, `coverage/`, `debug_files/`, `venv/`) | 재생성 가능 산출물과 로컬 런타임 환경을 숨김 경계로 격리 |
+| `.local/` | ignore | 로컬 workspace (`artifacts/`, `coverage/`, `debug_files/`, `state/`, `venv/`) | 재생성 가능 산출물, 로컬 런타임 환경, 개발 모드 웹 상태를 숨김 경계로 격리 |
 | `.venv/` | ignore(호환) | legacy local virtualenv | 기존 clone 호환용, 신규 bootstrap 정본은 `.local/venv/` |
 | `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 재생성 가능 캐시 |
 | `output/` | ignore | 사용자 생성 결과물 디렉터리 (tracked 제외) | 실행 결과 확인용이므로 루트 유지 |
@@ -126,7 +126,7 @@ make repo-audit-strict
 
 ```bash
 make clean-caches   # 재생성 가능한 cache/coverage만 삭제
-make clean-local    # cache + .local scratch 삭제 (output/, venv 유지)
+make clean-local    # cache + .local scratch 삭제 (output/, state/, venv 유지)
 make clean-venv     # .local/venv 및 legacy .venv 삭제
 ```
 

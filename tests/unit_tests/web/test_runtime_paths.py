@@ -15,7 +15,9 @@ def test_runtime_paths_development_mode(monkeypatch, tmp_path):
 
     assert runtime_paths.resolve_template_dir() == str(web_dir / "templates")
     assert runtime_paths.resolve_static_dir() == str(web_dir / "static")
-    assert runtime_paths.resolve_database_path() == str(web_dir / "storage.db")
+    assert runtime_paths.resolve_database_path() == str(
+        project_root / ".local" / "state" / "web" / "storage.db"
+    )
     assert runtime_paths.resolve_project_root() == str(project_root)
     assert runtime_paths.resolve_env_file_path() == str(project_root / ".env")
 

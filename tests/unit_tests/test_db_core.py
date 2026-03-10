@@ -45,6 +45,17 @@ def test_ensure_database_schema_creates_runtime_tables(tmp_path: Path) -> None:
     }.issubset(tables)
 
 
+def test_ensure_database_schema_creates_missing_parent_directories(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / ".local" / "state" / "web" / "storage.db"
+
+    ensure_database_schema(str(db_path))
+
+    assert db_path.parent.is_dir()
+    assert db_path.is_file()
+
+
 def test_connect_db_applies_additive_history_and_schedule_columns(
     tmp_path: Path,
 ) -> None:

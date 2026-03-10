@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sqlite3
 import traceback
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict
 
 from newsletter_core.public.generation import (
@@ -70,10 +70,12 @@ except ImportError:
 
 try:
     from archive import inject_archive_references
+    from runtime_paths import resolve_database_path
 except ImportError:
     from web.archive import inject_archive_references  # pragma: no cover
+    from web.runtime_paths import resolve_database_path  # pragma: no cover
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), "storage.db")
+DATABASE_PATH = resolve_database_path()
 logger = logging.getLogger("web.tasks")
 
 
@@ -340,6 +342,7 @@ def generate_newsletter_task(
 
 def create_schedule_entry(params: Dict[str, Any], job_id: str) -> str:
     """Create a scheduled newsletter entry."""
+    Path(DATABASE_PATH).expanduser().parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
 
