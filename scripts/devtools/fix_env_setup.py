@@ -301,9 +301,9 @@ def print_summary():
     print()
 
     print("🎯 다음 단계:")
-    print("  1. newsletter check-config 실행하여 설정 확인")
-    print("  2. newsletter test-email --to your@email.com 으로 이메일 테스트")
-    print("  3. 웹 인터페이스: python test_server.py")
+    print("  1. python -m newsletter check-config 실행하여 설정 확인")
+    print("  2. python -m newsletter test-email --to your@email.com 으로 이메일 테스트")
+    print("  3. 웹 인터페이스: python -m web.app")
     print()
 
     print("💡 중복 기능 정리:")

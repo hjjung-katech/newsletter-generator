@@ -232,7 +232,7 @@ skill-ci-gate: ## Skill: ci-gate
 
 skill-docs-and-config-consistency: ## Skill: docs-and-config-consistency
 	@echo "🧠 Skill docs-and-config-consistency 검증 중..."
-	@! rg -nP 'SENDGRID_API_KEY|(?<!POSTMARK_)FROM_EMAIL=|POSTMARK_TOKEN|POSTMARK_API_TOKEN' README.md docs/setup web/.env.example web/requirements.txt
+	@! rg -nP 'SENDGRID_API_KEY|(?<!POSTMARK_)FROM_EMAIL=|POSTMARK_TOKEN|POSTMARK_API_TOKEN' README.md docs/setup .env.example apps/experimental/.env.example web/requirements.txt
 
 skill-newsletter-smoke: ## Skill: newsletter-smoke
 	@echo "🧠 Skill newsletter-smoke 실행 중..."

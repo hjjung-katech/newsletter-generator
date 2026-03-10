@@ -20,7 +20,7 @@
 | `ENVIRONMENT` | 호환용 | legacy logging/security/runtime fallback |
 | `DEBUG` | 선택 | 개발 편의용 디버그 플래그 |
 | `HOST` | 선택 | 웹 바인딩 호스트 |
-| `PORT` | 배포 시 선택 | 웹 포트 (`.env.example` 기준 `8000`, legacy entrypoint는 미설정 시 `5000` fallback 존재) |
+| `PORT` | 배포 시 선택 | 웹 포트 (`.env.example` 기준 `8000`) |
 | `LOG_LEVEL` | 선택 | runtime/application log level |
 | `LOG_FORMAT` | 선택 | logging format (`standard`/`json`) |
 | `SECRET_KEY` | 프로덕션 권장(웹) | Flask 시크릿 키 |
@@ -92,7 +92,7 @@
 ## Compatibility Alias
 
 - `FLASK_ENV`
-  - direct `web/app.py` 실행 경로와의 호환용입니다.
+  - legacy fallback 경로와의 호환용입니다.
   - 신규 로컬/운영 설정에서는 `APP_ENV` 를 우선 사용하고, 필요 시 같은 값으로 함께 설정합니다.
 - `ENVIRONMENT`
   - 일부 legacy logging/security 경로의 fallback 입니다.
@@ -128,12 +128,14 @@ EMAIL_SENDER=newsletter@example.com
 
 # 웹/운영
 APP_ENV=production
-FLASK_ENV=production
-ENVIRONMENT=production
 SECRET_KEY=replace-me-in-production
 ADMIN_API_TOKEN=replace-me-with-an-ops-token
 ALLOWED_ORIGINS=https://app.example.com
 REDIS_URL=redis://localhost:6379/0
+
+# 선택적 compatibility alias
+# FLASK_ENV=production
+# ENVIRONMENT=production
 
 # experimental FastAPI runtime extension
 JWT_SECRET_KEY=replace-me-for-experimental-runtime
