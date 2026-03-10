@@ -11,12 +11,13 @@
 
 ## Release-tag timeline
 1. `N` (introduced): warnings enabled, behavior fully backward compatible.
-2. `N+1`: keep shims, block new direct imports of deprecated paths.
+2. `N+1`: keep shims, block new direct imports of deprecated paths and freeze the `newsletter/` Python surface.
 3. `N+2`: keep shims, migration completion target for remaining consumers.
 4. `N+3`: remove shim modules and deprecated import paths.
 
 ## Enforcement checklist
 - CI boundary check keeps `web -> newsletter` forbidden.
+- CI legacy surface guard keeps new Python modules from landing under `newsletter/`.
 - Deprecated path usage tracked by grep:
   - `rg "newsletter\\.api|newsletter\\.(collect|summarize|compose|deliver)" -n`
 - Before `N+3` cut:

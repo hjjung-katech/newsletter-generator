@@ -289,12 +289,15 @@ pytest --cov=newsletter tests/
 
 ### 테스트 작성 가이드
 
+> 경계 정책: 신규 런타임 기능은 `newsletter_core/` 아래에 추가합니다.
+> `newsletter/` 는 기존 호환 surface 회귀 방지와 단계적 제거 범위에서만 유지합니다.
+
 #### 단위 테스트 예시
 
 ```python
 import pytest
 from unittest.mock import Mock, patch
-from newsletter.compose import compose_newsletter
+from newsletter_core.application.generation.compose import compose_newsletter
 
 class TestComposeNewsletter:
     """뉴스레터 조합 함수 테스트."""
@@ -330,6 +333,9 @@ class TestComposeNewsletter:
 ```
 
 #### API 테스트 예시
+
+신규 기능 테스트는 가능하면 `newsletter_core.public.*` 또는 `newsletter_core.application.*`
+를 직접 대상으로 잡고, `newsletter/` import는 기존 호환 계약을 잠그는 경우에만 사용합니다.
 
 ```python
 import pytest
