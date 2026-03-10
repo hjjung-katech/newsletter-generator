@@ -15,7 +15,6 @@ docs/setup/WINDOWS_EXE_UPDATE_CHANNEL.md
 newsletter/compat_env.py
 newsletter/utils/subprocess_utils.py
 scripts/devtools/pyinstaller_hooks/hook-newsletter.py
-requirements-minimal.txt
 web/binary_compatibility.py
 web/path_manager.py
 web/runtime_hook.py

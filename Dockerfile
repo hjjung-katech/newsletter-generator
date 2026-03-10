@@ -1,33 +1,26 @@
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
 COPY requirements.txt .
 COPY web/requirements.txt ./web/
 
-# Install Python dependencies
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 RUN pip install -r web/requirements.txt
 
-# Copy application code
 COPY . .
 
-# Set Python path
-ENV PYTHONPATH=/app:/app/web
+ENV PYTHONPATH=/app
+ENV PORT=8000
+ENV WEB_CONCURRENCY=2
 
-# Create storage directory
-RUN mkdir -p /app/web/storage
+RUN mkdir -p /app/.local/state/web
 
-# Expose port
-EXPOSE $PORT
+EXPOSE 8000
 
-# Default command (can be overridden)
-CMD ["sh", "-c", "cd web && gunicorn --bind 0.0.0.0:$PORT app:app"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 300 web.app:app"]

@@ -38,7 +38,8 @@ def test_support_policy_freezes_option_b_contract() -> None:
         "2026-06-30",
         "3.13 | experimental source-only",
         "PyPI는 정식 end-user 릴리즈 채널이 아니다",
-        "promoted Docker image는 아직 정식 릴리즈 artifact가 아니다",
+        "canonical packaging target은 Dockerfile 기반 Linux container image",
+        "promoted Docker image release lane은 아직 운영하지 않는다",
     ]
 
     for phrase in required_phrases:
@@ -53,7 +54,9 @@ def test_support_policy_documents_canonical_artifacts_and_entrypoints() -> None:
         "`python -m newsletter ...`",
         "`dist/newsletter_web.exe`",
         "`release-metadata.json`",
+        "`SHA256SUMS.txt`",
         "`support-bundle.zip`",
+        "wheel/sdist",
         "Windows desktop 배포",
         "Linux server 운영",
     ]
@@ -130,3 +133,4 @@ def test_installation_docs_do_not_claim_unshipped_release_channels() -> None:
 
     assert "PyPI 패키지 (정식 릴리즈 채널 아님)" in installation
     assert "Docker 이미지 (정식 릴리즈 artifact 아님)" in installation
+    assert "Dockerfile`이 canonical container packaging target" in installation
