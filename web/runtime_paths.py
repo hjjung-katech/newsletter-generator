@@ -26,6 +26,12 @@ def _web_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
+def _project_root() -> Path:
+    if _is_frozen():
+        return _bundle_root()
+    return _web_dir().parent
+
+
 def _first_existing_dir(candidates: Iterable[Path]) -> Path:
     candidate_list = list(candidates)
     for candidate in candidate_list:
@@ -73,13 +79,11 @@ def resolve_static_dir() -> str:
 def resolve_database_path() -> str:
     if _is_frozen():
         return str(Path(sys.executable).resolve().parent / "storage.db")
-    return str(_web_dir() / "storage.db")
+    return str(_project_root() / ".local" / "state" / "web" / "storage.db")
 
 
 def resolve_project_root() -> str:
-    if _is_frozen():
-        return str(_bundle_root())
-    return str(_web_dir().parent)
+    return str(_project_root())
 
 
 def resolve_env_file_path() -> str:

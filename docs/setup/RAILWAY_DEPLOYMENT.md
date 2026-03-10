@@ -139,6 +139,10 @@ services:
 ## 파일 구조
 ```
 project/
+├── .local/
+│   └── state/
+│       └── web/
+│           └── storage.db      # SQLite 데이터베이스
 ├── web/
 │   ├── app.py              # Flask 메인 애플리케이션
 │   ├── worker.py           # RQ 워커 (프로덕션용)
@@ -146,7 +150,6 @@ project/
 │   ├── tasks.py            # 백그라운드 작업 정의
 │   ├── mail.py             # 이메일 발송 모듈
 │   ├── init_database.py    # DB 초기화
-│   ├── storage.db          # SQLite 데이터베이스
 │   └── requirements.txt    # Python 의존성
 ├── nixpacks.toml           # Nixpacks 빌드 설정
 ├── railway.yml             # Railway 서비스 정의

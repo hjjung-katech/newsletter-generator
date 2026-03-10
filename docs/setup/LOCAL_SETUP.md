@@ -209,12 +209,14 @@ newsletter-generator/
 │   ├── intermediate_processing/  # 중간 처리 파일
 │   ├── email_tests/            # 이메일 테스트 결과
 │   └── test_results/           # 테스트 결과
-├── .local/                     # 로컬 scratch 산출물
+├── .local/                     # 로컬 scratch/state 산출물
 │   ├── coverage/               # coverage 리포트/데이터
 │   ├── artifacts/              # repo audit, Windows burn-in 등 점검 산출물
-│   └── debug_files/            # 디버그 파일 (자동 생성)
+│   ├── debug_files/            # 디버그 파일 (자동 생성)
+│   └── state/
+│       └── web/
+│           └── storage.db      # 개발 모드 웹 데이터베이스 (자동 생성)
 └── web/
-    ├── storage.db              # 웹앱 데이터베이스 (자동 생성)
     ├── app.py                  # 메인 웹 애플리케이션
     ├── worker.py               # 백그라운드 워커 (선택사항)
     ├── schedule_runner.py      # 스케줄러 (선택사항)
@@ -239,7 +241,7 @@ python apps/web/main.py
 
 ### 데이터베이스 백업
 ```bash
-cp web/storage.db web/storage.db.backup_$(date +%Y%m%d_%H%M%S)
+cp .local/state/web/storage.db .local/state/web/storage.db.backup_$(date +%Y%m%d_%H%M%S)
 ```
 
 ### 데이터베이스 재설정
@@ -250,7 +252,7 @@ python web/init_database.py --force
 ### 히스토리 정리 (선택사항)
 ```bash
 # SQLite 명령어로 직접 정리
-sqlite3 storage.db "DELETE FROM history WHERE created_at < datetime('now', '-30 days');"
+sqlite3 .local/state/web/storage.db "DELETE FROM history WHERE created_at < datetime('now', '-30 days');"
 ```
 
 ## 12. 디버그 파일 정리
@@ -280,7 +282,7 @@ make clean-venv     # .local/venv 및 legacy .venv 제거
 ### 데이터베이스 관련 오류
 ```bash
 # 데이터베이스 재생성
-rm -f web/storage.db
+rm -f .local/state/web/storage.db
 python web/init_database.py
 ```
 

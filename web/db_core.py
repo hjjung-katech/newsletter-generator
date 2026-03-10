@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 
 _APPROVAL_STATUS_NOT_REQUESTED = "not_requested"
 _DELIVERY_STATUS_DRAFT = "draft"
@@ -196,8 +197,20 @@ def _ensure_database_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _ensure_database_parent_dir(db_path: str) -> None:
+    if db_path in {"", ":memory:"} or db_path.startswith("file:"):
+        return
+
+    parent_dir = Path(db_path).expanduser().parent
+    if str(parent_dir) in {"", "."}:
+        return
+
+    parent_dir.mkdir(parents=True, exist_ok=True)
+
+
 def ensure_database_schema(db_path: str) -> None:
     """Run additive DB migrations and ensure runtime schema is complete."""
+    _ensure_database_parent_dir(db_path)
     conn = sqlite3.connect(db_path)
     try:
         _ensure_database_schema(conn)
@@ -207,6 +220,7 @@ def ensure_database_schema(db_path: str) -> None:
 
 def connect_db(db_path: str) -> sqlite3.Connection:
     """Return a connection after ensuring the additive runtime schema."""
+    _ensure_database_parent_dir(db_path)
     conn = sqlite3.connect(db_path)
     _ensure_database_schema(conn)
     return conn
