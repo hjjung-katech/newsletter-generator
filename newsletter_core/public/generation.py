@@ -5,12 +5,12 @@ from __future__ import annotations
 import re
 from contextlib import nullcontext
 from dataclasses import dataclass
+from importlib import import_module
 from typing import Any, Dict, List, Optional, TypedDict, Union
 from unittest.mock import patch
 
 from langchain.tools import tool
 
-from newsletter import graph, tools
 from newsletter_core.public.source_policies import filter_articles_by_source_policies
 
 
@@ -43,6 +43,35 @@ class GenerateNewsletterRequest:
     suggest_count: int = 10
     source_allowlist: Optional[List[str]] = None
     source_blocklist: Optional[List[str]] = None
+
+
+class _LazyModuleProxy:
+    def __init__(self, module_name: str) -> None:
+        object.__setattr__(self, "_module_name", module_name)
+        object.__setattr__(self, "_module", None)
+
+    def _resolve(self) -> Any:
+        module = object.__getattribute__(self, "_module")
+        if module is None:
+            module = import_module(object.__getattribute__(self, "_module_name"))
+            object.__setattr__(self, "_module", module)
+        return module
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._resolve(), name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(self._resolve(), name, value)
+
+    def __delattr__(self, name: str) -> None:
+        delattr(self._resolve(), name)
+
+    def __repr__(self) -> str:
+        return f"<LazyModuleProxy {object.__getattribute__(self, '_module_name')}>"
+
+
+graph = _LazyModuleProxy("newsletter.graph")
+tools = _LazyModuleProxy("newsletter.tools")
 
 
 def _normalize_keywords(raw: Optional[Union[str, List[str]]]) -> List[str]:

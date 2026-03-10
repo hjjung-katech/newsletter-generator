@@ -1,7 +1,10 @@
 # flake8: noqa
-"""
-Newsletter Generator Web Service
-Flask application that provides web interface for the CLI newsletter generator
+"""Newsletter Generator web runtime entrypoint.
+
+This module keeps import-time behavior side-effect free. Heavy runtime setup
+such as DB schema creation, Sentry initialization, Redis queue wiring, and CLI
+adapter creation is deferred until the Flask app is created or lazily resolved
+by request handlers.
 """
 
 from __future__ import annotations
@@ -9,26 +12,15 @@ from __future__ import annotations
 import logging
 import os
 import platform
-import sys
-from pathlib import Path
+from collections.abc import Callable
 from typing import Any, cast
 
 import redis
 from flask import Flask, render_template
 
-WEB_DIR = Path(__file__).resolve().parent
-if str(WEB_DIR) not in sys.path:
-    sys.path.insert(0, str(WEB_DIR))
-
-if __package__ in {None, ""}:
-    REPO_ROOT = Path(__file__).resolve().parents[1]
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
-
 from newsletter_core.public.settings import get_setting_value
 from web.access_control import configure_access_control
 from web.cors_config import configure_cors
-from web.db_state import ensure_database_schema
 from web.newsletter_clients import create_newsletter_cli
 from web.ops_logging import log_exception, log_info, log_warning
 from web.routes_analytics import register_analytics_routes
@@ -50,15 +42,15 @@ from web.runtime_paths import (
 from web.sentry_integration import setup_sentry
 from web.suggest import bp as suggest_bp
 
-_set_sentry_user_context, _set_sentry_tags = setup_sentry()
-
 QUEUE_NAME = str(get_setting_value("RQ_QUEUE", "default"))
 DATABASE_PATH = resolve_database_path()
-newsletter_cli = create_newsletter_cli()
+
+newsletter_cli: Any = None
 redis_conn: Any = None
 task_queue: Any = None
 in_memory_tasks: dict[str, dict[str, Any]] = {}
 logger = logging.getLogger("web.app")
+_cached_app: Flask | None = None
 
 
 def _configure_logging() -> logging.Logger:
@@ -95,14 +87,38 @@ def _create_task_queue(app: Flask) -> tuple[Any, Any]:
             redis_url=redis_url,
         )
         return connected_redis, queue
-    except Exception as e:
+    except Exception as exc:
         log_exception(
             logger,
             "app.redis.connection_failed",
-            e,
+            exc,
             redis_url=redis_url,
         )
         return None, None
+
+
+def _resolve_newsletter_cli() -> Any:
+    global newsletter_cli
+    if newsletter_cli is None:
+        newsletter_cli = create_newsletter_cli()
+    return newsletter_cli
+
+
+def _resolve_queue_dependencies(app: Flask) -> tuple[Any, Any]:
+    global redis_conn, task_queue
+    if app.config.get("TESTING", False):
+        return redis_conn, task_queue
+    if redis_conn is None and task_queue is None:
+        redis_conn, task_queue = _create_task_queue(app)
+    return redis_conn, task_queue
+
+
+def _resolve_redis_conn(app: Flask) -> Any:
+    return _resolve_queue_dependencies(app)[0]
+
+
+def _resolve_task_queue(app: Flask) -> Any:
+    return _resolve_queue_dependencies(app)[1]
 
 
 def _register_index_route(app: Flask) -> None:
@@ -111,17 +127,18 @@ def _register_index_route(app: Flask) -> None:
         """Main dashboard page."""
         try:
             return cast(str, render_template("index.html"))
-        except Exception as e:
-            template_path = os.path.join(app.template_folder, "index.html")
+        except Exception as exc:
+            template_folder = app.template_folder or ""
+            template_path = os.path.join(template_folder, "index.html")
             log_exception(
                 logger,
                 "app.template.render_failed",
-                e,
+                exc,
                 template_folder=app.template_folder,
                 template_path=template_path,
                 template_exists=os.path.exists(template_path),
             )
-            return f"Template error: {str(e)}", 500
+            return f"Template error: {str(exc)}", 500
 
 
 def _register_routes(app: Flask) -> None:
@@ -132,13 +149,17 @@ def _register_routes(app: Flask) -> None:
         in_memory_tasks=in_memory_tasks,
         task_queue=task_queue,
         redis_conn=redis_conn,
-        get_newsletter_cli=lambda: newsletter_cli,
+        get_newsletter_cli=_resolve_newsletter_cli,
+        get_task_queue=lambda: _resolve_task_queue(app),
+        get_redis_conn=lambda: _resolve_redis_conn(app),
     )
     register_health_route(
         app=app,
         database_path=DATABASE_PATH,
         redis_conn=redis_conn,
         newsletter_cli=newsletter_cli,
+        get_redis_conn=lambda: _resolve_redis_conn(app),
+        get_newsletter_cli=_resolve_newsletter_cli,
     )
     register_ops_routes(app, DATABASE_PATH)
     register_send_email_route(app, DATABASE_PATH)
@@ -153,9 +174,10 @@ def _register_routes(app: Flask) -> None:
 
 
 def create_app() -> Flask:
-    global logger, redis_conn, task_queue
+    global logger
 
     logger = _configure_logging()
+    setup_sentry()
 
     app = Flask(
         __name__,
@@ -178,14 +200,40 @@ def create_app() -> Flask:
         database_path=DATABASE_PATH,
     )
 
-    ensure_database_schema(DATABASE_PATH)
-    redis_conn, task_queue = _create_task_queue(app)
     _register_index_route(app)
     _register_routes(app)
     return app
 
 
-app = create_app()
+def get_app() -> Flask:
+    global _cached_app
+    if _cached_app is None:
+        _cached_app = create_app()
+    return _cached_app
+
+
+class _LazyFlaskApp:
+    def __init__(self, app_getter: Callable[[], Flask]) -> None:
+        object.__setattr__(self, "_app_getter", app_getter)
+
+    def _app(self) -> Flask:
+        getter = object.__getattribute__(self, "_app_getter")
+        return getter()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._app(), name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(self._app(), name, value)
+
+    def __call__(self, environ: Any, start_response: Any) -> Any:
+        return self._app()(environ, start_response)
+
+    def __repr__(self) -> str:
+        return "<LazyFlaskApp proxy for web.app.get_app()>"
+
+
+app = _LazyFlaskApp(get_app)
 
 
 def _resolve_app_env() -> str:
@@ -196,8 +244,9 @@ def main() -> None:
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     debug = _resolve_app_env() == "development"
+    flask_app = get_app()
     log_info(logger, "app.starting", host=host, port=port, debug=debug)
-    app.run(host=host, port=port, debug=debug)
+    flask_app.run(host=host, port=port, debug=debug)
 
 
 if __name__ == "__main__":

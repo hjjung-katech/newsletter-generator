@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -16,8 +17,22 @@ def register_health_route(
     database_path: str,
     redis_conn: Any,
     newsletter_cli: Any,
+    get_redis_conn: Callable[[], Any] | None = None,
+    get_newsletter_cli: Callable[[], Any] | None = None,
 ) -> None:
     """Register health route on the given Flask app."""
+
+    def resolve_redis_conn() -> Any:
+        if get_redis_conn is None:
+            return redis_conn
+        resolved = get_redis_conn()
+        return resolved if resolved is not None else redis_conn
+
+    def resolve_newsletter_cli() -> Any:
+        if get_newsletter_cli is None:
+            return newsletter_cli
+        resolved = get_newsletter_cli()
+        return resolved if resolved is not None else newsletter_cli
 
     @app.route("/health")  # type: ignore[untyped-decorator]
     def health_check() -> ResponseReturnValue:
@@ -33,8 +48,9 @@ def register_health_route(
         overall_status = "healthy"
 
         try:
-            if redis_conn:
-                redis_conn.ping()
+            active_redis_conn = resolve_redis_conn()
+            if active_redis_conn:
+                active_redis_conn.ping()
                 deps["redis"] = {"status": "connected", "message": "Redis is healthy"}
             else:
                 deps["redis"] = {
@@ -102,7 +118,7 @@ def register_health_route(
         }
 
         try:
-            cli_type = type(newsletter_cli).__name__
+            cli_type = type(resolve_newsletter_cli()).__name__
             deps["newsletter_cli"] = {
                 "status": "healthy",
                 "type": cli_type,

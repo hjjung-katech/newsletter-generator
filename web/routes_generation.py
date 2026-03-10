@@ -12,7 +12,11 @@ from datetime import datetime
 from typing import Any, Callable
 
 from flask import Flask, jsonify, request
-from tasks import generate_newsletter_task
+
+try:
+    from tasks import generate_newsletter_task
+except ImportError:
+    from web.tasks import generate_newsletter_task  # pragma: no cover
 
 try:
     from db_state import (
@@ -203,6 +207,8 @@ def register_generation_routes(
     real_cli_class: type = RealNewsletterCLI,
     mock_cli_class: type = MockNewsletterCLI,
     get_newsletter_cli: Callable[[], Any] | None = None,
+    get_task_queue: Callable[[], Any] | None = None,
+    get_redis_conn: Callable[[], Any] | None = None,
 ) -> None:
     """Register generation, status, history, and scheduling routes."""
 
@@ -216,6 +222,18 @@ def register_generation_routes(
             return newsletter_cli
         resolved = get_newsletter_cli()
         return resolved if resolved is not None else newsletter_cli
+
+    def resolve_task_queue() -> Any:
+        if get_task_queue is None:
+            return task_queue
+        resolved = get_task_queue()
+        return resolved if resolved is not None else task_queue
+
+    def resolve_redis_conn() -> Any:
+        if get_redis_conn is None:
+            return redis_conn
+        resolved = get_redis_conn()
+        return resolved if resolved is not None else redis_conn
 
     def _serialize_schedule_timestamp(value: str | None) -> str | None:
         if not value:
@@ -310,7 +328,7 @@ def register_generation_routes(
                 send_email=send_email,
                 database_path=DATABASE_PATH,
                 in_memory_tasks=in_memory_tasks,
-                task_queue=task_queue,
+                task_queue=resolve_task_queue(),
                 run_in_memory_job=run_in_memory_job,
             )
             return (
@@ -859,8 +877,11 @@ def register_generation_routes(
         )
 
     def _dispatch_schedule_run(resolution: ScheduleRunResolution) -> dict[str, Any]:
-        if redis_conn and task_queue:
-            job = task_queue.enqueue(
+        active_redis_conn = resolve_redis_conn()
+        active_task_queue = resolve_task_queue()
+
+        if active_redis_conn and active_task_queue:
+            job = active_task_queue.enqueue(
                 generate_newsletter_task,
                 resolution.params,
                 resolution.immediate_job_id,
