@@ -6,9 +6,10 @@
 
 1. `main-ci.yml`
 - 목적: 코드 품질, 테스트, 빌드 검증의 메인 CI 파이프라인
-- 트리거: `push`(main/develop/feature/feat/fix/chore/docs/refactor/release/codex), `pull_request`(main/develop)
+- 트리거: `push`(main/develop/release/**), `pull_request`(main/develop)
 - 참고: PR 정책 검증은 `pr-policy-check.yml`에서 수행
-- 필수 체크 권고: `Build Check (windows-latest)`를 branch protection required check로 고정
+- 주요 PR gate: `Release Preflight`, `Source Smoke (macos-latest)`, `Source Smoke (windows-latest)`, `Container Smoke (ubuntu-latest)`, `Build Check (windows-latest)`
+- 참고: branch protection required check 구성 자체는 별도 관리자 설정 범위이며, 이 문서는 workflow truth만 설명합니다.
 
 2. `deployment.yml`
 - 목적: 배포 파이프라인 (Railway + Pages 병행)
@@ -39,6 +40,7 @@
 - 위 7개만 운영 워크플로우로 유지합니다.
 - 중복/레거시 워크플로우 파일은 저장소에 두지 않습니다.
 - 변경 시 이 문서와 실제 파일 목록을 항상 1:1로 맞춥니다.
+- `main-ci.yml`은 PR gate와 long gate를 같이 담지만, contributor-facing canonical command는 `python -m scripts.devtools.dev_entrypoint ...`를 유지합니다.
 
 ## CI Flake Retry Policy
 

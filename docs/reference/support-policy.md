@@ -14,15 +14,15 @@
 - macOS는 2차 지원이며 source-based development와 smoke 중심이다.
 - contributor-facing canonical entrypoint는 `python -m scripts.devtools.dev_entrypoint`다.
 - Makefile과 shell script는 현재 contributor automation wrapper로 남아 있지만, 아키텍처 계약의 정본은 아니다.
-- CI coverage는 이 문서의 지원 계약과 동일하지 않다. 현재 자동 검증 수준은 아래 표에 사실대로 적고, parity 확장은 후속 PR 범위다.
+- CI gate는 이 문서의 지원 계약을 비대칭적으로 집행한다. Linux는 full unit/package/container 검증, Windows는 source smoke + EXE release surface, macOS는 source smoke + runtime subset을 기준으로 유지한다.
 
 ## OS Support Contract
 
-| OS | 지원 등급 | source 개발 | 현재 자동 검증(main@5ca08544) | production server | native bundle | 비고 |
+| OS | 지원 등급 | source 개발 | 현재 자동 검증 | production server | native bundle | 비고 |
 |---|---|---|---|---|---|---|
-| Linux | 1차 지원 | 정식 지원 | Ubuntu 기반 unit/mock/integration + package build | canonical | 비정본 | canonical packaging target은 Dockerfile 기반 Linux container image이며, 현재 repo-managed promoted release channel은 Railway/Nixpacks source deploy |
-| Windows | 1차 지원 | 정식 지원 | PyInstaller build + EXE smoke + release artifact validation | 비정본 | canonical | source 개발은 정식 지원이지만 dedicated CI parity는 아직 미완료 |
-| macOS | 2차 지원 | source/smoke 중심 | dedicated CI 없음 | 비정본 | 미지원 | source-based development와 수동 smoke를 우선 |
+| Linux | 1차 지원 | 정식 지원 | unit (py3.11/3.12) + release preflight + manifest inventory + packaging truth + source smoke + container smoke + mock/integration push gate | canonical | 비정본 | canonical packaging target은 Dockerfile 기반 Linux container image이며, 현재 repo-managed promoted release channel은 Railway/Nixpacks source deploy |
+| Windows | 1차 지원 | 정식 지원 | source smoke + runtime subset + PyInstaller build + EXE smoke + release artifact validation | 비정본 | canonical | source 개발과 native desktop release surface를 같은 CI 파이프라인에서 검증한다 |
+| macOS | 2차 지원 | source/smoke 중심 | source smoke + runtime subset | 비정본 | 미지원 | native packaging은 추가하지 않고 source-based development parity만 유지 |
 
 ## Python Version Policy
 

@@ -40,9 +40,16 @@
 
 ## Current Verification Truth
 
-- Linux: `main-ci.yml`에서 Ubuntu 기반 unit/mock/integration/package build가 실행됩니다. canonical packaging target인 Dockerfile container image는 별도 packaging validation 대상으로 관리하며, promoted Docker image publish lane은 아직 운영하지 않습니다.
-- Windows: `main-ci.yml`에서 PyInstaller build, EXE smoke, release artifact validation이 실행됩니다.
-- macOS: 2026-03-10 기준 dedicated CI가 없습니다. 지원 계약은 `support-policy.md`에 따르되, CI parity 확장은 후속 PR 범위입니다.
+- PR gate:
+  - Linux: Ubuntu `unit-tests`(py3.11/3.12), `Release Preflight`, `Source Smoke (ubuntu-latest)`, `Build Check (ubuntu-latest)`, `Container Smoke (ubuntu-latest)`, `Mock API Tests`
+  - Windows: `Source Smoke (windows-latest)`, `Build Check (windows-latest)`
+  - macOS: `Source Smoke (macos-latest)`
+- long gate (`push` to `main`/`develop`/`release/**`):
+  - Linux: PR gate + `Integration Tests`
+  - Windows: PR gate + `Windows Burn-in Gate (main)` on `main` push
+- Linux container smoke는 canonical packaging target을 실제로 검증하지만, promoted Docker image publish lane 자체를 의미하지는 않습니다.
+- Windows source smoke + runtime subset은 EXE build-check를 대체하지 않고, source development 1차 지원 계약을 별도 집행합니다.
+- macOS source smoke + runtime subset은 source-based development/smoke 중심의 2차 지원 계약만 집행합니다.
 
 ## Local Gate Commands
 
@@ -54,12 +61,14 @@ python -m scripts.devtools.dev_entrypoint bootstrap
 python -m scripts.devtools.dev_entrypoint doctor
 python -m scripts.devtools.dev_entrypoint check
 python -m scripts.devtools.dev_entrypoint check --full
+python -m scripts.devtools.dev_entrypoint smoke web
 make repo-audit
 make repo-audit-strict
 ```
 
 - `python -m scripts.devtools.dev_entrypoint check`: 빠른 로컬 게이트
 - `python -m scripts.devtools.dev_entrypoint check --full`: PR 전 전체 게이트
+- `python -m scripts.devtools.dev_entrypoint smoke web`: cross-platform source web smoke
 - `make repo-audit`: 루트 인벤토리 + repo hygiene soft gate 리포트 생성
 - `make repo-audit-strict`: CI hard gate와 동일(strict) 경로 점검
 - dev 유틸 실행 스크립트는 `scripts/devtools/`를 기본 경로로 사용합니다.
@@ -88,6 +97,31 @@ make repo-audit-strict
 - 현재 contributor gate는 "고정 퍼센트 임계치" 문서보다 `python -m scripts.devtools.dev_entrypoint check --full` 통과와 테스트 리포트 정합성을 우선 기준으로 사용합니다.
 - 커버리지 개선 작업은 별도 RR/PR 단위로 분리합니다.
 - repo audit, coverage, debug 같은 로컬 scratch 산출물은 기본적으로 루트 `.local/` 아래에 격리합니다.
+
+## CI Gate Split
+
+### PR Gate
+
+- `Code Quality & Security`
+- `Unit Tests - ubuntu-latest-py3.11`
+- `Unit Tests - ubuntu-latest-py3.12`
+- `Release Preflight`
+- `Source Smoke (ubuntu-latest)`
+- `Source Smoke (macos-latest)`
+- `Source Smoke (windows-latest)`
+- `Mock API Tests`
+- `Build Check (ubuntu-latest)`
+- `Build Check (windows-latest)`
+- `Container Smoke (ubuntu-latest)`
+
+### Long Gate
+
+- `Integration Tests`
+  - `push` to `main`/`develop`에서만 실행합니다.
+- `Windows Burn-in Gate (main)`
+  - `main` push에서만 실행합니다.
+
+PR gate는 빠르고 결정적인 계약 검증에 집중하고, long gate는 장시간 시나리오와 main branch burn-in을 맡습니다.
 
 ## Repo Hygiene Gate
 

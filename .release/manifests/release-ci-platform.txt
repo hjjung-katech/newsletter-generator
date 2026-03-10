@@ -4,12 +4,15 @@
 .github/workflows/rr-lifecycle-close.yml
 .github/workflows/security-scan.yml
 .pre-commit-config.yaml
+.github/PULL_REQUEST_TEMPLATE/release_integration.md
+docs/dev/CI_CD_GUIDE.md
 docs/dev/LOCAL_CI_GUIDE.md
 Makefile
+scripts/devtools/dev_entrypoint.py
 scripts/devtools/check_quality.py
+scripts/devtools/web_health_smoke.py
 run_ci_checks.py
 requirements-dev.txt
-.github/PULL_REQUEST_TEMPLATE/release_integration.md
 .release/baseline.json
 .release/manifests/release-ci-platform.txt
 .release/reviewer_roles.json
@@ -18,3 +21,6 @@ scripts/devtools/hooks/pre-push
 scripts/devtools/setup_pre_push_hook.sh
 scripts/release_preflight.py
 scripts/validate_release_manifest.py
+tests/contract/test_ci_workflow_truth.py
+tests/unit_tests/test_dev_entrypoint.py
+tests/unit_tests/test_web_health_smoke.py
