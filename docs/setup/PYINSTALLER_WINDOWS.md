@@ -16,8 +16,8 @@ git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
 
 # 가상환경 생성 및 활성화
-python -m venv .venv
-.\.venv\Scripts\activate
+python -m venv .local\venv
+.\.local\venv\Scripts\activate
 
 # 필요한 패키지 설치
 pip install -r requirements.txt
