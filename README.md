@@ -35,8 +35,8 @@ Experimental FastAPI entrypoint uses a separate sample at
 
 ```bash
 python web/init_database.py
-python apps/web/main.py
-python apps/cli/main.py run --keywords "AI"
+python -m web.app
+python -m newsletter run --keywords "AI"
 ```
 
 웹 실행/CLI/배포 절차는 아래 정본 문서를 사용하세요.

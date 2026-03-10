@@ -11,6 +11,7 @@
 - Week 11 반영: 루트 `config.yml`을 `config/config.yml`로 이관
 - Week 18 반영: 로컬 scratch 산출물 기본 경로를 루트 `.local/`로 정규화
 - Week 19 반영: 로컬 가상환경 canonical 경로를 `.local/venv/`로 정규화, cache cleanup target 분리
+- Week 20 반영: canonical runtime entrypoint를 `python -m ...` 모듈 실행으로 정규화, `apps/`는 `experimental/`만 유지
 
 ## Scope
 
@@ -29,7 +30,7 @@
 | `setup.cfg`, `setup.py` | 제거 완료 | `pyproject.toml` 단일 경로 | 패키징 설정 중복 제거 |
 | `run_ci_checks.py` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 |
 | `.github/`, `.release/`, `docs/`, `scripts/`, `newsletter/`, `newsletter_core/`, `web/`, `tests/` | 유지 | 루트 유지 | 핵심 운영/도메인 디렉터리 |
-| `apps/` | 유지(과도기) | 루트 유지 | 엔트리포인트 경로 정리 전까지 호환 유지 |
+| `apps/` | 유지 | `apps/experimental/`만 유지 | FastAPI 실험 런타임 전용 경계 |
 | `templates/` | 이관 완료 | `newsletter/templates/` | 패키지 상대 경로 템플릿 자산으로 정규화 |
 | `config/` | 유지 | 런타임 설정 전용 디렉터리 | `config/config.yml`, `config/config.example.yml` 단일 정본 유지 |
 | `pyinstaller_hooks/` | 이관 완료 | `scripts/devtools/pyinstaller_hooks/` | 빌드 유틸 범주로 통합 |

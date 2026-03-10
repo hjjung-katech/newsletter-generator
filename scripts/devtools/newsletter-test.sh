@@ -37,4 +37,4 @@ if [ "$#" -eq 0 ]; then
 fi
 
 echo "Running newsletter test with data file: $1"
-python apps/cli/main.py test "$@"
+python -m newsletter test "$@"

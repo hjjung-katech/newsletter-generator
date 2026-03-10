@@ -91,7 +91,7 @@ python web/init_database.py --verify-only
 
 ```bash
 # 웹 애플리케이션만 실행 (권장)
-python apps/web/main.py
+python -m web.app
 ```
 
 웹 서버가 시작되면:
@@ -155,23 +155,23 @@ redis-server
 
 #### 2단계: 백그라운드 워커 실행 (별도 터미널)
 ```bash
-python apps/worker/main.py
+python -m web.worker
 ```
 
 #### 3단계: 스케줄러 실행 (별도 터미널, 선택사항)
 ```bash
-python apps/scheduler/main.py
+python -m web.schedule_runner
 ```
 
 #### 4단계: 웹 애플리케이션 실행
 ```bash
-python apps/web/main.py
+python -m web.app
 ```
 
 ## 7. 실행 모드별 특징
 
 ### 단독 실행 모드 (기본, 권장)
-- **명령어**: `python apps/web/main.py`
+- **명령어**: `python -m web.app`
 - **특징**:
   - Redis 불필요
   - 즉시 실행 가능
@@ -179,7 +179,7 @@ python apps/web/main.py
   - Windows에서 자동으로 적용됨
 
 ### Redis + 워커 모드 (고급)
-- **명령어**: Redis + `python apps/worker/main.py` + `python apps/web/main.py`
+- **명령어**: Redis + `python -m web.worker` + `python -m web.app`
 - **특징**:
   - Redis 서버 필요
   - 백그라운드 작업을 별도 프로세스로 처리
@@ -228,12 +228,12 @@ newsletter-generator/
 ### CLI 모드
 ```bash
 # 뉴스레터 생성
-python apps/cli/main.py run --keywords "AI,반도체" --to "your@email.com"
+python -m newsletter run --keywords "AI,반도체" --to "your@email.com"
 ```
 
 ### 웹 애플리케이션 모드
 ```bash
-python apps/web/main.py
+python -m web.app
 # 브라우저에서 http://localhost:8000 접속
 ```
 
@@ -342,21 +342,21 @@ redis-server
 ### 웹 서버 포트 충돌
 ```bash
 # 다른 포트로 실행
-PORT=8001 python apps/web/main.py
+PORT=8001 python -m web.app
 ```
 
 ## 추가 팁
 
 ### 개발 중 자동 재로드
 ```bash
-# canonical web wrapper에서 개발 모드 실행
-APP_ENV=development python apps/web/main.py
+# canonical web module에서 개발 모드 실행
+APP_ENV=development python -m web.app
 ```
 
 ### 로그 레벨 조정
 ```bash
 # 상세한 로그 확인
-LOG_LEVEL=DEBUG python apps/web/main.py
+LOG_LEVEL=DEBUG python -m web.app
 ```
 
 ### API 테스트

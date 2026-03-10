@@ -43,7 +43,7 @@ EMAIL_SENDER=newsletter@example.com
 
 ```bash
 python web/init_database.py
-python apps/web/main.py
+python -m web.app
 ```
 
 브라우저: `http://localhost:8000`

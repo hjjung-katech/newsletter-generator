@@ -188,8 +188,17 @@ def create_app() -> Flask:
 app = create_app()
 
 
+def _resolve_app_env() -> str:
+    return os.getenv("APP_ENV") or os.getenv("FLASK_ENV") or "production"
+
+
+def main() -> None:
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    debug = _resolve_app_env() == "development"
+    log_info(logger, "app.starting", host=host, port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug)
+
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    debug = os.environ.get("FLASK_ENV") == "development"
-    log_info(logger, "app.starting", port=port, debug=debug)
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    main()
