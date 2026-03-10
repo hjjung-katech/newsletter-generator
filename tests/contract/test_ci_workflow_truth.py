@@ -51,14 +51,25 @@ def test_active_docs_describe_ci_gate_split_truthfully() -> None:
     workflow_readme = _read_text(".github/workflows/README.md")
 
     for text in (ci_guide, workflow_readme):
+        assert "policy-check" in text
+        assert "docs-quality" in text
+        assert "Code Quality & Security" in text
+        assert "Unit Tests - ubuntu-latest-py3.11" in text
+        assert "Unit Tests - ubuntu-latest-py3.12" in text
         assert "Release Preflight" in text
+        assert "Source Smoke (ubuntu-latest)" in text
         assert "Source Smoke (macos-latest)" in text
         assert "Source Smoke (windows-latest)" in text
+        assert "Build Check (ubuntu-latest)" in text
+        assert "Build Check (windows-latest)" in text
         assert "Container Smoke (ubuntu-latest)" in text
 
     assert "macOS source smoke + runtime subset" in ci_guide
     assert "Windows source smoke + runtime subset" in ci_guide
     assert "Linux container smoke" in ci_guide
+    assert "Mock API Tests" in ci_guide
+    assert "branch protection required check" in ci_guide
+    assert "branch protection required check" in support_policy
     assert (
         "macOS | 2차 지원 | source/smoke 중심 | source smoke + runtime subset"
         in support_policy

@@ -8,8 +8,12 @@
 - 목적: 코드 품질, 테스트, 빌드 검증의 메인 CI 파이프라인
 - 트리거: `push`(main/develop/release/**), `pull_request`(main/develop)
 - 참고: PR 정책 검증은 `pr-policy-check.yml`에서 수행
-- 주요 PR gate: `Release Preflight`, `Source Smoke (macos-latest)`, `Source Smoke (windows-latest)`, `Container Smoke (ubuntu-latest)`, `Build Check (windows-latest)`
-- 참고: branch protection required check 구성 자체는 별도 관리자 설정 범위이며, 이 문서는 workflow truth만 설명합니다.
+- 현재 `main` branch protection required checks:
+  - `policy-check`, `docs-quality`, `Code Quality & Security`, `Release Preflight`
+  - `Unit Tests - ubuntu-latest-py3.11`, `Unit Tests - ubuntu-latest-py3.12`
+  - `Source Smoke (ubuntu-latest)`, `Source Smoke (macos-latest)`, `Source Smoke (windows-latest)`
+  - `Build Check (ubuntu-latest)`, `Build Check (windows-latest)`, `Container Smoke (ubuntu-latest)`
+- 추가 PR validation: `Mock API Tests`
 
 2. `deployment.yml`
 - 목적: 배포 파이프라인 (Railway + Pages 병행)
