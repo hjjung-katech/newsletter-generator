@@ -3,7 +3,7 @@ version: "3"
 services:
   web:
     source: .
-    start: cd web && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 app:app
+    start: gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 300 web.app:app
     variables:
       PYTHONPATH: /app
       WEB_CONCURRENCY: 2
@@ -15,7 +15,7 @@ services:
 
   worker:
     source: .
-    start: cd web && python worker.py
+    start: python -m web.worker
     variables:
       PYTHONPATH: /app
       RQ_QUEUE: default
@@ -24,7 +24,7 @@ services:
 
   scheduler:
     source: .
-    start: cd web && python schedule_runner.py --interval 300
+    start: python -m web.schedule_runner --interval 300
     variables:
       PYTHONPATH: /app
     depends_on:
@@ -33,6 +33,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    restart_policy: 
+    restart_policy:
       condition: on-failure
       max_attempts: 3

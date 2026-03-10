@@ -541,7 +541,7 @@ Closes #123
 4. **문서 업데이트**: CHANGELOG.md, 버전 번호 업데이트
 5. **PR 생성**: main 브랜치로 PR
 6. **태그 생성**: 릴리스 태그 생성
-7. **배포**: GitHub Releases, PyPI 배포
+7. **배포**: Windows desktop release surface와 Linux server release channel 문서 갱신
 
 ### 릴리스 스크립트
 

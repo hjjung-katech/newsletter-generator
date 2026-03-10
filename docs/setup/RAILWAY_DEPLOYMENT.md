@@ -1,7 +1,11 @@
 # Railway 배포 가이드
 
 ## 개요
-Newsletter Generator를 Railway PaaS에 배포하기 위한 완전한 가이드입니다.
+Newsletter Generator의 현재 repo-managed Linux server release channel인 Railway/Nixpacks source deploy 가이드입니다.
+
+- Linux server canonical packaging target은 루트 `Dockerfile` 기반 container image입니다.
+- Railway/Nixpacks는 현재 promoted release channel truth이며, promoted Docker image publish lane은 아직 운영하지 않습니다.
+- 정확한 artifact 계약은 `../reference/support-policy.md`를 기준으로 유지합니다.
 
 > **💡 로컬 개발 vs 프로덕션 배포**
 >
@@ -108,13 +112,13 @@ services:
 ```bash
 # 1. 환경 설정
 cd newsletter-generator
-python scripts/devtools/setup_env.py
+python -m scripts.devtools.dev_entrypoint bootstrap
 
-# 2. 데이터베이스 초기화
-python web/init_database.py
+# 2. 품질 게이트 확인
+python -m scripts.devtools.dev_entrypoint check
 
 # 3. 웹 서버 실행 (Redis 불필요)
-python -m web.app
+python -m scripts.devtools.dev_entrypoint run web
 # → http://localhost:8000에서 접속
 ```
 
@@ -126,16 +130,16 @@ services:
     image: redis:latest
 
   web:
-    build: ./web
-    start: gunicorn app:app --workers 2
+    source: .
+    start: gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 300 web.app:app
 
   worker:
-    build: ./web
-    start: python worker.py
+    source: .
+    start: python -m web.worker
 
   scheduler:
-    build: ./web
-    start: python schedule_runner.py
+    source: .
+    start: python -m web.schedule_runner --interval 300
 ```
 
 ## 파일 구조
@@ -159,10 +163,10 @@ project/
 ```
 
 ## 데이터베이스 초기화
-배포 시 자동으로 SQLite 데이터베이스가 초기화됩니다:
+Railway source deploy는 import-time bootstrap을 사용하지 않습니다. 필요한 경우 아래 명령으로 스키마를 명시적으로 준비합니다:
 
 ```bash
-python web/init_database.py --force
+python -m web.init_database --force
 ```
 
 이 명령은 다음 테이블들을 생성합니다:
@@ -185,7 +189,7 @@ REDIS_URL=redis://redis:6379/0
 ### 2. 데이터베이스 초기화 실패
 ```bash
 # 수동으로 데이터베이스 초기화
-python web/init_database.py --force
+python -m web.init_database --force
 ```
 
 ### 3. 워커 실행 오류

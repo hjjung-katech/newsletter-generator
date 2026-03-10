@@ -69,7 +69,8 @@ python -m scripts.devtools.dev_entrypoint check
 ### 방법 2: PyPI 패키지 (정식 릴리즈 채널 아님)
 
 2026-03-10 기준으로 PyPI는 정식 end-user 배포 채널이 아닙니다.
-이 섹션은 개발/실험용 참조 예시이며, 공식 설치 경로는 source checkout 또는 Windows native bundle 문서를 따릅니다.
+이 섹션은 개발/실험용 참조 예시입니다. 현재 wheel/sdist는 `newsletter`/`newsletter_core` Python package subset 빌드 산출물이며, canonical `web/` server runtime이나 Windows desktop release surface를 대체하지 않습니다.
+공식 설치 경로는 source checkout 또는 Windows native bundle 문서를 따릅니다.
 
 ```bash
 # 가상환경 생성 및 활성화
@@ -85,7 +86,8 @@ pip install newsletter-generator
 ### 방법 3: Docker 이미지 (정식 릴리즈 artifact 아님)
 
 저장소에는 `Dockerfile`이 있지만, 2026-03-10 기준 promoted Docker image release lane은 운영하지 않습니다.
-이 경로는 서버 smoke/실험용 참조이며, 현재 production truth는 Linux source-based deploy 문서(`RAILWAY_DEPLOYMENT.md`)에 맞춥니다.
+다만 Linux server packaging contract 기준으로는 루트 `Dockerfile`이 canonical container packaging target입니다.
+현재 promoted release channel truth는 Linux source-based deploy 문서(`RAILWAY_DEPLOYMENT.md`)에 맞춥니다.
 
 ```bash
 # Docker 이미지 빌드

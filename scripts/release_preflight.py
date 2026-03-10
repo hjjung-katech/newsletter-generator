@@ -10,16 +10,28 @@ import subprocess
 import sys
 from pathlib import Path
 
+from validate_release_manifest import discover_manifests, validate_manifest_inventory
+
 REQUIRED_FILES = [
     "AGENTS.md",
     "web/AGENTS.md",
     ".github/PULL_REQUEST_TEMPLATE/release_integration.md",
+    "pyproject.toml",
     "docs/dev/CI_CD_GUIDE.md",
     "docs/dev/LONG_TERM_REPO_STRATEGY.md",
     "docs/dev/REPO_HYGIENE_POLICY.md",
+    "docs/reference/support-policy.md",
+    "docs/setup/INSTALLATION.md",
+    "docs/setup/PYINSTALLER_WINDOWS.md",
+    "docs/setup/RAILWAY_DEPLOYMENT.md",
     "Makefile",
+    "Dockerfile",
+    "railway.yml",
+    "nixpacks.toml",
     ".release/baseline.json",
     ".release/manifests/release-ci-platform.txt",
+    ".release/manifests/release-packaging-policy.txt",
+    ".release/manifests/release-runtime-binary.txt",
     ".agents/skills/ci-gate/SKILL.md",
     ".agents/skills/ci-gate/agents/openai.yaml",
     ".agents/skills/docs-and-config-consistency/SKILL.md",
@@ -70,6 +82,21 @@ def check_python_package(pkg: str) -> tuple[bool, str]:
     return code == 0, (out.splitlines()[0] if out else f"missing package: {pkg}")
 
 
+def collect_manifest_failures() -> list[str]:
+    failures: list[str] = []
+    for manifest in discover_manifests(Path.cwd()):
+        duplicates, missing = validate_manifest_inventory(manifest, Path.cwd())
+        if duplicates:
+            failures.append(
+                f"manifest duplicate entries: {manifest} ({', '.join(duplicates)})"
+            )
+        if missing:
+            failures.append(
+                f"manifest stale entries: {manifest} ({', '.join(missing)})"
+            )
+    return failures
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline-tag", default="")
@@ -111,6 +138,8 @@ def main() -> int:
         ok, msg = check_python_package(pkg)
         if not ok:
             failures.append(f"required package unavailable: {pkg} ({msg})")
+
+    failures.extend(collect_manifest_failures())
 
     print("=== RELEASE PREFLIGHT REPORT ===")
     print(f"baseline tag: {baseline_tag}")

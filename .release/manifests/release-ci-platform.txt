@@ -13,8 +13,6 @@ requirements-dev.txt
 .release/baseline.json
 .release/manifests/release-ci-platform.txt
 .release/reviewer_roles.json
-docs/dev/BRANCH_MAIN_GAP_ANALYSIS.md
-docs/dev/MAIN_INTEGRATION_EXECUTION_PLAN.md
 scripts/apply_pr_metadata.py
 scripts/devtools/hooks/pre-push
 scripts/devtools/setup_pre_push_hook.sh

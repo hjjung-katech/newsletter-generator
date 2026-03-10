@@ -40,7 +40,7 @@
 
 ## Current Verification Truth
 
-- Linux: `main-ci.yml`에서 Ubuntu 기반 unit/mock/integration/package build가 실행됩니다.
+- Linux: `main-ci.yml`에서 Ubuntu 기반 unit/mock/integration/package build가 실행됩니다. canonical packaging target인 Dockerfile container image는 별도 packaging validation 대상으로 관리하며, promoted Docker image publish lane은 아직 운영하지 않습니다.
 - Windows: `main-ci.yml`에서 PyInstaller build, EXE smoke, release artifact validation이 실행됩니다.
 - macOS: 2026-03-10 기준 dedicated CI가 없습니다. 지원 계약은 `support-policy.md`에 따르되, CI parity 확장은 후속 PR 범위입니다.
 
@@ -193,6 +193,8 @@ List the comment items first, then apply only the ones I select.
 
 ```bash
 python scripts/release_preflight.py
+python scripts/validate_release_manifest.py
+python scripts/validate_release_manifest.py --manifest .release/manifests/release-packaging-policy.txt --source staged
 python scripts/validate_release_manifest.py --manifest .release/manifests/release-ci-platform.txt --source staged
 python scripts/validate_release_manifest.py --manifest .release/manifests/release-scheduler-reliability.txt --source staged
 python scripts/validate_release_manifest.py --manifest .release/manifests/release-runtime-binary-bootstrap.txt --source staged

@@ -4,6 +4,7 @@ python = "3.11"
 [variables]
 PYTHONPATH = "/app"
 NIXPACKS_PYTHON_VERSION = "3.11"
+WEB_CONCURRENCY = "2"
 
 [phases.setup]
 nixPkgs = ["nodejs", "npm"]
@@ -15,11 +16,5 @@ cmds = [
     "pip install gunicorn redis rq"
 ]
 
-[phases.build]
-cmds = [
-    "python web/init_database.py --force",
-    "echo 'Database initialized for production'"
-]
-
 [start]
-cmd = "cd web && gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 300 app:app"
+cmd = "gunicorn --bind 0.0.0.0:${PORT:-8000} --workers ${WEB_CONCURRENCY:-2} --timeout 300 web.app:app"
