@@ -105,7 +105,7 @@ newsletter-generator/
 ├── requirements-dev.txt        # 개발 의존성
 ├── pyproject.toml             # 프로젝트 설정
 ├── .pre-commit-config.yaml    # pre-commit 설정
-└── scripts/devtools/run_tests.py               # 테스트 실행 스크립트
+└── scripts/devtools/           # canonical developer entrypoint와 보조 dev tools
 ```
 
 ### 핵심 모듈 설명
@@ -252,36 +252,34 @@ def compose_newsletter(
 
 ### 테스트 구조
 
-```
+```text
 tests/
-├── unit_tests/              # 단위 테스트
-│   ├── test_collect.py     # 수집 모듈 테스트
-│   ├── test_compose.py     # 조합 모듈 테스트
-│   └── test_tools.py       # 도구 모듈 테스트
-├── api_tests/              # API 통합 테스트
-│   ├── test_serper.py      # Serper API 테스트
-│   └── test_gemini.py      # Gemini API 테스트
-└── test_data/              # 테스트 데이터
-    ├── sample_articles.json
-    └── mock_responses/
+├── unit_tests/      # 단위 테스트 및 web/db 세부 회귀
+├── integration/     # scheduler/runtime 통합 시나리오
+├── contract/        # API / docs / packaging / workflow truth 고정
+├── api_tests/       # 외부 API 중심 시나리오
+├── e2e/             # 별도 웹 런타임 필요
+├── deployment/      # 배포/실서비스 검증
+└── test_data/       # 테스트 데이터
 ```
 
 ### 테스트 실행
 
 ```bash
-# 모든 테스트 실행
-python scripts/devtools/run_tests.py ci
+# 빠른 로컬 게이트
+python -m scripts.devtools.dev_entrypoint check
 
-# 환경별 테스트
-python scripts/devtools/run_tests.py dev      # 개발 환경
-python scripts/devtools/run_tests.py ci       # CI 환경
-python scripts/devtools/run_tests.py integration  # 통합/프로덕션 검증
+# PR 전 전체 게이트
+python -m scripts.devtools.dev_entrypoint check --full
+
+# ops-safety 보호 경로
+python -m scripts.devtools.dev_entrypoint ops-safety-check
 
 # 특정 테스트 파일
-pytest tests/unit_tests/test_compose.py
+pytest tests/contract/test_generation_facade.py
 
 # 커버리지 포함
-pytest --cov=newsletter tests/
+pytest --cov=newsletter --cov=newsletter_core --cov=web tests/
 ```
 
 ### 테스트 작성 가이드
@@ -556,7 +554,7 @@ if [ -z "$VERSION" ]; then
 fi
 
 # 테스트 실행
-python scripts/devtools/run_tests.py ci
+python -m scripts.devtools.dev_entrypoint check --full
 if [ $? -ne 0 ]; then
     echo "Tests failed"
     exit 1
@@ -597,7 +595,7 @@ source .local/venv/bin/activate
 python -m scripts.devtools.dev_entrypoint check
 
 # 테스트 실행
-python scripts/devtools/run_tests.py dev
+python -m scripts.devtools.dev_entrypoint check
 
 # 패키지 재설치
 pip install -e . --force-reinstall

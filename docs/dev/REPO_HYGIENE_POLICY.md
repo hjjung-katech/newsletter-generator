@@ -13,6 +13,7 @@
 - Week 19 반영: 로컬 가상환경 canonical 경로를 `.local/venv/`로 정규화, cache cleanup target 분리
 - Week 20 반영: canonical runtime entrypoint를 `python -m ...` 모듈 실행으로 정규화, `apps/`는 `experimental/`만 유지
 - Week 21 반영: root `.env.example` 단일 정본 유지, `web/.env.example` 및 `requirements-minimal.txt` 제거
+- Week 22 반영: strict audit에서 관찰되는 generated root artifacts(`build/`, `newsletter_generator.egg-info/`)를 policy allowlist와 동기화
 
 ## Scope
 
@@ -39,6 +40,8 @@
 | `check_quality.py`, `setup_env.py`, `newsletter-test.sh`, `newsletter-test.bat` | 삭제 완료 | `scripts/devtools/`만 사용 | 루트 clutter 제거 및 단일 실행 경로 고정 |
 | `.local/` | ignore | 로컬 workspace (`artifacts/`, `coverage/`, `debug_files/`, `state/`, `venv/`) | 재생성 가능 산출물, 로컬 런타임 환경, 개발 모드 웹 상태를 숨김 경계로 격리 |
 | `.venv/` | ignore(호환) | legacy local virtualenv | 기존 clone 호환용, 신규 bootstrap 정본은 `.local/venv/` |
+| `build/` | ignore | 로컬/CI generated build artifacts | packaging/build 산출물, strict audit 정책 허용 대상 |
+| `newsletter_generator.egg-info/` | ignore | 로컬 editable install metadata | packaging metadata 산출물, strict audit 정책 허용 대상 |
 | `.pytest_cache/`, `.mypy_cache/`, `__pycache__/` | ignore | 로컬 캐시 | 재생성 가능 캐시 |
 | `output/` | ignore | 사용자 생성 결과물 디렉터리 (tracked 제외) | 실행 결과 확인용이므로 루트 유지 |
 | `config/config.yml` | 유지 | `config/` 내부 정본 | 런타임 설정 파일 위치 정규화 |
@@ -90,7 +93,7 @@
 - 운영 원칙:
   - Week 1~4: warning-only soft gate로 준비 단계 운영
   - Week 5+: hard gate 기본 운영, 예외 시에만 일시 override 검토
-  - root에서 ignore된 엔트리도 정책 allowlist(`.local/`, `output/`, 캐시 디렉터리) 밖이면 strict gate에서 경고합니다.
+  - root에서 ignore된 엔트리도 정책 allowlist(`.local/`, `output/`, `build/`, `newsletter_generator.egg-info/`, 캐시 디렉터리) 밖이면 strict gate에서 경고합니다.
 
 ### Shim Policy (Week 4)
 
@@ -135,5 +138,6 @@ make clean-venv     # .local/venv 및 legacy .venv 삭제
 ## Governance Notes
 
 - 본 문서는 Week 1 기준선에서 현재 운영 상태로 지속 업데이트합니다.
+- 현재 repo hygiene의 역할은 "초기 루트 정리 캠페인"이 아니라, 이미 달성한 steady-state를 깨지 않도록 guardrail을 유지하는 것입니다.
 - 정책 변경은 반드시 PR로 수행하고, `scripts/repo_hygiene_policy.json`과 함께 변경합니다.
 - root 예외 추가 시 사유와 제거 목표 시점을 PR 설명에 명시합니다.

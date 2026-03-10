@@ -1,5 +1,9 @@
 # Compact 뉴스레터 "이런뜻이에요" 섹션 구현 및 테스트 보고서
 
+> Historical report.
+> 이 문서는 2025-05-23 시점의 구현/테스트 결과 스냅샷이며 현재 실행 표준이 아닙니다.
+> 현재 테스트 실행 방법과 active 분류는 `tests/README.md`, `tests/TEST_EXECUTION_GUIDE.md`, `tests/TEST_CLASSIFICATION_SUMMARY.md` 를 우선 사용합니다.
+
 ## 📋 개요
 
 이 보고서는 compact 버전 뉴스레터에서 "이런뜻이에요" 섹션이 누락된 문제를 해결하고, **API 테스트와 단위 테스트를 분리**하여 관련 테스트를 구축한 결과를 정리합니다.

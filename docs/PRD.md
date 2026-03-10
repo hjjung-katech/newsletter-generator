@@ -1,287 +1,171 @@
 # Newsletter Generator 프로젝트 요구사항 문서 (PRD)
 
-## 1. 개요
+이 문서는 현재 저장소 기준의 제품 표면과 우선순위를 정리한 PRD입니다.
+새로운 앱 표면이나 지원 정책을 발명하지 않고, 이미 운영 중인 web/CLI/scheduler 현실을 반영합니다.
 
-* **제품명**: Newsletter Generator
-* **목적**: 키워드 기반으로 최신 뉴스를 수집·요약하여 HTML 뉴스레터를 생성하고 이메일로 발송하는 Python CLI 도구
-* **현재 상태**: MVP 완료, 고도화 기능 구현 중
-* **최종 형태**: Python 패키지 + CLI 실행 파일
+- 기준일: 2026-03-10
+- 제품/플랫폼 계약 정본:
+  - `docs/reference/support-policy.md`
+  - `docs/reference/web-api.md`
+  - `docs/dev/CI_CD_GUIDE.md`
+  - `docs/dev/LONG_TERM_REPO_STRATEGY.md`
 
----
+## 1. 제품 개요
 
-## 2. 배경 및 기회
+- 제품명: Newsletter Generator
+- 목적: 최신 뉴스 수집, AI 요약, HTML 뉴스레터 생성, 이메일 발송, 운영 이력 관리를 지원하는 뉴스레터 운영 도구
+- 현재 상태: Flask web runtime이 실질적인 운영 표면이며, CLI/scheduler/automation이 이를 보조합니다.
+- 현재 형태: Python 패키지 + Flask source runtime + scheduled/background execution + Windows desktop bundle
 
-1. 연구원들은 기술 동향·문헌 조사를 위해 수작업으로 뉴스를 모니터링함 → 시간 소모
-2. 기존 노코드 솔루션은 대량 처리·버전 관리·보안 측면에서 한계
-3. Python CLI로 구현하여 내부망에서도 손쉽게 배포 가능
+## 2. 문제 정의
 
----
+1. 운영자는 키워드/도메인 기반 뉴스레터를 반복적으로 생성, 검토, 발송해야 합니다.
+2. 단일 실행 성공보다 schedule, approval, source policy, preset, history 같은 운영 흐름의 안정성이 더 중요합니다.
+3. 현재 구조 부채는 root clutter보다 legacy runtime hotspot에 집중되어 있어, 제품 운영 완성도와 구조 축소를 함께 관리해야 합니다.
 
-## 3. 목표 및 성과
+## 3. 현재 제품 표면
 
-| ID | 목표 | 현재 상태 | 성공 지표 |
-| -- | ---- | --------- | --------- |
-| G1 | **CLI 한 번으로 키워드 → 이메일 발송** | ✅ 완료 | 60초 내 뉴스레터 생성 및 발송 |
-| G2 | **Google Drive 저장** | ✅ 완료 | 95% 이상 업로드 성공률 |
-| G3 | **키워드 자동 추천** | ✅ 완료 | 10개 이상 관련 키워드 생성 |
-| G4 | **통합 아키텍처** | ✅ 완료 | Compact/Detailed 스타일 지원 |
-| G5 | **스마트 필터링** | ✅ 완료 | 중복 제거, 품질 향상 |
+### 3.1 운영 표면
 
----
+| 표면 | 현재 상태 | 설명 |
+|---|---|---|
+| Web runtime | 주 운영 표면 | 생성, 미리보기, 발송, 프리셋, 승인, 스케줄, 소스 정책, 이력/분석을 다룹니다. |
+| CLI | 보조 운영 표면 | 반복 실행, 로컬 디버깅, smoke/automation 경로를 제공합니다. |
+| Scheduler / worker | 보조 운영 표면 | 예약 실행, retry safety, dedupe, outbox 흐름을 다룹니다. |
+| Archive / analytics | 운영 보조 표면 | 실행 이력 재사용, 검색, 운영 가시성을 제공합니다. |
 
-## 4. 구현된 기능
-
-### 4.1 핵심 기능 (MVP)
-
-| 기능 ID | 기능 | 상태 | 설명 |
-|---------|------|------|------|
-| FR-01 | **키워드 기반 기사 수집** | ✅ | Serper API, RSS 피드, 네이버 API 통합 |
-| FR-02 | **AI 기사 요약** | ✅ | Google Gemini Pro 기반 요약 및 편집 |
-| FR-03 | **뉴스레터 생성** | ✅ | 통합 아키텍처로 Compact/Detailed 지원 |
-| FR-04 | **이메일 발송** | ✅ | Postmark API 통합 |
-| FR-05 | **Google Drive 저장** | ✅ | 자동 업로드 및 폴더 관리 |
-
-### 4.2 고급 기능
+### 3.2 현재 구현된 핵심 기능
 
 | 기능 ID | 기능 | 상태 | 설명 |
-|---------|------|------|------|
-| FR-06 | **키워드 자동 추천** | ✅ | 도메인 기반 키워드 생성 |
-| FR-07 | **스마트 필터링** | ✅ | 중복 제거, 주요 소스 우선순위, 도메인 다양성 |
-| FR-07.1 | **AI 기반 점수 평가** | ✅ | LLM을 활용한 기사 우선순위 결정 (관련성, 영향력, 참신성, 소스 신뢰도, 시간적 신선도) |
-| FR-08 | **테스트 모드** | ✅ | Template/Content 모드 지원 |
-| FR-09 | **비용 추적** | ✅ | LangSmith 통합 |
-| FR-10 | **CI/CD 파이프라인** | ✅ | GitHub Actions 자동화 |
+|---|---|---|---|
+| FR-01 | 뉴스 수집 | 운영 중 | Serper, RSS, Naver 등 현재 지원 소스를 통합합니다. |
+| FR-02 | AI 요약 및 조합 | 운영 중 | LangGraph + multi-LLM 경로로 HTML 뉴스레터를 생성합니다. |
+| FR-03 | Web generation flow | 운영 중 | generate / preview / send / archive reference 흐름을 제공합니다. |
+| FR-04 | 이메일 발송 | 운영 중 | Postmark 기반 발송과 outbox dedupe를 지원합니다. |
+| FR-05 | Schedule workflow | 운영 중 | 예약 실행, preview/run-now, retry safety 경로를 다룹니다. |
+| FR-06 | Approval workflow | 운영 중 | 승인 대기함과 상태 전이를 제공합니다. |
+| FR-07 | Preset lifecycle | 운영 중 | 저장/갱신/삭제/기본값 관리가 가능합니다. |
+| FR-08 | Source policy management | 운영 중 | allow/block 규칙을 운영자가 관리할 수 있습니다. |
+| FR-09 | Execution history / archive | 운영 중 | 이전 실행 검색과 참조 흐름을 제공합니다. |
+| FR-10 | Analytics / ops visibility | 운영 중 | 기본 분석과 운영 상태 확인 경로를 제공합니다. |
 
-### 4.3 계획 중인 기능
+## 4. 현재 제품 목표
 
-| 기능 ID | 기능 | 우선순위 | 설명 |
-|---------|------|----------|------|
-| FR-11 | **벡터 DB RAG** | 중 | 과거 기사 검색 및 인용 |
-| FR-12 | **웹 GUI** | 낮음 | Flask 기반 웹 인터페이스 고도화 |
-| FR-13 | **개인화 뉴스레터** | 낮음 | 사용자별 관심사 필터링 |
+| ID | 목표 | 현재 상태 | 성공 기준 |
+|---|---|---|---|
+| G1 | web 운영 표면에서 주요 작업을 완료 | 진행 중 | generate/preview/send/history/schedule 흐름이 안정적으로 연결됨 |
+| G2 | schedule / approval / preset / source policy 흐름 안정화 | 진행 중 | protected path 회귀 0건 유지 |
+| G3 | CLI/scheduler/web가 같은 core contract를 공유 | 진행 중 | `newsletter_core.public` 경계 사용 유지 |
+| G4 | legacy runtime surface를 축소 | 진행 중 | `newsletter/` 와 hotspot LOC가 점진 감소 |
+| G5 | 운영 계약과 문서 truth를 일치시킴 | 진행 중 | support policy / CI / strategy / PRD가 같은 현실을 설명 |
 
----
+## 5. 다음 90일 우선순위
 
-## 5. 기술 스택
+이번 PRD는 제품 우선순위를 현재 운영 표면 기준으로 고정합니다.
 
-### 5.1 현재 구현
+### 우선순위 상단
 
-| 영역 | 기술/라이브러리 | 역할 |
-|------|----------------|------|
-| **CLI** | Typer | 사용자 인터페이스 |
-| **LLM** | Google Gemini Pro, LangChain, LangGraph | AI 요약 및 워크플로우 |
-| **뉴스 수집** | Serper API, RSS (feedparser), 네이버 API | 다양한 소스 통합 |
-| **이메일** | Postmark | 뉴스레터 발송 |
-| **저장소** | Google Drive API | 파일 저장 |
-| **템플릿** | Jinja2 | HTML 렌더링 |
-| **비용 추적** | LangSmith | AI 사용량 모니터링 |
+1. schedule workflow 완성도
+- 예약 생성, retry safety, preview/run-now, duplicate prevention evidence를 강화합니다.
 
-### 5.2 개발 도구
+2. preset lifecycle
+- 저장/적용/갱신/삭제 흐름과 운영 토큰 기반 보호 경계를 안정화합니다.
 
-| 영역 | 도구 | 용도 |
-|------|------|------|
-| **코드 품질** | Black, isort, flake8, mypy | 포맷팅 및 린팅 |
-| **테스트** | pytest, responses | 단위/통합 테스트 |
-| **CI/CD** | GitHub Actions | 자동화된 테스트 및 배포 |
-| **문서** | Markdown, Mermaid | 프로젝트 문서화 |
+3. approval workflow
+- 승인 대기함, 상태 전이, 메모/검토 흐름의 일관성을 높입니다.
 
----
+4. source policy management
+- allow/block 정책 편집과 generation 반영 경로를 명확히 유지합니다.
 
-## 6. 시스템 아키텍처
+5. execution history visibility
+- archive 검색, 과거 실행 참조, 운영 이력 확인 흐름을 개선합니다.
 
-### 6.1 통합 아키텍처 개요
+6. personalization 설정 모델 정리
+- 개인화에 필요한 설정/저장 모델을 정리하되, 신규 앱 표면을 만들지 않습니다.
 
-```mermaid
-flowchart TD
-    A[CLI 입력] --> B[키워드 처리]
-    B --> C[뉴스 수집]
-    C --> D[필터링 & 그룹화]
-    D --> E[AI 기반 점수 평가]
-    E --> F[AI 요약]
-    F --> G[통합 조합 함수]
-    G --> H[HTML 생성]
-    H --> I[이메일 발송]
-    H --> J[Drive 저장]
-    H --> K[로컬 저장]
-```
+### 엔지니어링 선행 과제
 
-### 6.2 핵심 구성 요소
+- legacy surface reduction
+  - `newsletter_core/` 중심 경계를 강화하고, `newsletter/` / hotspot `web/` 파일은 축소합니다.
+- docs truthfulness
+  - strategy, PRD, tests guide, migration log, dev docs가 현재 현실을 설명하도록 유지합니다.
+- ops-safety observability
+  - `check --full`, scheduler retry safety, outbox/dedupe, live smoke 결과를 운영 판단 기준으로 사용합니다.
 
-1. **통합 조합 함수**: `compose_newsletter()`가 Compact/Detailed 스타일을 모두 처리
-2. **LangGraph 워크플로우**: 상태 기반 뉴스레터 생성 프로세스
-3. **스마트 필터링**: 중복 제거, 품질 향상, 다양성 보장
-4. **설정 기반 차이점 관리**: `NewsletterConfig` 클래스로 스타일별 설정
+## 6. 현재 비우선 / 비목표
 
----
+다음 항목은 현재 우선순위로 올리지 않습니다.
 
-## 7. 사용자 시나리오
+- 벡터 DB RAG
+- 새로운 웹/모바일 앱 표면 추가
+- 모바일 앱
+- 새로운 배포 채널 발명
+- support policy / packaging policy 재정의
 
-### 7.1 기본 사용 시나리오
+## 7. 사용 시나리오
+
+### 7.1 운영자 시나리오
 
 ```bash
-# 1. 키워드 기반 뉴스레터 생성
-newsletter run --keywords "AI,머신러닝" --output-format html
+# 로컬 개발/운영 확인
+python -m scripts.devtools.dev_entrypoint run web
 
-# 2. 도메인 기반 자동 키워드 생성
-newsletter run --domain "자율주행" --to user@example.com
-
-# 3. 간결한 임원용 리포트
-newsletter run --domain "AI" --template-style compact --to ceo@company.com
+# CLI 실행 표면
+python -m scripts.devtools.dev_entrypoint run newsletter -- run --keywords "AI"
 ```
 
-### 7.2 고급 사용 시나리오
+운영자는 web 표면에서 다음 작업을 수행합니다.
+
+- 키워드/도메인 기반 생성 및 미리보기
+- 프리셋 저장/수정/삭제
+- 승인 대기함 검토
+- 소스 정책 편집
+- 스케줄 생성/관리
+- 실행 이력 검색 및 archive reference 재사용
+
+### 7.2 품질/운영 시나리오
 
 ```bash
-# 1. 고품질 필터링
-newsletter run --keywords "반도체" --max-per-source 3 --period 7
+# 빠른 로컬 게이트
+python -m scripts.devtools.dev_entrypoint check
 
-# 2. 비용 추적
-newsletter run --keywords "AI" --track-cost
+# PR 전 전체 게이트
+python -m scripts.devtools.dev_entrypoint check --full
 
-# 3. 테스트 모드
-newsletter test output/data.json --mode content
+# web smoke
+python -m scripts.devtools.dev_entrypoint smoke web
 ```
 
----
+## 8. 품질 및 운영 기준
 
-## 8. 성능 지표
+### 8.1 품질 게이트
 
-### 8.1 현재 검증 상태
+- contributor-facing canonical gate:
+  - `python -m scripts.devtools.dev_entrypoint check`
+  - `python -m scripts.devtools.dev_entrypoint check --full`
+- repo hygiene / docs quality / PR policy / required checks 기준은 `docs/dev/CI_CD_GUIDE.md` 와 `docs/reference/support-policy.md` 를 따릅니다.
 
-2026-03-08 기준으로 이 저장소는 로컬/CI 게이트 중심으로 품질을 검증합니다. 아래 표는 현재 저장소에서
-직접 확인 가능한 상태만 기록합니다.
+### 8.2 운영 판단 지표
 
-| 항목 | 현재 상태 | 근거 |
-|------|-----------|------|
-| **처리 시간** | 정식 SLO 미고정 | smoke/integration 회귀는 있으나 지속 수집되는 latency 대시보드는 아직 없음 |
-| **API 응답률** | 정식 SLI 미고정 | `tests/test_web_api.py`, contract/integration suite로 회귀만 검증 |
-| **이메일 발송률** | 실운영 계측 전 | 기본 게이트는 mock/dummy credential 중심이며 live delivery는 별도 환경 필요 |
-| **테스트 커버리지** | baseline 재산정 중 | coverage scope는 `newsletter + newsletter_core + web` 기준으로 추적 |
+다음 항목은 슬로건이 아니라 실제 운영 판단 기준으로 사용합니다.
 
-### 8.2 품질 지표
+- `check --full` 또는 동등 full gate 결과
+- scheduler retry safety 관련 suite 결과
+- dedupe/outbox regression 여부
+- source web smoke 또는 deployed ops smoke 결과
+- coverage artifact와 contract suite 변동
 
-- **중복 기사 제거율**: 95% 이상
-- **주요 소스 비율**: 70% 이상
-- **키워드 관련성**: 90% 이상
+## 9. 아키텍처 및 구현 제약
 
----
+- 신규 기능과 점진적 구조 이동의 목표 영역은 `newsletter_core/` 입니다.
+- `newsletter/` 와 일부 `web/` hotspot 은 축소 대상이며, 확장 대상이 아닙니다.
+- 지원 범위와 packaging 정책은 `docs/reference/support-policy.md` 를 그대로 따릅니다.
+- web API 계약은 `docs/reference/web-api.md` 를 따릅니다.
 
-## 9. 보안 및 운영
+## 10. 문서 및 참조
 
-### 9.1 보안 요구사항
-
-- ✅ API 키 `.env` 파일 관리
-- ✅ 환경 변수 기반 설정
-- ✅ 민감 정보 Git 제외
-- ✅ HTTPS 통신 강제
-
-### 9.2 운영 요구사항
-
-- ✅ 로그 파일 관리
-- ✅ 에러 처리 및 복구
-- ✅ 중간 결과 저장 (디버깅용)
-- ✅ 성능 모니터링 (LangSmith)
-
----
-
-## 10. 배포 및 유지보수
-
-### 10.1 배포 방식
-
-1. **개발 설치**: `pip install -e .`
-2. **PyPI 배포**: 향후 계획
-3. **Docker 컨테이너**: 향후 계획
-
-### 10.2 CI/CD 파이프라인
-
-- ✅ 단위 테스트 매트릭스 (Python 3.11, 3.12)
-- ✅ 코드 품질/보안 검사
-- ✅ Mock API 테스트 및 Windows 빌드 검증
-- ✅ 문서 품질 검사와 PR 정책 검사
-- ✅ main/develop push 시 scheduler integration contract 실행
-- ✅ GitHub Pages/Railway 배포 워크플로우 유지
-
----
-
-## 11. 향후 로드맵
-
-### 11.1 단기 계획 (1-3개월)
-
-- [ ] PyPI 패키지 배포
-- [ ] Docker 이미지 제공
-- [ ] 성능 최적화
-- [ ] 추가 뉴스 소스 통합
-
-### 11.2 중기 계획 (3-6개월)
-
-- [ ] 벡터 DB RAG 구현
-- [ ] 웹 GUI 개발
-- [ ] 개인화 기능
-- [ ] 다국어 지원
-
-### 11.3 장기 계획 (6개월+)
-
-- [ ] 모바일 앱
-- [ ] 실시간 알림
-- [ ] 고급 분석 기능
-- [ ] 엔터프라이즈 기능
-
----
-
-## 12. 리스크 관리
-
-### 12.1 기술적 리스크
-
-| 리스크 | 영향도 | 완화 전략 | 상태 |
-|--------|--------|----------|------|
-| API 할당량 초과 | 높음 | 다중 소스, 캐싱 | ✅ 완화됨 |
-| LLM 비용 증가 | 중간 | 비용 추적, 최적화 | ✅ 모니터링 중 |
-| 의존성 충돌 | 낮음 | 가상환경, 버전 고정 | ✅ 관리됨 |
-
-### 12.2 운영 리스크
-
-| 리스크 | 영향도 | 완화 전략 | 상태 |
-|--------|--------|----------|------|
-| 서비스 중단 | 중간 | 다중 소스, 재시도 로직 | ✅ 구현됨 |
-| 데이터 품질 | 중간 | 스마트 필터링 | ✅ 구현됨 |
-| 사용자 오류 | 낮음 | 상세 문서, 에러 메시지 | ✅ 개선됨 |
-
----
-
-## 13. 성공 지표 및 KPI
-
-### 13.1 기술적 KPI
-
-- 목표: `main-ci`, `docs-quality`, `security-scan`, 로컬 `make check-full`가 지속적으로 green 상태 유지
-- 목표: coverage는 최신 artifact 기준으로 `newsletter + newsletter_core + web` 전체 범위를 추적
-- 목표: scheduler/web/runtime contract 회귀 0건 유지
-- 목표: 실운영 SLI/SLO는 별도 모니터링 도입 후 수치화
-
-### 13.2 사용자 KPI
-
-- 📊 주간 활성 사용자: 목표 20명
-- 📊 뉴스레터 생성 성공률: 95% 이상
-- 📊 사용자 만족도: 4.5/5.0 이상
-
----
-
-## 14. 문서 및 지원
-
-### 14.1 문서 체계
-
-- ✅ [사용자 가이드](user/USER_GUIDE.md)
-- ✅ [개발자 가이드](dev/DEVELOPMENT_GUIDE.md)
-- ✅ [CLI 참조](user/CLI_REFERENCE.md)
-- ✅ [설치 가이드](setup/INSTALLATION.md)
-
-### 14.2 지원 채널
-
-- GitHub Issues: 버그 리포트 및 기능 요청
-- GitHub Discussions: 질문 및 아이디어 공유
-- 내부 문서: 상세 사용법 및 FAQ
-
----
-
-## 15. 결론
-
-Newsletter Generator는 MVP 목표를 성공적으로 달성하였으며, 현재 고도화 기능을 지속적으로 개발 중입니다. 통합 아키텍처와 스마트 필터링을 통해 고품질의 뉴스레터를 안정적으로 생성할 수 있으며, 향후 벡터 DB RAG와 웹 GUI 등의 고급 기능을 통해 더욱 강력한 도구로 발전할 예정입니다.
+- 문서 허브: `docs/README.md`
+- 지원 계약: `docs/reference/support-policy.md`
+- CI / workflow 계약: `docs/dev/CI_CD_GUIDE.md`
+- 구조/운영 우선순위: `docs/dev/LONG_TERM_REPO_STRATEGY.md`
+- 아키텍처 경계: `docs/technical/adr-0001-architecture-boundaries.md`
