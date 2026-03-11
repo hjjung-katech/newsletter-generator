@@ -3,7 +3,6 @@ Newsletter Generator - Custom Tools
 이 모듈은 뉴스레터 생성을 위한 LangChain 도구를 정의합니다.
 """
 
-import json
 import logging
 import os
 from typing import Any, Dict, List, cast
@@ -21,9 +20,6 @@ from newsletter_core.application.tools_search_flow import (
     SerperKeywordFailure,
     SerperKeywordReport,
     SerperLogMessage,
-    SerperSearchPlan,
-    SerperSearchRequestError,
-    SerperSearchResponseDecodeError,
     build_serper_failure_log_messages,
     build_serper_keyword_log_messages,
     build_serper_search_plans,
@@ -37,6 +33,9 @@ from newsletter_core.application.tools_support import (
     resolve_search_request,
     sanitize_filename,
 )
+from newsletter_core.infrastructure.tools_search_runtime import (
+    execute_serper_search_request,
+)
 
 from . import config
 from .html_utils import clean_html_markers
@@ -45,28 +44,6 @@ from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
-
-
-def _execute_serper_search_request(
-    search_plan: SerperSearchPlan,
-) -> dict[str, Any]:
-    try:
-        response = requests.request(
-            "POST",
-            search_plan.url,
-            headers=search_plan.headers,
-            data=search_plan.payload,
-        )
-        response.raise_for_status()
-    except requests.exceptions.RequestException as exc:
-        raise SerperSearchRequestError(str(exc)) from exc
-
-    try:
-        raw_results = response.json()
-    except json.JSONDecodeError as exc:
-        raise SerperSearchResponseDecodeError(response.text) from exc
-
-    return cast(dict[str, Any], raw_results)
 
 
 def _emit_serper_log_messages(log_messages: list[SerperLogMessage]) -> None:
@@ -99,7 +76,7 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
         logger.info(f"Searching articles for keyword: '{search_plan.keyword}'")
         keyword_result = execute_serper_search_plan(
             search_plan,
-            executor=_execute_serper_search_request,
+            executor=execute_serper_search_request,
         )
 
         if isinstance(keyword_result, SerperKeywordFailure):
@@ -436,7 +413,7 @@ def extract_common_theme_from_keywords(
 
     if not has_any_api_key:
         logger.warning("API 키가 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다.")
-        return extract_common_theme_fallback(keywords)
+        return str(extract_common_theme_fallback(keywords))
 
     try:
         # LLM 팩토리를 사용하여 테마 추출에 최적화된 모델 사용
@@ -481,7 +458,7 @@ def extract_common_theme_from_keywords(
             # Check if API key is available before trying Gemini fallback
             if not api_key:
                 logger.warning("GEMINI_API_KEY를 찾을 수 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다.")
-                return extract_common_theme_fallback(keywords)
+                return str(extract_common_theme_fallback(keywords))
 
         # Fallback using LangChain Google GenAI
         from langchain_core.messages import HumanMessage as FallbackHumanMessage
@@ -511,11 +488,11 @@ def extract_common_theme_from_keywords(
 
         except Exception as llm_error:
             logger.warning(f"LLM factory를 통한 테마 추출이 실패했습니다: {llm_error}")
-            return extract_common_theme_fallback(keywords)
+            return str(extract_common_theme_fallback(keywords))
 
     except Exception as e:
         logger.error(f"테마 추출 중 오류 발생: {e}")
-        return extract_common_theme_fallback(keywords)
+        return str(extract_common_theme_fallback(keywords))
 
 
 def get_filename_safe_theme(keywords: Any, domain: str | None = None) -> str:
@@ -534,7 +511,7 @@ def get_filename_safe_theme(keywords: Any, domain: str | None = None) -> str:
         domain,
         theme_extractor=extract_common_theme_from_keywords,
     )
-    return sanitize_filename(theme)
+    return str(sanitize_filename(theme))
 
 
 def regenerate_section_with_gemini(section_title: str, news_links: list) -> list:

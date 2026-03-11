@@ -10,10 +10,10 @@ from unittest.mock import MagicMock, patch
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from newsletter import config
+from newsletter import config  # noqa: E402
 
 # 테스트할 모듈 임포트
-from newsletter.tools import search_news_articles
+from newsletter.tools import search_news_articles  # noqa: E402
 
 
 class TestImprovedSearch(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestImprovedSearch(unittest.TestCase):
         elif hasattr(config, "SERPER_API_KEY"):
             del config.SERPER_API_KEY  # 원래 키가 없었다면 삭제
 
-    @patch("newsletter.tools.requests.request")
+    @patch("newsletter_core.infrastructure.tools_search_runtime.requests.request")
     def test_improved_search_functionality(self, mock_request):
         """수정된 search_news_articles 함수의 기본 기능 테스트"""
         # 모의(mock) API 응답 설정
@@ -77,24 +77,18 @@ class TestImprovedSearch(unittest.TestCase):
 
             # 첫 번째 결과의 필요한 속성 확인
             first_article = articles[0]
-            self.assertIsInstance(
-                first_article, dict, "기사 항목이 딕셔너리가 아닙니다"
-            )
+            self.assertIsInstance(first_article, dict, "기사 항목이 딕셔너리가 아닙니다")
 
             # 필수 속성 확인
             required_fields = ["title", "link"]
             for field in required_fields:
-                self.assertIn(
-                    field, first_article, f"기사에 필수 필드 {field}가 없습니다"
-                )
-                self.assertIsNotNone(
-                    first_article[field], f"기사의 {field} 필드가 None입니다"
-                )
+                self.assertIn(field, first_article, f"기사에 필수 필드 {field}가 없습니다")
+                self.assertIsNotNone(first_article[field], f"기사의 {field} 필드가 None입니다")
                 self.assertNotEqual(
                     first_article[field], "", f"기사의 {field} 필드가 비어 있습니다"
                 )
 
-    @patch("newsletter.tools.requests.request")
+    @patch("newsletter_core.infrastructure.tools_search_runtime.requests.request")
     def test_multiple_keywords(self, mock_request):
         """여러 키워드로 검색하는 기능 테스트"""
         # 모의(mock) API 응답 설정 (키워드별로 다른 응답을 줄 수 있도록 side_effect 사용 가능)
