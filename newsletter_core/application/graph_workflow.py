@@ -32,7 +32,10 @@ class NewsletterState(TypedDict):
 
 def parse_graph_article_date(date_str: Any) -> Optional[datetime]:
     """Parse graph article dates through the shared date parser."""
-    return parse_date_string(date_str)
+    parsed_date = parse_date_string(date_str)
+    if parsed_date is None or isinstance(parsed_date, datetime):
+        return parsed_date
+    raise TypeError(f"Unexpected parsed date type: {type(parsed_date)}")
 
 
 def route_after_collect(

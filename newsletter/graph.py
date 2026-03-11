@@ -55,7 +55,10 @@ def parse_article_date_for_graph(date_str: Any) -> Optional[datetime]:
     Returns:
         datetime 객체 또는 변환 실패 시 None
     """
-    return cast(Optional[datetime], parse_graph_article_date(date_str))
+    parsed_date = parse_graph_article_date(date_str)
+    if parsed_date is None or isinstance(parsed_date, datetime):
+        return parsed_date
+    raise TypeError(f"Unexpected parsed date type: {type(parsed_date)}")
 
 
 # 노드 함수 정의
@@ -129,8 +132,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
     # Save raw articles with unified naming
     try:
+        domain_value = state.get("domain")
         domain_str = (
-            state["domain"].replace(" ", "_") if state.get("domain") else "general"
+            domain_value.replace(" ", "_")
+            if isinstance(domain_value, str) and domain_value
+            else "general"
         )
 
         # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
@@ -266,8 +272,11 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
 
         # 파일 저장
         try:
+            domain_value = state.get("domain")
             domain_str = (
-                state["domain"].replace(" ", "_") if state.get("domain") else "general"
+                domain_value.replace(" ", "_")
+                if isinstance(domain_value, str) and domain_value
+                else "general"
             )
 
             # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
@@ -430,8 +439,11 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
             keywords_str = (
                 "_".join(state["keywords"]) if state["keywords"] else "unknown"
             )
+            domain_value = state.get("domain")
             domain_str = (
-                state["domain"].replace(" ", "_") if state.get("domain") else "general"
+                domain_value.replace(" ", "_")
+                if isinstance(domain_value, str) and domain_value
+                else "general"
             )
             template_style = state.get("template_style", "detailed")
 
@@ -598,4 +610,8 @@ def generate_newsletter(
     global _last_generation_info
     _last_generation_info = build_generation_info(final_state, get_cost_summary())
 
-    return cast(Tuple[str, str], resolve_generation_result(final_state))
+    generation_result = resolve_generation_result(final_state)
+    if isinstance(generation_result, tuple) and len(generation_result) == 2:
+        html_content, status = generation_result
+        return str(html_content), str(status)
+    raise TypeError(f"Unexpected generation result type: {type(generation_result)}")
