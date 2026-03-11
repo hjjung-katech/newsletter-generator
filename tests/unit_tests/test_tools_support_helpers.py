@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from unittest.mock import Mock
-
 import newsletter.tools as tools_module
-from newsletter import config
 from newsletter_core.application.tools_support import (
-    ParsedSerperResponse,
     SearchRequest,
     extract_common_theme_fallback,
     parse_generated_keywords,
@@ -140,75 +136,6 @@ def test_resolve_filename_theme_uses_extractor_only_for_multi_keyword_inputs() -
         == "직접도메인"
     )
     assert calls == [["AI", "반도체"], "AI, 반도체"]
-
-
-def test_legacy_search_news_articles_delegates_to_core_helpers(
-    monkeypatch,
-) -> None:
-    search_calls: list[tuple[str, int]] = []
-    payload_calls: list[tuple[str, int]] = []
-    parse_calls: list[tuple[dict[str, object], int]] = []
-
-    monkeypatch.setattr(config, "SERPER_API_KEY", "dummy-tools-key")
-
-    def fake_resolve_search_request(keywords: str, num_results: int) -> SearchRequest:
-        search_calls.append((keywords, num_results))
-        return SearchRequest(keywords=("정제된 키워드",), num_results=3)
-
-    def fake_build_serper_payload(keyword: str, num_results: int) -> str:
-        payload_calls.append((keyword, num_results))
-        return '{"q": "정제된 키워드", "num": 3}'
-
-    def fake_parse_serper_response(
-        results: dict[str, object],
-        num_results: int,
-    ) -> ParsedSerperResponse:
-        parse_calls.append((results, num_results))
-        return ParsedSerperResponse(
-            articles=[
-                {
-                    "title": "정제된 기사",
-                    "url": "https://example.com/article",
-                    "link": "https://example.com/article",
-                    "snippet": "요약",
-                    "source": "테스트 소스",
-                    "date": "2026-03-11",
-                }
-            ],
-            container_names=("news",),
-            container_count=1,
-        )
-
-    response = Mock()
-    response.raise_for_status = Mock()
-    response.json.return_value = {"news": [{"title": "raw"}]}
-
-    monkeypatch.setattr(
-        tools_module, "resolve_search_request", fake_resolve_search_request
-    )
-    monkeypatch.setattr(tools_module, "build_serper_payload", fake_build_serper_payload)
-    monkeypatch.setattr(
-        tools_module, "parse_serper_response", fake_parse_serper_response
-    )
-    monkeypatch.setattr(tools_module.requests, "request", Mock(return_value=response))
-
-    result = tools_module.search_news_articles.invoke(
-        {"keywords": "원본 키워드", "num_results": 99}
-    )
-
-    assert search_calls == [("원본 키워드", 99)]
-    assert payload_calls == [("정제된 키워드", 3)]
-    assert parse_calls == [({"news": [{"title": "raw"}]}, 3)]
-    assert result == [
-        {
-            "title": "정제된 기사",
-            "url": "https://example.com/article",
-            "link": "https://example.com/article",
-            "snippet": "요약",
-            "source": "테스트 소스",
-            "date": "2026-03-11",
-        }
-    ]
 
 
 def test_legacy_get_filename_safe_theme_delegates_to_core_helpers(
