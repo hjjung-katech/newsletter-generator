@@ -6,7 +6,7 @@ Newsletter Generator - Custom Tools
 import json
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, cast
 
 import markdownify
 import requests  # type: ignore[import-untyped]
@@ -17,11 +17,22 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.tools import ToolException
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from newsletter_core.application.tools_search_flow import (
+    SerperKeywordFailure,
+    SerperKeywordReport,
+    SerperLogMessage,
+    SerperSearchPlan,
+    SerperSearchRequestError,
+    SerperSearchResponseDecodeError,
+    build_serper_failure_log_messages,
+    build_serper_keyword_log_messages,
+    build_serper_search_plans,
+    execute_serper_search_plan,
+    summarize_serper_search_reports,
+)
 from newsletter_core.application.tools_support import (
-    build_serper_payload,
     extract_common_theme_fallback,
     parse_generated_keywords,
-    parse_serper_response,
     resolve_filename_theme,
     resolve_search_request,
     sanitize_filename,
@@ -34,6 +45,33 @@ from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
+
+
+def _execute_serper_search_request(
+    search_plan: SerperSearchPlan,
+) -> dict[str, Any]:
+    try:
+        response = requests.request(
+            "POST",
+            search_plan.url,
+            headers=search_plan.headers,
+            data=search_plan.payload,
+        )
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        raise SerperSearchRequestError(str(exc)) from exc
+
+    try:
+        raw_results = response.json()
+    except json.JSONDecodeError as exc:
+        raise SerperSearchResponseDecodeError(response.text) from exc
+
+    return cast(dict[str, Any], raw_results)
+
+
+def _emit_serper_log_messages(log_messages: list[SerperLogMessage]) -> None:
+    for log_message in log_messages:
+        getattr(logger, log_message.level)(log_message.message)
 
 
 @tool  # type: ignore[untyped-decorator]
@@ -51,87 +89,42 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
         raise ToolException("SERPER_API_KEY not found. Please set it in the .env file.")
 
     search_request = resolve_search_request(keywords, num_results)
-    all_collected_articles = []
-    keyword_article_counts = {}
+    search_plans = build_serper_search_plans(
+        search_request, api_key=config.SERPER_API_KEY
+    )
+    keyword_reports: list[SerperKeywordReport] = []
 
     logger.info("\nStarting article collection process:")
-    for keyword in search_request.keywords:
-        logger.info(f"Searching articles for keyword: '{keyword}'")
-        url = "https://google.serper.dev/news"
-        payload = build_serper_payload(keyword, search_request.num_results)
+    for search_plan in search_plans:
+        logger.info(f"Searching articles for keyword: '{search_plan.keyword}'")
+        keyword_result = execute_serper_search_plan(
+            search_plan,
+            executor=_execute_serper_search_request,
+        )
 
-        headers = {
-            "X-API-KEY": config.SERPER_API_KEY,
-            "Content-Type": "application/json",
-        }
-
-        try:
-            response = requests.request("POST", url, headers=headers, data=payload)
-            response.raise_for_status()
-
-            results = response.json()
-            parsed_results = parse_serper_response(results, search_request.num_results)
-
-            for container_name in parsed_results.container_names:
-                logger.info(f"Found '{container_name}' results for keyword '{keyword}'")
-
-            logger.info(
-                f"Total container items found: {parsed_results.container_count}"
+        if isinstance(keyword_result, SerperKeywordFailure):
+            _emit_serper_log_messages(
+                list(build_serper_failure_log_messages(keyword_result))
             )
+            continue
 
-            # 디버깅: 응답 구조 확인
-            if not parsed_results.container_count and results:
-                logger.warning(
-                    f"Warning: No result containers found. Available keys: {list(results.keys())}"
-                )
-                if len(results.keys()) <= 3:  # 키가 적으면 전체 구조 확인
-                    logger.warning(
-                        f"Response structure: {json.dumps(results, ensure_ascii=False)[:300]}..."
-                    )
+        _emit_serper_log_messages(
+            list(build_serper_keyword_log_messages(keyword_result))
+        )
+        keyword_reports.append(keyword_result)
 
-            # 각 아이템 처리
-            articles_for_keyword = parsed_results.articles
-            for item_idx, item in enumerate(articles_for_keyword):
-                # 디버깅 정보 (첫 3개 항목만)
-                if item_idx < 3:
-                    logger.debug(
-                        f"Debug: Item keys (index: {item_idx}): {list(item.keys())}"
-                    )
-                    raw_date_val = item.get("date")
-                    raw_published_at_val = item.get("publishedAt")
-                    logger.debug(
-                        f"Debug: Date value: '{raw_date_val}' / PublishedAt: '{raw_published_at_val}'"
-                    )
-
-            if not articles_for_keyword:
-                logger.warning(f"No articles could be parsed for keyword '{keyword}'.")
-
-            num_found = len(articles_for_keyword)
-            keyword_article_counts[keyword] = num_found
-            logger.info(f"Found {num_found} articles for keyword: '{keyword}'")
-            all_collected_articles.extend(articles_for_keyword)
-
-        except requests.exceptions.RequestException as e:
-            logger.error(
-                f"Error fetching articles for keyword '{keyword}' from Serper.dev: {e}"
-            )
-            # Continue to next keyword if one fails
-        except json.JSONDecodeError:
-            logger.error(
-                f"Error decoding JSON response for keyword '{keyword}' from Serper.dev. Response: {response.text}"
-            )
-            # Continue to next keyword
+    search_summary = summarize_serper_search_reports(keyword_reports)
 
     # 검색 결과 간결 표시
-    total_collected = len(all_collected_articles)
-    if keyword_article_counts and total_collected > 0:
-        show_collection_brief(keyword_article_counts)
+    total_collected = len(search_summary.all_articles)
+    if search_summary.keyword_article_counts and total_collected > 0:
+        show_collection_brief(search_summary.keyword_article_counts)
     elif total_collected > 0:
         logger.info(f"📰 총 {total_collected}개 기사 수집 완료")
     else:
         logger.warning("⚠️  수집된 기사가 없습니다")
 
-    return all_collected_articles
+    return cast(List[Dict], search_summary.all_articles)
 
 
 @tool  # type: ignore[untyped-decorator]

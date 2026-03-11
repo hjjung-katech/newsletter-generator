@@ -49,7 +49,7 @@ def build_serper_payload(keyword: str, num_results: int) -> str:
     return json.dumps({"q": keyword, "gl": "kr", "num": num_results})
 
 
-def _select_serper_containers(
+def select_serper_containers(
     results: Mapping[str, Any]
 ) -> tuple[list[Any], tuple[str, ...]]:
     containers: list[Any] = []
@@ -89,7 +89,7 @@ def parse_serper_response(
 ) -> ParsedSerperResponse:
     """Parse the Serper response while preserving legacy container precedence."""
 
-    containers, container_names = _select_serper_containers(results)
+    containers, container_names = select_serper_containers(results)
     articles = [
         shape_serper_article(cast(Mapping[str, Any], item))
         for item in containers[: min(num_results, len(containers))]
@@ -204,5 +204,6 @@ __all__ = [
     "resolve_filename_theme",
     "resolve_search_request",
     "sanitize_filename",
+    "select_serper_containers",
     "shape_serper_article",
 ]
