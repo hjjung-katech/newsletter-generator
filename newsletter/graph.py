@@ -4,59 +4,34 @@ Newsletter Generator - LangGraph Workflow
 """
 
 import json
-import os  # Added import
-import re  # Added import for regex date parsing
+import os
 import time
-from datetime import datetime, timedelta, timezone  # Added imports
-from typing import Annotated, Any, Dict, List, Literal, Optional, Tuple, TypedDict
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-from langchain_core.messages import HumanMessage
-from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, StateGraph
-from pydantic.v1 import BaseModel, Field  # Updated import for Pydantic v1 compatibility
 
-from . import collect as news_collect
-from . import config
-from .chains import get_newsletter_chain
-from .date_utils import parse_date_string
-from .utils.file_naming import generate_unified_newsletter_filename
-from .utils.logger import (
-    get_logger,
-    show_filter_brief,
-    show_final_brief,
-    step_brief,
-    step_result,
+from newsletter_core.application.graph_workflow import (
+    NewsletterState,
+    build_generation_info,
+    build_initial_graph_state,
+    build_newsletter_chain_payload,
+    normalize_summary_chain_result,
+    parse_graph_article_date,
+    resolve_generation_result,
+    route_after_collect,
+    route_after_compose,
+    route_after_process,
+    route_after_score,
+    route_after_summarize,
 )
+
+from .chains import get_newsletter_chain
+from .utils.file_naming import generate_unified_newsletter_filename
+from .utils.logger import get_logger, step_brief
 
 # 로거 초기화
 logger = get_logger()
-
-
-# State 정의
-class NewsletterState(TypedDict):
-    """뉴스레터 생성 과정의 상태를 정의하는 클래스"""
-
-    # 입력 값
-    keywords: List[str]
-    news_period_days: int  # Configurable days for news recency filter
-    domain: str  # Added domain field
-    template_style: str  # Template style: 'compact' or 'detailed'
-    email_compatible: bool  # Email compatibility processing flag
-    # 중간 결과물
-    collected_articles: Optional[List[Dict]]  # Made Optional
-    processed_articles: Optional[List[Dict]]  # New field
-    ranked_articles: Optional[List[Dict]]  # Articles scored and ranked
-    article_summaries: Optional[Dict]  # Made Optional
-    category_summaries: Optional[Dict]  # 카테고리별 요약 결과
-    newsletter_topic: Optional[str]  # 뉴스레터 주제 필드
-    # 최종 결과물
-    newsletter_html: Optional[str]  # Made Optional
-    # 제어 및 메타데이터
-    error: Optional[str]  # Made Optional
-    status: str  # 'collecting', 'processing', 'summarizing', 'composing', 'complete', 'error'
-    start_time: float
-    step_times: Dict[str, float]
-    total_time: Optional[float]
 
 
 # Store info about the most recent generation for inspection
@@ -80,7 +55,10 @@ def parse_article_date_for_graph(date_str: Any) -> Optional[datetime]:
     Returns:
         datetime 객체 또는 변환 실패 시 None
     """
-    return parse_date_string(date_str)
+    parsed_date = parse_graph_article_date(date_str)
+    if parsed_date is None or isinstance(parsed_date, datetime):
+        return parsed_date
+    raise TypeError(f"Unexpected parsed date type: {type(parsed_date)}")
 
 
 # 노드 함수 정의
@@ -154,9 +132,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
     # Save raw articles with unified naming
     try:
-        keywords_str = "_".join(state["keywords"]) if state["keywords"] else "unknown"
+        domain_value = state.get("domain")
         domain_str = (
-            state["domain"].replace(" ", "_") if state.get("domain") else "general"
+            domain_value.replace(" ", "_")
+            if isinstance(domain_value, str) and domain_value
+            else "general"
         )
 
         # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
@@ -292,11 +272,11 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
 
         # 파일 저장
         try:
-            keywords_str = (
-                "_".join(state["keywords"]) if state["keywords"] else "unknown"
-            )
+            domain_value = state.get("domain")
             domain_str = (
-                state["domain"].replace(" ", "_") if state.get("domain") else "general"
+                domain_value.replace(" ", "_")
+                if isinstance(domain_value, str) and domain_value
+                else "general"
             )
 
             # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
@@ -364,13 +344,9 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
         newsletter_chain = get_newsletter_chain(is_compact=is_compact)
 
         # 체인 실행을 위한 데이터 준비
-        chain_data = {
-            "articles": ranked_articles,
-            "keywords": state.get("keywords", []),
-            "domain": state.get("domain", ""),
-            "email_compatible": state.get("email_compatible", False),
-            "template_style": template_style,
-        }
+        chain_data = build_newsletter_chain_payload(
+            state, ranked_articles, template_style
+        )
 
         logger.info(
             f"Generating newsletter using {template_style} style for {len(ranked_articles)} articles"
@@ -383,39 +359,19 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
         result = newsletter_chain.invoke(chain_data)
 
         if isinstance(result, str):
-            # 레거시 형식 (HTML 문자열)
-            logger.info(f"[yellow]Received HTML string (legacy format)[/yellow]")
-            newsletter_html = result
-            structured_data = {
-                "newsletter_topic": state.get("domain", ""),
-                "keywords": state.get("keywords", []),
-                "generation_date": datetime.now().strftime("%Y-%m-%d"),
-                "articles_count": len(ranked_articles),
-            }
-            sections = []
-            mode = template_style
-        elif isinstance(result, dict):
-            # 새로운 형식 (구조화된 결과)
-            newsletter_html = result.get("html", "")
-            structured_data = result.get("structured_data", {})
-            sections = result.get("sections", [])
-            mode = result.get("mode", template_style)
+            logger.info("[yellow]Received HTML string (legacy format)[/yellow]")
 
-            # 주요 메타데이터 추가
-            structured_data.update(
-                {
-                    "keywords": state.get("keywords", []),
-                    "domain": state.get("domain", ""),
-                    "template_style": template_style,
-                    "email_compatible": state.get("email_compatible", False),
-                    "articles_count": len(ranked_articles),
-                    "generation_timestamp": datetime.now().isoformat(),
-                }
-            )
-        else:
-            raise ValueError(
-                f"Unexpected result type from newsletter chain: {type(result)}"
-            )
+        (
+            newsletter_html,
+            category_summaries,
+            newsletter_topic,
+        ) = normalize_summary_chain_result(
+            result,
+            state=state,
+            template_style=template_style,
+            article_count=len(ranked_articles),
+            generated_at=datetime.now(),
+        )
 
         step_times = state.get("step_times", {})
         step_times["summarize"] = time.time() - start_time
@@ -423,13 +379,8 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
         return {
             **state,
             "newsletter_html": newsletter_html,
-            "category_summaries": {
-                "sections": sections,
-                "structured_data": structured_data,
-            },
-            "newsletter_topic": structured_data.get(
-                "newsletter_topic", state.get("domain", "")
-            ),
+            "category_summaries": category_summaries,
+            "newsletter_topic": newsletter_topic,
             "status": "summarizing_complete",
             "step_times": step_times,
         }
@@ -477,7 +428,7 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
     try:
         # 이미 체인에서 HTML이 생성된 경우 그대로 사용
         if newsletter_html:
-            logger.info(f"[cyan]Using pre-generated HTML from chains[/cyan]")
+            logger.info("[cyan]Using pre-generated HTML from chains[/cyan]")
             final_html = newsletter_html
         else:
             # Fallback: 기존 로직으로 HTML 생성 (현재는 체인이 담당)
@@ -488,8 +439,11 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
             keywords_str = (
                 "_".join(state["keywords"]) if state["keywords"] else "unknown"
             )
+            domain_value = state.get("domain")
             domain_str = (
-                state["domain"].replace(" ", "_") if state.get("domain") else "general"
+                domain_value.replace(" ", "_")
+                if isinstance(domain_value, str) and domain_value
+                else "general"
             )
             template_style = state.get("template_style", "detailed")
 
@@ -558,37 +512,14 @@ def create_newsletter_graph() -> StateGraph:
     workflow.add_node("handle_error", handle_error)
 
     # 엣지 추가 (노드 간 전환)
-    workflow.add_conditional_edges(
-        "collect_articles",
-        lambda state: (
-            "handle_error" if state.get("status") == "error" else "process_articles"
-        ),  # Route to process_articles
-    )
-    workflow.add_conditional_edges(
-        "process_articles",  # Edges from new node
-        lambda state: (
-            "handle_error"
-            if state.get("status") == "error"
-            else (
-                "score_articles" if state.get("processed_articles") else "handle_error"
-            )
-        ),
-    )
-    workflow.add_conditional_edges(
-        "score_articles",
-        lambda state: (
-            "handle_error" if state.get("status") == "error" else "summarize_articles"
-        ),
-    )
-    workflow.add_conditional_edges(
-        "summarize_articles",
-        lambda state: (
-            "handle_error" if state.get("status") == "error" else "compose_newsletter"
-        ),
-    )
+    workflow.add_conditional_edges("collect_articles", route_after_collect)
+    workflow.add_conditional_edges("process_articles", route_after_process)
+    workflow.add_conditional_edges("score_articles", route_after_score)
+    workflow.add_conditional_edges("summarize_articles", route_after_summarize)
     workflow.add_conditional_edges(
         "compose_newsletter",
-        lambda state: "handle_error" if state.get("status") == "error" else END,
+        route_after_compose,
+        {"handle_error": "handle_error", "complete": END},
     )
     workflow.add_edge("handle_error", END)
 
@@ -602,7 +533,7 @@ def create_newsletter_graph() -> StateGraph:
 def generate_newsletter(
     keywords: List[str],
     news_period_days: int = 14,
-    domain: str = None,
+    domain: Optional[str] = None,
     template_style: str = "compact",
     email_compatible: bool = False,
 ) -> Tuple[str, str]:
@@ -660,46 +591,27 @@ def generate_newsletter(
     theme_time = time.time() - theme_start
 
     # 초기 상태 생성
-    initial_state: NewsletterState = {
-        "keywords": keywords,
-        "news_period_days": news_period_days,
-        "domain": domain,
-        "template_style": template_style,
-        "email_compatible": email_compatible,
-        "newsletter_topic": newsletter_topic,
-        "collected_articles": None,
-        "processed_articles": None,
-        "ranked_articles": None,
-        "article_summaries": None,
-        "category_summaries": None,
-        "newsletter_html": None,
-        "error": None,
-        "status": "collecting",
-        "start_time": workflow_start,
-        "step_times": {"extract_theme": theme_time},
-        "total_time": None,
-    }
+    initial_state = build_initial_graph_state(
+        keywords=keywords,
+        news_period_days=news_period_days,
+        domain=domain,
+        template_style=template_style,
+        email_compatible=email_compatible,
+        newsletter_topic=newsletter_topic,
+        workflow_start=workflow_start,
+        theme_time=theme_time,
+    )
 
     # 그래프 생성 및 실행
     graph = create_newsletter_graph()
-    final_state = graph.invoke(initial_state)  # type: ignore
+    final_state = cast(NewsletterState, graph.invoke(initial_state))
     final_state["total_time"] = time.time() - workflow_start
 
     global _last_generation_info
-    _last_generation_info = {
-        "step_times": final_state.get("step_times", {}),
-        "total_time": final_state.get("total_time"),
-        "cost_summary": get_cost_summary(),
-    }
+    _last_generation_info = build_generation_info(final_state, get_cost_summary())
 
-    # 결과 반환
-    if (
-        final_state.get("status") == "complete"
-        and final_state.get("newsletter_html") is not None
-    ):
-        return final_state["newsletter_html"], "success"  # type: ignore
-    else:
-        error_message = final_state.get("error", "알 수 없는 오류 발생")
-        return (
-            error_message if error_message is not None else "알 수 없는 오류 발생"
-        ), "error"
+    generation_result = resolve_generation_result(final_state)
+    if isinstance(generation_result, tuple) and len(generation_result) == 2:
+        html_content, status = generation_result
+        return str(html_content), str(status)
+    raise TypeError(f"Unexpected generation result type: {type(generation_result)}")

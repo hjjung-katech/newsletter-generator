@@ -18,7 +18,9 @@ def _clear_module_cache() -> None:
         "newsletter.centralized_settings",
         "newsletter.settings",
         "newsletter.cli",
+        "newsletter.graph",
         "newsletter.llm_factory",
+        "newsletter_core.application.graph_workflow",
         "newsletter_core.public.settings",
     )
     for name in list(sys.modules):
@@ -219,3 +221,19 @@ def test_llm_factory_import_does_not_mutate_google_environment(
 
     assert after == before
     assert repr(module.llm_factory) == "<LazyLLMFactory proxy>"
+
+
+@pytest.mark.unit
+def test_graph_workflow_helper_import_does_not_call_load_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"count": 0}
+
+    def _fake_load_dotenv(*_args, **_kwargs):
+        calls["count"] += 1
+        return False
+
+    monkeypatch.setattr(dotenv, "load_dotenv", _fake_load_dotenv)
+    _clear_module_cache()
+    importlib.import_module("newsletter_core.application.graph_workflow")
+    assert calls["count"] == 0
