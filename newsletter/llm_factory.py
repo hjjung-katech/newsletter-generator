@@ -13,6 +13,11 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional, cast
 
+from newsletter_core.application.llm_factory import (
+    build_provider_info,
+    get_default_model,
+    resolve_provider_selection,
+)
 from newsletter_core.public.settings import get_llm_config
 
 from .cost_tracking import get_cost_callback_for_provider
@@ -680,6 +685,26 @@ class LLMFactory:
     def llm_config(self) -> Dict[str, Any]:
         return cast(Dict[str, Any], get_llm_config())
 
+    def _build_callbacks(
+        self,
+        provider_name: str,
+        callbacks: Optional[List[Any]] = None,
+        *,
+        fallback_path: bool = False,
+    ) -> List[Any]:
+        final_callbacks = list(callbacks) if callbacks else []
+        try:
+            cost_callback = get_cost_callback_for_provider(provider_name)
+            final_callbacks.append(cost_callback)
+        except Exception as e:
+            message = (
+                f"비용 추적 추가 ({provider_name})"
+                if fallback_path
+                else f"Warning: Failed to add cost tracking for {provider_name}"
+            )
+            handle_exception(e, message, log_level=logging.INFO)
+        return final_callbacks
+
     def get_llm_for_task(
         self,
         task: str,
@@ -697,72 +722,26 @@ class LLMFactory:
         Returns:
             LLM 모델 인스턴스 (fallback 기능 포함)
         """
-        model_config = self.llm_config.get("models", {}).get(task)
+        selection = resolve_provider_selection(
+            self.llm_config,
+            task,
+            self.providers.keys(),
+            self.get_available_providers(),
+        )
+        provider_name = selection.selected_provider
+        provider = self.providers[provider_name]
 
-        if not model_config:
-            # 기본 설정 사용
-            provider_name = self.llm_config.get("default_provider", "gemini")
-            model_config = {
-                "provider": provider_name,
-                "model": self._get_default_model(provider_name),
-                "temperature": 0.3,
-                "max_retries": 2,
-                "timeout": 60,
-            }
-
-        provider_name = model_config.get("provider", "gemini")
-        provider = self.providers.get(provider_name)
-
-        if not provider:
-            raise ValueError(f"Unknown provider: {provider_name}")
-
-        # 비용 추적 콜백 자동 추가
-        final_callbacks = list(callbacks) if callbacks else []
-        try:
-            cost_callback = get_cost_callback_for_provider(provider_name)
-            final_callbacks.append(cost_callback)
-        except Exception as e:
-            handle_exception(
-                e,
-                f"Warning: Failed to add cost tracking for {provider_name}",
-                log_level=logging.INFO,
+        if selection.used_fallback:
+            logger.warning(
+                f"{selection.requested_provider}을 사용할 수 없어 {provider_name}으로 대체합니다"
             )
 
-        if not provider.is_available():
-            # Fallback to available provider
-            for fallback_name, fallback_provider in self.providers.items():
-                if fallback_provider.is_available():
-                    logger.warning(f"{provider_name}을 사용할 수 없어 {fallback_name}으로 대체합니다")
-                    model_config = model_config.copy()
-                    model_config["provider"] = fallback_name
-                    model_config["model"] = self._get_default_model(fallback_name)
-
-                    # Fallback 제공자에 대한 비용 추적 콜백 업데이트
-                    final_callbacks = list(callbacks) if callbacks else []
-                    try:
-                        cost_callback = get_cost_callback_for_provider(fallback_name)
-                        final_callbacks.append(cost_callback)
-                    except Exception as e:
-                        handle_exception(
-                            e,
-                            f"비용 추적 추가 ({fallback_name})",
-                            log_level=logging.INFO,
-                        )
-                        # 비용 추적 실패는 치명적이지 않음
-
-                    llm = fallback_provider.create_model(model_config, final_callbacks)
-
-                    # Fallback 래퍼 적용
-                    if enable_fallback:
-                        return LLMWithFallback(llm, self, task, final_callbacks)
-                    else:
-                        return llm
-
-            raise ValueError(
-                "No LLM providers are available. Please check your API keys."
-            )
-
-        llm = provider.create_model(model_config, final_callbacks)
+        final_callbacks = self._build_callbacks(
+            provider_name,
+            callbacks,
+            fallback_path=selection.used_fallback,
+        )
+        llm = provider.create_model(selection.model_config, final_callbacks)
 
         # Fallback 래퍼 적용
         if enable_fallback:
@@ -772,14 +751,8 @@ class LLMFactory:
 
     def _get_default_model(self, provider_name: str) -> str:
         """제공자별 기본 모델명을 반환합니다."""
-        provider_models = self.llm_config.get("provider_models", {})
-        models = provider_models.get(provider_name, {})
-        default_model = {
-            "gemini": "gemini-1.5-pro",
-            "openai": "gpt-4o",
-            "anthropic": "claude-3-sonnet-20240229",
-        }.get(provider_name, "gemini-1.5-pro")
-        return cast(str, models.get("standard", default_model))
+        default_model: str = get_default_model(self.llm_config, provider_name)
+        return default_model
 
     def get_available_providers(self) -> List[str]:
         """사용 가능한 제공자 목록을 반환합니다."""
@@ -789,13 +762,15 @@ class LLMFactory:
 
     def get_provider_info(self) -> Dict[str, Dict[str, Any]]:
         """각 제공자의 사용 가능 여부와 모델 정보를 반환합니다."""
-        info = {}
-        for name, provider in self.providers.items():
-            info[name] = {
-                "available": provider.is_available(),
-                "models": self.llm_config.get("provider_models", {}).get(name, {}),
-            }
-        return info
+        availability = {
+            name: provider.is_available() for name, provider in self.providers.items()
+        }
+        provider_info: Dict[str, Dict[str, Any]] = build_provider_info(
+            self.llm_config,
+            self.providers.keys(),
+            availability,
+        )
+        return provider_info
 
 
 _llm_factory_instance: LLMFactory | None = None

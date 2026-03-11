@@ -48,6 +48,8 @@ class LLMFactory:
         # 자동 fallback 지원
 ```
 
+- 현재 provider/model 선택, 설정 정규화, provider info shaping 같은 순수 결정 로직은 `newsletter_core/application/llm_factory.py` 로 이관되었고, `newsletter/llm_factory.py` 는 provider SDK wiring, env access, fallback execution, legacy import path 호환을 담당하는 compatibility boundary로 유지됩니다.
+
 ### 0.3. 자동 Fallback 시스템
 
 API 할당량 초과나 오류 발생 시 자동으로 다른 제공자로 전환:
