@@ -4,33 +4,39 @@ Newsletter Generator - Custom Tools
 """
 
 import json
+import logging
 import os
-import re
-import time
-import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import markdownify
-import requests
+import requests  # type: ignore[import-untyped]
 from bs4 import BeautifulSoup
 from langchain.prompts import PromptTemplate
 from langchain.tools import tool
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.outputs import Generation, LLMResult
 from langchain_core.tools import ToolException
 from langchain_google_genai import ChatGoogleGenerativeAI
-from rich.console import Console
+
+from newsletter_core.application.tools_support import (
+    build_serper_payload,
+    extract_common_theme_fallback,
+    parse_generated_keywords,
+    parse_serper_response,
+    resolve_filename_theme,
+    resolve_search_request,
+    sanitize_filename,
+)
 
 from . import config
-from .utils.logger import get_logger, show_collection_brief
+from .html_utils import clean_html_markers
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger, show_collection_brief
 
 # 로거 초기화
 logger = get_logger()
-console = Console()
 
 
-@tool
+@tool  # type: ignore[untyped-decorator]
 def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     """
     Search for news articles using the Serper.dev API for each keyword.
@@ -44,23 +50,15 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     if not config.SERPER_API_KEY:
         raise ToolException("SERPER_API_KEY not found. Please set it in the .env file.")
 
-    if num_results > 20:
-        num_results = 20  # Limit to 20 results max
-
-    individual_keywords = [kw.strip() for kw in keywords.split(",")]
+    search_request = resolve_search_request(keywords, num_results)
     all_collected_articles = []
     keyword_article_counts = {}
 
     logger.info("\nStarting article collection process:")
-    for keyword in individual_keywords:
+    for keyword in search_request.keywords:
         logger.info(f"Searching articles for keyword: '{keyword}'")
-        # 뉴스 전용 엔드포인트 사용으로 변경
         url = "https://google.serper.dev/news"
-
-        # 뉴스 전용 엔드포인트는 단순한 파라미터만 필요
-        payload = json.dumps(
-            {"q": keyword, "gl": "kr", "num": num_results}  # 한국 지역 결과
-        )
+        payload = build_serper_payload(keyword, search_request.num_results)
 
         headers = {
             "X-API-KEY": config.SERPER_API_KEY,
@@ -72,31 +70,17 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
             response.raise_for_status()
 
             results = response.json()
-            articles_for_keyword = []
+            parsed_results = parse_serper_response(results, search_request.num_results)
 
-            # 여러 가능한 결과 컨테이너를 확인하여 데이터 추출
-            containers = []
+            for container_name in parsed_results.container_names:
+                logger.info(f"Found '{container_name}' results for keyword '{keyword}'")
 
-            # 1. 'news' 키 확인 (뉴스 엔드포인트의 주요 응답 형식)
-            if "news" in results:
-                logger.info(f"Found 'news' results for keyword '{keyword}'")
-                containers.extend(results["news"])
-
-            # 2. 'topStories' 키도 확인 (일부 응답에 존재할 수 있음)
-            if "topStories" in results:
-                logger.info(f"Found 'topStories' results for keyword '{keyword}'")
-                containers.extend(results["topStories"])
-
-            # 3. 'organic' 키 확인 (fallback - 일반 검색 결과)
-            if "organic" in results and not containers:
-                logger.info(f"Found 'organic' results for keyword '{keyword}'")
-                containers.extend(results["organic"])
-
-            # 결과 로깅
-            logger.info(f"Total container items found: {len(containers)}")
+            logger.info(
+                f"Total container items found: {parsed_results.container_count}"
+            )
 
             # 디버깅: 응답 구조 확인
-            if not containers and results:
+            if not parsed_results.container_count and results:
                 logger.warning(
                     f"Warning: No result containers found. Available keys: {list(results.keys())}"
                 )
@@ -106,9 +90,8 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
                     )
 
             # 각 아이템 처리
-            for item_idx, item in enumerate(
-                containers[: min(num_results, len(containers))]
-            ):
+            articles_for_keyword = parsed_results.articles
+            for item_idx, item in enumerate(articles_for_keyword):
                 # 디버깅 정보 (첫 3개 항목만)
                 if item_idx < 3:
                     logger.debug(
@@ -119,17 +102,6 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
                     logger.debug(
                         f"Debug: Date value: '{raw_date_val}' / PublishedAt: '{raw_published_at_val}'"
                     )
-                # 공통 형식으로 변환
-                article = {
-                    "title": item.get("title", "제목 없음"),
-                    "url": item.get("link", ""),
-                    "link": item.get("link", ""),  # 호환성을 위해 link도 추가
-                    "snippet": item.get("snippet")
-                    or item.get("description", "내용 없음"),
-                    "source": item.get("source", "출처 없음"),
-                    "date": item.get("date") or item.get("publishedAt") or "날짜 없음",
-                }
-                articles_for_keyword.append(article)
 
             if not articles_for_keyword:
                 logger.warning(f"No articles could be parsed for keyword '{keyword}'.")
@@ -162,7 +134,7 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
     return all_collected_articles
 
 
-@tool
+@tool  # type: ignore[untyped-decorator]
 def fetch_article_content(url: str) -> Dict[str, Any]:
     """
     Fetch the full content of an article from its URL.
@@ -264,7 +236,7 @@ def fetch_article_content(url: str) -> Dict[str, Any]:
         raise ToolException(f"Error fetching article content: {str(e)}")
 
 
-@tool
+@tool  # type: ignore[untyped-decorator]
 def save_newsletter_locally(
     html_content: str, filename_base: str, output_format: str = "html"
 ) -> str:
@@ -308,12 +280,11 @@ def save_newsletter_locally(
         raise ToolException(f"Error saving newsletter locally: {e}")
 
 
-# clean_html_markers 함수는 newsletter.html_utils 모듈로 이동했습니다.
-from .html_utils import clean_html_markers
-
-
+# Keyword generation still owns LLM/runtime glue in the legacy wrapper.
 def generate_keywords_with_gemini(
-    domain: str, count: int = 10, callbacks=None
+    domain: str,
+    count: int = 10,
+    callbacks: list[Any] | None = None,
 ) -> list[str]:
     """
     Generates high-quality trend keywords for a given domain using configured LLM.
@@ -388,30 +359,7 @@ def generate_keywords_with_gemini(
         # 실행 및 응답 처리
         response_content = chain.invoke({"domain": domain, "count": count})
         logger.debug(f"Raw response from Gemini:\n{response_content}")
-
-        # 응답 처리
-        keywords = []
-        for line in response_content.split("\n"):
-            if not line.strip():
-                continue
-
-            # 앞의 번호 및 마크다운 볼드 표시 제거
-            clean_line = re.sub(r"^\d+\.?\s*", "", line.strip())
-            clean_line = re.sub(r"\*\*(.+?)\*\*", r"\1", clean_line)
-
-            # 괄호 안의 영어 설명 제거 (있는 경우)
-            clean_line = re.sub(r"\s*\(.+?\)\s*$", "", clean_line)
-
-            if clean_line:
-                keywords.append(clean_line)
-
-        # 키워드 형식 처리
-        final_keywords = keywords[:count]
-        if len(final_keywords) < count and keywords:
-            final_keywords = keywords
-
-        if len(final_keywords) == 1 and "," in final_keywords[0]:
-            final_keywords = [kw.strip() for kw in final_keywords[0].split(",")][:count]
+        final_keywords = parse_generated_keywords(response_content, count)
 
         # 키워드 효과성 검증 (옵션)
         final_keywords = validate_and_refine_keywords(
@@ -437,7 +385,7 @@ def validate_and_refine_keywords(
     validated_keywords = []
     replacement_needed = []
 
-    logger.info(f"\n검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...")
+    logger.info("\n검증 중: 각 키워드가 충분한 뉴스 결과를 반환하는지 확인합니다...")
 
     for keyword in keywords:
         try:
@@ -448,9 +396,7 @@ def validate_and_refine_keywords(
 
             if len(test_results) >= min_results_per_keyword:
                 validated_keywords.append(keyword)
-                logger.info(
-                    f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]"
-                )
+                logger.info(f"[green]✓ '{keyword}': {len(test_results)}개 결과 확인[/green]")
             else:
                 replacement_needed.append(keyword)
                 logger.info(
@@ -468,14 +414,18 @@ def validate_and_refine_keywords(
         )
 
         # 이 부분도 수정 필요 - domain 변수가 함수 내에서 접근할 수 없음
-        new_keywords = []  # 임시 빈 리스트로 대체
+        new_keywords: list[str] = []  # 임시 빈 리스트로 대체
 
         validated_keywords.extend(new_keywords)
 
     return validated_keywords[:count]  # 원래 요청한 개수만큼 반환
 
 
-def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
+def extract_common_theme_from_keywords(
+    keywords: Any,
+    api_key: str | None = None,
+    callbacks: list[Any] | None = None,
+) -> str:
     """Extracts a common theme from a list of keywords using configured LLM."""
     if not keywords:
         return "General News"
@@ -492,15 +442,12 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
     )
 
     if not has_any_api_key:
-        logger.warning(
-            "API 키가 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다."
-        )
+        logger.warning("API 키가 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다.")
         return extract_common_theme_fallback(keywords)
 
     try:
         # LLM 팩토리를 사용하여 테마 추출에 최적화된 모델 사용
         try:
-            from langchain_core.messages import HumanMessage
             from langchain_core.output_parsers import StrOutputParser
             from langchain_core.prompts import PromptTemplate
 
@@ -514,8 +461,6 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
 
                     callbacks += get_tracking_callbacks()
                 except Exception as e:
-                    import logging
-
                     logging.warning(f"get_tracking_callbacks 예외 발생: {e}")
 
             llm = get_llm_for_task("theme_extraction", callbacks, enable_fallback=False)
@@ -536,21 +481,17 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
             if len(extracted_theme) > 30:
                 extracted_theme = extracted_theme[:30]
 
-            return extracted_theme.strip()
+            return str(extracted_theme).strip()
 
         except Exception as e:
-            logger.warning(
-                f"LLM 팩토리를 통한 테마 추출이 실패했습니다. 대체 방법을 사용합니다: {e}"
-            )
+            logger.warning(f"LLM 팩토리를 통한 테마 추출이 실패했습니다. 대체 방법을 사용합니다: {e}")
             # Check if API key is available before trying Gemini fallback
             if not api_key:
-                logger.warning(
-                    "GEMINI_API_KEY를 찾을 수 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다."
-                )
+                logger.warning("GEMINI_API_KEY를 찾을 수 없습니다. 테마 추출을 위한 간단한 대체 방법을 사용합니다.")
                 return extract_common_theme_fallback(keywords)
 
         # Fallback using LangChain Google GenAI
-        from langchain_core.messages import HumanMessage
+        from langchain_core.messages import HumanMessage as FallbackHumanMessage
 
         from .llm_factory import get_llm_for_task
 
@@ -567,8 +508,8 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
 - 반드시 한국어로 답변해 주세요
 """
 
-            response = llm.invoke([HumanMessage(content=final_prompt)])
-            extracted_theme = response.content.strip()
+            response = llm.invoke([FallbackHumanMessage(content=final_prompt)])
+            extracted_theme = str(response.content).strip()
 
             if len(extracted_theme) > 30:  # Keep the length check
                 extracted_theme = extracted_theme[:30]
@@ -584,72 +525,7 @@ def extract_common_theme_from_keywords(keywords, api_key=None, callbacks=None):
         return extract_common_theme_fallback(keywords)
 
 
-def extract_common_theme_fallback(keywords):
-    """
-    AI API 없이 간단한 휴리스틱 방식으로 공통 주제 추출을 시도합니다.
-    """
-    if isinstance(keywords, str):
-        keywords = [k.strip() for k in keywords.split(",") if k.strip()]
-
-    if len(keywords) <= 1:
-        return keywords[0] if keywords else ""
-
-    # 공통 도메인을 찾지 못한 경우 - 단순한 키워드 조합 우선
-    if len(keywords) <= 3:
-        return ", ".join(keywords)
-    else:
-        # 4개 이상일 때는 "첫번째키워드 외 (총개수-1)개 분야" 형식
-        return f"{keywords[0]} 외 {len(keywords)-1}개 분야"
-
-
-def sanitize_filename(text):
-    """
-    파일명에 사용할 수 있도록 텍스트를 정리합니다.
-
-    Args:
-        text: 정리할 텍스트
-
-    Returns:
-        파일명에 적합한 문자열
-    """
-    if not text:
-        return "unknown"
-
-    # 1. 파일명에 허용되지 않는 특수 문자 제거 또는 대체
-    invalid_chars = r'[\\/*?:"<>|]'
-    text = re.sub(invalid_chars, "", text)
-
-    # 2. 괄호를 제거하고 내용만 유지
-    text = re.sub(r"\(([^)]*)\)", r"\1", text)
-
-    # 3. 공백을 언더스코어로 변경
-    text = text.replace(" ", "_")
-
-    # 4. 콤마, 마침표 등 추가 문자 처리
-    text = text.replace(",", "")
-    text = text.replace(".", "")
-
-    # 5. 연속된 언더스코어 처리
-    text = re.sub(r"_{2,}", "_", text)
-
-    # 6. 파일명 길이 제한 (최대 50자)
-    if len(text) > 50:
-        # 긴 내용 처리: 방법 1 - 단어 단위로 제한
-        words = text.split("_")
-        if len(words) > 3:
-            result = "_".join(words[:3]) + "_etc"
-            # 결과가 여전히 50자 초과인 경우
-            if len(result) > 50:
-                result = result[:46] + "_etc"
-            return result
-        else:
-            # 방법 2 - 글자 수 직접 제한
-            return text[:46] + "_etc"
-
-    return text
-
-
-def get_filename_safe_theme(keywords, domain=None):
+def get_filename_safe_theme(keywords: Any, domain: str | None = None) -> str:
     """
     키워드 또는 도메인에서 파일명에 안전한 테마 문자열을 생성합니다.
 
@@ -660,19 +536,11 @@ def get_filename_safe_theme(keywords, domain=None):
     Returns:
         파일명에 적합한 테마 문자열
     """
-    # 1. 먼저 적절한 테마를 선택
-    if domain:
-        theme = domain
-    elif isinstance(keywords, list) and len(keywords) == 1:
-        theme = keywords[0]
-    elif (isinstance(keywords, list) and len(keywords) > 1) or (
-        isinstance(keywords, str) and "," in keywords
-    ):
-        theme = extract_common_theme_from_keywords(keywords)
-    else:
-        theme = keywords if isinstance(keywords, str) else ""
-
-    # 2. 테마를 파일명에 적합하게 정리
+    theme = resolve_filename_theme(
+        keywords,
+        domain,
+        theme_extractor=extract_common_theme_from_keywords,
+    )
     return sanitize_filename(theme)
 
 
@@ -687,8 +555,6 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     Returns:
         list: 생성된 요약문 문단 목록
     """
-    from . import config
-
     # LLM 팩토리를 사용하여 섹션 재생성에 최적화된 모델 사용
     try:
         from langchain_core.messages import HumanMessage
@@ -717,11 +583,11 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
 
         prompt = f"""
         다음은 '{section_title}'에 관련된 뉴스 기사 목록입니다:
-        
+
         {news_links_text}
-        
+
         위 뉴스 기사들을 바탕으로 '{section_title}'에 대한 종합적인 요약문을 작성해주세요.
-        
+
         요구사항:
         1. 1개의 문단으로 나누어 작성해주세요. 각 문단은 최소 3-4문장 이상으로 구성해주세요.
         2. 문단은 주요 트렌드나 동향을 설명해주세요.
@@ -744,9 +610,7 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
         return paragraphs[:3]
 
     except Exception as e:
-        logger.warning(
-            f"LLM 팩토리를 통한 섹션 재생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
-        )
+        logger.warning(f"LLM 팩토리를 통한 섹션 재생성이 실패했습니다. 대체 방법을 사용합니다: {e}")
 
     # Fallback using LangChain Google GenAI
     from langchain_core.messages import HumanMessage
@@ -777,11 +641,11 @@ def regenerate_section_with_gemini(section_title: str, news_links: list) -> list
     # 프롬프트 구성
     prompt = f"""
     다음은 '{section_title}'에 관련된 뉴스 기사 목록입니다:
-    
+
     {news_links_text}
-    
+
     위 뉴스 기사들을 바탕으로 '{section_title}'에 대한 종합적인 요약문을 작성해주세요.
-    
+
     요구사항:
     1. 3개의 문단으로 나누어 작성해주세요. 각 문단은 최소 3-4문장 이상으로 구성해주세요.
     2. 첫 번째 문단은 주요 트렌드나 동향을 설명해주세요.
@@ -831,8 +695,6 @@ def generate_introduction_with_gemini(
     Returns:
         str: 생성된 소개 메시지
     """
-    from . import config
-
     # LLM 팩토리를 사용하여 소개 생성에 최적화된 모델 사용
     try:
         from langchain_core.messages import HumanMessage
@@ -850,14 +712,14 @@ def generate_introduction_with_gemini(
 
         prompt = f"""
         다음은 뉴스레터의 주제와 포함된 섹션 제목들입니다:
-        
+
         뉴스레터 주제: {safe_topic}
-        
+
         섹션 제목:
         {section_titles_text}
-        
+
         위 정보를 바탕으로 뉴스레터의 소개 메시지를 작성해주세요.
-        
+
         요구사항:
         1. 전문적이고 친절한 톤으로 작성해주세요.
         2. 2-3 문장으로 간결하게 작성해주세요.
@@ -865,17 +727,15 @@ def generate_introduction_with_gemini(
         4. 한국어로 작성해주세요.
         5. 각 섹션의 핵심 내용이 무엇인지 간략히 언급해주세요.
         6. 'R&D 전략 수립' 또는 '의사결정'에 도움이 될 수 있다는 점을 언급해주세요.
-        
+
         소개 메시지만 반환해 주세요.
         """
 
         response = llm.invoke([HumanMessage(content=prompt)])
-        return response.content.strip()
+        return str(response.content).strip()
 
     except Exception as e:
-        logger.warning(
-            f"LLM 팩토리를 통한 소개 생성이 실패했습니다. 대체 방법을 사용합니다: {e}"
-        )
+        logger.warning(f"LLM 팩토리를 통한 소개 생성이 실패했습니다. 대체 방법을 사용합니다: {e}")
         # Fallback using LangChain Google GenAI
         from .llm_factory import get_llm_for_task
 
@@ -894,14 +754,14 @@ def generate_introduction_with_gemini(
     # 프롬프트 구성
     prompt = f"""
     다음은 뉴스레터의 주제와 포함된 섹션 제목들입니다:
-    
+
     뉴스레터 주제: {safe_topic}
-    
+
     섹션 제목:
     {section_titles_text}
-    
+
     위 정보를 바탕으로 뉴스레터의 소개 메시지를 작성해주세요.
-    
+
     요구사항:
     1. 전문적이고 친절한 톤으로 작성해주세요.
     2. 2-3 문장으로 간결하게 작성해주세요.
@@ -909,13 +769,13 @@ def generate_introduction_with_gemini(
     4. 한국어로 작성해주세요.
     5. 각 섹션의 핵심 내용이 무엇인지 간략히 언급해주세요.
     6. 'R&D 전략 수립' 또는 '의사결정'에 도움이 될 수 있다는 점을 언급해주세요.
-    
+
     소개 메시지만 반환해 주세요.
     """
 
     try:
         response = llm.invoke([HumanMessage(content=prompt)])
-        introduction = response.content.strip()
+        introduction = str(response.content).strip()
 
         return introduction
     except Exception as e:
