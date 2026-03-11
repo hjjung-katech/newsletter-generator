@@ -51,6 +51,7 @@ class LLMFactory:
 - 현재 provider/model 선택, 설정 정규화, provider info shaping 같은 순수 결정 로직은 `newsletter_core/application/llm_factory.py` 로 이관되었고, fallback runtime 설정 정규화, fallback chain 구성, retry/error helper 같은 orchestration helper는 `newsletter_core/application/llm_factory_fallback.py` 로 이동했습니다.
 - provider SDK 생성, env/API key 접근, provider 초기화 입력 조립 같은 runtime adapter 책임은 `newsletter_core/infrastructure/llm_factory_runtime.py` 로 이동했습니다.
 - `newsletter/llm_factory.py` 는 fallback/singleton entrypoint와 legacy import path 호환을 담당하는 thin compatibility boundary로 유지됩니다.
+- `newsletter/tools.py` 는 여전히 legacy integration surface이지만, Serper 입력 정규화/결과 shaping과 theme/filename 순수 helper는 `newsletter_core/application/tools_support.py` 로 이동했고 외부 IO/LLM glue만 legacy wrapper에 남깁니다.
 
 ### 0.3. 자동 Fallback 시스템
 
