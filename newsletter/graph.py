@@ -6,11 +6,34 @@ Newsletter Generator - LangGraph Workflow
 import json
 import os
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 from langgraph.graph import END, StateGraph
 
+from newsletter_core.application.graph_node_helpers import (
+    build_collect_error_state,
+    build_collect_keyword_query,
+    build_collect_success_state,
+    build_compose_error_state,
+    build_compose_missing_data_state,
+    build_compose_success_state,
+    build_process_missing_articles_state,
+    build_process_success_state,
+    build_score_error_state,
+    build_score_missing_articles_state,
+    build_score_success_state,
+    build_summarize_error_state,
+    build_summarize_missing_articles_state,
+    build_summarize_success_state,
+    filter_articles_for_processing,
+    resolve_compose_html,
+    resolve_graph_domain_slug,
+    resolve_graph_keywords_slug,
+    resolve_scoring_domain,
+    resolve_summary_chain_style,
+    sort_articles_by_graph_date_desc,
+)
 from newsletter_core.application.graph_workflow import (
     NewsletterState,
     build_generation_info,
@@ -76,32 +99,25 @@ def collect_articles_node(
 
     try:
         # 기존 Serper API 방식 사용
-        keyword_str = ", ".join(state["keywords"])
+        keyword_str = build_collect_keyword_query(state["keywords"])
         articles = search_news_articles.invoke(
             {"keywords": keyword_str, "num_results": 10}
         )
 
         logger.info(f"Serper API에서 {len(articles)}개 기사 수집 완료")
 
-        step_times = state.get("step_times", {})
-        step_times["collect_articles"] = time.time() - start_time
-        return {
-            **state,
-            "collected_articles": articles,
-            "status": "processing",  # Next status is processing
-            "step_times": step_times,
-        }
+        return build_collect_success_state(
+            state,
+            articles=articles,
+            elapsed=time.time() - start_time,
+        )
     except Exception as e:
         logger.error(f"[red]Error during article collection: {e}[/red]")
-        step_times = state.get("step_times", {})
-        step_times["collect_articles"] = time.time() - start_time
-        return {
-            **state,
-            "collected_articles": [],  # Ensure it's an empty list on error
-            "error": f"기사 수집 중 오류 발생: {str(e)}",
-            "status": "error",
-            "step_times": step_times,
-        }
+        return build_collect_error_state(
+            state,
+            error_message=f"기사 수집 중 오류 발생: {str(e)}",
+            elapsed=time.time() - start_time,
+        )
 
 
 # New node for processing articles
@@ -119,12 +135,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         logger.warning(
             "[yellow]Warning: No articles found to process. Check if collection was successful.[/yellow]"
         )
-        return {
-            **state,
-            "processed_articles": [],
-            "status": "error",
-            "error": "수집된 기사가 없습니다.",
-        }
+        return build_process_missing_articles_state(state)
 
     logger.info(
         f"Processing {len(collected_articles)} articles with {state.get('news_period_days', 7)} day filter..."
@@ -132,12 +143,7 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
 
     # Save raw articles with unified naming
     try:
-        domain_value = state.get("domain")
-        domain_str = (
-            domain_value.replace(" ", "_")
-            if isinstance(domain_value, str) and domain_value
-            else "general"
-        )
+        domain_str = resolve_graph_domain_slug(state)
 
         # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -152,39 +158,11 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
     except Exception as e:
         logger.warning(f"Warning: Failed to save raw articles: {e}")
 
-    # 1. 날짜 기반 필터링
-    articles_within_date_range = []
-    articles_with_missing_date = []
-    articles_with_unparseable_date = []
-    articles_with_date = 0
-    articles_unparseable_date = 0
-    cutoff_date = datetime.now(timezone.utc) - timedelta(
-        days=state.get("news_period_days", 7)
-    )
-
     initial_count = len(collected_articles)
-
-    for article in collected_articles:
-        date_str = article.get("date")
-        if not date_str or date_str == "날짜 없음":
-            articles_with_missing_date.append(article)
-            continue
-
-        parsed_date = parse_article_date_for_graph(date_str)
-        if parsed_date is None:
-            articles_unparseable_date += 1
-            articles_with_unparseable_date.append(article)
-            continue
-
-        articles_with_date += 1
-        if parsed_date >= cutoff_date:
-            articles_within_date_range.append(article)
-
-    # Combine kept articles (recent + missing + unparseable dates)
-    filtered_articles = (
-        articles_within_date_range
-        + articles_with_missing_date
-        + articles_with_unparseable_date
+    filtered_articles = filter_articles_for_processing(
+        collected_articles,
+        news_period_days=state.get("news_period_days", 7),
+        current_time=datetime.now().astimezone(),
     )
 
     show_filter_brief(initial_count, len(filtered_articles), "날짜 필터링")
@@ -211,24 +189,16 @@ def process_articles_node(state: NewsletterState) -> NewsletterState:
         )
         processed_articles_sorted = []
     else:
-        # Article sorting
-        processed_articles_sorted = sorted(
-            deduplicated_articles,
-            key=lambda x: parse_article_date_for_graph(x.get("date", ""))
-            or datetime.min.replace(tzinfo=timezone.utc),
-            reverse=True,
+        processed_articles_sorted = sort_articles_by_graph_date_desc(
+            deduplicated_articles
         )
 
     step_result("기사 처리 완료", len(processed_articles_sorted))
-
-    step_times = state.get("step_times", {})
-    step_times["process_articles"] = time.time() - start_time
-    return {
-        **state,
-        "processed_articles": processed_articles_sorted,
-        "status": "scoring",  # Next step is scoring
-        "step_times": step_times,
-    }
+    return build_process_success_state(
+        state,
+        processed_articles=processed_articles_sorted,
+        elapsed=time.time() - start_time,
+    )
 
 
 def score_articles_node(state: NewsletterState) -> NewsletterState:
@@ -243,15 +213,10 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
     processed_articles = state.get("processed_articles", [])
     if not processed_articles:
         logger.warning("[yellow]No articles to score.[/yellow]")
-        step_times = state.get("step_times", {})
-        step_times["score_articles"] = time.time() - start_time
-        return {
-            **state,
-            "ranked_articles": [],
-            "status": "error",
-            "error": "스코어링할 기사가 없습니다.",
-            "step_times": step_times,
-        }
+        return build_score_missing_articles_state(
+            state,
+            elapsed=time.time() - start_time,
+        )
 
     try:
         from . import scoring
@@ -261,7 +226,7 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
         logger.info(f"[cyan]Using scoring weights: {scoring_weights}[/cyan]")
 
         # 도메인/주제 결정
-        domain = state.get("domain", "") or ", ".join(state.get("keywords", []))
+        domain = resolve_scoring_domain(state)
 
         # 기사 스코어링
         ranked_articles = scoring.score_articles(
@@ -272,12 +237,7 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
 
         # 파일 저장
         try:
-            domain_value = state.get("domain")
-            domain_str = (
-                domain_value.replace(" ", "_")
-                if isinstance(domain_value, str) and domain_value
-                else "general"
-            )
+            domain_str = resolve_graph_domain_slug(state)
 
             # 중간 파일용 파일명 생성 (단순히 타임스탬프 + 설명적 이름 사용)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -292,27 +252,19 @@ def score_articles_node(state: NewsletterState) -> NewsletterState:
         except Exception as e:
             logger.warning(f"Warning: Failed to save scored articles: {e}")
 
-        step_times = state.get("step_times", {})
-        step_times["score_articles"] = time.time() - start_time
-
-        return {
-            **state,
-            "ranked_articles": ranked_articles,
-            "status": "scoring_complete",
-            "step_times": step_times,
-        }
+        return build_score_success_state(
+            state,
+            ranked_articles=ranked_articles,
+            elapsed=time.time() - start_time,
+        )
 
     except Exception as e:
         logger.error(f"Error during article scoring: {e}")
-        step_times = state.get("step_times", {})
-        step_times["score_articles"] = time.time() - start_time
-        return {
-            **state,
-            "ranked_articles": [],
-            "status": "error",
-            "error": f"기사 스코어링 중 오류: {str(e)}",
-            "step_times": step_times,
-        }
+        return build_score_error_state(
+            state,
+            error_message=f"기사 스코어링 중 오류: {str(e)}",
+            elapsed=time.time() - start_time,
+        )
 
 
 def summarize_articles_node(state: NewsletterState) -> NewsletterState:
@@ -327,20 +279,13 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
     ranked_articles = state.get("ranked_articles", [])
     if not ranked_articles:
         logger.warning("[yellow]No articles to summarize.[/yellow]")
-        step_times = state.get("step_times", {})
-        step_times["summarize"] = time.time() - start_time
-        return {
-            **state,
-            "newsletter_html": None,
-            "status": "error",
-            "error": "요약할 기사가 없습니다.",
-            "step_times": step_times,
-        }
+        return build_summarize_missing_articles_state(
+            state,
+            elapsed=time.time() - start_time,
+        )
 
     try:
-        # 사용할 체인 결정
-        template_style = state.get("template_style", "detailed")
-        is_compact = template_style == "compact"
+        template_style, is_compact = resolve_summary_chain_style(state)
         newsletter_chain = get_newsletter_chain(is_compact=is_compact)
 
         # 체인 실행을 위한 데이터 준비
@@ -373,17 +318,13 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
             generated_at=datetime.now(),
         )
 
-        step_times = state.get("step_times", {})
-        step_times["summarize"] = time.time() - start_time
-
-        return {
-            **state,
-            "newsletter_html": newsletter_html,
-            "category_summaries": category_summaries,
-            "newsletter_topic": newsletter_topic,
-            "status": "summarizing_complete",
-            "step_times": step_times,
-        }
+        return build_summarize_success_state(
+            state,
+            newsletter_html=newsletter_html,
+            category_summaries=category_summaries,
+            newsletter_topic=newsletter_topic,
+            elapsed=time.time() - start_time,
+        )
 
     except Exception as e:
         logger.error(f"Error during article summarization: {e}")
@@ -391,15 +332,11 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
 
         logger.debug(f"Traceback: {traceback.format_exc()}")
 
-        step_times = state.get("step_times", {})
-        step_times["summarize"] = time.time() - start_time
-        return {
-            **state,
-            "newsletter_html": None,
-            "status": "error",
-            "error": f"기사 요약 중 오류: {str(e)}",
-            "step_times": step_times,
-        }
+        return build_summarize_error_state(
+            state,
+            error_message=f"기사 요약 중 오류: {str(e)}",
+            elapsed=time.time() - start_time,
+        )
 
 
 def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
@@ -416,35 +353,21 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
 
     if not category_summaries and not newsletter_html:
         logger.warning("[yellow]No category summaries to compose newsletter.[/yellow]")
-        step_times = state.get("step_times", {})
-        step_times["compose"] = time.time() - start_time
-        return {
-            **state,
-            "status": "error",
-            "error": "구성할 뉴스레터 데이터가 없습니다.",
-            "step_times": step_times,
-        }
+        return build_compose_missing_data_state(
+            state,
+            elapsed=time.time() - start_time,
+        )
 
     try:
         # 이미 체인에서 HTML이 생성된 경우 그대로 사용
         if newsletter_html:
             logger.info("[cyan]Using pre-generated HTML from chains[/cyan]")
-            final_html = newsletter_html
-        else:
-            # Fallback: 기존 로직으로 HTML 생성 (현재는 체인이 담당)
-            final_html = "<html><body>Newsletter generation failed</body></html>"
+        final_html = resolve_compose_html(newsletter_html)
 
         # 파일 저장
         try:
-            keywords_str = (
-                "_".join(state["keywords"]) if state["keywords"] else "unknown"
-            )
-            domain_value = state.get("domain")
-            domain_str = (
-                domain_value.replace(" ", "_")
-                if isinstance(domain_value, str) and domain_value
-                else "general"
-            )
+            keywords_str = resolve_graph_keywords_slug(state)
+            domain_str = resolve_graph_domain_slug(state)
             template_style = state.get("template_style", "detailed")
 
             # generate_unified_newsletter_filename이 이미 전체 경로를 반환함
@@ -464,26 +387,19 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
         except Exception as e:
             logger.error(f"Error saving newsletter: {e}")
 
-        step_times = state.get("step_times", {})
-        step_times["compose"] = time.time() - start_time
-
-        return {
-            **state,
-            "newsletter_html": final_html,
-            "status": "complete",
-            "step_times": step_times,
-        }
+        return build_compose_success_state(
+            state,
+            newsletter_html=final_html,
+            elapsed=time.time() - start_time,
+        )
 
     except Exception as e:
         logger.error(f"Error composing newsletter: {e}")
-        step_times = state.get("step_times", {})
-        step_times["compose"] = time.time() - start_time
-        return {
-            **state,
-            "status": "error",
-            "error": f"뉴스레터 구성 중 오류: {str(e)}",
-            "step_times": step_times,
-        }
+        return build_compose_error_state(
+            state,
+            error_message=f"뉴스레터 구성 중 오류: {str(e)}",
+            elapsed=time.time() - start_time,
+        )
 
 
 def handle_error(state: NewsletterState) -> NewsletterState:

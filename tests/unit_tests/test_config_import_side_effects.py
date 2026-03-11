@@ -19,6 +19,7 @@ def _clear_module_cache() -> None:
         "newsletter.settings",
         "newsletter.cli",
         "newsletter.graph",
+        "newsletter_core.application.graph_node_helpers",
         "newsletter.llm_factory",
         "newsletter_core.application.graph_workflow",
         "newsletter_core.public.settings",
@@ -236,4 +237,20 @@ def test_graph_workflow_helper_import_does_not_call_load_dotenv(
     monkeypatch.setattr(dotenv, "load_dotenv", _fake_load_dotenv)
     _clear_module_cache()
     importlib.import_module("newsletter_core.application.graph_workflow")
+    assert calls["count"] == 0
+
+
+@pytest.mark.unit
+def test_graph_node_helper_import_does_not_call_load_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"count": 0}
+
+    def _fake_load_dotenv(*_args, **_kwargs):
+        calls["count"] += 1
+        return False
+
+    monkeypatch.setattr(dotenv, "load_dotenv", _fake_load_dotenv)
+    _clear_module_cache()
+    importlib.import_module("newsletter_core.application.graph_node_helpers")
     assert calls["count"] == 0
