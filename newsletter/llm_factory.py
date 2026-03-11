@@ -7,14 +7,18 @@ LLM Factory Module
 F-14: 중앙화된 설정을 활용한 성능 최적화
 """
 
-import logging
-import time
 from typing import Any, Dict, Iterator, List, Optional, cast
 
 from newsletter_core.application.llm_factory import (
     build_provider_info,
     get_default_model,
     resolve_provider_selection,
+)
+from newsletter_core.application.llm_factory_fallback import (
+    create_fallback_model,
+    invoke_with_fallback,
+    is_fallback_trigger_error,
+    resolve_fallback_runtime_config,
 )
 from newsletter_core.infrastructure.llm_factory_runtime import (
     build_provider_callbacks,
@@ -42,13 +46,10 @@ logger = get_logger()
 try:
     from langchain_core.runnables import Runnable
     from langchain_core.runnables.config import RunnableConfig
-    from langchain_core.runnables.utils import Input, Output
 except ImportError:
     # Fallback for older versions
     Runnable = object
     RunnableConfig = dict
-    Input = Any
-    Output = Any
 
 
 def _load_runtime_settings() -> Any | None:
@@ -84,40 +85,22 @@ class LLMWithFallback(Runnable):
         self.callbacks = callbacks or []
         self.last_used = "primary"
 
-        # F-14: 중앙화된 설정에서 성능 파라미터 가져오기
-        try:
-            from .centralized_settings import get_settings
+        self.runtime_config = resolve_fallback_runtime_config(
+            _load_runtime_settings,
+            logger=logger,
+        )
+        self.max_retries = self.runtime_config.max_retries
+        self.retry_delay = self.runtime_config.retry_delay
+        self.timeout = self.runtime_config.timeout
+        self.test_mode = self.runtime_config.test_mode
+        self.mock_responses = self.runtime_config.mock_responses
+        self.skip_real_api = self.runtime_config.skip_real_api
 
-            settings = get_settings()
-            self.max_retries = settings.llm_max_retries
-            self.retry_delay = settings.llm_retry_delay
-            self.timeout = settings.llm_request_timeout
-
-            # F-14: 테스트 모드 감지 및 설정
-            self.test_mode = getattr(settings, "test_mode", False)
-            self.mock_responses = getattr(settings, "mock_api_responses", False)
-            self.skip_real_api = getattr(settings, "skip_real_api_calls", False)
-
-            logger.info(
-                f"F-14 LLM 설정 로드: 재시도={self.max_retries}, "
-                f"지연={self.retry_delay}초, 타임아웃={self.timeout}초, "
-                f"테스트모드={self.test_mode}"
-            )
-
-        except Exception as e:
-            # F-14 설정 로드 실패 시 기본값 사용
-            logger.warning(f"F-14 설정 로드 실패, 기본값 사용: {e}")
-            self.max_retries = 3
-            self.retry_delay = 1.0
-            self.timeout = 60
-
-            # 테스트 환경 감지 (pytest 또는 환경변수)
-            import os
-            import sys
-
-            self.test_mode = "pytest" in sys.modules or os.getenv("TESTING") == "1"
-            self.mock_responses = self.test_mode
-            self.skip_real_api = self.test_mode
+        logger.info(
+            f"F-14 LLM 설정 로드: 재시도={self.max_retries}, "
+            f"지연={self.retry_delay}초, 타임아웃={self.timeout}초, "
+            f"테스트모드={self.test_mode}"
+        )
 
         logger.info(
             f"F-14 LLM ({task}) 초기화 완료: "
@@ -190,43 +173,17 @@ class LLMWithFallback(Runnable):
         **kwargs: Any,
     ) -> Any:
         """실제 LLM 호출 (프로덕션 모드)"""
-        # 기존 retry 로직 유지
-        max_retries = self.max_retries
-
-        for attempt in range(max_retries + 1):
-            try:
-                logger.debug(f"LLM 호출 시도 {attempt + 1}/{max_retries + 1}")
-
-                result = self.primary_llm.invoke(input_data, config=config, **kwargs)
-                self.last_used = "primary"
-                return result
-
-            except Exception as e:
-                if self._is_retryable_error(e) and attempt < max_retries:
-                    delay = self.retry_delay
-                    wait_time = delay * (2**attempt)  # Exponential backoff
-                    logger.warning(f"LLM 호출 실패, {wait_time}초 후 재시도: {e}")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    fallback_llm = self.fallback_llm
-                    if fallback_llm is None:
-                        fallback_llm = self._get_fallback_llm()
-                        self.fallback_llm = fallback_llm
-
-                    if fallback_llm is not None:
-                        logger.warning(f"Primary LLM 실패, fallback 사용: {e}")
-                        try:
-                            result = fallback_llm.invoke(
-                                input_data, config=config, **kwargs
-                            )
-                            self.last_used = "fallback"
-                            return result
-                        except Exception as fallback_error:
-                            logger.error(f"Fallback LLM도 실패: {fallback_error}")
-
-                    logger.error(f"모든 LLM 호출 실패: {e}")
-                    raise e
+        result, last_used = invoke_with_fallback(
+            primary_llm=self.primary_llm,
+            input_data=input_data,
+            config=config,
+            kwargs=kwargs,
+            runtime_config=self.runtime_config,
+            fallback_loader=self._load_fallback_llm,
+            logger=logger,
+        )
+        self.last_used = last_used
+        return result
 
     def stream(
         self,
@@ -237,39 +194,35 @@ class LLMWithFallback(Runnable):
         """스트리밍 지원 (F-14 개선)"""
         try:
             if hasattr(self.primary_llm, "stream"):
-                yield from self.primary_llm.stream(input_data, config=config, **kwargs)
+                yield from self.primary_llm.stream(
+                    input_data,
+                    config=config,
+                    **kwargs,
+                )
                 return
 
             result = self.invoke(input_data, config=config, **kwargs)
             yield result
         except Exception as e:
-            error_str = str(e).lower()
-            is_retryable = any(
-                keyword in error_str
-                for keyword in [
-                    "529",
-                    "429",
-                    "quota",
-                    "rate limit",
-                    "too many requests",
-                    "overloaded",
-                ]
-            )
-
-            if is_retryable:
-                fallback_llm = self.fallback_llm
-                if fallback_llm is None:
-                    fallback_llm = self._get_fallback_llm()
-                    self.fallback_llm = fallback_llm
+            if is_fallback_trigger_error(e):
+                fallback_llm = self._load_fallback_llm()
 
                 if fallback_llm is None:
                     raise e
 
                 if hasattr(fallback_llm, "stream"):
-                    yield from fallback_llm.stream(input_data, config=config, **kwargs)
+                    yield from fallback_llm.stream(
+                        input_data,
+                        config=config,
+                        **kwargs,
+                    )
                     return
 
-                result = fallback_llm.invoke(input_data, config=config, **kwargs)
+                result = fallback_llm.invoke(
+                    input_data,
+                    config=config,
+                    **kwargs,
+                )
                 yield result
                 return
 
@@ -291,24 +244,8 @@ class LLMWithFallback(Runnable):
                 for input_data in inputs
             ]
         except Exception as e:
-            error_str = str(e).lower()
-            is_retryable = any(
-                keyword in error_str
-                for keyword in [
-                    "529",
-                    "429",
-                    "quota",
-                    "rate limit",
-                    "too many requests",
-                    "overloaded",
-                ]
-            )
-
-            if is_retryable:
-                fallback_llm = self.fallback_llm
-                if fallback_llm is None:
-                    fallback_llm = self._get_fallback_llm()
-                    self.fallback_llm = fallback_llm
+            if is_fallback_trigger_error(e):
+                fallback_llm = self._load_fallback_llm()
 
                 if fallback_llm is None:
                     raise e
@@ -323,121 +260,29 @@ class LLMWithFallback(Runnable):
 
             raise e
 
-    def _get_fallback_llm(self) -> Any | None:
-        """Fallback LLM을 찾아서 반환"""
+    def _load_fallback_llm(self) -> Any | None:
+        """Fallback LLM을 생성해 캐시하거나 기존 인스턴스를 반환합니다."""
+        if self.fallback_llm is not None:
+            return self.fallback_llm
+
         primary_provider = type(self.primary_llm).__name__
         primary_model = getattr(self.primary_llm, "model", "unknown")
-
-        logger.info(f"{primary_provider} ({primary_model})에 대한 대체 모델을 찾는 중입니다")
-
-        # 1. 같은 제공자 내에서 안정적인 모델로 fallback 시도
-        if "gemini" in primary_provider.lower():
-            stable_models = ["gemini-1.5-pro", "gemini-1.5-flash"]
-
-            for stable_model in stable_models:
-                if stable_model != primary_model:  # 동일한 모델이 아닌 경우만
-                    try:
-                        logger.info(f"안정적인 Gemini 모델을 시도합니다: {stable_model}")
-                        fallback_config = {
-                            "provider": "gemini",
-                            "model": stable_model,
-                            "temperature": getattr(
-                                self.primary_llm, "temperature", 0.3
-                            ),
-                            "max_retries": 2,
-                            "timeout": 60,
-                        }
-
-                        # 비용 추적 콜백 추가
-                        fallback_callbacks = list(self.callbacks)
-                        try:
-                            cost_callback = get_cost_callback_for_provider("gemini")
-                            fallback_callbacks.append(cost_callback)
-                        except Exception as e:
-                            handle_exception(e, "비용 추적 콜백 추가", log_level=logging.INFO)
-                            # 비용 추적 실패는 치명적이지 않음
-
-                        provider = self.factory.providers.get("gemini")
-                        if provider and provider.is_available():
-                            return provider.create_model(
-                                fallback_config, fallback_callbacks
-                            )
-                    except Exception as e:
-                        logger.warning(f"안정적인 Gemini 모델 {stable_model} 생성에 실패했습니다: {e}")
-                        continue
-
-        # 2. 다른 제공자로 fallback 시도
-        available_providers = self.factory.get_available_providers()
-
-        for provider_name in available_providers:
-            provider = self.factory.providers[provider_name]
-
-            # 이미 시도한 제공자는 스킵 (단, Gemini는 다른 모델로 이미 시도했으므로 제외)
-            if provider_name == "gemini":
-                continue
-
-            try:
-                # 제공자별 안정적인 기본 모델 사용
-                stable_model_map = {
-                    "openai": "gpt-4o",
-                    "anthropic": "claude-3-5-sonnet-20241022",
-                }
-
-                fallback_model = stable_model_map.get(
-                    provider_name, self.factory._get_default_model(provider_name)
-                )
-
-                logger.info(f"다른 제공자를 시도합니다: {provider_name} (모델: {fallback_model})")
-
-                fallback_config = {
-                    "provider": provider_name,
-                    "model": fallback_model,
-                    "temperature": getattr(self.primary_llm, "temperature", 0.3),
-                    "max_retries": 2,
-                    "timeout": 60,
-                }
-
-                # 비용 추적 콜백 추가
-                fallback_callbacks = list(self.callbacks)
-                try:
-                    cost_callback = get_cost_callback_for_provider(provider_name)
-                    fallback_callbacks.append(cost_callback)
-                except Exception as e:
-                    handle_exception(
-                        e,
-                        f"비용 추적 콜백 추가 ({provider_name})",
-                        log_level=logging.INFO,
-                    )
-                    # 비용 추적 실패는 치명적이지 않음
-
-                return provider.create_model(fallback_config, fallback_callbacks)
-
-            except Exception as e:
-                logger.warning(f"{provider_name}으로 대체 LLM 생성에 실패했습니다: {e}")
-                continue
-
-        logger.warning("대체 LLM을 생성할 수 없습니다")
-        return None
+        self.fallback_llm = create_fallback_model(
+            primary_provider_name=primary_provider,
+            primary_model=primary_model,
+            temperature=getattr(self.primary_llm, "temperature", 0.3),
+            available_providers=self.factory.get_available_providers(),
+            default_model_getter=self.factory._get_default_model,
+            providers=self.factory.providers,
+            callbacks=list(self.callbacks),
+            callback_builder=self.factory._build_callbacks,
+            logger=logger,
+        )
+        return self.fallback_llm
 
     def __getattr__(self, name: str) -> Any:
         """다른 속성들은 primary LLM에 위임"""
         return getattr(self.primary_llm, name)
-
-    def _is_retryable_error(self, e: Exception) -> bool:
-        error_str = str(e).lower()
-        return any(
-            keyword in error_str
-            for keyword in [
-                "529",
-                "429",
-                "quota",
-                "rate limit",
-                "too many requests",
-                "overloaded",
-                "timeout",
-                "connection",
-            ]
-        )
 
 
 class LLMFactory:
@@ -500,7 +345,10 @@ class LLMFactory:
 
         if selection.used_fallback:
             logger.warning(
-                f"{selection.requested_provider}을 사용할 수 없어 {provider_name}으로 대체합니다"
+                (
+                    f"{selection.requested_provider}을 사용할 수 없어 "
+                    f"{provider_name}으로 대체합니다"
+                )
             )
 
         final_callbacks = self._build_callbacks(
@@ -523,15 +371,17 @@ class LLMFactory:
 
     def get_available_providers(self) -> List[str]:
         """사용 가능한 제공자 목록을 반환합니다."""
-        return [
-            name for name, provider in self.providers.items() if provider.is_available()
-        ]
+        available_providers: List[str] = []
+        for name, provider in self.providers.items():
+            if provider.is_available():
+                available_providers.append(name)
+        return available_providers
 
     def get_provider_info(self) -> Dict[str, Dict[str, Any]]:
         """각 제공자의 사용 가능 여부와 모델 정보를 반환합니다."""
-        availability = {
-            name: provider.is_available() for name, provider in self.providers.items()
-        }
+        availability: Dict[str, bool] = {}
+        for name, provider in self.providers.items():
+            availability[name] = provider.is_available()
         provider_info: Dict[str, Dict[str, Any]] = build_provider_info(
             self.llm_config,
             self.providers.keys(),
