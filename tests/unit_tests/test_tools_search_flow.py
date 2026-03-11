@@ -344,7 +344,7 @@ def test_legacy_search_news_articles_delegates_to_core_search_flow(
         headers={"X-API-KEY": "dummy-tools-key"},
         payload='{"q": "정제된 키워드"}',
     )
-    assert calls["executor"] is tools_module._execute_serper_search_request
+    assert calls["executor"] is tools_module.execute_serper_search_request
     assert calls["reports"] == [
         SerperKeywordReport(
             keyword="정제된 키워드",
