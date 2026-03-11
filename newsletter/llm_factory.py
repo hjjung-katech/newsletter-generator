@@ -8,15 +8,17 @@ F-14: 중앙화된 설정을 활용한 성능 최적화
 """
 
 import logging
-import os
 import time
-from abc import ABC, abstractmethod
 from typing import Any, Dict, Iterator, List, Optional, cast
 
 from newsletter_core.application.llm_factory import (
     build_provider_info,
     get_default_model,
     resolve_provider_selection,
+)
+from newsletter_core.infrastructure.llm_factory_runtime import (
+    build_provider_callbacks,
+    build_runtime_provider_registry,
 )
 from newsletter_core.public.settings import get_llm_config
 
@@ -36,21 +38,6 @@ except ImportError:
 # 로거 초기화
 logger = get_logger()
 
-try:
-    from langchain_google_genai import ChatGoogleGenerativeAI
-except ImportError:
-    ChatGoogleGenerativeAI = None
-
-try:
-    from langchain_openai import ChatOpenAI
-except ImportError:
-    ChatOpenAI = None
-
-try:
-    from langchain_anthropic import ChatAnthropic
-except ImportError:
-    ChatAnthropic = None
-
 # LangChain Runnable 관련 imports 추가
 try:
     from langchain_core.runnables import Runnable
@@ -64,61 +51,10 @@ except ImportError:
     Output = Any
 
 
-def _get_runtime_settings() -> Any | None:
+def _load_runtime_settings() -> Any | None:
     if not CENTRALIZED_SETTINGS_AVAILABLE or get_settings is None:
         return None
-    try:
-        return get_settings()
-    except Exception as exc:
-        logger.warning(f"중앙화된 설정 로드 실패, 환경변수 fallback 사용: {exc}")
-        return None
-
-
-def _get_secret_value(value: Any) -> str | None:
-    if value is None:
-        return None
-    if hasattr(value, "get_secret_value"):
-        secret_value = value.get_secret_value()
-        return str(secret_value) if secret_value is not None else None
-    return str(value)
-
-
-def _get_provider_api_key(provider_name: str) -> str | None:
-    settings = _get_runtime_settings()
-    if settings is not None:
-        secret_map = {
-            "gemini": settings.gemini_api_key,
-            "openai": settings.openai_api_key,
-            "anthropic": settings.anthropic_api_key,
-        }
-        secret_value = _get_secret_value(secret_map.get(provider_name))
-        if secret_value:
-            return secret_value
-
-    env_keys = {
-        "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
-        "openai": ("OPENAI_API_KEY",),
-        "anthropic": ("ANTHROPIC_API_KEY",),
-    }
-    for env_key in env_keys.get(provider_name, ()):
-        env_value = os.getenv(env_key)
-        if env_value:
-            return env_value
-    return None
-
-
-def _prepare_google_runtime_environment() -> None:
-    google_creds_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
-    if google_creds_path and not os.path.exists(google_creds_path):
-        logger.warning(
-            f"GOOGLE_APPLICATION_CREDENTIALS이 존재하지 않는 파일을 가리킵니다: {google_creds_path}"
-        )
-        logger.info("Google Cloud 인증을 비활성화하고 API 키만 사용합니다.")
-
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
-    os.environ["GOOGLE_CLOUD_PROJECT"] = ""
-    os.environ.pop("CLOUDSDK_CONFIG", None)
-    os.environ.pop("GCLOUD_PROJECT", None)
+    return get_settings()
 
 
 class QuotaExceededError(Exception):
@@ -504,182 +440,16 @@ class LLMWithFallback(Runnable):
         )
 
 
-class LLMProvider(ABC):
-    """LLM 제공자 추상 클래스"""
-
-    @abstractmethod
-    def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
-    ) -> Any:
-        """LLM 모델 인스턴스를 생성합니다."""
-        pass
-
-    @abstractmethod
-    def is_available(self) -> bool:
-        """제공자가 사용 가능한지 확인합니다."""
-        pass
-
-
-class GeminiProvider(LLMProvider):
-    """Google Gemini LLM 제공자"""
-
-    def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
-    ) -> Any:
-        """Gemini 모델 생성 - F-14 중앙화된 설정 시스템 적용"""
-        logger.debug("Creating Gemini model")
-
-        if not ChatGoogleGenerativeAI:
-            raise ImportError("langchain_google_genai 패키지가 설치되지 않았습니다")
-
-        _prepare_google_runtime_environment()
-        api_key = _get_provider_api_key("gemini")
-        if not api_key:
-            raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다")
-
-        # F-14: 중앙화된 설정에서 파라미터 가져오기
-        model_params = model_config.copy()
-        settings = _get_runtime_settings()
-        if settings is not None:
-            model_params.setdefault("timeout", settings.llm_request_timeout)
-            if settings.enable_fast_mode and "gemini-1.5-pro" in model_params.get(
-                "model", ""
-            ):
-                model_params["model"] = "gemini-1.5-flash"
-                logger.info("빠른 모드: Gemini Pro를 Flash로 변경")
-        else:
-            model_params.setdefault("timeout", 120)
-
-        model_params.setdefault("temperature", 0.3)
-        model_params.setdefault("max_tokens", 4000)
-        model_params.setdefault("model", "gemini-1.5-pro")
-
-        cost_callback = get_cost_callback_for_provider("gemini")
-        all_callbacks = (callbacks or []) + ([cost_callback] if cost_callback else [])
-
-        logger.debug(f"Gemini 모델 생성: {model_params}")
-
-        return ChatGoogleGenerativeAI(
-            google_api_key=api_key,
-            model=model_params["model"],
-            temperature=model_params["temperature"],
-            max_output_tokens=model_params["max_tokens"],
-            timeout=model_params.get("timeout", 120),
-            callbacks=all_callbacks,
-        )
-
-    def is_available(self) -> bool:
-        return ChatGoogleGenerativeAI is not None and bool(
-            _get_provider_api_key("gemini")
-        )
-
-
-class OpenAIProvider(LLMProvider):
-    """OpenAI LLM 제공자"""
-
-    def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
-    ) -> Any:
-        """OpenAI 모델 생성 - F-14 중앙화된 설정 시스템 적용"""
-        logger.debug("Creating OpenAI model")
-
-        if not ChatOpenAI:
-            raise ImportError("langchain_openai 패키지가 설치되지 않았습니다")
-
-        api_key = _get_provider_api_key("openai")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다")
-
-        # F-14: 중앙화된 설정에서 파라미터 가져오기
-        model_params = model_config.copy()
-        settings = _get_runtime_settings()
-        if settings is not None:
-            model_params.setdefault("timeout", settings.llm_request_timeout)
-            if settings.enable_fast_mode and "gpt-4" in model_params.get("model", ""):
-                model_params["model"] = "gpt-3.5-turbo"
-                logger.info("빠른 모드: GPT-4를 GPT-3.5-turbo로 변경")
-        else:
-            model_params.setdefault("timeout", 120)
-
-        model_params.setdefault("temperature", 0.3)
-        model_params.setdefault("max_tokens", 4000)
-        model_params.setdefault("model", "gpt-4o-mini")
-
-        cost_callback = get_cost_callback_for_provider("openai")
-        all_callbacks = (callbacks or []) + ([cost_callback] if cost_callback else [])
-
-        logger.debug(f"OpenAI 모델 생성: {model_params}")
-
-        return ChatOpenAI(
-            api_key=api_key,
-            model=model_params["model"],
-            temperature=model_params["temperature"],
-            max_tokens=model_params["max_tokens"],
-            timeout=model_params.get("timeout", 120),
-            callbacks=all_callbacks,
-        )
-
-    def is_available(self) -> bool:
-        return ChatOpenAI is not None and bool(_get_provider_api_key("openai"))
-
-
-class AnthropicProvider(LLMProvider):
-    """Anthropic Claude LLM 제공자"""
-
-    def create_model(
-        self, model_config: Dict[str, Any], callbacks: Optional[List[Any]] = None
-    ) -> Any:
-        if not ChatAnthropic:
-            raise ImportError("langchain_anthropic 패키지가 설치되지 않았습니다")
-
-        api_key = _get_provider_api_key("anthropic")
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다")
-
-        # F-14: 중앙화된 설정에서 타임아웃 적용
-        model_params = model_config.copy()
-        settings = _get_runtime_settings()
-        if settings is not None:
-            model_params.setdefault("timeout", settings.llm_request_timeout)
-            if settings.enable_fast_mode and "claude-3-opus" in model_params.get(
-                "model", ""
-            ):
-                model_params["model"] = "claude-3-haiku-20240307"
-                logger.info("빠른 모드: Claude Opus를 Haiku로 변경")
-        else:
-            model_params.setdefault("timeout", 120)
-
-        model_params.setdefault("temperature", 0.1)
-        model_params.setdefault("max_tokens", 4000)
-        model_params.setdefault("model", "claude-3-haiku-20240307")
-
-        cost_callback = get_cost_callback_for_provider("anthropic")
-        all_callbacks = (callbacks or []) + ([cost_callback] if cost_callback else [])
-
-        logger.debug(f"Anthropic 모델 생성: {model_params}")
-
-        return ChatAnthropic(
-            anthropic_api_key=api_key,
-            model=model_params["model"],
-            temperature=model_params["temperature"],
-            max_tokens=model_params["max_tokens"],
-            timeout=model_params.get("timeout", 120),
-            callbacks=all_callbacks,
-        )
-
-    def is_available(self) -> bool:
-        return ChatAnthropic is not None and bool(_get_provider_api_key("anthropic"))
-
-
 class LLMFactory:
     """LLM 팩토리 클래스"""
 
     def __init__(self) -> None:
-        self.providers = {
-            "gemini": GeminiProvider(),
-            "openai": OpenAIProvider(),
-            "anthropic": AnthropicProvider(),
-        }
+        self.providers = build_runtime_provider_registry(
+            runtime_settings_loader=_load_runtime_settings,
+            cost_callback_factory=get_cost_callback_for_provider,
+            exception_handler=handle_exception,
+            logger=logger,
+        )
 
     @property
     def llm_config(self) -> Dict[str, Any]:
@@ -692,17 +462,14 @@ class LLMFactory:
         *,
         fallback_path: bool = False,
     ) -> List[Any]:
-        final_callbacks = list(callbacks) if callbacks else []
-        try:
-            cost_callback = get_cost_callback_for_provider(provider_name)
-            final_callbacks.append(cost_callback)
-        except Exception as e:
-            message = (
-                f"비용 추적 추가 ({provider_name})"
-                if fallback_path
-                else f"Warning: Failed to add cost tracking for {provider_name}"
-            )
-            handle_exception(e, message, log_level=logging.INFO)
+        final_callbacks: List[Any] = build_provider_callbacks(
+            provider_name,
+            callbacks,
+            cost_callback_factory=get_cost_callback_for_provider,
+            exception_handler=handle_exception,
+            logger=logger,
+            fallback_path=fallback_path,
+        )
         return final_callbacks
 
     def get_llm_for_task(
