@@ -65,6 +65,21 @@ except ImportError:
     from web.analytics import record_schedule_event  # pragma: no cover
 
 try:
+    from generation_route_actions import (
+        build_generation_dispatch_action,
+        build_route_side_effect_action,
+        build_schedule_run_dispatch_action,
+        build_sync_email_action,
+    )
+except ImportError:
+    from web.generation_route_actions import (  # pragma: no cover
+        build_generation_dispatch_action,
+        build_route_side_effect_action,
+        build_schedule_run_dispatch_action,
+        build_sync_email_action,
+    )
+
+try:
     from generation_route_dispatch import (
         GenerationJobResolution,
         ScheduleRunResolution,
@@ -184,22 +199,31 @@ def _dispatch_generation_job(
         has_task_queue=task_queue is not None,
         is_testing=bool(app.config.get("TESTING", False)),
     )
+    dispatch_action = build_generation_dispatch_action(
+        dispatch_via=dispatch_plan.via,
+        response_status=dispatch_plan.response_status,
+        should_start_in_memory_thread=dispatch_plan.should_start_in_memory_thread,
+        payload=payload,
+        job_id=resolution.job_id,
+        send_email=send_email,
+        task_idempotency_key=resolution.effective_idempotency_key,
+        response_idempotency_key=resolution.idempotency_key,
+        database_path=database_path,
+        started_at=datetime.now().isoformat(),
+        build_processing_task_fn=build_in_memory_processing_task,
+    )
 
-    if dispatch_plan.via == "redis":
+    if dispatch_action.via == "redis":
         log_info(
             logger,
             "generate.job.queued",
             job_id=resolution.job_id,
-            via=dispatch_plan.via,
+            via=dispatch_action.via,
         )
         task_queue.enqueue(
             generate_newsletter_task,
-            payload,
-            resolution.job_id,
-            send_email,
-            resolution.effective_idempotency_key,
-            database_path,
-            job_id=resolution.job_id,
+            *dispatch_action.task_call.args,
+            **dispatch_action.task_call.queue_kwargs,
         )
         return build_generation_job_response(
             resolution=resolution,
@@ -210,20 +234,12 @@ def _dispatch_generation_job(
     log_info(
         logger, "generate.job.queued", job_id=resolution.job_id, via=dispatch_plan.via
     )
-    in_memory_tasks[resolution.job_id] = build_in_memory_processing_task(
-        started_at=datetime.now().isoformat(),
-        idempotency_key=resolution.idempotency_key,
-    )
+    in_memory_tasks[resolution.job_id] = dispatch_action.processing_task
 
-    if dispatch_plan.should_start_in_memory_thread:
+    if dispatch_action.thread_kwargs is not None:
         thread = threading.Thread(
             target=run_in_memory_job,
-            kwargs={
-                "job_id": resolution.job_id,
-                "data": payload,
-                "send_email": send_email,
-                "idempotency_key": resolution.effective_idempotency_key,
-            },
+            kwargs=dispatch_action.thread_kwargs,
             daemon=True,
         )
         thread.start()
@@ -492,12 +508,20 @@ def register_generation_routes(
 
             # 이메일 발송 기능 추가
             email_sent = False
-            if options.email and result.get("content") and not options.preview_only:
+            email_action = build_sync_email_action(
+                email=options.email,
+                preview_only=options.preview_only,
+                result=result,
+                keywords=options.keywords,
+                domain=options.domain,
+                subject_builder=build_sync_email_subject,
+            )
+            if email_action is not None:
                 try:
                     log_info(
                         logger,
                         "generate.sync.email_sending",
-                        email=options.email,
+                        email=email_action.to,
                     )
                     # 이메일 발송 - try-except로 import 처리
                     try:
@@ -517,31 +541,24 @@ def register_generation_routes(
                                 500,
                             )
 
-                    # 제목 생성
-                    subject = build_sync_email_subject(
-                        result_title=result.get("title"),
-                        keywords=options.keywords,
-                        domain=options.domain,
-                    )
-
                     # 이메일 발송
                     send_email_func(
-                        to=options.email,
-                        subject=subject,
-                        html=result["content"],
+                        to=email_action.to,
+                        subject=email_action.subject,
+                        html=email_action.html,
                     )
                     email_sent = True
                     log_info(
                         logger,
                         "generate.sync.email_sent",
-                        email=options.email,
+                        email=email_action.to,
                     )
                 except Exception as e:
                     log_exception(
                         logger,
                         "generate.sync.email_failed",
                         e,
-                        email=options.email,
+                        email=email_action.to,
                     )
                     # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
 
@@ -736,47 +753,45 @@ def register_generation_routes(
     def _dispatch_schedule_run(resolution: ScheduleRunResolution) -> dict[str, Any]:
         active_redis_conn = resolve_redis_conn()
         active_task_queue = resolve_task_queue()
+        dispatch_action = build_schedule_run_dispatch_action(
+            params=resolution.params,
+            immediate_job_id=resolution.immediate_job_id,
+            effective_idempotency_key=resolution.effective_idempotency_key,
+            database_path=DATABASE_PATH,
+            has_async_runtime=bool(active_redis_conn and active_task_queue),
+        )
 
-        if active_redis_conn and active_task_queue:
+        if dispatch_action.mode == "queued":
             job = active_task_queue.enqueue(
                 generate_newsletter_task,
-                resolution.params,
-                resolution.immediate_job_id,
-                resolution.params.get("send_email", False),
-                resolution.effective_idempotency_key,
-                DATABASE_PATH,
-                job_id=resolution.immediate_job_id,
-                job_timeout="10m",
+                *dispatch_action.task_call.args,
+                **dispatch_action.task_call.queue_kwargs,
             )
-            record_schedule_event(
-                DATABASE_PATH,
-                event_type="schedule.run_now.queued",
+            queued_event = build_route_side_effect_action(
                 schedule_id=resolution.schedule_id,
                 job_id=resolution.immediate_job_id,
+                event_type="schedule.run_now.queued",
                 source="api.schedule_run_now",
                 status="queued",
                 payload=build_schedule_run_event_payload(queue_job_id=job.id),
             )
+            record_schedule_event(DATABASE_PATH, **queued_event.as_record_kwargs())
             return build_schedule_run_response(
                 resolution=resolution,
                 status="queued",
             )
 
         result = generate_newsletter_task(
-            resolution.params,
-            resolution.immediate_job_id,
-            resolution.params.get("send_email", False),
-            resolution.effective_idempotency_key,
-            DATABASE_PATH,
+            *dispatch_action.task_call.args,
         )
-        record_schedule_event(
-            DATABASE_PATH,
-            event_type="schedule.run_now.completed",
+        completed_event = build_route_side_effect_action(
             schedule_id=resolution.schedule_id,
             job_id=resolution.immediate_job_id,
+            event_type="schedule.run_now.completed",
             source="api.schedule_run_now",
             status=result.get("status"),
         )
+        record_schedule_event(DATABASE_PATH, **completed_event.as_record_kwargs())
         return build_schedule_run_response(
             resolution=resolution,
             status="completed",
@@ -877,10 +892,9 @@ def register_generation_routes(
         )
         conn.commit()
         conn.close()
-        record_schedule_event(
-            DATABASE_PATH,
-            event_type="schedule.created",
+        created_event = build_route_side_effect_action(
             schedule_id=schedule_id,
+            event_type="schedule.created",
             source="api.schedule",
             status="scheduled",
             payload=build_schedule_created_event_payload(
@@ -890,6 +904,7 @@ def register_generation_routes(
                 expires_at=schedule_request.expires_at,
             ),
         )
+        record_schedule_event(DATABASE_PATH, **created_event.as_record_kwargs())
 
         next_run_iso = to_iso_utc(next_run_utc)
         return (
@@ -935,29 +950,29 @@ def register_generation_routes(
                 return jsonify({"error": "Schedule is disabled"}), 400
 
             resolution = _resolve_schedule_run(schedule_id, params)
-            record_schedule_event(
-                DATABASE_PATH,
-                event_type="schedule.run_now.requested",
+            requested_event = build_route_side_effect_action(
                 schedule_id=schedule_id,
                 job_id=resolution.immediate_job_id,
+                event_type="schedule.run_now.requested",
                 source="api.schedule_run_now",
                 status="requested",
                 payload=build_schedule_run_requested_payload(
                     resolution.idempotency_key
                 ),
             )
+            record_schedule_event(DATABASE_PATH, **requested_event.as_record_kwargs())
             return jsonify(_dispatch_schedule_run(resolution))
 
         except Exception as e:
             if locals().get("resolution"):
-                record_schedule_event(
-                    DATABASE_PATH,
-                    event_type="schedule.run_now.failed",
+                failed_event = build_route_side_effect_action(
                     schedule_id=schedule_id,
                     job_id=locals()["resolution"].immediate_job_id,
+                    event_type="schedule.run_now.failed",
                     source="api.schedule_run_now",
                     status="failed",
                     payload=build_schedule_run_failed_payload(str(e)),
                 )
+                record_schedule_event(DATABASE_PATH, **failed_event.as_record_kwargs())
             log_exception(logger, "schedule.run_now.failed", e, schedule_id=schedule_id)
             return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500

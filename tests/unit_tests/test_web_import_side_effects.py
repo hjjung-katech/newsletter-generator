@@ -166,3 +166,24 @@ def test_generation_route_dispatch_import_does_not_call_load_dotenv(
     finally:
         _restore_module("web.generation_route_dispatch", previous)
         _restore_module("generation_route_dispatch", previous_top_level)
+
+
+@pytest.mark.unit
+def test_generation_route_actions_import_does_not_call_load_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"count": 0}
+
+    def _fake_load_dotenv(*_args, **_kwargs) -> bool:
+        calls["count"] += 1
+        return False
+
+    monkeypatch.setattr(dotenv, "load_dotenv", _fake_load_dotenv)
+    previous = _pop_module("web.generation_route_actions")
+    previous_top_level = _pop_module("generation_route_actions")
+    try:
+        importlib.import_module("web.generation_route_actions")
+        assert calls["count"] == 0
+    finally:
+        _restore_module("web.generation_route_actions", previous)
+        _restore_module("generation_route_actions", previous_top_level)
