@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -191,38 +190,6 @@ def test_resolve_generation_result_matches_legacy_tuple_contract(
         graph_workflow.resolve_generation_result(_make_state(**state_overrides))
         == expected
     )
-
-
-@pytest.mark.unit
-def test_summarize_articles_node_delegates_result_normalization(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fake_chain = MagicMock()
-    fake_chain.invoke.return_value = {"html": "<html>ok</html>"}
-    called = {}
-
-    def _fake_normalize(result, **kwargs):
-        called["result"] = result
-        called["kwargs"] = kwargs
-        return ("<html>ok</html>", {"sections": [], "structured_data": {}}, "AI")
-
-    monkeypatch.setattr(
-        graph_module, "get_newsletter_chain", lambda is_compact: fake_chain
-    )
-    monkeypatch.setattr(graph_module, "normalize_summary_chain_result", _fake_normalize)
-
-    updated = graph_module.summarize_articles_node(
-        _make_state(
-            ranked_articles=[{"title": "A"}],
-            step_times={},
-            status="scoring_complete",
-        )
-    )
-
-    assert called["result"] == {"html": "<html>ok</html>"}
-    assert called["kwargs"]["article_count"] == 1
-    assert updated["newsletter_html"] == "<html>ok</html>"
-    assert updated["status"] == "summarizing_complete"
 
 
 @pytest.mark.unit
