@@ -7,7 +7,6 @@ import logging
 import sqlite3
 import threading
 import uuid
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable
 
@@ -66,9 +65,45 @@ except ImportError:
     from web.analytics import record_schedule_event  # pragma: no cover
 
 try:
+    from generation_route_dispatch import (
+        GenerationJobResolution,
+        ScheduleRunResolution,
+        build_generation_dispatch_plan,
+        build_generation_job_response,
+        build_in_memory_completed_task,
+        build_in_memory_failed_task,
+        build_in_memory_processing_task,
+        build_schedule_created_event_payload,
+        build_schedule_created_response,
+        build_schedule_entry,
+        build_schedule_run_event_payload,
+        build_schedule_run_failed_payload,
+        build_schedule_run_requested_payload,
+        build_schedule_run_resolution,
+        build_schedule_run_response,
+    )
+except ImportError:
+    from web.generation_route_dispatch import (  # pragma: no cover
+        GenerationJobResolution,
+        ScheduleRunResolution,
+        build_generation_dispatch_plan,
+        build_generation_job_response,
+        build_in_memory_completed_task,
+        build_in_memory_failed_task,
+        build_in_memory_processing_task,
+        build_schedule_created_event_payload,
+        build_schedule_created_response,
+        build_schedule_entry,
+        build_schedule_run_event_payload,
+        build_schedule_run_failed_payload,
+        build_schedule_run_requested_payload,
+        build_schedule_run_resolution,
+        build_schedule_run_response,
+    )
+
+try:
     from generation_route_support import (
         build_generate_request_context,
-        build_generate_response,
         build_generation_invoke_plan,
         build_history_entry,
         build_status_response_from_row,
@@ -83,7 +118,6 @@ try:
 except ImportError:
     from web.generation_route_support import (  # pragma: no cover
         build_generate_request_context,
-        build_generate_response,
         build_generation_invoke_plan,
         build_history_entry,
         build_status_response_from_row,
@@ -97,24 +131,6 @@ except ImportError:
     )
 
 logger = logging.getLogger("web.routes_generation")
-
-
-@dataclass(frozen=True)
-class GenerationJobResolution:
-    job_id: str
-    deduplicated: bool
-    stored_status: str
-    idempotency_key: str
-    effective_idempotency_key: str | None
-
-
-@dataclass(frozen=True)
-class ScheduleRunResolution:
-    schedule_id: str
-    params: dict[str, Any]
-    immediate_job_id: str
-    idempotency_key: str
-    effective_idempotency_key: str | None
 
 
 def _resolve_generation_job(
@@ -164,8 +180,18 @@ def _dispatch_generation_job(
     task_queue: Any,
     run_in_memory_job: Callable[..., None],
 ) -> dict[str, Any]:
-    if task_queue:
-        log_info(logger, "generate.job.queued", job_id=resolution.job_id, via="redis")
+    dispatch_plan = build_generation_dispatch_plan(
+        has_task_queue=task_queue is not None,
+        is_testing=bool(app.config.get("TESTING", False)),
+    )
+
+    if dispatch_plan.via == "redis":
+        log_info(
+            logger,
+            "generate.job.queued",
+            job_id=resolution.job_id,
+            via=dispatch_plan.via,
+        )
         task_queue.enqueue(
             generate_newsletter_task,
             payload,
@@ -175,21 +201,21 @@ def _dispatch_generation_job(
             database_path,
             job_id=resolution.job_id,
         )
-        return build_generate_response(
-            job_id=resolution.job_id,
-            status="queued",
+        return build_generation_job_response(
+            resolution=resolution,
+            status=dispatch_plan.response_status,
             deduplicated=False,
-            idempotency_key=resolution.idempotency_key,
         )
 
-    log_info(logger, "generate.job.queued", job_id=resolution.job_id, via="in_memory")
-    in_memory_tasks[resolution.job_id] = {
-        "status": "processing",
-        "started_at": datetime.now().isoformat(),
-        "idempotency_key": resolution.idempotency_key,
-    }
+    log_info(
+        logger, "generate.job.queued", job_id=resolution.job_id, via=dispatch_plan.via
+    )
+    in_memory_tasks[resolution.job_id] = build_in_memory_processing_task(
+        started_at=datetime.now().isoformat(),
+        idempotency_key=resolution.idempotency_key,
+    )
 
-    if not app.config.get("TESTING", False):
+    if dispatch_plan.should_start_in_memory_thread:
         thread = threading.Thread(
             target=run_in_memory_job,
             kwargs={
@@ -202,11 +228,10 @@ def _dispatch_generation_job(
         )
         thread.start()
 
-    return build_generate_response(
-        job_id=resolution.job_id,
-        status="processing",
+    return build_generation_job_response(
+        resolution=resolution,
+        status=dispatch_plan.response_status,
         deduplicated=False,
-        idempotency_key=resolution.idempotency_key,
     )
 
 
@@ -267,17 +292,15 @@ def register_generation_routes(
                 idempotency_key,
                 DATABASE_PATH,
             )
-            in_memory_tasks[job_id] = {
-                "status": "completed",
-                "result": result,
-                "updated_at": datetime.now().isoformat(),
-            }
+            in_memory_tasks[job_id] = build_in_memory_completed_task(
+                result=result,
+                updated_at=datetime.now().isoformat(),
+            )
         except Exception as exc:
-            in_memory_tasks[job_id] = {
-                "status": "failed",
-                "error": str(exc),
-                "updated_at": datetime.now().isoformat(),
-            }
+            in_memory_tasks[job_id] = build_in_memory_failed_task(
+                error=str(exc),
+                updated_at=datetime.now().isoformat(),
+            )
 
     @app.route("/api/generate", methods=["POST"])
     def generate_newsletter():
@@ -322,11 +345,10 @@ def register_generation_routes(
             if resolution.deduplicated:
                 return (
                     jsonify(
-                        build_generate_response(
-                            job_id=resolution.job_id,
+                        build_generation_job_response(
+                            resolution=resolution,
                             status=resolution.stored_status,
                             deduplicated=True,
-                            idempotency_key=resolution.idempotency_key,
                         )
                     ),
                     202,
@@ -552,11 +574,10 @@ def register_generation_routes(
             result = process_newsletter_sync(data)
 
             # 메모리에 결과 저장
-            in_memory_tasks[job_id] = {
-                "status": "completed",
-                "result": result,
-                "updated_at": datetime.now().isoformat(),
-            }
+            in_memory_tasks[job_id] = build_in_memory_completed_task(
+                result=result,
+                updated_at=datetime.now().isoformat(),
+            )
 
             log_info(
                 logger,
@@ -569,11 +590,10 @@ def register_generation_routes(
             return result
         except Exception as e:
             log_exception(logger, "generate.in_memory.failed", e, job_id=job_id)
-            in_memory_tasks[job_id] = {
-                "status": "failed",
-                "error": str(e),
-                "updated_at": datetime.now().isoformat(),
-            }
+            in_memory_tasks[job_id] = build_in_memory_failed_task(
+                error=str(e),
+                updated_at=datetime.now().isoformat(),
+            )
             raise e
 
     def _parse_optional_json(
@@ -661,18 +681,16 @@ def register_generation_routes(
 
         schedules = []
         for row in rows:
-            schedule_id, params, rrule, next_run, created_at, enabled = row
             schedules.append(
-                {
-                    "id": schedule_id,
-                    "params": _parse_optional_json(
-                        params, job_id=schedule_id, field_name="schedule.params"
+                build_schedule_entry(
+                    row,
+                    parse_params=lambda raw, schedule_id=row[0]: _parse_optional_json(
+                        raw,
+                        job_id=schedule_id,
+                        field_name="schedule.params",
                     ),
-                    "rrule": rrule,
-                    "next_run": _serialize_schedule_timestamp(next_run),
-                    "created_at": _serialize_schedule_timestamp(created_at),
-                    "enabled": bool(enabled),
-                }
+                    serialize_timestamp=_serialize_schedule_timestamp,
+                )
             )
         return schedules
 
@@ -705,20 +723,14 @@ def register_generation_routes(
         idempotency_enabled = is_feature_enabled(
             "WEB_IDEMPOTENCY_ENABLED", default=True
         )
-        idempotency_key = build_schedule_idempotency_key(
-            schedule_id=schedule_id,
-            intended_run_at=intended_run_at,
-        )
-        if not idempotency_enabled:
-            idempotency_key = f"schedule:{schedule_id}:{to_iso_utc(intended_run_at)}"
-        job_suffix = derive_job_id(idempotency_key, prefix="sched").split("_", 1)[1]
-        immediate_job_id = f"schedule_{schedule_id}_{job_suffix}"
-        return ScheduleRunResolution(
+        return build_schedule_run_resolution(
             schedule_id=schedule_id,
             params=params,
-            immediate_job_id=immediate_job_id,
-            idempotency_key=idempotency_key,
-            effective_idempotency_key=idempotency_key if idempotency_enabled else None,
+            intended_run_at=intended_run_at,
+            idempotency_enabled=idempotency_enabled,
+            schedule_idempotency_key_builder=build_schedule_idempotency_key,
+            derive_job_id_fn=derive_job_id,
+            to_iso_utc_fn=to_iso_utc,
         )
 
     def _dispatch_schedule_run(resolution: ScheduleRunResolution) -> dict[str, Any]:
@@ -743,14 +755,12 @@ def register_generation_routes(
                 job_id=resolution.immediate_job_id,
                 source="api.schedule_run_now",
                 status="queued",
-                payload={"queue_job_id": job.id},
+                payload=build_schedule_run_event_payload(queue_job_id=job.id),
             )
-            return {
-                "status": "queued",
-                "job_id": resolution.immediate_job_id,
-                "message": "Newsletter generation started",
-                "idempotency_key": resolution.idempotency_key,
-            }
+            return build_schedule_run_response(
+                resolution=resolution,
+                status="queued",
+            )
 
         result = generate_newsletter_task(
             resolution.params,
@@ -767,12 +777,11 @@ def register_generation_routes(
             source="api.schedule_run_now",
             status=result.get("status"),
         )
-        return {
-            "status": "completed",
-            "result": result,
-            "job_id": resolution.immediate_job_id,
-            "idempotency_key": resolution.idempotency_key,
-        }
+        return build_schedule_run_response(
+            resolution=resolution,
+            status="completed",
+            result=result,
+        )
 
     @app.route("/api/status/<job_id>")
     def get_job_status(job_id):
@@ -874,24 +883,21 @@ def register_generation_routes(
             schedule_id=schedule_id,
             source="api.schedule",
             status="scheduled",
-            payload={
-                "rrule": rrule_str,
-                "email": schedule_request.params["email"],
-                "is_test": schedule_request.is_test,
-                "require_approval": bool(
-                    schedule_request.params.get("require_approval", False)
-                ),
-                "expires_at": schedule_request.expires_at,
-            },
+            payload=build_schedule_created_event_payload(
+                params=schedule_request.params,
+                rrule=rrule_str,
+                is_test=schedule_request.is_test,
+                expires_at=schedule_request.expires_at,
+            ),
         )
 
+        next_run_iso = to_iso_utc(next_run_utc)
         return (
             jsonify(
-                {
-                    "status": "scheduled",
-                    "schedule_id": schedule_id,
-                    "next_run": to_iso_utc(next_run_utc),
-                }
+                build_schedule_created_response(
+                    schedule_id=schedule_id,
+                    next_run=next_run_iso,
+                )
             ),
             201,
         )
@@ -936,7 +942,9 @@ def register_generation_routes(
                 job_id=resolution.immediate_job_id,
                 source="api.schedule_run_now",
                 status="requested",
-                payload={"idempotency_key": resolution.idempotency_key},
+                payload=build_schedule_run_requested_payload(
+                    resolution.idempotency_key
+                ),
             )
             return jsonify(_dispatch_schedule_run(resolution))
 
@@ -949,7 +957,7 @@ def register_generation_routes(
                     job_id=locals()["resolution"].immediate_job_id,
                     source="api.schedule_run_now",
                     status="failed",
-                    payload={"error": str(e)},
+                    payload=build_schedule_run_failed_payload(str(e)),
                 )
             log_exception(logger, "schedule.run_now.failed", e, schedule_id=schedule_id)
             return jsonify({"error": f"Failed to execute schedule: {str(e)}"}), 500
