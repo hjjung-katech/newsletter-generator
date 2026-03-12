@@ -67,15 +67,23 @@ except ImportError:
 try:
     from generation_route_actions import (
         build_generation_dispatch_action,
-        build_route_side_effect_action,
+        build_schedule_create_action,
+        build_schedule_run_completed_action,
         build_schedule_run_dispatch_action,
+        build_schedule_run_failed_action,
+        build_schedule_run_queued_action,
+        build_schedule_run_requested_action,
         build_sync_email_action,
     )
 except ImportError:
     from web.generation_route_actions import (  # pragma: no cover
         build_generation_dispatch_action,
-        build_route_side_effect_action,
+        build_schedule_create_action,
+        build_schedule_run_completed_action,
         build_schedule_run_dispatch_action,
+        build_schedule_run_failed_action,
+        build_schedule_run_queued_action,
+        build_schedule_run_requested_action,
         build_sync_email_action,
     )
 
@@ -88,12 +96,8 @@ try:
         build_in_memory_completed_task,
         build_in_memory_failed_task,
         build_in_memory_processing_task,
-        build_schedule_created_event_payload,
         build_schedule_created_response,
         build_schedule_entry,
-        build_schedule_run_event_payload,
-        build_schedule_run_failed_payload,
-        build_schedule_run_requested_payload,
         build_schedule_run_resolution,
         build_schedule_run_response,
     )
@@ -106,12 +110,8 @@ except ImportError:
         build_in_memory_completed_task,
         build_in_memory_failed_task,
         build_in_memory_processing_task,
-        build_schedule_created_event_payload,
         build_schedule_created_response,
         build_schedule_entry,
-        build_schedule_run_event_payload,
-        build_schedule_run_failed_payload,
-        build_schedule_run_requested_payload,
         build_schedule_run_resolution,
         build_schedule_run_response,
     )
@@ -767,13 +767,10 @@ def register_generation_routes(
                 *dispatch_action.task_call.args,
                 **dispatch_action.task_call.queue_kwargs,
             )
-            queued_event = build_route_side_effect_action(
+            queued_event = build_schedule_run_queued_action(
                 schedule_id=resolution.schedule_id,
                 job_id=resolution.immediate_job_id,
-                event_type="schedule.run_now.queued",
-                source="api.schedule_run_now",
-                status="queued",
-                payload=build_schedule_run_event_payload(queue_job_id=job.id),
+                queue_job_id=job.id,
             )
             record_schedule_event(DATABASE_PATH, **queued_event.as_record_kwargs())
             return build_schedule_run_response(
@@ -784,12 +781,10 @@ def register_generation_routes(
         result = generate_newsletter_task(
             *dispatch_action.task_call.args,
         )
-        completed_event = build_route_side_effect_action(
+        completed_event = build_schedule_run_completed_action(
             schedule_id=resolution.schedule_id,
             job_id=resolution.immediate_job_id,
-            event_type="schedule.run_now.completed",
-            source="api.schedule_run_now",
-            status=result.get("status"),
+            result_status=result.get("status"),
         )
         record_schedule_event(DATABASE_PATH, **completed_event.as_record_kwargs())
         return build_schedule_run_response(
@@ -873,6 +868,15 @@ def register_generation_routes(
             return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
 
         schedule_id = str(uuid.uuid4())
+        next_run_iso = to_iso_utc(next_run_utc)
+        schedule_create_action = build_schedule_create_action(
+            schedule_id=schedule_id,
+            params=schedule_request.params,
+            rrule=rrule_str,
+            next_run_iso=next_run_iso,
+            is_test=schedule_request.is_test,
+            expires_at=schedule_request.expires_at,
+        )
 
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
@@ -881,32 +885,14 @@ def register_generation_routes(
             INSERT INTO schedules (id, params, rrule, next_run, is_test, expires_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            (
-                schedule_id,
-                json.dumps(schedule_request.params),
-                rrule_str,
-                to_iso_utc(next_run_utc),
-                int(schedule_request.is_test),
-                schedule_request.expires_at,
-            ),
+            schedule_create_action.insert_values,
         )
         conn.commit()
         conn.close()
-        created_event = build_route_side_effect_action(
-            schedule_id=schedule_id,
-            event_type="schedule.created",
-            source="api.schedule",
-            status="scheduled",
-            payload=build_schedule_created_event_payload(
-                params=schedule_request.params,
-                rrule=rrule_str,
-                is_test=schedule_request.is_test,
-                expires_at=schedule_request.expires_at,
-            ),
+        record_schedule_event(
+            DATABASE_PATH,
+            **schedule_create_action.created_event.as_record_kwargs(),
         )
-        record_schedule_event(DATABASE_PATH, **created_event.as_record_kwargs())
-
-        next_run_iso = to_iso_utc(next_run_utc)
         return (
             jsonify(
                 build_schedule_created_response(
@@ -950,28 +936,20 @@ def register_generation_routes(
                 return jsonify({"error": "Schedule is disabled"}), 400
 
             resolution = _resolve_schedule_run(schedule_id, params)
-            requested_event = build_route_side_effect_action(
+            requested_event = build_schedule_run_requested_action(
                 schedule_id=schedule_id,
                 job_id=resolution.immediate_job_id,
-                event_type="schedule.run_now.requested",
-                source="api.schedule_run_now",
-                status="requested",
-                payload=build_schedule_run_requested_payload(
-                    resolution.idempotency_key
-                ),
+                idempotency_key=resolution.idempotency_key,
             )
             record_schedule_event(DATABASE_PATH, **requested_event.as_record_kwargs())
             return jsonify(_dispatch_schedule_run(resolution))
 
         except Exception as e:
             if locals().get("resolution"):
-                failed_event = build_route_side_effect_action(
+                failed_event = build_schedule_run_failed_action(
                     schedule_id=schedule_id,
                     job_id=locals()["resolution"].immediate_job_id,
-                    event_type="schedule.run_now.failed",
-                    source="api.schedule_run_now",
-                    status="failed",
-                    payload=build_schedule_run_failed_payload(str(e)),
+                    error=str(e),
                 )
                 record_schedule_event(DATABASE_PATH, **failed_event.as_record_kwargs())
             log_exception(logger, "schedule.run_now.failed", e, schedule_id=schedule_id)

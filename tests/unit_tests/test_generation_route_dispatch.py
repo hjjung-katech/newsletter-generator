@@ -12,6 +12,7 @@ WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
+import generation_route_actions  # noqa: E402
 import generation_route_dispatch  # noqa: E402
 import routes_generation  # noqa: E402
 
@@ -257,9 +258,26 @@ def test_schedule_routes_delegate_response_helpers(
     observed: dict[str, Any] = {}
     app = _build_generation_app(str(tmp_path / "storage.db"))
 
-    def fake_build_schedule_created_event_payload(**kwargs: Any) -> dict[str, Any]:
-        observed["create_event_kwargs"] = kwargs
-        return {"rrule": kwargs["rrule"], "email": kwargs["params"]["email"]}
+    def fake_build_schedule_create_action(**kwargs: Any) -> Any:
+        observed["create_action_kwargs"] = kwargs
+        return generation_route_actions.ScheduleCreateAction(
+            insert_values=(
+                kwargs["schedule_id"],
+                json.dumps(kwargs["params"]),
+                kwargs["rrule"],
+                kwargs["next_run_iso"],
+                int(kwargs["is_test"]),
+                kwargs["expires_at"],
+            ),
+            created_event=generation_route_actions.RouteSideEffectAction(
+                schedule_id=kwargs["schedule_id"],
+                job_id=None,
+                event_type="schedule.created",
+                source="api.schedule",
+                status="scheduled",
+                payload={"rrule": kwargs["rrule"], "email": kwargs["params"]["email"]},
+            ),
+        )
 
     def fake_build_schedule_created_response(
         *, schedule_id: str, next_run: str
@@ -269,8 +287,8 @@ def test_schedule_routes_delegate_response_helpers(
 
     monkeypatch.setattr(
         routes_generation,
-        "build_schedule_created_event_payload",
-        fake_build_schedule_created_event_payload,
+        "build_schedule_create_action",
+        fake_build_schedule_create_action,
     )
     monkeypatch.setattr(
         routes_generation,
@@ -295,7 +313,7 @@ def test_schedule_routes_delegate_response_helpers(
     payload = response.get_json()
     assert payload is not None
     assert payload["status"] == "scheduled"
-    assert observed["create_event_kwargs"]["params"]["email"] == "reader@example.com"
+    assert observed["create_action_kwargs"]["params"]["email"] == "reader@example.com"
     assert observed["create_response_args"][0] == payload["schedule_id"]
 
 
@@ -311,11 +329,16 @@ def test_schedule_run_now_delegates_run_response_helpers(
         lambda *_args, **_kwargs: {"status": "success", "title": "Scheduled"},
     )
 
-    def fake_build_schedule_run_requested_payload(
-        idempotency_key: str,
-    ) -> dict[str, Any]:
-        observed["requested_payload"] = idempotency_key
-        return {"idempotency_key": idempotency_key}
+    def fake_build_schedule_run_requested_action(**kwargs: Any) -> Any:
+        observed["requested_action_kwargs"] = kwargs
+        return generation_route_actions.RouteSideEffectAction(
+            schedule_id=kwargs["schedule_id"],
+            job_id=kwargs["job_id"],
+            event_type="schedule.run_now.requested",
+            source="api.schedule_run_now",
+            status="requested",
+            payload={"idempotency_key": kwargs["idempotency_key"]},
+        )
 
     def fake_build_schedule_run_response(
         *,
@@ -335,8 +358,8 @@ def test_schedule_run_now_delegates_run_response_helpers(
 
     monkeypatch.setattr(
         routes_generation,
-        "build_schedule_run_requested_payload",
-        fake_build_schedule_run_requested_payload,
+        "build_schedule_run_requested_action",
+        fake_build_schedule_run_requested_action,
     )
     monkeypatch.setattr(
         routes_generation,
@@ -360,7 +383,9 @@ def test_schedule_run_now_delegates_run_response_helpers(
         response = client.post(f"/api/schedule/{schedule_id}/run")
 
     assert response.status_code == 200
-    assert observed["requested_payload"].startswith("schedule:")
+    assert observed["requested_action_kwargs"]["idempotency_key"].startswith(
+        "schedule:"
+    )
     assert observed["run_response_args"][0] == schedule_id
     assert observed["run_response_args"][1] == "completed"
 
