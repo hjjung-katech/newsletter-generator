@@ -4,6 +4,7 @@ import importlib
 import sys
 from types import ModuleType
 
+import dotenv
 import pytest
 from flask import Flask
 
@@ -123,3 +124,24 @@ def test_generation_facade_import_is_lazy_for_legacy_modules() -> None:
         _restore_module("newsletter_core.public.generation", previous_generation)
         _restore_module("newsletter.graph", previous_graph)
         _restore_module("newsletter.tools", previous_tools)
+
+
+@pytest.mark.unit
+def test_generation_route_support_import_does_not_call_load_dotenv(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = {"count": 0}
+
+    def _fake_load_dotenv(*_args, **_kwargs) -> bool:
+        calls["count"] += 1
+        return False
+
+    monkeypatch.setattr(dotenv, "load_dotenv", _fake_load_dotenv)
+    previous = _pop_module("web.generation_route_support")
+    previous_top_level = _pop_module("generation_route_support")
+    try:
+        importlib.import_module("web.generation_route_support")
+        assert calls["count"] == 0
+    finally:
+        _restore_module("web.generation_route_support", previous)
+        _restore_module("generation_route_support", previous_top_level)
