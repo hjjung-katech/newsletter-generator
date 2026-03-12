@@ -65,7 +65,36 @@ try:
 except ImportError:
     from web.analytics import record_schedule_event  # pragma: no cover
 
-from web.types import GenerateNewsletterRequest
+try:
+    from generation_route_support import (
+        build_generate_request_context,
+        build_generate_response,
+        build_generation_invoke_plan,
+        build_history_entry,
+        build_status_response_from_row,
+        build_status_response_from_task,
+        build_sync_email_subject,
+        build_sync_generation_options,
+        build_sync_generation_response,
+        parse_preview_request,
+        parse_schedule_create_request,
+        validate_generate_request,
+    )
+except ImportError:
+    from web.generation_route_support import (  # pragma: no cover
+        build_generate_request_context,
+        build_generate_response,
+        build_generation_invoke_plan,
+        build_history_entry,
+        build_status_response_from_row,
+        build_status_response_from_task,
+        build_sync_email_subject,
+        build_sync_generation_options,
+        build_sync_generation_response,
+        parse_preview_request,
+        parse_schedule_create_request,
+        validate_generate_request,
+    )
 
 logger = logging.getLogger("web.routes_generation")
 
@@ -86,22 +115,6 @@ class ScheduleRunResolution:
     immediate_job_id: str
     idempotency_key: str
     effective_idempotency_key: str | None
-
-
-def _validate_generate_request(data: dict[str, Any]) -> GenerateNewsletterRequest:
-    """Validate generation request payload without runtime dynamic loading."""
-    return GenerateNewsletterRequest(**data)
-
-
-def _build_generate_response(
-    *, job_id: str, status: str, deduplicated: bool, idempotency_key: str
-) -> dict[str, Any]:
-    return {
-        "job_id": job_id,
-        "status": status,
-        "deduplicated": deduplicated,
-        "idempotency_key": idempotency_key,
-    }
 
 
 def _resolve_generation_job(
@@ -162,7 +175,7 @@ def _dispatch_generation_job(
             database_path,
             job_id=resolution.job_id,
         )
-        return _build_generate_response(
+        return build_generate_response(
             job_id=resolution.job_id,
             status="queued",
             deduplicated=False,
@@ -189,7 +202,7 @@ def _dispatch_generation_job(
         )
         thread.start()
 
-    return _build_generate_response(
+    return build_generate_response(
         job_id=resolution.job_id,
         status="processing",
         deduplicated=False,
@@ -276,21 +289,19 @@ def register_generation_routes(
                 return jsonify({"error": "No data provided"}), 400
 
             try:
-                validated_data = _validate_generate_request(data)
+                validated_data = validate_generate_request(data)
             except Exception as e:
                 log_exception(logger, "generate.request.invalid", e)
                 return jsonify({"error": f"Invalid request: {str(e)}"}), 400
 
-            # Extract email for sending
-            email = validated_data.email
-            send_email = bool(email)
+            request_context = build_generate_request_context(validated_data)
             log_info(
                 logger,
                 "generate.request.received",
-                has_domain=bool(validated_data.domain),
-                has_keywords=bool(validated_data.keywords),
-                email=email,
-                send_email=send_email,
+                has_domain=request_context.has_domain,
+                has_keywords=request_context.has_keywords,
+                email=request_context.email,
+                send_email=request_context.send_email,
             )
             log_debug(logger, "generate.request.payload", payload=data)
 
@@ -311,7 +322,7 @@ def register_generation_routes(
             if resolution.deduplicated:
                 return (
                     jsonify(
-                        _build_generate_response(
+                        build_generate_response(
                             job_id=resolution.job_id,
                             status=resolution.stored_status,
                             deduplicated=True,
@@ -325,7 +336,7 @@ def register_generation_routes(
                 app=app,
                 payload=data,
                 resolution=resolution,
-                send_email=send_email,
+                send_email=request_context.send_email,
                 database_path=DATABASE_PATH,
                 in_memory_tasks=in_memory_tasks,
                 task_queue=resolve_task_queue(),
@@ -344,43 +355,26 @@ def register_generation_routes(
     def get_newsletter():
         """Generate newsletter directly with GET parameters"""
         try:
-            # 파라미터 추출
-            topic = request.args.get("topic", "")
-            keywords = request.args.get("keywords", topic)  # topic을 keywords로도 받음
-            period = request.args.get("period", 14, type=int)
-            template_style = request.args.get("template_style", "compact")
-
-            # 기간 파라미터 검증
-            if period not in [1, 7, 14, 30]:
-                return (
-                    jsonify(
-                        {"error": "Invalid period. Must be one of: 1, 7, 14, 30 days"}
-                    ),
-                    400,
-                )
-
-            # 키워드가 없으면 에러
-            if not keywords:
-                return (
-                    jsonify({"error": "Missing required parameter: topic or keywords"}),
-                    400,
-                )
+            try:
+                preview_request = parse_preview_request(request.args.to_dict(flat=True))
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
 
             log_info(
                 logger,
                 "newsletter.preview.requested",
-                keywords=keywords,
-                period=period,
-                template_style=template_style,
+                keywords=preview_request.keywords,
+                period=preview_request.period,
+                template_style=preview_request.template_style,
             )
 
             # 뉴스레터 생성
             active_newsletter_cli = resolve_newsletter_cli()
             result = active_newsletter_cli.generate_newsletter(
-                keywords=keywords,
-                template_style=template_style,
+                keywords=preview_request.keywords,
+                template_style=preview_request.template_style,
                 email_compatible=False,
-                period=period,
+                period=preview_request.period,
             )
 
             if result["status"] == "success":
@@ -414,55 +408,29 @@ def register_generation_routes(
                 cli_type=type(active_newsletter_cli).__name__,
             )
 
-            # Extract parameters
-            keywords = data.get("keywords", "")
-            domain = data.get("domain", "")
-            template_style = data.get("template_style", "compact")
-            email_compatible = data.get("email_compatible", False)
-            period = data.get("period", 14)
-            email = data.get("email", "")  # 이메일 주소 추가
+            options = build_sync_generation_options(data)
 
             log_debug(
                 logger,
                 "generate.sync.parameters",
-                keywords=keywords,
-                domain=domain,
-                template_style=template_style,
-                email_compatible=email_compatible,
-                period=period,
-                email=email,
+                keywords=options.keywords,
+                domain=options.domain,
+                template_style=options.template_style,
+                email_compatible=options.email_compatible,
+                period=options.period,
+                email=options.email,
             )
 
             # Use newsletter CLI with proper parameters
             try:
-                if keywords:
-                    log_info(
-                        logger,
-                        "generate.sync.invoke",
-                        mode="keywords",
-                        cli_type=type(active_newsletter_cli).__name__,
-                    )
-                    result = active_newsletter_cli.generate_newsletter(
-                        keywords=keywords,
-                        template_style=template_style,
-                        email_compatible=email_compatible,
-                        period=period,
-                    )
-                elif domain:
-                    log_info(
-                        logger,
-                        "generate.sync.invoke",
-                        mode="domain",
-                        cli_type=type(active_newsletter_cli).__name__,
-                    )
-                    result = active_newsletter_cli.generate_newsletter(
-                        domain=domain,
-                        template_style=template_style,
-                        email_compatible=email_compatible,
-                        period=period,
-                    )
-                else:
-                    raise ValueError("Either keywords or domain must be provided")
+                invoke_plan = build_generation_invoke_plan(options)
+                log_info(
+                    logger,
+                    "generate.sync.invoke",
+                    mode=invoke_plan.mode,
+                    cli_type=type(active_newsletter_cli).__name__,
+                )
+                result = active_newsletter_cli.generate_newsletter(**invoke_plan.kwargs)
 
                 log_info(
                     logger,
@@ -492,20 +460,8 @@ def register_generation_routes(
                 if isinstance(active_newsletter_cli, RealNewsletterCLI):
                     log_info(logger, "generate.sync.fallback_mock")
                     mock_cli = MockNewsletterCLI()
-                    if keywords:
-                        result = mock_cli.generate_newsletter(
-                            keywords=keywords,
-                            template_style=template_style,
-                            email_compatible=email_compatible,
-                            period=period,
-                        )
-                    else:
-                        result = mock_cli.generate_newsletter(
-                            domain=domain,
-                            template_style=template_style,
-                            email_compatible=email_compatible,
-                            period=period,
-                        )
+                    fallback_plan = build_generation_invoke_plan(options)
+                    result = mock_cli.generate_newsletter(**fallback_plan.kwargs)
                     log_info(
                         logger,
                         "generate.sync.fallback_result",
@@ -514,9 +470,13 @@ def register_generation_routes(
 
             # 이메일 발송 기능 추가
             email_sent = False
-            if email and result.get("content") and not data.get("preview_only"):
+            if options.email and result.get("content") and not options.preview_only:
                 try:
-                    log_info(logger, "generate.sync.email_sending", email=email)
+                    log_info(
+                        logger,
+                        "generate.sync.email_sending",
+                        email=options.email,
+                    )
                     # 이메일 발송 - try-except로 import 처리
                     try:
                         import mail
@@ -536,45 +496,41 @@ def register_generation_routes(
                             )
 
                     # 제목 생성
-                    subject = result.get("title", "Newsletter")
-                    if keywords:
-                        subject = f"Newsletter: {keywords}"
-                    elif domain:
-                        subject = f"Newsletter: {domain} Insights"
+                    subject = build_sync_email_subject(
+                        result_title=result.get("title"),
+                        keywords=options.keywords,
+                        domain=options.domain,
+                    )
 
                     # 이메일 발송
-                    send_email_func(to=email, subject=subject, html=result["content"])
+                    send_email_func(
+                        to=options.email,
+                        subject=subject,
+                        html=result["content"],
+                    )
                     email_sent = True
-                    log_info(logger, "generate.sync.email_sent", email=email)
+                    log_info(
+                        logger,
+                        "generate.sync.email_sent",
+                        email=options.email,
+                    )
                 except Exception as e:
                     log_exception(
                         logger,
                         "generate.sync.email_failed",
                         e,
-                        email=email,
+                        email=options.email,
                     )
                     # 이메일 발송 실패해도 뉴스레터 생성은 성공으로 처리
 
-            response = {
-                "status": result.get("status", "error"),
-                "html_content": result.get("content", ""),
-                "title": result.get("title", "Newsletter"),
-                "generation_stats": result.get("generation_stats", {}),
-                "input_params": result.get("input_params", {}),
-                "error": result.get("error"),
-                "sent": email_sent,
-                "email_sent": email_sent,
-                "subject": result.get("title", "Newsletter"),  # compatibility alias
-                "html_size": len(result.get("content", "")),
-                "processing_info": {
-                    "using_real_cli": isinstance(
-                        active_newsletter_cli, RealNewsletterCLI
-                    ),
-                    "template_style": template_style,
-                    "email_compatible": email_compatible,
-                    "period_days": period,
-                },
-            }
+            response = build_sync_generation_response(
+                result,
+                using_real_cli=isinstance(active_newsletter_cli, RealNewsletterCLI),
+                template_style=options.template_style,
+                email_compatible=options.email_compatible,
+                period=options.period,
+                email_sent=email_sent,
+            )
 
             log_info(
                 logger,
@@ -636,29 +592,6 @@ def register_generation_routes(
             )
             return None
 
-    def _build_status_response_from_task(
-        job_id: str, task: dict[str, Any]
-    ) -> dict[str, Any]:
-        response = {
-            "job_id": job_id,
-            "status": task["status"],
-            "sent": task.get("sent", False),
-            "idempotency_key": task.get("idempotency_key"),
-        }
-
-        result = task.get("result")
-        if isinstance(result, dict):
-            response["result"] = result
-            response["sent"] = result.get("sent", False)
-            response["approval_status"] = result.get("approval_status")
-            response["delivery_status"] = result.get("delivery_status")
-        elif result is not None:
-            response["result"] = result
-
-        if "error" in task:
-            response["error"] = task["error"]
-        return response
-
     def _load_job_status_row(job_id: str) -> tuple[Any, ...] | None:
         conn = sqlite3.connect(DATABASE_PATH)
         try:
@@ -684,50 +617,6 @@ def register_generation_routes(
         finally:
             conn.close()
 
-    def _build_status_response_from_row(
-        job_id: str, row: tuple[Any, ...]
-    ) -> dict[str, Any]:
-        (
-            params,
-            result,
-            status,
-            idempotency_key,
-            approval_status,
-            delivery_status,
-            approved_at,
-            rejected_at,
-            approval_note,
-        ) = row
-        response = {
-            "job_id": job_id,
-            "status": status,
-            "params": _parse_optional_json(
-                params, job_id=job_id, field_name="status.params"
-            ),
-            "sent": False,
-            "idempotency_key": idempotency_key,
-            "approval_status": approval_status,
-            "delivery_status": delivery_status,
-            "approved_at": approved_at,
-            "rejected_at": rejected_at,
-            "approval_note": approval_note,
-        }
-
-        result_data = _parse_optional_json(
-            result, job_id=job_id, field_name="status.result"
-        )
-        if isinstance(result_data, dict):
-            response["result"] = result_data
-            response["sent"] = result_data.get("sent", False)
-            if response["approval_status"] is None:
-                response["approval_status"] = result_data.get("approval_status")
-            if response["delivery_status"] is None:
-                response["delivery_status"] = result_data.get("delivery_status")
-        elif result_data is not None:
-            response["result"] = result_data
-
-        return response
-
     def _load_recent_history_rows(limit: int = 20) -> list[tuple[Any, ...]]:
         conn = sqlite3.connect(DATABASE_PATH)
         try:
@@ -749,38 +638,6 @@ def register_generation_routes(
         finally:
             conn.close()
 
-    def _build_history_entry(row: tuple[Any, ...]) -> dict[str, Any]:
-        (
-            job_id,
-            params,
-            result,
-            created_at,
-            status,
-            idempotency_key,
-            approval_status,
-            delivery_status,
-            approved_at,
-            rejected_at,
-            approval_note,
-        ) = row
-        return {
-            "id": job_id,
-            "params": _parse_optional_json(
-                params, job_id=job_id, field_name="history.params"
-            ),
-            "result": _parse_optional_json(
-                result, job_id=job_id, field_name="history.result"
-            ),
-            "created_at": created_at,
-            "status": status,
-            "idempotency_key": idempotency_key,
-            "approval_status": approval_status,
-            "delivery_status": delivery_status,
-            "approved_at": approved_at,
-            "rejected_at": rejected_at,
-            "approval_note": approval_note,
-        }
-
     def _compute_schedule_next_run(rrule_str: str) -> datetime:
         from dateutil.rrule import rrulestr
 
@@ -790,18 +647,6 @@ def register_generation_routes(
         if not next_run:
             raise ValueError("Invalid RRULE: no future occurrences")
         return to_utc(next_run)
-
-    def _build_schedule_params(data: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "keywords": data.get("keywords"),
-            "domain": data.get("domain"),
-            "email": data["email"],
-            "template_style": data.get("template_style", "compact"),
-            "email_compatible": data.get("email_compatible", True),
-            "period": data.get("period", 14),
-            "send_email": True,
-            "require_approval": bool(data.get("require_approval", False)),
-        }
 
     def _list_active_schedules() -> list[dict[str, Any]]:
         conn = sqlite3.connect(DATABASE_PATH)
@@ -934,7 +779,7 @@ def register_generation_routes(
         """Get status of a newsletter generation job"""
         if job_id in in_memory_tasks:
             return jsonify(
-                _build_status_response_from_task(job_id, in_memory_tasks[job_id])
+                build_status_response_from_task(job_id, in_memory_tasks[job_id])
             )
 
         row = _load_job_status_row(job_id)
@@ -942,7 +787,22 @@ def register_generation_routes(
         if not row:
             return jsonify({"error": "Job not found"}), 404
 
-        return jsonify(_build_status_response_from_row(job_id, row))
+        return jsonify(
+            build_status_response_from_row(
+                job_id,
+                row,
+                parse_params=lambda raw: _parse_optional_json(
+                    raw,
+                    job_id=job_id,
+                    field_name="status.params",
+                ),
+                parse_result=lambda raw: _parse_optional_json(
+                    raw,
+                    job_id=job_id,
+                    field_name="status.result",
+                ),
+            )
+        )
 
     @app.route("/api/history")
     def get_history():
@@ -954,7 +814,22 @@ def register_generation_routes(
             log_exception(logger, "history.load_failed", e)
             return jsonify({"error": f"Database error: {str(e)}"}), 500
 
-        history = [_build_history_entry(row) for row in rows]
+        history = [
+            build_history_entry(
+                row,
+                parse_params=lambda raw, job_id=row[0]: _parse_optional_json(
+                    raw,
+                    job_id=job_id,
+                    field_name="history.params",
+                ),
+                parse_result=lambda raw, job_id=row[0]: _parse_optional_json(
+                    raw,
+                    job_id=job_id,
+                    field_name="history.result",
+                ),
+            )
+            for row in rows
+        ]
         log_info(logger, "history.returned", count=len(history))
         return jsonify(history)
 
@@ -962,24 +837,18 @@ def register_generation_routes(
     def create_schedule():
         """Create a recurring newsletter schedule"""
         data = request.get_json()
+        try:
+            schedule_request = parse_schedule_create_request(data)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
 
-        if not data or not data.get("rrule") or not data.get("email"):
-            return jsonify({"error": "Missing required fields: rrule, email"}), 400
-
-        # Keywords나 domain 중 하나는 필수
-        if not data.get("keywords") and not data.get("domain"):
-            return jsonify({"error": "Either keywords or domain is required"}), 400
-
-        rrule_str = data["rrule"]
+        rrule_str = schedule_request.rrule
         try:
             next_run_utc = _compute_schedule_next_run(rrule_str)
         except Exception as e:
             return jsonify({"error": f"Invalid RRULE: {str(e)}"}), 400
 
         schedule_id = str(uuid.uuid4())
-        schedule_params = _build_schedule_params(data)
-        is_test = bool(data.get("is_test", False))
-        expires_at = data.get("expires_at")
 
         conn = sqlite3.connect(DATABASE_PATH)
         cursor = conn.cursor()
@@ -990,11 +859,11 @@ def register_generation_routes(
             """,
             (
                 schedule_id,
-                json.dumps(schedule_params),
+                json.dumps(schedule_request.params),
                 rrule_str,
                 to_iso_utc(next_run_utc),
-                int(is_test),
-                expires_at,
+                int(schedule_request.is_test),
+                schedule_request.expires_at,
             ),
         )
         conn.commit()
@@ -1007,10 +876,12 @@ def register_generation_routes(
             status="scheduled",
             payload={
                 "rrule": rrule_str,
-                "email": data["email"],
-                "is_test": is_test,
-                "require_approval": bool(data.get("require_approval", False)),
-                "expires_at": expires_at,
+                "email": schedule_request.params["email"],
+                "is_test": schedule_request.is_test,
+                "require_approval": bool(
+                    schedule_request.params.get("require_approval", False)
+                ),
+                "expires_at": schedule_request.expires_at,
             },
         )
 
