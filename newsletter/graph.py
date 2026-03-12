@@ -11,6 +11,12 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 
 from langgraph.graph import END, StateGraph
 
+from newsletter_core.application.graph_composition import (
+    build_compose_persist_plan,
+    build_summarize_result_state,
+    build_summary_invocation_plan,
+    build_theme_resolution_plan,
+)
 from newsletter_core.application.graph_node_helpers import (
     build_collect_error_state,
     build_collect_keyword_query,
@@ -25,21 +31,15 @@ from newsletter_core.application.graph_node_helpers import (
     build_score_success_state,
     build_summarize_error_state,
     build_summarize_missing_articles_state,
-    build_summarize_success_state,
     filter_articles_for_processing,
-    resolve_compose_html,
     resolve_graph_domain_slug,
-    resolve_graph_keywords_slug,
     resolve_scoring_domain,
-    resolve_summary_chain_style,
     sort_articles_by_graph_date_desc,
 )
 from newsletter_core.application.graph_workflow import (
     NewsletterState,
     build_generation_info,
     build_initial_graph_state,
-    build_newsletter_chain_payload,
-    normalize_summary_chain_result,
     parse_graph_article_date,
     resolve_generation_result,
     route_after_collect,
@@ -285,44 +285,27 @@ def summarize_articles_node(state: NewsletterState) -> NewsletterState:
         )
 
     try:
-        template_style, is_compact = resolve_summary_chain_style(state)
-        newsletter_chain = get_newsletter_chain(is_compact=is_compact)
-
-        # 체인 실행을 위한 데이터 준비
-        chain_data = build_newsletter_chain_payload(
-            state, ranked_articles, template_style
-        )
+        summary_plan = build_summary_invocation_plan(state, ranked_articles)
+        newsletter_chain = get_newsletter_chain(is_compact=summary_plan["is_compact"])
 
         logger.info(
-            f"Generating newsletter using {template_style} style for {len(ranked_articles)} articles"
+            f"Generating newsletter using {summary_plan['template_style']} style for {summary_plan['article_count']} articles"
         )
 
         # 최종 활용 기사 수 표시
         show_final_brief(len(ranked_articles))
 
         # 체인 실행
-        result = newsletter_chain.invoke(chain_data)
+        result = newsletter_chain.invoke(summary_plan["chain_payload"])
 
         if isinstance(result, str):
             logger.info("[yellow]Received HTML string (legacy format)[/yellow]")
 
-        (
-            newsletter_html,
-            category_summaries,
-            newsletter_topic,
-        ) = normalize_summary_chain_result(
-            result,
-            state=state,
-            template_style=template_style,
-            article_count=len(ranked_articles),
-            generated_at=datetime.now(),
-        )
-
-        return build_summarize_success_state(
+        return build_summarize_result_state(
             state,
-            newsletter_html=newsletter_html,
-            category_summaries=category_summaries,
-            newsletter_topic=newsletter_topic,
+            result,
+            plan=summary_plan,
+            generated_at=datetime.now(),
             elapsed=time.time() - start_time,
         )
 
@@ -362,24 +345,23 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
         # 이미 체인에서 HTML이 생성된 경우 그대로 사용
         if newsletter_html:
             logger.info("[cyan]Using pre-generated HTML from chains[/cyan]")
-        final_html = resolve_compose_html(newsletter_html)
+        compose_plan = build_compose_persist_plan(state, newsletter_html)
 
         # 파일 저장
         try:
-            keywords_str = resolve_graph_keywords_slug(state)
-            domain_str = resolve_graph_domain_slug(state)
-            template_style = state.get("template_style", "detailed")
-
             # generate_unified_newsletter_filename이 이미 전체 경로를 반환함
             file_path = generate_unified_newsletter_filename(
-                domain_str, f"newsletter_{template_style}", keywords_str, "html"
+                compose_plan["domain_slug"],
+                compose_plan["file_stem"],
+                compose_plan["keywords_slug"],
+                "html",
             )
 
             # 디렉토리 존재 확인 (파일 경로에서 디렉토리 부분 추출)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
             with open(file_path, "w", encoding="utf-8") as f:
-                f.write(final_html)
+                f.write(compose_plan["final_html"])
 
             step_result("뉴스레터 저장 완료")
             logger.info(f"[green]Newsletter saved to {file_path}[/green]")
@@ -389,7 +371,7 @@ def compose_newsletter_node(state: NewsletterState) -> NewsletterState:
 
         return build_compose_success_state(
             state,
-            newsletter_html=final_html,
+            newsletter_html=compose_plan["final_html"],
             elapsed=time.time() - start_time,
         )
 
@@ -478,12 +460,9 @@ def generate_newsletter(
 
     # 뉴스레터 주제 결정 (도메인, 단일 키워드, 또는 공통 주제)
     theme_start = time.time()
-    newsletter_topic = ""
-    if domain:
-        newsletter_topic = domain  # 도메인이 있으면 도메인 사용
-    elif len(keywords) == 1:
-        newsletter_topic = keywords[0]  # 단일 키워드면 해당 키워드 사용
-    else:
+    topic_plan = build_theme_resolution_plan(keywords, domain)
+    newsletter_topic = topic_plan["newsletter_topic"]
+    if topic_plan["requires_theme_extraction"]:
         # 여러 키워드의 공통 주제 추출
         from .tools import extract_common_theme_from_keywords
 

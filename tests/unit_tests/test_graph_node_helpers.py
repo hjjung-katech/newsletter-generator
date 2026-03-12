@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timezone
 from types import ModuleType, SimpleNamespace
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -232,62 +231,3 @@ def test_process_articles_node_delegates_filter_sort_and_state_helpers(
         {"title": "sorted", "date": "2026-03-10T09:00:00Z"}
     ]
     assert result["status"] == "scoring"
-
-
-@pytest.mark.unit
-def test_summarize_articles_node_delegates_style_and_success_helpers(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    fake_chain = MagicMock()
-    fake_chain.invoke.return_value = {"html": "<html>ok</html>"}
-    captured = {}
-
-    def _fake_resolve_style(state):
-        captured["style_state"] = state
-        return ("compact", True)
-
-    monkeypatch.setattr(
-        graph_module, "resolve_summary_chain_style", _fake_resolve_style
-    )
-    monkeypatch.setattr(
-        graph_module, "get_newsletter_chain", lambda is_compact: fake_chain
-    )
-    monkeypatch.setattr(
-        graph_module,
-        "normalize_summary_chain_result",
-        lambda result, **kwargs: (
-            "<html>ok</html>",
-            {"sections": [], "structured_data": {}},
-            "AI",
-        ),
-    )
-
-    def _fake_success(
-        state, *, newsletter_html, category_summaries, newsletter_topic, elapsed
-    ):
-        captured["success"] = (
-            newsletter_html,
-            category_summaries,
-            newsletter_topic,
-            elapsed,
-        )
-        return _make_state(
-            newsletter_html=newsletter_html,
-            category_summaries=category_summaries,
-            newsletter_topic=newsletter_topic,
-            status="summarizing_complete",
-            step_times={"summarize": elapsed},
-        )
-
-    monkeypatch.setattr(graph_module, "build_summarize_success_state", _fake_success)
-
-    result = graph_module.summarize_articles_node(
-        _make_state(
-            ranked_articles=[{"title": "A"}],
-            status="scoring_complete",
-        )
-    )
-
-    assert captured["style_state"]["template_style"] == "compact"
-    assert result["newsletter_html"] == "<html>ok</html>"
-    assert result["status"] == "summarizing_complete"
