@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
@@ -25,6 +26,12 @@ class GenerationDispatchAction:
 class ScheduleRunDispatchAction:
     mode: str
     task_call: TaskDispatchCall
+
+
+@dataclass(frozen=True)
+class ScheduleCreateAction:
+    insert_values: tuple[str, str, str, str, int, str | None]
+    created_event: RouteSideEffectAction
 
 
 @dataclass(frozen=True)
@@ -189,3 +196,100 @@ def build_sync_email_action(
         domain=domain,
     )
     return SyncEmailAction(to=email, subject=subject, html=html)
+
+
+def build_schedule_create_action(
+    *,
+    schedule_id: str,
+    params: Mapping[str, Any],
+    rrule: str,
+    next_run_iso: str,
+    is_test: bool,
+    expires_at: str | None,
+) -> ScheduleCreateAction:
+    return ScheduleCreateAction(
+        insert_values=(
+            schedule_id,
+            json.dumps(dict(params)),
+            rrule,
+            next_run_iso,
+            int(is_test),
+            expires_at,
+        ),
+        created_event=build_route_side_effect_action(
+            schedule_id=schedule_id,
+            event_type="schedule.created",
+            source="api.schedule",
+            status="scheduled",
+            payload={
+                "rrule": rrule,
+                "email": params["email"],
+                "is_test": is_test,
+                "require_approval": bool(params.get("require_approval", False)),
+                "expires_at": expires_at,
+            },
+        ),
+    )
+
+
+def build_schedule_run_requested_action(
+    *,
+    schedule_id: str,
+    job_id: str,
+    idempotency_key: str,
+) -> RouteSideEffectAction:
+    return build_route_side_effect_action(
+        schedule_id=schedule_id,
+        job_id=job_id,
+        event_type="schedule.run_now.requested",
+        source="api.schedule_run_now",
+        status="requested",
+        payload={"idempotency_key": idempotency_key},
+    )
+
+
+def build_schedule_run_queued_action(
+    *,
+    schedule_id: str,
+    job_id: str,
+    queue_job_id: str,
+) -> RouteSideEffectAction:
+    return build_route_side_effect_action(
+        schedule_id=schedule_id,
+        job_id=job_id,
+        event_type="schedule.run_now.queued",
+        source="api.schedule_run_now",
+        status="queued",
+        payload={"queue_job_id": queue_job_id},
+    )
+
+
+def build_schedule_run_completed_action(
+    *,
+    schedule_id: str,
+    job_id: str,
+    result_status: str | None,
+) -> RouteSideEffectAction:
+    return build_route_side_effect_action(
+        schedule_id=schedule_id,
+        job_id=job_id,
+        event_type="schedule.run_now.completed",
+        source="api.schedule_run_now",
+        status=result_status,
+    )
+
+
+def build_schedule_run_failed_action(
+    *,
+    schedule_id: str,
+    job_id: str,
+    error: str,
+) -> RouteSideEffectAction:
+    return build_route_side_effect_action(
+        schedule_id=schedule_id,
+        job_id=job_id,
+        event_type="schedule.run_now.failed",
+        source="api.schedule_run_now",
+        status="failed",
+        payload={"error": error},
+    )

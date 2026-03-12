@@ -143,6 +143,65 @@ def test_build_schedule_dispatch_and_side_effect_helpers_preserve_contract() -> 
     }
 
 
+def test_build_schedule_create_and_run_event_helpers_preserve_contract() -> None:
+    created = generation_route_actions.build_schedule_create_action(
+        schedule_id="schedule-1",
+        params={"keywords": ["AI"], "email": "queue@example.com"},
+        rrule="FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+        next_run_iso="2026-03-16T09:00:00+00:00",
+        is_test=False,
+        expires_at=None,
+    )
+    requested = generation_route_actions.build_schedule_run_requested_action(
+        schedule_id="schedule-1",
+        job_id="schedule_sched_1_run",
+        idempotency_key="schedule:key",
+    )
+    queued = generation_route_actions.build_schedule_run_queued_action(
+        schedule_id="schedule-1",
+        job_id="schedule_sched_1_run",
+        queue_job_id="rq-job-1",
+    )
+    completed = generation_route_actions.build_schedule_run_completed_action(
+        schedule_id="schedule-1",
+        job_id="schedule_sched_1_run",
+        result_status="success",
+    )
+    failed = generation_route_actions.build_schedule_run_failed_action(
+        schedule_id="schedule-1",
+        job_id="schedule_sched_1_run",
+        error="queue unavailable",
+    )
+
+    assert created.insert_values == (
+        "schedule-1",
+        '{"keywords": ["AI"], "email": "queue@example.com"}',
+        "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+        "2026-03-16T09:00:00+00:00",
+        0,
+        None,
+    )
+    assert created.created_event.as_record_kwargs() == {
+        "event_type": "schedule.created",
+        "schedule_id": "schedule-1",
+        "source": "api.schedule",
+        "status": "scheduled",
+        "payload": {
+            "rrule": "FREQ=WEEKLY;BYDAY=MO;BYHOUR=9;BYMINUTE=0",
+            "email": "queue@example.com",
+            "is_test": False,
+            "require_approval": False,
+            "expires_at": None,
+        },
+    }
+    assert requested.as_record_kwargs()["payload"] == {
+        "idempotency_key": "schedule:key"
+    }
+    assert queued.as_record_kwargs()["payload"] == {"queue_job_id": "rq-job-1"}
+    assert completed.as_record_kwargs()["status"] == "success"
+    assert failed.as_record_kwargs()["payload"] == {"error": "queue unavailable"}
+
+
 def test_build_sync_email_action_respects_preview_gate_and_subject_builder() -> None:
     builder_calls: list[dict[str, Any]] = []
 
@@ -281,15 +340,67 @@ def test_schedule_run_now_delegates_pre_side_effect_helpers(
             ),
         )
 
-    def fake_build_route_side_effect_action(**kwargs: Any) -> Any:
-        observed["events"].append(kwargs)
+    def _record_event(event: generation_route_actions.RouteSideEffectAction) -> None:
+        observed["events"].append(event.as_record_kwargs())
+
+    def fake_build_schedule_create_action(**kwargs: Any) -> Any:
+        observed["schedule_create_kwargs"] = kwargs
+        event = generation_route_actions.RouteSideEffectAction(
+            schedule_id=kwargs["schedule_id"],
+            job_id=None,
+            event_type="schedule.created",
+            source="api.schedule",
+            status="scheduled",
+            payload={"rrule": kwargs["rrule"]},
+        )
+        _record_event(event)
+        return generation_route_actions.ScheduleCreateAction(
+            insert_values=(
+                kwargs["schedule_id"],
+                json.dumps(kwargs["params"]),
+                kwargs["rrule"],
+                kwargs["next_run_iso"],
+                int(kwargs["is_test"]),
+                kwargs["expires_at"],
+            ),
+            created_event=event,
+        )
+
+    def fake_build_schedule_run_requested_action(**kwargs: Any) -> Any:
+        observed["requested_kwargs"] = kwargs
+        event = generation_route_actions.RouteSideEffectAction(
+            schedule_id=kwargs["schedule_id"],
+            job_id=kwargs["job_id"],
+            event_type="schedule.run_now.requested",
+            source="api.schedule_run_now",
+            status="requested",
+            payload={"idempotency_key": kwargs["idempotency_key"]},
+        )
+        _record_event(event)
+        return event
+
+    def fake_build_schedule_run_queued_action(**kwargs: Any) -> Any:
+        observed["queued_event_kwargs"] = kwargs
+        event = generation_route_actions.RouteSideEffectAction(
+            schedule_id=kwargs["schedule_id"],
+            job_id=kwargs["job_id"],
+            event_type="schedule.run_now.queued",
+            source="api.schedule_run_now",
+            status="queued",
+            payload={"queue_job_id": kwargs["queue_job_id"]},
+        )
+        _record_event(event)
+        return event
+
+    def fake_build_schedule_run_completed_action(**kwargs: Any) -> Any:
+        observed["completed_event_kwargs"] = kwargs
         return generation_route_actions.RouteSideEffectAction(
             schedule_id=kwargs["schedule_id"],
-            job_id=kwargs.get("job_id"),
-            event_type=kwargs["event_type"],
-            source=kwargs["source"],
-            status=kwargs["status"],
-            payload=kwargs.get("payload"),
+            job_id=kwargs["job_id"],
+            event_type="schedule.run_now.completed",
+            source="api.schedule_run_now",
+            status=kwargs["result_status"],
+            payload=None,
         )
 
     def fake_record_schedule_event(
@@ -320,8 +431,23 @@ def test_schedule_run_now_delegates_pre_side_effect_helpers(
     )
     monkeypatch.setattr(
         routes_generation,
-        "build_route_side_effect_action",
-        fake_build_route_side_effect_action,
+        "build_schedule_create_action",
+        fake_build_schedule_create_action,
+    )
+    monkeypatch.setattr(
+        routes_generation,
+        "build_schedule_run_requested_action",
+        fake_build_schedule_run_requested_action,
+    )
+    monkeypatch.setattr(
+        routes_generation,
+        "build_schedule_run_queued_action",
+        fake_build_schedule_run_queued_action,
+    )
+    monkeypatch.setattr(
+        routes_generation,
+        "build_schedule_run_completed_action",
+        fake_build_schedule_run_completed_action,
     )
     monkeypatch.setattr(
         routes_generation, "record_schedule_event", fake_record_schedule_event
@@ -351,7 +477,10 @@ def test_schedule_run_now_delegates_pre_side_effect_helpers(
     run_payload = run_response.get_json()
     assert run_payload is not None
     assert run_payload["status"] == "queued"
+    assert observed["schedule_create_kwargs"]["params"]["email"] == "queue@example.com"
     assert observed["schedule_dispatch_kwargs"]["has_async_runtime"] is True
+    assert observed["requested_kwargs"]["idempotency_key"].startswith("schedule:")
+    assert observed["queued_event_kwargs"]["queue_job_id"] == "queue-run-now-job"
     assert observed["queued_func"] is routes_generation.generate_newsletter_task
     assert observed["queued_kwargs"]["job_timeout"] == "10m"
     assert {event["event_type"] for event in observed["events"]} >= {
