@@ -159,6 +159,35 @@ class NewsletterApp {
         presetStatus.textContent = message;
     }
 
+    setPresetSummaryHtml(html = '') {
+        const presetSummary = document.getElementById('presetSummary');
+        if (!presetSummary) {
+            return;
+        }
+
+        presetSummary.innerHTML = html || '';
+        presetSummary.classList.toggle('hidden', !html);
+    }
+
+    renderPresetSelectionState(preset, options = {}) {
+        if (!preset) {
+            this.setPresetSummaryHtml('');
+            this.setPresetStatus(
+                options.statusMessage || '운영 토큰이 있으면 프리셋을 저장하고 불러올 수 있습니다.',
+                options.statusTone || 'gray'
+            );
+            return;
+        }
+
+        const view = NewsletterAppViewStateHelpers.resolvePresetSelectionView({
+            preset,
+            selectedPresetId: this.selectedPresetId
+        });
+
+        this.setPresetStatus(options.statusMessage || view.statusMessage, options.statusTone || view.statusTone);
+        this.setPresetSummaryHtml(view.detailsHtml);
+    }
+
     syncPresetActions() {
         const presetActionState = NewsletterAppSelectionVisibilityHelpers.resolvePresetActionState(this.selectedPresetId);
         ['applyPresetBtn', 'updatePresetBtn', 'deletePresetBtn'].forEach((buttonId) => {
@@ -391,14 +420,11 @@ class NewsletterApp {
 
         const preset = this.getSelectedPreset();
         if (preset) {
-            const summary = preset.description
-                ? `${preset.name}: ${preset.description}`
-                : `${preset.name} 프리셋이 준비되었습니다.`;
-            this.setPresetStatus(summary, 'gray');
+            this.renderPresetSelectionState(preset);
             return;
         }
 
-        this.setPresetStatus('운영 토큰이 있으면 프리셋을 저장하고 불러올 수 있습니다.');
+        this.renderPresetSelectionState(null);
     }
 
     async loadPresets(preferredPresetId = '') {
@@ -415,6 +441,7 @@ class NewsletterApp {
                 presetSelect.innerHTML = '<option value="">프리셋을 선택하세요</option>';
                 this.selectedPresetId = '';
                 this.syncPresetActions();
+                this.setPresetSummaryHtml('');
                 const message = response.status === 401 || response.status === 503
                     ? this.getProtectedRouteMessage(result.error || '프리셋을 불러올 수 없습니다.')
                     : (result.error || '프리셋을 불러올 수 없습니다.');
@@ -427,16 +454,19 @@ class NewsletterApp {
             this.renderPresetOptions(resolvedPresetId);
 
             if (this.savedPresets.length === 0) {
+                this.setPresetSummaryHtml('');
                 this.setPresetStatus('저장된 프리셋이 없습니다. 현재 입력값으로 새 프리셋을 저장해보세요.');
             } else if (this.selectedPresetId) {
                 this.handlePresetSelection(this.selectedPresetId);
             } else {
+                this.setPresetSummaryHtml('');
                 this.setPresetStatus('프리셋을 선택하면 현재 폼에 불러올 수 있습니다.');
             }
         } catch (error) {
             this.savedPresets = [];
             this.selectedPresetId = '';
             this.syncPresetActions();
+            this.setPresetSummaryHtml('');
             this.setPresetStatus(`프리셋 조회 실패: ${error.message}`, 'red');
         }
     }
@@ -582,7 +612,10 @@ class NewsletterApp {
         }
 
         this.applyPresetToForm(preset);
-        this.setPresetStatus(`${preset.name} 프리셋을 현재 폼에 적용했습니다.`, 'green');
+        this.renderPresetSelectionState(preset, {
+            statusMessage: `${preset.name} 프리셋을 현재 폼에 적용했습니다.`,
+            statusTone: 'green'
+        });
         this.showSuccess(`프리셋 적용 완료: ${preset.name}`);
     }
 

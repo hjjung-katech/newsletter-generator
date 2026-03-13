@@ -33,6 +33,14 @@ except ImportError:
     from web.ops_logging import log_exception, log_info  # pragma: no cover
 
 try:
+    from preset_route_support import enrich_preset_entries, enrich_preset_entry
+except ImportError:
+    from web.preset_route_support import (  # pragma: no cover
+        enrich_preset_entries,
+        enrich_preset_entry,
+    )
+
+try:
     from web.types import EMAIL_PATTERN
 except ImportError:
     from .types import EMAIL_PATTERN  # pragma: no cover
@@ -126,7 +134,8 @@ def register_preset_routes(app: Flask, database_path: str) -> None:
     @app.route("/api/presets")  # type: ignore[untyped-decorator]
     def list_presets() -> ResponseReturnValue:
         try:
-            return jsonify(list_generation_presets(database_path))
+            presets = list_generation_presets(database_path)
+            return jsonify(enrich_preset_entries(database_path, presets))
         except Exception as exc:
             log_exception(logger, "preset.list.failed", exc)
             return jsonify({"error": "프리셋 목록을 불러오지 못했습니다"}), 500
@@ -146,7 +155,7 @@ def register_preset_routes(app: Flask, database_path: str) -> None:
                 is_default=is_default,
             )
             log_info(logger, "preset.create.completed", preset_id=preset["id"])
-            return jsonify(preset), 201
+            return jsonify(enrich_preset_entry(database_path, preset)), 201
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except sqlite3.IntegrityError:
@@ -172,7 +181,7 @@ def register_preset_routes(app: Flask, database_path: str) -> None:
             if not preset:
                 return jsonify({"error": "프리셋을 찾을 수 없습니다"}), 404
             log_info(logger, "preset.update.completed", preset_id=preset_id)
-            return jsonify(preset)
+            return jsonify(enrich_preset_entry(database_path, preset))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except sqlite3.IntegrityError:

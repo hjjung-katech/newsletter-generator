@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -21,6 +22,71 @@ def _build_preset_app(database_path: str) -> Flask:
     app.config["TESTING"] = True
     routes_presets.register_preset_routes(app, database_path)
     return app
+
+
+def _insert_history_row(
+    *,
+    database_path: str,
+    job_id: str,
+    params: dict,
+    result: dict,
+    created_at: str,
+    status: str = "completed",
+    approval_status: str = "not_requested",
+    delivery_status: str = "draft",
+) -> None:
+    conn = sqlite3.connect(database_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO history (
+                id,
+                params,
+                result,
+                created_at,
+                status,
+                approval_status,
+                delivery_status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                job_id,
+                json.dumps(params),
+                json.dumps(result),
+                created_at,
+                status,
+                approval_status,
+                delivery_status,
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _insert_source_policy(
+    *,
+    database_path: str,
+    policy_id: str,
+    pattern: str,
+    policy_type: str = "allow",
+    is_active: bool = True,
+) -> None:
+    conn = sqlite3.connect(database_path)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO source_policies (id, pattern, policy_type, is_active)
+            VALUES (?, ?, ?, ?)
+            """,
+            (policy_id, pattern, policy_type, int(is_active)),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def test_preset_routes_create_and_list(tmp_path: Path) -> None:
@@ -54,6 +120,10 @@ def test_preset_routes_create_and_list(tmp_path: Path) -> None:
         assert created["is_default"] is True
         assert created["params"]["keywords"] == ["AI", "robotics"]
         assert created["params"]["rrule"].startswith("FREQ=WEEKLY")
+        assert created["preset_visibility"]["availability_state"] == "available"
+        assert created["preset_visibility"]["preset_type"] == "scheduled"
+        assert created["latest_related_execution"] is None
+        assert created["source_policy_visibility"]["link_state"] == "unavailable"
 
         list_response = client.get("/api/presets")
         assert list_response.status_code == 200
@@ -62,6 +132,7 @@ def test_preset_routes_create_and_list(tmp_path: Path) -> None:
     assert isinstance(presets, list)
     assert presets[0]["id"] == created["id"]
     assert presets[0]["is_default"] is True
+    assert presets[0]["preset_visibility"]["recent_usage_state"] == "empty"
 
 
 def test_update_route_promotes_single_default_preset(tmp_path: Path) -> None:
@@ -167,3 +238,70 @@ def test_delete_route_removes_preset(tmp_path: Path) -> None:
         list_response = client.get("/api/presets")
         assert list_response.status_code == 200
         assert list_response.get_json() == []
+
+
+def test_list_route_adds_recent_execution_and_source_policy_visibility(
+    tmp_path: Path,
+) -> None:
+    db_path = str(tmp_path / "storage.db")
+    app = _build_preset_app(db_path)
+
+    payload = {
+        "name": "Domain Watch",
+        "description": "Monitor Reuters domain",
+        "is_default": False,
+        "params": {
+            "domain": "https://www.reuters.com",
+            "template_style": "modern",
+            "email_compatible": True,
+            "period": 14,
+            "email": "ops@example.com",
+        },
+    }
+
+    with app.test_client() as client:
+        create_response = client.post(
+            "/api/presets",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        created = create_response.get_json()
+        assert create_response.status_code == 201
+        assert created is not None
+
+    _insert_history_row(
+        database_path=db_path,
+        job_id="job-preset-1",
+        params={
+            "domain": "reuters.com",
+            "template_style": "modern",
+            "email_compatible": True,
+            "period": 14,
+            "email": "ops@example.com",
+        },
+        result={"title": "Reuters daily digest"},
+        created_at="2026-03-13T08:00:00Z",
+    )
+    _insert_source_policy(
+        database_path=db_path,
+        policy_id="policy-1",
+        pattern="reuters.com",
+        policy_type="allow",
+    )
+
+    with app.test_client() as client:
+        list_response = client.get("/api/presets")
+        assert list_response.status_code == 200
+        presets = list_response.get_json()
+
+    assert isinstance(presets, list)
+    preset = presets[0]
+    assert preset["latest_related_execution"]["job_id"] == "job-preset-1"
+    assert (
+        preset["latest_related_execution"]["execution_visibility"]["status_category"]
+        == "completed"
+    )
+    assert preset["source_policy_visibility"]["link_state"] == "matched"
+    assert preset["source_policy_visibility"]["match_count"] == 1
+    assert preset["preset_visibility"]["has_recent_related_execution"] is True
+    assert preset["preset_visibility"]["has_source_policy_link"] is True
