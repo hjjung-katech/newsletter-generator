@@ -35,6 +35,19 @@ except ImportError:
     from web.ops_logging import log_exception, log_info  # pragma: no cover
 
 try:
+    from generation_route_support import (
+        build_approval_entry,
+        build_approval_visibility,
+        build_execution_visibility,
+    )
+except ImportError:
+    from web.generation_route_support import (  # pragma: no cover
+        build_approval_entry,
+        build_approval_visibility,
+        build_execution_visibility,
+    )
+
+try:
     from time_utils import get_utc_now, to_iso_utc
 except ImportError:
     from web.time_utils import get_utc_now, to_iso_utc  # pragma: no cover
@@ -117,34 +130,14 @@ def register_approval_routes(app: Flask, database_path: str) -> None:
         finally:
             conn.close()
 
-        approvals = []
-        for row in rows:
-            (
-                job_id,
-                params_json,
-                result_json,
-                created_at,
-                status,
-                current_approval_status,
-                delivery_status,
-                approved_at,
-                rejected_at,
-                approval_note,
-            ) = row
-            approvals.append(
-                {
-                    "id": job_id,
-                    "params": _parse_json(params_json),
-                    "result": _parse_json(result_json),
-                    "created_at": created_at,
-                    "status": status,
-                    "approval_status": current_approval_status,
-                    "delivery_status": delivery_status,
-                    "approved_at": approved_at,
-                    "rejected_at": rejected_at,
-                    "approval_note": approval_note,
-                }
+        approvals = [
+            build_approval_entry(
+                row,
+                parse_params=_parse_json,
+                parse_result=_parse_json,
             )
+            for row in rows
+        ]
 
         log_info(logger, "approval.inbox.loaded", count=len(approvals))
         return jsonify(approvals)
@@ -202,6 +195,21 @@ def register_approval_routes(app: Flask, database_path: str) -> None:
                     "approval_status": APPROVAL_STATUS_APPROVED,
                     "delivery_status": DELIVERY_STATUS_APPROVED,
                     "approved_at": approved_at,
+                    "approval_note": note,
+                    "execution_visibility": build_execution_visibility(
+                        status=status,
+                        approved_at=approved_at,
+                        approval_status=APPROVAL_STATUS_APPROVED,
+                        delivery_status=DELIVERY_STATUS_APPROVED,
+                        result=result,
+                    ),
+                    "approval_visibility": build_approval_visibility(
+                        status=status,
+                        approval_status=APPROVAL_STATUS_APPROVED,
+                        delivery_status=DELIVERY_STATUS_APPROVED,
+                        approved_at=approved_at,
+                        result=result,
+                    ),
                 }
             )
         except Exception as exc:
@@ -253,6 +261,19 @@ def register_approval_routes(app: Flask, database_path: str) -> None:
                     "approval_status": APPROVAL_STATUS_REJECTED,
                     "delivery_status": DELIVERY_STATUS_DRAFT,
                     "rejected_at": rejected_at,
+                    "approval_note": note,
+                    "execution_visibility": build_execution_visibility(
+                        status=status,
+                        rejected_at=rejected_at,
+                        approval_status=APPROVAL_STATUS_REJECTED,
+                        delivery_status=DELIVERY_STATUS_DRAFT,
+                    ),
+                    "approval_visibility": build_approval_visibility(
+                        status=status,
+                        approval_status=APPROVAL_STATUS_REJECTED,
+                        delivery_status=DELIVERY_STATUS_DRAFT,
+                        rejected_at=rejected_at,
+                    ),
                 }
             )
         except Exception as exc:

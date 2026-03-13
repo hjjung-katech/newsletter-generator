@@ -37,6 +37,9 @@ test('buildHistoryListHtml renders derived badges and actions for completed item
             created_at: '2026-03-12T00:00:00Z',
             status: 'completed',
             approval_status: 'pending',
+            result: {
+                html_content: '<html>pending</html>'
+            },
             execution_visibility: {
                 status_category: 'completed',
                 status_label: '완료',
@@ -82,6 +85,15 @@ test('buildApprovalsListHtml renders delivery view model with note and actions',
             approval_status: 'pending',
             delivery_status: 'pending_approval',
             approval_note: 'review this',
+            approval_visibility: {
+                approval_state: 'pending',
+                approval_label: '승인 대기',
+                approval_message: '검토 후 승인 또는 반려할 수 있습니다.',
+                primary_timestamp: '2026-03-12T02:00:00Z',
+                timestamp_label: '요청 시각',
+                can_approve: true,
+                can_reject: true
+            },
             execution_visibility: {
                 status_category: 'completed',
                 status_label: '완료',
@@ -93,6 +105,32 @@ test('buildApprovalsListHtml renders delivery view model with note and actions',
                 domain: 'Semiconductor',
                 email: 'ops@example.com'
             }
+        },
+        {
+            id: 'approval-2',
+            created_at: '2026-03-12T03:00:00Z',
+            approval_status: 'approved',
+            delivery_status: 'approved',
+            approval_visibility: {
+                approval_state: 'approved',
+                approval_label: '승인 완료',
+                approval_message: '승인이 완료되었습니다. 이제 발송할 수 있습니다.',
+                primary_timestamp: '2026-03-12T03:05:00Z',
+                timestamp_label: '승인 시각',
+                can_approve: false,
+                can_reject: false
+            },
+            execution_visibility: {
+                status_category: 'completed',
+                status_label: '완료',
+                status_message: '생성은 완료되었고 발송 준비가 끝났습니다.',
+                approval_label: '승인 완료',
+                delivery_label: '승인됨'
+            },
+            params: {
+                keywords: ['Battery'],
+                email: 'approved@example.com'
+            }
         }
     ]);
 
@@ -100,7 +138,36 @@ test('buildApprovalsListHtml renders delivery view model with note and actions',
     assert.match(html, /이메일: ops@example.com/);
     assert.match(html, /메모: review this/);
     assert.match(html, /승인 대기/);
+    assert.match(html, /검토 후 승인 또는 반려할 수 있습니다/);
+    assert.match(html, /요청 시각:/);
     assert.match(html, /app\.rejectHistoryItem\('approval-1'\)/);
+    assert.match(html, /승인이 완료되었습니다\. 이제 발송할 수 있습니다/);
+    assert.match(html, /승인 시각:/);
+    assert.doesNotMatch(html, /app\.approveHistoryItem\('approval-2'\)/);
+    assert.doesNotMatch(html, /app\.rejectHistoryItem\('approval-2'\)/);
+});
+
+test('resolveApprovalVisibility normalizes fallback states and action availability', () => {
+    assert.deepEqual(
+        helpers.resolveApprovalVisibility({
+            approval_status: 'pending',
+            status: 'completed',
+            created_at: '2026-03-12T04:00:00Z',
+            result: { html_content: '<html>ok</html>' }
+        }),
+        {
+            rawApprovalStatus: 'pending',
+            approvalState: 'pending',
+            approvalLabel: '승인 대기',
+            approvalMessage: '검토 후 승인 또는 반려할 수 있습니다.',
+            primaryTimestamp: '2026-03-12T04:00:00Z',
+            timestampLabel: '기준 시각',
+            canResolve: true,
+            canApprove: true,
+            canReject: true,
+            isResolved: false
+        }
+    );
 });
 
 test('analytics helpers render summary cards and deduplicated event payloads', () => {
@@ -219,6 +286,12 @@ test('section state helpers preserve empty, error, and content decisions', () =>
     assert.match(
         helpers.resolveHistorySectionState({ history: [] }).html,
         /아직 생성된 뉴스레터가 없습니다/
+    );
+    assert.match(
+        helpers.resolveApprovalsSectionState({
+            approvals: []
+        }).html,
+        /승인 요청 이력이 없습니다/
     );
     assert.match(
         helpers.resolveApprovalsSectionState({

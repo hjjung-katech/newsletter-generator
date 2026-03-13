@@ -1052,7 +1052,7 @@ class NewsletterApp {
         const approvalsList = document.getElementById('approvalsList');
 
         try {
-            const response = await fetch('/api/approvals', {
+            const response = await fetch('/api/approvals?approval_status=all', {
                 headers: this.buildHeaders({ includeAdminToken: true })
             });
             const approvals = await response.json();
