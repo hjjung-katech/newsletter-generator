@@ -148,6 +148,7 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     row = (
         '{"keywords":"AI"}',
         '{"sent": true, "approval_status": "approved"}',
+        "2026-03-12T00:00:00Z",
         "completed",
         "generate:123",
         None,
@@ -167,6 +168,12 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     assert status_response["params"] == {"keywords": "AI"}
     assert status_response["sent"] is True
     assert status_response["approval_status"] == "approved"
+    assert status_response["execution_visibility"]["status_category"] == "completed"
+    assert status_response["execution_visibility"]["status_label"] == "완료"
+    assert (
+        status_response["execution_visibility"]["primary_timestamp"]
+        == "2026-03-12T00:00:00Z"
+    )
 
     history_entry = generation_route_support.build_history_entry(
         (
@@ -189,6 +196,31 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     assert history_entry["id"] == "job-1"
     assert history_entry["params"] == {"keywords": "AI"}
     assert history_entry["result"] == {"status": "success"}
+    assert history_entry["execution_visibility"]["status_category"] == "completed"
+    assert history_entry["execution_visibility"]["status_label"] == "완료"
+
+
+def test_build_execution_visibility_exposes_operator_facing_labels() -> None:
+    visibility = generation_route_support.build_execution_visibility(
+        status="completed",
+        created_at="2026-03-12T00:00:00Z",
+        approval_status="pending",
+        delivery_status="pending_approval",
+        result={"title": "AI Weekly"},
+    )
+
+    assert visibility == {
+        "raw_status": "completed",
+        "status_category": "completed",
+        "status_label": "완료",
+        "status_message": "생성은 완료되었고 승인 대기 중입니다.",
+        "primary_timestamp": "2026-03-12T00:00:00Z",
+        "approval_label": "승인 대기",
+        "delivery_label": "승인 대기",
+        "result_title": "AI Weekly",
+        "has_result": True,
+        "can_view_result": True,
+    }
 
 
 def test_parse_schedule_create_request_builds_normalized_params() -> None:

@@ -54,6 +54,126 @@ class ScheduleCreateOptions:
     expires_at: str | None
 
 
+_STATUS_CATEGORY_MAP = {
+    "pending": "queued",
+    "queued": "queued",
+    "requested": "queued",
+    "processing": "running",
+    "running": "running",
+    "started": "running",
+    "completed": "completed",
+    "finished": "completed",
+    "success": "completed",
+    "failed": "failed",
+    "error": "failed",
+    "redis_failed": "failed",
+}
+
+_STATUS_LABELS = {
+    "queued": "대기 중",
+    "running": "실행 중",
+    "completed": "완료",
+    "failed": "실패",
+    "empty": "실행 이력 없음",
+    "unknown": "상태 미상",
+}
+
+_APPROVAL_LABELS = {
+    "pending": "승인 대기",
+    "approved": "승인 완료",
+    "rejected": "반려됨",
+    "not_requested": "승인 불필요",
+}
+
+_DELIVERY_LABELS = {
+    "draft": "초안",
+    "pending_approval": "승인 대기",
+    "approved": "승인됨",
+    "sent": "발송 완료",
+    "send_failed": "발송 실패",
+}
+
+
+def _normalize_status_category(status: Any) -> str:
+    normalized = str(status or "").strip().lower()
+    if not normalized:
+        return "unknown"
+    return _STATUS_CATEGORY_MAP.get(normalized, "unknown")
+
+
+def _resolve_status_message(
+    *,
+    category: str,
+    approval_status: str | None,
+    delivery_status: str | None,
+    error_message: str | None,
+) -> str:
+    if category == "queued":
+        return "실행이 대기열에 등록되었습니다."
+    if category == "running":
+        return "실행이 진행 중입니다."
+    if category == "failed":
+        return error_message or "최근 실행이 실패했습니다."
+    if category == "completed":
+        if approval_status == "pending" or delivery_status == "pending_approval":
+            return "생성은 완료되었고 승인 대기 중입니다."
+        if delivery_status == "sent":
+            return "생성과 발송이 완료되었습니다."
+        if delivery_status == "approved":
+            return "생성은 완료되었고 발송 준비가 끝났습니다."
+        return "최근 실행이 완료되었습니다."
+    if category == "empty":
+        return "아직 실행 이력이 없습니다."
+    return "현재 상태를 확인할 수 없습니다."
+
+
+def build_execution_visibility(
+    *,
+    status: Any,
+    created_at: str | None = None,
+    started_at: str | None = None,
+    updated_at: str | None = None,
+    approved_at: str | None = None,
+    rejected_at: str | None = None,
+    approval_status: str | None = None,
+    delivery_status: str | None = None,
+    result: Any = None,
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    result_mapping = result if isinstance(result, Mapping) else {}
+    category = _normalize_status_category(status)
+    primary_timestamp = (
+        updated_at or started_at or approved_at or rejected_at or created_at
+    )
+    resolved_error = error_message
+    if not resolved_error and isinstance(result_mapping, Mapping):
+        raw_result_error = result_mapping.get("error")
+        if raw_result_error:
+            resolved_error = str(raw_result_error)
+
+    return {
+        "raw_status": status,
+        "status_category": category,
+        "status_label": _STATUS_LABELS.get(category, _STATUS_LABELS["unknown"]),
+        "status_message": _resolve_status_message(
+            category=category,
+            approval_status=approval_status,
+            delivery_status=delivery_status,
+            error_message=resolved_error,
+        ),
+        "primary_timestamp": primary_timestamp,
+        "approval_label": _APPROVAL_LABELS.get(approval_status)
+        if approval_status is not None
+        else None,
+        "delivery_label": _DELIVERY_LABELS.get(delivery_status)
+        if delivery_status is not None
+        else None,
+        "result_title": result_mapping.get("title"),
+        "has_result": result is not None,
+        "can_view_result": category == "completed" and result is not None,
+    }
+
+
 def validate_generate_request(data: dict[str, Any]) -> GenerateNewsletterRequest:
     """Validate generation request payload without runtime dynamic loading."""
     return GenerateNewsletterRequest(**data)
@@ -202,6 +322,15 @@ def build_status_response_from_task(
 
     if "error" in task:
         response["error"] = task["error"]
+    response["execution_visibility"] = build_execution_visibility(
+        status=task.get("status"),
+        started_at=task.get("started_at"),
+        updated_at=task.get("updated_at"),
+        approval_status=response.get("approval_status"),
+        delivery_status=response.get("delivery_status"),
+        result=result,
+        error_message=task.get("error"),
+    )
     return response
 
 
@@ -215,6 +344,7 @@ def build_status_response_from_row(
     (
         params,
         result,
+        created_at,
         status,
         idempotency_key,
         approval_status,
@@ -227,6 +357,7 @@ def build_status_response_from_row(
         "job_id": job_id,
         "status": status,
         "params": parse_params(params),
+        "created_at": created_at,
         "sent": False,
         "idempotency_key": idempotency_key,
         "approval_status": approval_status,
@@ -247,6 +378,15 @@ def build_status_response_from_row(
     elif result_data is not None:
         response["result"] = result_data
 
+    response["execution_visibility"] = build_execution_visibility(
+        status=status,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+        approval_status=response.get("approval_status"),
+        delivery_status=response.get("delivery_status"),
+        result=result_data,
+    )
     return response
 
 
@@ -269,10 +409,11 @@ def build_history_entry(
         rejected_at,
         approval_note,
     ) = row
+    result_data = parse_result(result)
     return {
         "id": job_id,
         "params": parse_params(params),
-        "result": parse_result(result),
+        "result": result_data,
         "created_at": created_at,
         "status": status,
         "idempotency_key": idempotency_key,
@@ -281,6 +422,15 @@ def build_history_entry(
         "approved_at": approved_at,
         "rejected_at": rejected_at,
         "approval_note": approval_note,
+        "execution_visibility": build_execution_visibility(
+            status=status,
+            created_at=created_at,
+            approved_at=approved_at,
+            rejected_at=rejected_at,
+            approval_status=approval_status,
+            delivery_status=delivery_status,
+            result=result_data,
+        ),
     }
 
 

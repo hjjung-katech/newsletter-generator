@@ -37,6 +37,13 @@ test('buildHistoryListHtml renders derived badges and actions for completed item
             created_at: '2026-03-12T00:00:00Z',
             status: 'completed',
             approval_status: 'pending',
+            execution_visibility: {
+                status_category: 'completed',
+                status_label: '완료',
+                status_message: '생성은 완료되었고 승인 대기 중입니다.',
+                primary_timestamp: '2026-03-12T00:00:00Z',
+                approval_label: '승인 대기'
+            },
             params: {
                 keywords: ['AI', 'Battery']
             }
@@ -46,6 +53,12 @@ test('buildHistoryListHtml renders derived badges and actions for completed item
             created_at: '2026-03-12T01:00:00Z',
             status: 'completed',
             approval_status: 'approved',
+            execution_visibility: {
+                status_category: 'completed',
+                status_label: '완료',
+                status_message: '최근 실행이 완료되었습니다.',
+                primary_timestamp: '2026-03-12T01:00:00Z'
+            },
             params: {
                 domain: 'Mobility'
             }
@@ -54,8 +67,9 @@ test('buildHistoryListHtml renders derived badges and actions for completed item
 
     assert.match(html, /키워드: AI, Battery/);
     assert.match(html, /도메인: Mobility/);
-    assert.match(html, /bg-green-100 text-green-800\">completed/);
-    assert.match(html, /bg-amber-100 text-amber-800\">pending/);
+    assert.match(html, /bg-green-100 text-green-800\">완료/);
+    assert.match(html, /bg-amber-100 text-amber-800\">승인 대기/);
+    assert.match(html, /생성은 완료되었고 승인 대기 중입니다/);
     assert.match(html, /app\.approveHistoryItem\('job-pending'\)/);
     assert.match(html, /app\.rerunHistoryItem\('job-approved'\)/);
 });
@@ -68,6 +82,13 @@ test('buildApprovalsListHtml renders delivery view model with note and actions',
             approval_status: 'pending',
             delivery_status: 'pending_approval',
             approval_note: 'review this',
+            execution_visibility: {
+                status_category: 'completed',
+                status_label: '완료',
+                status_message: '생성은 완료되었고 승인 대기 중입니다.',
+                approval_label: '승인 대기',
+                delivery_label: '승인 대기'
+            },
             params: {
                 domain: 'Semiconductor',
                 email: 'ops@example.com'
@@ -78,7 +99,7 @@ test('buildApprovalsListHtml renders delivery view model with note and actions',
     assert.match(html, /도메인: Semiconductor/);
     assert.match(html, /이메일: ops@example.com/);
     assert.match(html, /메모: review this/);
-    assert.match(html, /pending_approval/);
+    assert.match(html, /승인 대기/);
     assert.match(html, /app\.rejectHistoryItem\('approval-1'\)/);
 });
 
@@ -159,6 +180,12 @@ test('schedule list helper renders params, next run, and actions', () => {
             id: 'schedule-1',
             next_run: '2026-03-12T06:00:00Z',
             rrule: 'FREQ=WEEKLY;BYDAY=MO',
+            latest_execution: {
+                status_category: 'completed',
+                status_label: '완료',
+                status_message: '최근 예약 실행이 완료되었습니다.',
+                primary_timestamp: '2026-03-12T05:00:00Z'
+            },
             params: {
                 keywords: ['AI'],
                 email: 'alerts@example.com'
@@ -169,7 +196,23 @@ test('schedule list helper renders params, next run, and actions', () => {
     assert.match(html, /키워드: AI/);
     assert.match(html, /alerts@example.com/);
     assert.match(html, /FREQ=WEEKLY;BYDAY=MO/);
+    assert.match(html, /최근 예약 실행이 완료되었습니다/);
+    assert.match(html, /완료/);
     assert.match(html, /app\.runScheduleNow\('schedule-1'\)/);
+});
+
+test('history and schedule helpers fall back to empty execution visibility for missing runs', () => {
+    const schedulesHtml = helpers.buildSchedulesListHtml([
+        {
+            id: 'schedule-2',
+            next_run: '2026-03-12T07:00:00Z',
+            rrule: 'FREQ=DAILY',
+            params: { domain: 'battery.com', email: 'ops@example.com' }
+        }
+    ]);
+
+    assert.match(schedulesHtml, /실행 이력 없음/);
+    assert.match(schedulesHtml, /아직 실행 이력이 없습니다/);
 });
 
 test('section state helpers preserve empty, error, and content decisions', () => {

@@ -638,6 +638,7 @@ def register_generation_routes(
                 SELECT
                     params,
                     result,
+                    created_at,
                     status,
                     idempotency_key,
                     approval_status,
@@ -653,6 +654,52 @@ def register_generation_routes(
             return cursor.fetchone()
         finally:
             conn.close()
+
+    def _load_latest_schedule_execution_map(
+        schedule_ids: list[str],
+    ) -> dict[str, dict[str, Any]]:
+        if not schedule_ids:
+            return {}
+
+        conn = sqlite3.connect(DATABASE_PATH)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT schedule_id, event_type, job_id, status, payload, created_at
+                FROM analytics_events
+                WHERE schedule_id IN (SELECT value FROM json_each(?))
+                  AND (
+                    event_type LIKE 'schedule.execute%'
+                    OR event_type LIKE 'schedule.run_now%'
+                  )
+                ORDER BY created_at DESC, id DESC
+                """,
+                (json.dumps(schedule_ids),),
+            )
+            rows = cursor.fetchall()
+        except sqlite3.OperationalError:
+            return {}
+        finally:
+            conn.close()
+
+        latest_events: dict[str, dict[str, Any]] = {}
+        for schedule_id, event_type, job_id, status, payload, created_at in rows:
+            if schedule_id in latest_events:
+                continue
+            latest_events[schedule_id] = {
+                "event_type": event_type,
+                "job_id": job_id,
+                "status": status,
+                "payload": _parse_optional_json(
+                    payload,
+                    job_id=schedule_id,
+                    field_name="schedule.latest_execution.payload",
+                )
+                or {},
+                "created_at": created_at,
+            }
+        return latest_events
 
     def _load_recent_history_rows(limit: int = 20) -> list[tuple[Any, ...]]:
         conn = sqlite3.connect(DATABASE_PATH)
@@ -696,6 +743,9 @@ def register_generation_routes(
         finally:
             conn.close()
 
+        latest_execution_map = _load_latest_schedule_execution_map(
+            [str(row[0]) for row in rows]
+        )
         schedules = []
         for row in rows:
             schedules.append(
@@ -707,6 +757,7 @@ def register_generation_routes(
                         field_name="schedule.params",
                     ),
                     serialize_timestamp=_serialize_schedule_timestamp,
+                    latest_execution=latest_execution_map.get(str(row[0])),
                 )
             )
         return schedules

@@ -298,6 +298,12 @@ class TestWebAPI:
         assert "job_id" in status_result
         assert "status" in status_result
         assert "sent" in status_result  # Check for sent field
+        assert status_result["execution_visibility"]["status_category"] in {
+            "completed",
+            "failed",
+            "queued",
+            "running",
+        }
         assert status_result["job_id"] == job_id
 
     def test_job_status_not_found(self, client):
@@ -349,11 +355,26 @@ class TestWebAPI:
 
     def test_history_endpoint(self, client):
         """Test history endpoint"""
-        response = client.get("/api/history")
-        assert response.status_code == 200
+        job_id = f"history-job-{uuid.uuid4()}"
+        _insert_history_row(
+            job_id=job_id,
+            params={"keywords": ["AI"], "email": "ops@example.com"},
+            result={"status": "success", "title": "AI Weekly"},
+            created_at="2026-03-08T08:00:00Z",
+            status="completed",
+        )
 
-        result = json.loads(response.data)
-        assert isinstance(result, list)
+        try:
+            response = client.get("/api/history")
+            assert response.status_code == 200
+
+            result = json.loads(response.data)
+            assert isinstance(result, list)
+            matching = next(item for item in result if item["id"] == job_id)
+            assert matching["execution_visibility"]["status_category"] == "completed"
+            assert matching["execution_visibility"]["status_label"] == "완료"
+        finally:
+            _delete_history_row(job_id)
 
     def test_analytics_endpoint(self, client):
         """Test analytics dashboard endpoint"""
@@ -510,6 +531,15 @@ class TestWebAPI:
             next_run="2026-03-08 09:30:00",
             created_at="2026-03-08 08:15:00",
         )
+        event_id = record_analytics_event(
+            DATABASE_PATH,
+            "schedule.run_now.completed",
+            schedule_id=schedule_id,
+            job_id="schedule-job-1",
+            status="completed",
+            payload={"result_status": "success"},
+            occurred_at="2026-03-08T10:00:00Z",
+        )
 
         try:
             response = client.get("/api/schedules")
@@ -519,7 +549,17 @@ class TestWebAPI:
             matching = next(item for item in schedules if item["id"] == schedule_id)
             assert matching["next_run"] == "2026-03-08T09:30:00Z"
             assert matching["created_at"] == "2026-03-08T08:15:00Z"
+            assert matching["latest_execution"] == {
+                "event_type": "schedule.run_now.completed",
+                "job_id": "schedule-job-1",
+                "status_category": "completed",
+                "status_label": "완료",
+                "status_message": "최근 예약 실행이 완료되었습니다.",
+                "primary_timestamp": "2026-03-08T10:00:00Z",
+                "result_status": "success",
+            }
         finally:
+            _delete_analytics_event(event_id)
             _delete_schedule(schedule_id)
 
 
