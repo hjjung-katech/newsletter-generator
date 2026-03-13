@@ -457,12 +457,16 @@ class TestWebAPI:
         assert created["pattern"] == "reuters.com"
         assert created["policy_type"] == "allow"
         assert created["is_active"] is True
+        assert created["latest_related_execution"] is None
+        assert created["preset_linkage_visibility"]["link_state"] == "none"
+        assert created["source_policy_visibility"]["visibility_state"] == "detached"
 
         try:
             list_response = client.get("/api/source-policies")
             assert list_response.status_code == 200
             listed = json.loads(list_response.data)
-            assert any(item["id"] == created_policy_id for item in listed)
+            matching = next(item for item in listed if item["id"] == created_policy_id)
+            assert matching["source_policy_visibility"]["status_label"] == "연결 없음"
 
             update_response = client.put(
                 f"/api/source-policies/{created_policy_id}",
@@ -480,6 +484,7 @@ class TestWebAPI:
             assert updated["pattern"] == "spam.example"
             assert updated["policy_type"] == "block"
             assert updated["is_active"] is False
+            assert updated["source_policy_visibility"]["visibility_state"] == "disabled"
 
             delete_response = client.delete(f"/api/source-policies/{created_policy_id}")
             assert delete_response.status_code == 200

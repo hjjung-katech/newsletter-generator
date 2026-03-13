@@ -214,30 +214,70 @@ test('analytics helpers render summary cards and deduplicated event payloads', (
     assert.match(eventsHtml, /mode<\/span>: async/);
 });
 
-test('source policy helpers summarize counts, preserve sort order, and render badges', () => {
+test('source policy helpers summarize linkage, recent execution, and render badges', () => {
     const policies = [
         {
             id: 'policy-block',
             pattern: 'zeta.com',
             policy_type: 'block',
             is_active: false,
-            updated_at: '2026-03-12T04:00:00Z'
+            updated_at: '2026-03-12T04:00:00Z',
+            source_policy_visibility: {
+                visibility_state: 'disabled',
+                status_label: '비활성',
+                status_message: '비활성 상태라 현재 실행에는 적용되지 않습니다.',
+                linked_preset_count: 0,
+                linked_default_preset_count: 0
+            }
         },
         {
             id: 'policy-allow',
             pattern: 'alpha.com',
             policy_type: 'allow',
             is_active: true,
-            updated_at: '2026-03-12T05:00:00Z'
+            updated_at: '2026-03-12T05:00:00Z',
+            linked_presets: [
+                { id: 'preset-1', name: 'Alpha Watch', is_default: true }
+            ],
+            preset_linkage_visibility: {
+                link_state: 'matched',
+                message: '연결된 도메인 프리셋 1개, 기본 프리셋 1개',
+                linked_preset_count: 1,
+                linked_default_preset_count: 1
+            },
+            latest_related_execution: {
+                job_id: 'job-1',
+                created_at: '2026-03-12T06:00:00Z',
+                execution_visibility: {
+                    status_category: 'completed',
+                    status_label: '완료',
+                    status_message: '최근 실행에서 이 정책이 실제로 반영되었습니다.',
+                    primary_timestamp: '2026-03-12T06:00:00Z',
+                    result_title: 'Alpha Brief'
+                }
+            },
+            source_policy_visibility: {
+                visibility_state: 'applied',
+                status_label: '최근 반영',
+                status_message: '최근 실행에서 이 정책이 실제로 반영되었습니다.',
+                linked_preset_count: 1,
+                linked_default_preset_count: 1,
+                linked_preset_names: ['Alpha Watch'],
+                recent_usage_state: 'recent',
+                policy_type_label: 'Allow 정책'
+            }
         }
     ];
     const summary = helpers.summarizeSourcePolicies(policies);
     const html = helpers.buildSourcePoliciesHtml(policies);
 
-    assert.equal(summary.message, '활성 정책 1개 (allow 1 / block 0)');
+    assert.equal(summary.message, '활성 정책 1개 (allow 1 / block 0) · 프리셋 연결 1개 · 최근 반영 1개');
     assert.ok(html.indexOf('alpha.com') < html.indexOf('zeta.com'));
-    assert.match(html, /active/);
-    assert.match(html, /paused/);
+    assert.match(html, /최근 반영/);
+    assert.match(html, /비활성/);
+    assert.match(html, /Alpha Watch/);
+    assert.match(html, /최근 실행/);
+    assert.match(html, /Alpha Brief/);
     assert.match(html, /app\.toggleSourcePolicyActive\('policy-block', true\)/);
 });
 
@@ -401,6 +441,24 @@ test('analytics and source policy section helpers preserve derived section state
     });
     assert.equal(errorPolicies.statusTone, 'red');
     assert.match(errorPolicies.html, /text-red-600/);
+
+    const detachedPolicies = helpers.resolveSourcePoliciesSectionState({
+        sourcePolicies: [
+            {
+                id: 'policy-detached',
+                pattern: 'orphan.example',
+                policy_type: 'allow',
+                is_active: true,
+                source_policy_visibility: {
+                    visibility_state: 'detached',
+                    status_label: '연결 없음',
+                    status_message: '활성 정책이지만 연결된 프리셋이나 최근 적용 이력이 없습니다.'
+                }
+            }
+        ]
+    });
+    assert.equal(detachedPolicies.statusTone, 'yellow');
+    assert.match(detachedPolicies.statusMessage, /연결되지 않았습니다/);
 });
 
 test('keyword suggestion view helper preserves loading, success, and error render states', () => {
