@@ -124,6 +124,14 @@ def test_preset_routes_create_and_list(tmp_path: Path) -> None:
         assert created["preset_visibility"]["preset_type"] == "scheduled"
         assert created["latest_related_execution"] is None
         assert created["source_policy_visibility"]["link_state"] == "unavailable"
+        assert (
+            created["personalization_visibility"]["personalization_state"]
+            == "overridden"
+        )
+        assert created["personalization_visibility"]["override_labels"] == [
+            "이메일 호환 모드",
+            "기간",
+        ]
 
         list_response = client.get("/api/presets")
         assert list_response.status_code == 200
@@ -305,3 +313,5 @@ def test_list_route_adds_recent_execution_and_source_policy_visibility(
     assert preset["source_policy_visibility"]["match_count"] == 1
     assert preset["preset_visibility"]["has_recent_related_execution"] is True
     assert preset["preset_visibility"]["has_source_policy_link"] is True
+    assert preset["personalization_visibility"]["has_recent_related_execution"] is True
+    assert preset["personalization_visibility"]["source_policy_link_state"] == "matched"

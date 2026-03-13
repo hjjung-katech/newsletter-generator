@@ -19,6 +19,13 @@ except ImportError:
         build_execution_visibility,
     )
 
+try:
+    from personalization_route_support import build_personalization_visibility
+except ImportError:
+    from web.personalization_route_support import (  # pragma: no cover
+        build_personalization_visibility,
+    )
+
 
 def _parse_json_mapping(raw_value: str | None) -> dict[str, Any]:
     if not raw_value:
@@ -301,6 +308,11 @@ def build_preset_entry(
         preset_copy,
         latest_related_execution=latest_related_execution,
         source_policy_visibility=source_policy_visibility,
+    )
+    preset_copy["personalization_visibility"] = build_personalization_visibility(
+        preset_copy.get("params"),
+        source_policy_visibility=source_policy_visibility,
+        latest_related_execution=latest_related_execution,
     )
     return preset_copy
 

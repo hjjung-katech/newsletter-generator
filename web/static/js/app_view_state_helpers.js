@@ -155,6 +155,79 @@
         return new Date(timestamp).toLocaleString();
     }
 
+    function resolvePersonalizationVisibility(source = {}) {
+        const visibility = source?.personalization_visibility || {};
+        const overrideLabels = Array.isArray(visibility.override_labels)
+            ? visibility.override_labels
+            : [];
+
+        return {
+            personalizationState: visibility.personalization_state || 'unknown',
+            statusLabel: visibility.status_label || '개인화 상태 미상',
+            statusMessage: visibility.status_message || '',
+            effectiveTemplateStyle: visibility.effective_template_style || source?.params?.template_style || 'compact',
+            effectivePeriod: visibility.effective_period ?? source?.params?.period ?? 14,
+            emailModeLabel: visibility.email_mode_label
+                || ((visibility.email_compatible ?? source?.params?.email_compatible) ? '이메일 호환 모드' : '기본 모드'),
+            overrideCount: visibility.override_count ?? overrideLabels.length,
+            overrideLabels,
+            archiveReferenceCount: visibility.archive_reference_count ?? 0,
+            sourcePolicyOverrideCount: visibility.source_policy_override_count ?? 0,
+            sourcePolicyLinkState: visibility.source_policy_link_state || 'unknown',
+            sourcePolicyMessage: visibility.source_policy_message || '',
+            hasRecentRelatedExecution: Boolean(visibility.has_recent_related_execution),
+            recentUsageLabel: visibility.recent_usage_label || ''
+        };
+    }
+
+    function buildPersonalizationVisibilityBadge(source = {}) {
+        const visibility = resolvePersonalizationVisibility(source);
+        const toneClass = visibility.personalizationState === 'overridden'
+            ? 'bg-violet-100 text-violet-800'
+            : visibility.personalizationState === 'default'
+                ? 'bg-slate-100 text-slate-700'
+                : visibility.personalizationState === 'empty'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-slate-100 text-slate-700';
+
+        return `<span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneClass}">${visibility.statusLabel}</span>`;
+    }
+
+    function buildPersonalizationMetaHtml(source = {}, { compact = false } = {}) {
+        const visibility = resolvePersonalizationVisibility(source);
+        const parts = [];
+        const detailTokens = [
+            `템플릿 ${visibility.effectiveTemplateStyle}`,
+            `${visibility.effectivePeriod}일`,
+            visibility.emailModeLabel
+        ];
+
+        if (visibility.archiveReferenceCount > 0) {
+            detailTokens.push(`아카이브 ${visibility.archiveReferenceCount}개`);
+        }
+        if (visibility.sourcePolicyOverrideCount > 0) {
+            detailTokens.push(`소스 정책 오버라이드 ${visibility.sourcePolicyOverrideCount}개`);
+        }
+
+        parts.push(
+            `<p class="${compact ? 'mt-1' : 'mt-2'} text-xs text-gray-500">개인화: ${detailTokens.join(' · ')}</p>`
+        );
+
+        if (visibility.overrideCount > 0 && visibility.overrideLabels.length > 0) {
+            parts.push(
+                `<p class="mt-1 text-xs text-gray-500">오버라이드: ${visibility.overrideLabels.join(', ')}</p>`
+            );
+        }
+        if (visibility.statusMessage) {
+            parts.push(`<p class="mt-1 text-sm text-gray-500">${visibility.statusMessage}</p>`);
+        }
+        if (visibility.sourcePolicyMessage) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">소스 정책 연결: ${visibility.sourcePolicyMessage}</p>`);
+        }
+
+        return parts.join('');
+    }
+
     function buildExecutionMetaHtml(source = {}, { includeResultTitle = true, includeTimestamp = true } = {}) {
         const visibility = resolveExecutionVisibility(source);
         const parts = [];
@@ -227,6 +300,7 @@
                             ${buildApprovalStatusBadge(resolveApprovalVisibility(item).approvalState, resolveApprovalVisibility(item).approvalLabel)}
                             ${buildDeliveryStatusBadge(item.delivery_status, resolveExecutionVisibility(item).deliveryLabel)}
                             ${buildExecutionMetaHtml(item)}
+                            ${buildPersonalizationMetaHtml(item, { compact: true })}
                         </div>
                         <div class="space-x-2">
                             ${buildHistoryActionsHtml(item)}
@@ -250,6 +324,7 @@
                             ${item.approval_note ? `<p class="mt-2 text-sm text-gray-500">메모: ${item.approval_note}</p>` : ''}
                             ${buildApprovalMetaHtml(item)}
                             ${buildExecutionMetaHtml(item, { includeResultTitle: false, includeTimestamp: false })}
+                            ${buildPersonalizationMetaHtml(item, { compact: true })}
                         </div>
                         <div class="space-x-2 whitespace-nowrap">
                             <button onclick="app.viewHistoryItem('${item.id}')"
@@ -582,6 +657,7 @@
         if (visibility?.is_scheduled) {
             badges.push(buildPresetVisibilityBadge('예약', 'bg-indigo-100 text-indigo-800'));
         }
+        badges.push(buildPersonalizationVisibilityBadge(preset));
 
         const executionHtml = latestExecution?.job_id
             ? `
@@ -611,6 +687,7 @@
                     ${badges.join('')}
                 </div>
                 <div class="mt-3 space-y-1">
+                    ${buildPersonalizationMetaHtml(preset)}
                     ${executionHtml}
                     ${sourcePolicyHtml}
                     ${updatedAtHtml}
@@ -843,6 +920,7 @@
         buildAnalyticsSummaryCardsHtml,
         buildApprovalsListHtml,
         buildApprovalMetaHtml,
+        buildPersonalizationMetaHtml,
         buildPresetSelectionSummaryHtml,
         buildSectionMessageHtml,
         buildHistoryListHtml,
@@ -855,6 +933,7 @@
         resolveHistorySectionState,
         resolveKeywordSuggestionView,
         resolveListSectionState,
+        resolvePersonalizationVisibility,
         resolvePresetSelectionView,
         resolveResultButtonState,
         resolveSchedulesSectionState,

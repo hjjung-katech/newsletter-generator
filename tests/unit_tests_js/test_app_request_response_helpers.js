@@ -132,6 +132,10 @@ test('normalizeGenerationResultEnvelope merges top-level metadata without mutati
         delivery_status: 'sent',
         approved_at: '2026-03-12T00:00:00Z',
         approval_note: 'ready',
+        personalization_visibility: {
+            personalization_state: 'default',
+            status_label: '기본 개인화'
+        },
         result: {
             html_content: '<html>ok</html>',
             status: 'success'
@@ -146,7 +150,11 @@ test('normalizeGenerationResultEnvelope merges top-level metadata without mutati
         approval_status: 'approved',
         delivery_status: 'sent',
         approved_at: '2026-03-12T00:00:00Z',
-        approval_note: 'ready'
+        approval_note: 'ready',
+        personalization_visibility: {
+            personalization_state: 'default',
+            status_label: '기본 개인화'
+        }
     });
 });
 
@@ -174,6 +182,17 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
             email_compatible: true,
             period_days: 14
         },
+        personalization_visibility: {
+            personalization_state: 'overridden',
+            status_label: '오버라이드 적용',
+            status_message: '기본값 대비 개인화 오버라이드 2개가 적용됩니다.',
+            effective_template_style: 'compact',
+            effective_period: 14,
+            email_mode_label: '이메일 호환 모드',
+            override_labels: ['이메일 호환 모드', '아카이브 컨텍스트'],
+            archive_reference_count: 1,
+            source_policy_message: '활성 소스 정책 1개와 연결됩니다.'
+        },
         input_params: {
             keywords: 'AI, Robotics',
             domain: 'Mobility'
@@ -191,6 +210,9 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
     assert.match(html, /Generation Statistics/);
     assert.match(html, /Generated Keywords/);
     assert.match(html, /Processing Information/);
+    assert.match(html, /Personalization Context/);
+    assert.match(html, /오버라이드 적용/);
+    assert.match(html, /Overrides: 이메일 호환 모드, 아카이브 컨텍스트/);
     assert.match(html, /Input Parameters/);
     assert.match(html, /Archive References/);
     assert.match(html, /newsletter-html\/job-123/);

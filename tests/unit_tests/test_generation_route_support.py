@@ -135,6 +135,26 @@ def test_build_sync_generation_response_preserves_contract() -> None:
         "email_sent": True,
         "subject": "AI Weekly",
         "html_size": len("<html>ok</html>"),
+        "personalization_visibility": {
+            "personalization_state": "default",
+            "status_label": "기본 개인화",
+            "status_message": "현재 개인화 설정은 기본값으로 유지됩니다.",
+            "effective_template_style": "compact",
+            "effective_period": 14,
+            "email_compatible": False,
+            "email_mode_label": "기본 모드",
+            "override_count": 0,
+            "override_labels": [],
+            "has_archive_context": False,
+            "archive_reference_count": 0,
+            "source_policy_override_count": 0,
+            "source_policy_link_state": "unknown",
+            "source_policy_message": "",
+            "has_recent_related_execution": False,
+            "recent_usage_state": "empty",
+            "recent_usage_label": "연관 실행 없음",
+            "recent_usage_timestamp": None,
+        },
         "processing_info": {
             "using_real_cli": True,
             "template_style": "compact",
@@ -171,6 +191,10 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     assert status_response["execution_visibility"]["status_category"] == "completed"
     assert status_response["execution_visibility"]["status_label"] == "완료"
     assert (
+        status_response["personalization_visibility"]["personalization_state"]
+        == "default"
+    )
+    assert (
         status_response["execution_visibility"]["primary_timestamp"]
         == "2026-03-12T00:00:00Z"
     )
@@ -198,6 +222,10 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     assert history_entry["result"] == {"status": "success"}
     assert history_entry["execution_visibility"]["status_category"] == "completed"
     assert history_entry["execution_visibility"]["status_label"] == "완료"
+    assert (
+        history_entry["personalization_visibility"]["personalization_state"]
+        == "default"
+    )
 
 
 def test_build_execution_visibility_exposes_operator_facing_labels() -> None:
@@ -264,6 +292,7 @@ def test_build_approval_entry_includes_execution_and_approval_visibility() -> No
     )
 
     assert entry["execution_visibility"]["status_message"] == "생성은 완료되었고 발송 준비가 끝났습니다."
+    assert entry["personalization_visibility"]["personalization_state"] == "default"
     assert entry["approval_visibility"] == {
         "raw_approval_status": "approved",
         "approval_state": "approved",

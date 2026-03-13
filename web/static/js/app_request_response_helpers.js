@@ -131,6 +131,10 @@
             }
         });
 
+        if (result.personalization_visibility) {
+            normalized.personalization_visibility = result.personalization_visibility;
+        }
+
         return normalized;
     }
 
@@ -157,6 +161,43 @@
                         </div>
                     `).join('')}
                 </div>
+            </div>
+        `;
+    }
+
+    function buildPersonalizationDetailsHtml(result = {}) {
+        const visibility = result.personalization_visibility || {};
+        if (!visibility || Object.keys(visibility).length === 0) {
+            return '';
+        }
+
+        const state = visibility.personalization_state || 'unknown';
+        const toneClass = state === 'overridden'
+            ? 'bg-violet-100 text-violet-800'
+            : state === 'default'
+                ? 'bg-slate-100 text-slate-700'
+                : state === 'empty'
+                    ? 'bg-amber-100 text-amber-800'
+                    : 'bg-slate-100 text-slate-700';
+        const overrideLabels = Array.isArray(visibility.override_labels)
+            ? visibility.override_labels
+            : [];
+
+        return `
+            <div class="mb-4 p-4 bg-violet-50 rounded-lg border border-violet-200">
+                <h4 class="text-lg font-semibold text-violet-900 mb-3">
+                    <i class="fas fa-sliders-h mr-2"></i>Personalization Context
+                </h4>
+                <div class="flex flex-wrap gap-2 text-sm">
+                    <span class="inline-flex px-2.5 py-1 rounded-full font-semibold ${toneClass}">${visibility.status_label || '개인화 상태 미상'}</span>
+                    <span class="inline-flex px-2.5 py-1 rounded-full font-semibold bg-white text-gray-700">Template: ${visibility.effective_template_style || 'compact'}</span>
+                    <span class="inline-flex px-2.5 py-1 rounded-full font-semibold bg-white text-gray-700">Period: ${visibility.effective_period ?? 14}d</span>
+                    <span class="inline-flex px-2.5 py-1 rounded-full font-semibold bg-white text-gray-700">${visibility.email_mode_label || '기본 모드'}</span>
+                </div>
+                ${visibility.status_message ? `<p class="mt-2 text-sm text-gray-600">${visibility.status_message}</p>` : ''}
+                ${overrideLabels.length ? `<p class="mt-1 text-sm text-gray-600">Overrides: ${overrideLabels.join(', ')}</p>` : ''}
+                ${visibility.archive_reference_count ? `<p class="mt-1 text-sm text-gray-600">Archive context: ${visibility.archive_reference_count} item(s)</p>` : ''}
+                ${visibility.source_policy_message ? `<p class="mt-1 text-sm text-gray-600">Source policy: ${visibility.source_policy_message}</p>` : ''}
             </div>
         `;
     }
@@ -265,6 +306,8 @@
             `;
         }
 
+        detailsHtml += buildPersonalizationDetailsHtml(result);
+
         if (result.input_params) {
             const params = result.input_params;
             const archiveReferences = Array.isArray(result.archive_references)
@@ -341,6 +384,7 @@
         buildSourcePolicyPayload,
         normalizeGenerationResultEnvelope,
         buildStepTimesHtml,
-        buildResultDetailsHtml
+        buildResultDetailsHtml,
+        buildPersonalizationDetailsHtml
     });
 });
