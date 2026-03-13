@@ -56,6 +56,16 @@ test('buildHistoryListHtml renders derived badges and actions for completed item
             created_at: '2026-03-12T01:00:00Z',
             status: 'completed',
             approval_status: 'approved',
+            personalization_visibility: {
+                personalization_state: 'default',
+                status_label: '기본 개인화',
+                status_message: '현재 개인화 설정은 기본값으로 유지됩니다.',
+                effective_template_style: 'compact',
+                effective_period: 14,
+                email_mode_label: '기본 모드',
+                override_count: 0,
+                override_labels: []
+            },
             execution_visibility: {
                 status_category: 'completed',
                 status_label: '완료',
@@ -73,6 +83,7 @@ test('buildHistoryListHtml renders derived badges and actions for completed item
     assert.match(html, /bg-green-100 text-green-800\">완료/);
     assert.match(html, /bg-amber-100 text-amber-800\">승인 대기/);
     assert.match(html, /생성은 완료되었고 승인 대기 중입니다/);
+    assert.match(html, /개인화: 템플릿 compact · 14일 · 기본 모드/);
     assert.match(html, /app\.approveHistoryItem\('job-pending'\)/);
     assert.match(html, /app\.rerunHistoryItem\('job-approved'\)/);
 });
@@ -349,6 +360,17 @@ test('preset selection helper renders default, recent execution, and source poli
             source_policy_visibility: {
                 link_state: 'matched',
                 message: '활성 소스 정책 1개와 연결됩니다. (allow 1 / block 0)'
+            },
+            personalization_visibility: {
+                personalization_state: 'overridden',
+                status_label: '오버라이드 적용',
+                status_message: '기본값 대비 개인화 오버라이드 2개가 적용됩니다.',
+                effective_template_style: 'modern',
+                effective_period: 7,
+                email_mode_label: '이메일 호환 모드',
+                override_count: 2,
+                override_labels: ['템플릿 스타일', '기간'],
+                source_policy_message: '활성 소스 정책 1개와 연결됩니다. (allow 1 / block 0)'
             }
         }
     });
@@ -358,6 +380,9 @@ test('preset selection helper renders default, recent execution, and source poli
     assert.match(view.detailsHtml, /선택됨/);
     assert.match(view.detailsHtml, /기본/);
     assert.match(view.detailsHtml, /도메인 프리셋/);
+    assert.match(view.detailsHtml, /오버라이드 적용/);
+    assert.match(view.detailsHtml, /개인화: 템플릿 modern · 7일 · 이메일 호환 모드/);
+    assert.match(view.detailsHtml, /오버라이드: 템플릿 스타일, 기간/);
     assert.match(view.detailsHtml, /최근 연관 실행/);
     assert.match(view.detailsHtml, /Reuters digest/);
     assert.match(view.detailsHtml, /활성 소스 정책 1개와 연결됩니다/);
@@ -388,6 +413,40 @@ test('preset selection helper falls back when there is no related execution', ()
     assert.match(view.detailsHtml, /연관된 최근 실행 이력이 없습니다/);
     assert.match(view.detailsHtml, /예약/);
     assert.match(view.detailsHtml, /키워드 프리셋이라 직접 연결된 소스 정책을 확인할 수 없습니다/);
+});
+
+test('personalization helper resolves default and overridden summaries', () => {
+    const defaultVisibility = helpers.resolvePersonalizationVisibility({
+        personalization_visibility: {
+            personalization_state: 'default',
+            status_label: '기본 개인화',
+            effective_template_style: 'compact',
+            effective_period: 14,
+            email_mode_label: '기본 모드',
+            override_count: 0,
+            override_labels: []
+        }
+    });
+    const overriddenHtml = helpers.buildPersonalizationMetaHtml({
+        personalization_visibility: {
+            personalization_state: 'overridden',
+            status_label: '오버라이드 적용',
+            status_message: '기본값 대비 개인화 오버라이드 3개가 적용됩니다.',
+            effective_template_style: 'modern',
+            effective_period: 7,
+            email_mode_label: '이메일 호환 모드',
+            override_count: 3,
+            override_labels: ['템플릿 스타일', '기간', '아카이브 컨텍스트'],
+            archive_reference_count: 1,
+            source_policy_message: '활성 소스 정책 1개와 연결됩니다.'
+        }
+    });
+
+    assert.equal(defaultVisibility.personalizationState, 'default');
+    assert.equal(defaultVisibility.statusLabel, '기본 개인화');
+    assert.match(overriddenHtml, /개인화: 템플릿 modern · 7일 · 이메일 호환 모드 · 아카이브 1개/);
+    assert.match(overriddenHtml, /오버라이드: 템플릿 스타일, 기간, 아카이브 컨텍스트/);
+    assert.match(overriddenHtml, /활성 소스 정책 1개와 연결됩니다/);
 });
 
 test('section state helpers preserve empty, error, and content decisions', () => {

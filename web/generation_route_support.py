@@ -13,6 +13,13 @@ else:
     except ImportError:
         from web.types import GenerateNewsletterRequest  # pragma: no cover
 
+try:
+    from personalization_route_support import build_personalization_visibility
+except ImportError:
+    from web.personalization_route_support import (  # pragma: no cover
+        build_personalization_visibility,
+    )
+
 
 @dataclass(frozen=True)
 class GenerateRequestContext:
@@ -383,17 +390,27 @@ def build_sync_generation_response(
 ) -> dict[str, Any]:
     html_content = result.get("content", "")
     title = result.get("title", "Newsletter")
+    input_params = result.get("input_params", {})
+    personalization_params = (
+        dict(input_params) if isinstance(input_params, Mapping) else {}
+    )
+    personalization_params.setdefault("template_style", template_style)
+    personalization_params.setdefault("email_compatible", email_compatible)
+    personalization_params.setdefault("period", period)
     return {
         "status": result.get("status", "error"),
         "html_content": html_content,
         "title": title,
         "generation_stats": result.get("generation_stats", {}),
-        "input_params": result.get("input_params", {}),
+        "input_params": input_params,
         "error": result.get("error"),
         "sent": email_sent,
         "email_sent": email_sent,
         "subject": title,
         "html_size": len(html_content),
+        "personalization_visibility": build_personalization_visibility(
+            personalization_params
+        ),
         "processing_info": {
             "using_real_cli": using_real_cli,
             "template_style": template_style,
@@ -441,6 +458,15 @@ def build_status_response_from_task(
         approved_at=None,
         rejected_at=None,
         result=result,
+    )
+    personalization_params = (
+        result.get("input_params", {})
+        if isinstance(result, Mapping)
+        and isinstance(result.get("input_params"), Mapping)
+        else {}
+    )
+    response["personalization_visibility"] = build_personalization_visibility(
+        personalization_params
     )
     return response
 
@@ -507,6 +533,15 @@ def build_status_response_from_row(
         delivery_status=response.get("delivery_status"),
         result=result_data,
     )
+    personalization_params = (
+        result_data.get("input_params", {})
+        if isinstance(result_data, Mapping)
+        and isinstance(result_data.get("input_params"), Mapping)
+        else response["params"]
+    )
+    response["personalization_visibility"] = build_personalization_visibility(
+        personalization_params
+    )
     return response
 
 
@@ -530,6 +565,12 @@ def build_history_entry(
         approval_note,
     ) = row
     result_data = parse_result(result)
+    personalization_params = (
+        result_data.get("input_params", {})
+        if isinstance(result_data, Mapping)
+        and isinstance(result_data.get("input_params"), Mapping)
+        else parse_params(params)
+    )
     return {
         "id": job_id,
         "params": parse_params(params),
@@ -560,6 +601,9 @@ def build_history_entry(
             delivery_status=delivery_status,
             result=result_data,
         ),
+        "personalization_visibility": build_personalization_visibility(
+            personalization_params
+        ),
     }
 
 
@@ -582,6 +626,12 @@ def build_approval_entry(
         approval_note,
     ) = row
     result_data = parse_result(result)
+    personalization_params = (
+        result_data.get("input_params", {})
+        if isinstance(result_data, Mapping)
+        and isinstance(result_data.get("input_params"), Mapping)
+        else parse_params(params)
+    )
     return {
         "id": job_id,
         "params": parse_params(params),
@@ -610,6 +660,9 @@ def build_approval_entry(
             approval_status=approval_status,
             delivery_status=delivery_status,
             result=result_data,
+        ),
+        "personalization_visibility": build_personalization_visibility(
+            personalization_params
         ),
     }
 
