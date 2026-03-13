@@ -172,6 +172,73 @@ test('schedule list helper renders params, next run, and actions', () => {
     assert.match(html, /app\.runScheduleNow\('schedule-1'\)/);
 });
 
+test('section state helpers preserve empty, error, and content decisions', () => {
+    assert.match(
+        helpers.resolveHistorySectionState({ history: [] }).html,
+        /아직 생성된 뉴스레터가 없습니다/
+    );
+    assert.match(
+        helpers.resolveApprovalsSectionState({
+            errorMessage: '권한이 없습니다.',
+            errorTone: 'yellow'
+        }).html,
+        /text-amber-600/
+    );
+    assert.match(
+        helpers.resolveSchedulesSectionState({
+            schedules: [{ id: 'schedule-1', next_run: '2026-03-12T06:00:00Z', rrule: 'FREQ=WEEKLY', params: {} }]
+        }).html,
+        /schedule-1/
+    );
+});
+
+test('analytics and source policy section helpers preserve derived section state', () => {
+    const analytics = helpers.resolveAnalyticsSectionState({
+        result: {
+            window_days: 7,
+            summary: { generation: { completed: 2 } },
+            recent_events: [{ event_type: 'schedule_run' }]
+        }
+    });
+    assert.equal(analytics.statusTone, 'green');
+    assert.equal(analytics.summary.generation.completed, 2);
+    assert.equal(analytics.events.length, 1);
+
+    const emptyPolicies = helpers.resolveSourcePoliciesSectionState({
+        sourcePolicies: [],
+        editingSourcePolicyId: ''
+    });
+    assert.match(emptyPolicies.html, /등록된 소스 정책이 없습니다/);
+    assert.equal(emptyPolicies.shouldResetForm, true);
+
+    const errorPolicies = helpers.resolveSourcePoliciesSectionState({
+        errorMessage: '소스 정책을 불러올 수 없습니다.',
+        errorTone: 'red'
+    });
+    assert.equal(errorPolicies.statusTone, 'red');
+    assert.match(errorPolicies.html, /text-red-600/);
+});
+
+test('keyword suggestion view helper preserves loading, success, and error render states', () => {
+    const loading = helpers.resolveKeywordSuggestionView({ phase: 'loading' });
+    assert.equal(loading.buttonDisabled, true);
+    assert.match(loading.buttonHtml, /추천 중/);
+
+    const success = helpers.resolveKeywordSuggestionView({
+        phase: 'success',
+        keywords: ['AI', 'Robotics']
+    });
+    assert.match(success.resultHtml, /추천 키워드/);
+    assert.match(success.resultHtml, /app\.addKeywordToInput\('AI'\)/);
+    assert.match(success.resultHtml, /모든 키워드 사용/);
+
+    const error = helpers.resolveKeywordSuggestionView({
+        phase: 'error',
+        errorMessage: 'boom'
+    });
+    assert.match(error.resultHtml, /오류가 발생했습니다: boom/);
+});
+
 test('index templates load both helper scripts before app shell', () => {
     ['index.html', 'index_en.html'].forEach((templateName) => {
         const template = fs.readFileSync(path.join(repoRoot, 'web/templates', templateName), 'utf8');

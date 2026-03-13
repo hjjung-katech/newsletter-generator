@@ -246,9 +246,11 @@ class NewsletterApp {
     }
 
     async hydrateArchiveReferences(referenceIds = []) {
-        const normalizedIds = Array.isArray(referenceIds)
-            ? referenceIds.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
-            : [];
+        const hydrationState = NewsletterAppSelectionVisibilityHelpers.resolveHydratedArchiveReferences(
+            this.selectedArchiveReferences,
+            referenceIds
+        );
+        const normalizedIds = hydrationState.normalizedIds;
 
         if (!normalizedIds.length) {
             this.selectedArchiveReferences = [];
@@ -256,8 +258,7 @@ class NewsletterApp {
             return;
         }
 
-        const placeholderMap = new Map(this.selectedArchiveReferences.map((reference) => [reference.job_id, reference]));
-        this.selectedArchiveReferences = normalizedIds.map((jobId) => placeholderMap.get(jobId) || this.normalizeArchiveReference({ job_id: jobId, title: jobId }));
+        this.selectedArchiveReferences = hydrationState.nextSelectedReferences;
         this.renderSelectedArchiveReferences();
 
         if (!this.hasAdminToken()) {
@@ -1031,18 +1032,19 @@ class NewsletterApp {
                 const message = response.status === 401 || response.status === 503
                     ? this.getProtectedRouteMessage(history.error || '히스토리를 불러올 수 없습니다.')
                     : (history.error || '히스토리를 불러올 수 없습니다.');
-                historyList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                historyList.innerHTML = NewsletterAppViewStateHelpers.resolveHistorySectionState({
+                    errorMessage: message,
+                    errorTone: 'yellow'
+                }).html;
                 return;
             }
 
-            if (history.length === 0) {
-                historyList.innerHTML = '<p class="text-gray-500">아직 생성된 뉴스레터가 없습니다.</p>';
-                return;
-            }
-
-            historyList.innerHTML = NewsletterAppViewStateHelpers.buildHistoryListHtml(history);
+            historyList.innerHTML = NewsletterAppViewStateHelpers.resolveHistorySectionState({ history }).html;
         } catch (error) {
-            historyList.innerHTML = `<p class="text-red-600">히스토리 조회 실패: ${error.message}</p>`;
+            historyList.innerHTML = NewsletterAppViewStateHelpers.resolveHistorySectionState({
+                errorMessage: `히스토리 조회 실패: ${error.message}`,
+                errorTone: 'red'
+            }).html;
         }
     }
 
@@ -1059,18 +1061,19 @@ class NewsletterApp {
                 const message = response.status === 401 || response.status === 503
                     ? this.getProtectedRouteMessage(approvals.error || '승인 대기함을 불러올 수 없습니다.')
                     : (approvals.error || '승인 대기함을 불러올 수 없습니다.');
-                approvalsList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                approvalsList.innerHTML = NewsletterAppViewStateHelpers.resolveApprovalsSectionState({
+                    errorMessage: message,
+                    errorTone: 'yellow'
+                }).html;
                 return;
             }
 
-            if (approvals.length === 0) {
-                approvalsList.innerHTML = '<p class="text-gray-500">승인 대기 중인 뉴스레터가 없습니다.</p>';
-                return;
-            }
-
-            approvalsList.innerHTML = NewsletterAppViewStateHelpers.buildApprovalsListHtml(approvals);
+            approvalsList.innerHTML = NewsletterAppViewStateHelpers.resolveApprovalsSectionState({ approvals }).html;
         } catch (error) {
-            approvalsList.innerHTML = `<p class="text-red-600">승인 대기함 조회 실패: ${error.message}</p>`;
+            approvalsList.innerHTML = NewsletterAppViewStateHelpers.resolveApprovalsSectionState({
+                errorMessage: `승인 대기함 조회 실패: ${error.message}`,
+                errorTone: 'red'
+            }).html;
         }
     }
 
@@ -1101,25 +1104,34 @@ class NewsletterApp {
             const result = await response.json();
 
             if (!response.ok) {
-                this.analyticsData = null;
                 const message = response.status === 401 || response.status === 503
                     ? this.getProtectedRouteMessage(result.error || 'Analytics를 불러올 수 없습니다.')
                     : (result.error || 'Analytics를 불러올 수 없습니다.');
-                this.setAnalyticsStatus(message, 'yellow');
-                this.renderAnalyticsCards({});
-                this.renderAnalyticsEvents([]);
+                const analyticsState = NewsletterAppViewStateHelpers.resolveAnalyticsSectionState({
+                    errorMessage: message,
+                    errorTone: 'yellow'
+                });
+                this.analyticsData = null;
+                this.setAnalyticsStatus(analyticsState.statusMessage, analyticsState.statusTone);
+                this.renderAnalyticsCards(analyticsState.summary);
+                this.renderAnalyticsEvents(analyticsState.events);
                 return;
             }
 
+            const analyticsState = NewsletterAppViewStateHelpers.resolveAnalyticsSectionState({ result });
             this.analyticsData = result;
-            this.setAnalyticsStatus(`최근 ${result.window_days}일 기준 analytics 요약과 최근 ${result.recent_events.length}건 이벤트를 표시합니다.`, 'green');
-            this.renderAnalyticsCards(result.summary || {});
-            this.renderAnalyticsEvents(result.recent_events || []);
+            this.setAnalyticsStatus(analyticsState.statusMessage, analyticsState.statusTone);
+            this.renderAnalyticsCards(analyticsState.summary);
+            this.renderAnalyticsEvents(analyticsState.events);
         } catch (error) {
+            const analyticsState = NewsletterAppViewStateHelpers.resolveAnalyticsSectionState({
+                errorMessage: `Analytics 조회 실패: ${error.message}`,
+                errorTone: 'red'
+            });
             this.analyticsData = null;
-            this.setAnalyticsStatus(`Analytics 조회 실패: ${error.message}`, 'red');
-            this.renderAnalyticsCards({});
-            this.renderAnalyticsEvents([]);
+            this.setAnalyticsStatus(analyticsState.statusMessage, analyticsState.statusTone);
+            this.renderAnalyticsCards(analyticsState.summary);
+            this.renderAnalyticsEvents(analyticsState.events);
         }
     }
 
@@ -1137,9 +1149,14 @@ class NewsletterApp {
                 const message = response.status === 401 || response.status === 503
                     ? this.getProtectedRouteMessage(policies.error || '소스 정책을 불러올 수 없습니다.')
                     : (policies.error || '소스 정책을 불러올 수 없습니다.');
-                sourcePoliciesList.innerHTML = `<p class="text-amber-600">${message}</p>`;
-                this.setSourcePolicySummary(message, 'yellow');
-                this.setSourcePolicyStatus(message, 'yellow');
+                const sectionState = NewsletterAppViewStateHelpers.resolveSourcePoliciesSectionState({
+                    errorMessage: message,
+                    errorTone: 'yellow',
+                    editingSourcePolicyId: this.editingSourcePolicyId
+                });
+                sourcePoliciesList.innerHTML = sectionState.html;
+                this.setSourcePolicySummary(sectionState.summaryMessage, sectionState.summaryTone);
+                this.setSourcePolicyStatus(sectionState.statusMessage, sectionState.statusTone);
                 return;
             }
 
@@ -1147,29 +1164,28 @@ class NewsletterApp {
             this.renderSourcePolicies();
         } catch (error) {
             this.sourcePolicies = [];
-            sourcePoliciesList.innerHTML = `<p class="text-red-600">소스 정책 조회 실패: ${error.message}</p>`;
-            this.setSourcePolicySummary(`소스 정책 조회 실패: ${error.message}`, 'red');
-            this.setSourcePolicyStatus(`소스 정책 조회 실패: ${error.message}`, 'red');
+            const sectionState = NewsletterAppViewStateHelpers.resolveSourcePoliciesSectionState({
+                errorMessage: `소스 정책 조회 실패: ${error.message}`,
+                errorTone: 'red',
+                editingSourcePolicyId: this.editingSourcePolicyId
+            });
+            sourcePoliciesList.innerHTML = sectionState.html;
+            this.setSourcePolicySummary(sectionState.summaryMessage, sectionState.summaryTone);
+            this.setSourcePolicyStatus(sectionState.statusMessage, sectionState.statusTone);
         }
     }
 
     renderSourcePolicies() {
         const sourcePoliciesList = document.getElementById('sourcePoliciesList');
 
-        if (this.sourcePolicies.length === 0) {
-            sourcePoliciesList.innerHTML = '<p class="text-gray-500">등록된 소스 정책이 없습니다.</p>';
-            this.setSourcePolicySummary('현재 적용 중인 소스 정책이 없습니다. 필요하면 allow/block 정책을 추가하세요.');
-            if (!this.editingSourcePolicyId) {
-                this.resetSourcePolicyForm();
-            }
-            return;
-        }
+        const sectionState = NewsletterAppViewStateHelpers.resolveSourcePoliciesSectionState({
+            sourcePolicies: this.sourcePolicies,
+            editingSourcePolicyId: this.editingSourcePolicyId
+        });
+        sourcePoliciesList.innerHTML = sectionState.html;
+        this.setSourcePolicySummary(sectionState.summaryMessage, sectionState.summaryTone);
 
-        const summary = NewsletterAppViewStateHelpers.summarizeSourcePolicies(this.sourcePolicies);
-        this.setSourcePolicySummary(summary.message);
-        sourcePoliciesList.innerHTML = NewsletterAppViewStateHelpers.buildSourcePoliciesHtml(this.sourcePolicies);
-
-        if (!this.editingSourcePolicyId) {
+        if (sectionState.shouldResetForm) {
             this.resetSourcePolicyForm();
         }
     }
@@ -1315,18 +1331,19 @@ class NewsletterApp {
                 const message = response.status === 401 || response.status === 503
                     ? this.getProtectedRouteMessage(schedules.error || '예약 목록을 불러올 수 없습니다.')
                     : (schedules.error || '예약 목록을 불러올 수 없습니다.');
-                schedulesList.innerHTML = `<p class="text-amber-600">${message}</p>`;
+                schedulesList.innerHTML = NewsletterAppViewStateHelpers.resolveSchedulesSectionState({
+                    errorMessage: message,
+                    errorTone: 'yellow'
+                }).html;
                 return;
             }
 
-            if (schedules.length === 0) {
-                schedulesList.innerHTML = '<p class="text-gray-500">예약된 발송이 없습니다.</p>';
-                return;
-            }
-
-            schedulesList.innerHTML = NewsletterAppViewStateHelpers.buildSchedulesListHtml(schedules);
+            schedulesList.innerHTML = NewsletterAppViewStateHelpers.resolveSchedulesSectionState({ schedules }).html;
         } catch (error) {
-            schedulesList.innerHTML = `<p class="text-red-600">예약 목록 조회 실패: ${error.message}</p>`;
+            schedulesList.innerHTML = NewsletterAppViewStateHelpers.resolveSchedulesSectionState({
+                errorMessage: `예약 목록 조회 실패: ${error.message}`,
+                errorTone: 'red'
+            }).html;
         }
     }
 
@@ -1647,14 +1664,16 @@ class NewsletterApp {
         const button = document.getElementById('btn-suggest');
 
         if (!domain) {
-            resultDiv.innerHTML = '<div class="text-red-600 text-sm">도메인을 입력해주세요.</div>';
+            resultDiv.innerHTML = NewsletterAppViewStateHelpers.resolveKeywordSuggestionView({
+                phase: 'missing-domain'
+            }).resultHtml;
             return;
         }
 
-        // Show loading state
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>추천 중...';
-        resultDiv.innerHTML = '<div class="text-blue-600 text-sm">키워드를 생성하고 있습니다...</div>';
+        const loadingState = NewsletterAppViewStateHelpers.resolveKeywordSuggestionView({ phase: 'loading' });
+        button.disabled = loadingState.buttonDisabled;
+        button.innerHTML = loadingState.buttonHtml;
+        resultDiv.innerHTML = loadingState.resultHtml;
 
         try {
             const response = await fetch('/api/suggest', {
@@ -1667,29 +1686,20 @@ class NewsletterApp {
 
             const data = await response.json();
 
-            if (response.ok && data.keywords && data.keywords.length > 0) {
-                // Display suggested keywords
-                const keywordsList = data.keywords.map(keyword =>
-                    `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2 mb-2 cursor-pointer hover:bg-blue-200" onclick="app.addKeywordToInput('${keyword}')">${keyword}</span>`
-                ).join('');
-
-                resultDiv.innerHTML = `
-                    <div class="text-sm text-gray-700 mb-2">추천 키워드 (클릭하여 추가):</div>
-                    <div class="flex flex-wrap">${keywordsList}</div>
-                    <button onclick="app.useAllKeywords(${JSON.stringify(data.keywords).replace(/"/g, '&quot;')})"
-                            class="mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
-                        모든 키워드 사용
-                    </button>
-                `;
-            } else {
-                resultDiv.innerHTML = '<div class="text-yellow-600 text-sm">키워드를 생성할 수 없습니다. 다른 도메인을 시도해보세요.</div>';
-            }
+            resultDiv.innerHTML = NewsletterAppViewStateHelpers.resolveKeywordSuggestionView(
+                response.ok && data.keywords && data.keywords.length > 0
+                    ? { phase: 'success', keywords: data.keywords }
+                    : { phase: 'empty' }
+            ).resultHtml;
         } catch (error) {
-            resultDiv.innerHTML = '<div class="text-red-600 text-sm">오류가 발생했습니다: ' + error.message + '</div>';
+            resultDiv.innerHTML = NewsletterAppViewStateHelpers.resolveKeywordSuggestionView({
+                phase: 'error',
+                errorMessage: error.message
+            }).resultHtml;
         } finally {
-            // Restore button state
-            button.disabled = false;
-            button.innerHTML = '<i class="fas fa-lightbulb mr-1"></i>추천받기';
+            const idleState = NewsletterAppViewStateHelpers.resolveKeywordSuggestionView();
+            button.disabled = idleState.buttonDisabled;
+            button.innerHTML = idleState.buttonHtml;
         }
     }
 

@@ -167,6 +167,43 @@
             : [];
     }
 
+    function buildArchiveReferenceSnapshot(selectedArchiveReferences = []) {
+        return new Map(
+            Array.isArray(selectedArchiveReferences)
+                ? selectedArchiveReferences.map((reference) => [reference.job_id, reference])
+                : []
+        );
+    }
+
+    function resolveHydratedArchiveReferences(selectedArchiveReferences = [], referenceIds = []) {
+        const normalizedIds = Array.isArray(referenceIds)
+            ? referenceIds.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 3)
+            : [];
+
+        if (!normalizedIds.length) {
+            return {
+                normalizedIds,
+                nextSelectedReferences: [],
+                missingIds: []
+            };
+        }
+
+        const snapshot = buildArchiveReferenceSnapshot(selectedArchiveReferences);
+        const nextSelectedReferences = normalizedIds.map((jobId) => snapshot.get(jobId) || {
+            job_id: jobId,
+            title: jobId,
+            snippet: '선택된 참고본 세부 정보를 불러오지 못했습니다.',
+            source_value: '',
+            created_at: null
+        });
+
+        return {
+            normalizedIds,
+            nextSelectedReferences,
+            missingIds: normalizedIds.filter((jobId) => !snapshot.has(jobId))
+        };
+    }
+
     function resolveTabPanelState(tabId = '') {
         const panelMap = {
             generateTab: 'generatePanel',
@@ -221,6 +258,8 @@
         buildArchiveSearchResultsHtml,
         resolveArchiveSelectionUpdate,
         removeArchiveReference,
+        buildArchiveReferenceSnapshot,
+        resolveHydratedArchiveReferences,
         resolveTabPanelState,
         resolveInputMethodVisibility,
         resolveScheduleViewState

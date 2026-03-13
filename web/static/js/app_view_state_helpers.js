@@ -286,6 +286,184 @@
             `).join('');
     }
 
+    function buildSectionMessageHtml(message = '', tone = 'gray') {
+        const toneClass = tone === 'red'
+            ? 'text-red-600'
+            : tone === 'yellow'
+                ? 'text-amber-600'
+                : 'text-gray-500';
+
+        return `<p class="${toneClass}">${message}</p>`;
+    }
+
+    function resolveListSectionState({ items = [], errorMessage = '', emptyMessage = '', errorTone = 'yellow', renderItems }) {
+        if (errorMessage) {
+            return {
+                state: 'error',
+                html: buildSectionMessageHtml(errorMessage, errorTone)
+            };
+        }
+
+        if (!Array.isArray(items) || items.length === 0) {
+            return {
+                state: 'empty',
+                html: buildSectionMessageHtml(emptyMessage, 'gray')
+            };
+        }
+
+        return {
+            state: 'content',
+            html: renderItems(items)
+        };
+    }
+
+    function resolveHistorySectionState({ history = [], errorMessage = '', errorTone = 'yellow' } = {}) {
+        return resolveListSectionState({
+            items: history,
+            errorMessage,
+            emptyMessage: '아직 생성된 뉴스레터가 없습니다.',
+            errorTone,
+            renderItems: buildHistoryListHtml
+        });
+    }
+
+    function resolveApprovalsSectionState({ approvals = [], errorMessage = '', errorTone = 'yellow' } = {}) {
+        return resolveListSectionState({
+            items: approvals,
+            errorMessage,
+            emptyMessage: '승인 대기 중인 뉴스레터가 없습니다.',
+            errorTone,
+            renderItems: buildApprovalsListHtml
+        });
+    }
+
+    function resolveSchedulesSectionState({ schedules = [], errorMessage = '', errorTone = 'yellow' } = {}) {
+        return resolveListSectionState({
+            items: schedules,
+            errorMessage,
+            emptyMessage: '예약된 발송이 없습니다.',
+            errorTone,
+            renderItems: buildSchedulesListHtml
+        });
+    }
+
+    function resolveAnalyticsSectionState({ result = null, errorMessage = '', errorTone = 'yellow' } = {}) {
+        if (errorMessage) {
+            return {
+                hasData: false,
+                statusMessage: errorMessage,
+                statusTone: errorTone,
+                summary: {},
+                events: []
+            };
+        }
+
+        const windowDays = result?.window_days ?? 0;
+        const recentEvents = Array.isArray(result?.recent_events) ? result.recent_events : [];
+
+        return {
+            hasData: true,
+            statusMessage: `최근 ${windowDays}일 기준 analytics 요약과 최근 ${recentEvents.length}건 이벤트를 표시합니다.`,
+            statusTone: 'green',
+            summary: result?.summary || {},
+            events: recentEvents
+        };
+    }
+
+    function resolveSourcePoliciesSectionState({
+        sourcePolicies = [],
+        editingSourcePolicyId = '',
+        errorMessage = '',
+        errorTone = 'yellow'
+    } = {}) {
+        if (errorMessage) {
+            return {
+                hasPolicies: false,
+                html: buildSectionMessageHtml(errorMessage, errorTone),
+                summaryMessage: errorMessage,
+                summaryTone: errorTone,
+                statusMessage: errorMessage,
+                statusTone: errorTone,
+                shouldResetForm: false
+            };
+        }
+
+        if (!Array.isArray(sourcePolicies) || sourcePolicies.length === 0) {
+            return {
+                hasPolicies: false,
+                html: buildSectionMessageHtml('등록된 소스 정책이 없습니다.', 'gray'),
+                summaryMessage: '현재 적용 중인 소스 정책이 없습니다. 필요하면 allow/block 정책을 추가하세요.',
+                summaryTone: 'gray',
+                statusMessage: null,
+                statusTone: 'gray',
+                shouldResetForm: !editingSourcePolicyId
+            };
+        }
+
+        const summary = summarizeSourcePolicies(sourcePolicies);
+        return {
+            hasPolicies: true,
+            html: buildSourcePoliciesHtml(sourcePolicies),
+            summaryMessage: summary.message,
+            summaryTone: 'gray',
+            statusMessage: null,
+            statusTone: 'gray',
+            shouldResetForm: !editingSourcePolicyId
+        };
+    }
+
+    function resolveKeywordSuggestionView({ phase = 'idle', keywords = [], errorMessage = '' } = {}) {
+        if (phase === 'loading') {
+            return {
+                buttonDisabled: true,
+                buttonHtml: '<i class="fas fa-spinner fa-spin mr-1"></i>추천 중...',
+                resultHtml: '<div class="text-blue-600 text-sm">키워드를 생성하고 있습니다...</div>'
+            };
+        }
+
+        if (phase === 'missing-domain') {
+            return {
+                buttonDisabled: false,
+                buttonHtml: '<i class="fas fa-lightbulb mr-1"></i>추천받기',
+                resultHtml: '<div class="text-red-600 text-sm">도메인을 입력해주세요.</div>'
+            };
+        }
+
+        if (phase === 'error') {
+            return {
+                buttonDisabled: false,
+                buttonHtml: '<i class="fas fa-lightbulb mr-1"></i>추천받기',
+                resultHtml: `<div class="text-red-600 text-sm">오류가 발생했습니다: ${errorMessage}</div>`
+            };
+        }
+
+        if (phase === 'empty') {
+            return {
+                buttonDisabled: false,
+                buttonHtml: '<i class="fas fa-lightbulb mr-1"></i>추천받기',
+                resultHtml: '<div class="text-yellow-600 text-sm">키워드를 생성할 수 없습니다. 다른 도메인을 시도해보세요.</div>'
+            };
+        }
+
+        const safeKeywords = Array.isArray(keywords) ? keywords : [];
+        const keywordsList = safeKeywords.map((keyword) =>
+            `<span class="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full mr-2 mb-2 cursor-pointer hover:bg-blue-200" onclick="app.addKeywordToInput('${keyword}')">${keyword}</span>`
+        ).join('');
+
+        return {
+            buttonDisabled: false,
+            buttonHtml: '<i class="fas fa-lightbulb mr-1"></i>추천받기',
+            resultHtml: `
+                <div class="text-sm text-gray-700 mb-2">추천 키워드 (클릭하여 추가):</div>
+                <div class="flex flex-wrap">${keywordsList}</div>
+                <button onclick="app.useAllKeywords(${JSON.stringify(safeKeywords).replace(/"/g, '&quot;')})"
+                        class="mt-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded hover:bg-green-200">
+                    모든 키워드 사용
+                </button>
+            `
+        };
+    }
+
     function resolveResultButtonState(result = {}) {
         const enabled = result.status === 'success' && Boolean(result.html_content);
         return {
@@ -298,10 +476,18 @@
         buildAnalyticsEventsHtml,
         buildAnalyticsSummaryCardsHtml,
         buildApprovalsListHtml,
+        buildSectionMessageHtml,
         buildHistoryListHtml,
         buildSchedulesListHtml,
         buildSourcePoliciesHtml,
+        resolveAnalyticsSectionState,
+        resolveApprovalsSectionState,
+        resolveHistorySectionState,
+        resolveKeywordSuggestionView,
+        resolveListSectionState,
         resolveResultButtonState,
+        resolveSchedulesSectionState,
+        resolveSourcePoliciesSectionState,
         sortSourcePolicies,
         summarizeSourcePolicies
     };

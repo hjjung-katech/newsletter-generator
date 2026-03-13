@@ -144,6 +144,24 @@ test('resolveInputMethodVisibility and resolveScheduleViewState preserve UI shel
     );
 });
 
+test('archive hydration helpers preserve snapshot values and build placeholders for missing ids', () => {
+    const snapshot = helpers.buildArchiveReferenceSnapshot([
+        { job_id: 'job-1', title: 'Saved Title' }
+    ]);
+    assert.equal(snapshot.get('job-1').title, 'Saved Title');
+
+    const hydrated = helpers.resolveHydratedArchiveReferences(
+        [{ job_id: 'job-1', title: 'Saved Title', snippet: 'snippet', source_value: 'source' }],
+        ['job-1', 'job-2', '', null]
+    );
+
+    assert.deepEqual(hydrated.normalizedIds, ['job-1', 'job-2']);
+    assert.deepEqual(hydrated.missingIds, ['job-2']);
+    assert.equal(hydrated.nextSelectedReferences[0].title, 'Saved Title');
+    assert.equal(hydrated.nextSelectedReferences[1].title, 'job-2');
+    assert.match(hydrated.nextSelectedReferences[1].snippet, /세부 정보를 불러오지 못했습니다/);
+});
+
 test('status class helpers return stable classnames for UI sections', () => {
     assert.equal(
         helpers.buildPresetStatusClassName('green'),
