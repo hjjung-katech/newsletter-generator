@@ -37,6 +37,17 @@ try:
 except ImportError:
     from web.ops_logging import log_exception, log_info  # pragma: no cover
 
+try:
+    from source_policy_route_support import (
+        enrich_source_policy_entries,
+        enrich_source_policy_entry,
+    )
+except ImportError:
+    from web.source_policy_route_support import (  # pragma: no cover
+        enrich_source_policy_entries,
+        enrich_source_policy_entry,
+    )
+
 logger = logging.getLogger("web.routes_source_policies")
 
 VALID_POLICY_TYPES = {SOURCE_POLICY_ALLOW, SOURCE_POLICY_BLOCK}
@@ -65,7 +76,12 @@ def register_source_policy_routes(app: Flask, database_path: str) -> None:
     @app.route("/api/source-policies")  # type: ignore[untyped-decorator]
     def list_source_policy_entries() -> ResponseReturnValue:
         try:
-            return jsonify(list_source_policies(database_path))
+            return jsonify(
+                enrich_source_policy_entries(
+                    database_path,
+                    list_source_policies(database_path),
+                )
+            )
         except Exception as exc:
             log_exception(logger, "source_policy.list.failed", exc)
             return jsonify({"error": "소스 정책 목록을 불러오지 못했습니다"}), 500
@@ -88,7 +104,7 @@ def register_source_policy_routes(app: Flask, database_path: str) -> None:
                 policy_id=policy["id"],
                 policy_type=policy_type,
             )
-            return jsonify(policy), 201
+            return jsonify(enrich_source_policy_entry(database_path, policy)), 201
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except sqlite3.IntegrityError:
@@ -112,7 +128,7 @@ def register_source_policy_routes(app: Flask, database_path: str) -> None:
             if not policy:
                 return jsonify({"error": "소스 정책을 찾을 수 없습니다"}), 404
             log_info(logger, "source_policy.update.completed", policy_id=policy_id)
-            return jsonify(policy)
+            return jsonify(enrich_source_policy_entry(database_path, policy))
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         except sqlite3.IntegrityError:

@@ -1221,6 +1221,9 @@ class NewsletterApp {
         if (sectionState.shouldResetForm) {
             this.resetSourcePolicyForm();
         }
+        if (sectionState.statusMessage) {
+            this.setSourcePolicyStatus(sectionState.statusMessage, sectionState.statusTone);
+        }
     }
 
     editSourcePolicy(policyId) {

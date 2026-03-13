@@ -355,12 +355,32 @@
         const activePolicies = sourcePolicies.filter((policy) => policy.is_active);
         const allowCount = activePolicies.filter((policy) => policy.policy_type === 'allow').length;
         const blockCount = activePolicies.filter((policy) => policy.policy_type === 'block').length;
+        const linkedPolicyCount = sourcePolicies.filter((policy) =>
+            resolveSourcePolicyVisibility(policy).linkedPresetCount > 0
+        ).length;
+        const appliedPolicyCount = sourcePolicies.filter((policy) =>
+            resolveSourcePolicyVisibility(policy).visibilityState === 'applied'
+        ).length;
+        const detachedPolicyCount = sourcePolicies.filter((policy) =>
+            resolveSourcePolicyVisibility(policy).visibilityState === 'detached'
+        ).length;
 
         return {
             activeCount: activePolicies.length,
             allowCount,
             blockCount,
-            message: `활성 정책 ${activePolicies.length}개 (allow ${allowCount} / block ${blockCount})`
+            linkedPolicyCount,
+            appliedPolicyCount,
+            detachedPolicyCount,
+            message: `활성 정책 ${activePolicies.length}개 (allow ${allowCount} / block ${blockCount}) · 프리셋 연결 ${linkedPolicyCount}개 · 최근 반영 ${appliedPolicyCount}개`,
+            statusMessage: detachedPolicyCount > 0
+                ? `활성 정책 ${detachedPolicyCount}개는 아직 프리셋이나 최근 실행과 연결되지 않았습니다.`
+                : (appliedPolicyCount > 0
+                    ? `최근 실행에 반영된 정책 ${appliedPolicyCount}개를 확인했습니다.`
+                    : null),
+            statusTone: detachedPolicyCount > 0
+                ? 'yellow'
+                : (appliedPolicyCount > 0 ? 'green' : 'gray')
         };
     }
 
@@ -373,6 +393,93 @@
                 }
                 return left.pattern.localeCompare(right.pattern);
             });
+    }
+
+    function resolveSourcePolicyVisibility(policy = {}) {
+        const visibility = policy?.source_policy_visibility || {};
+        const linkage = policy?.preset_linkage_visibility || {};
+        const linkedPresets = Array.isArray(policy?.linked_presets) ? policy.linked_presets : [];
+        const latestExecution = policy?.latest_related_execution || null;
+        const visibilityState = visibility.visibility_state
+            || (policy.is_active ? 'enabled' : 'disabled');
+        const linkedPresetCount = visibility.linked_preset_count ?? linkage.linked_preset_count ?? linkedPresets.length;
+        const linkedDefaultPresetCount = visibility.linked_default_preset_count ?? linkage.linked_default_preset_count ?? linkedPresets.filter((preset) => preset?.is_default).length;
+        const linkedPresetNames = Array.isArray(visibility.linked_preset_names) && visibility.linked_preset_names.length > 0
+            ? visibility.linked_preset_names
+            : linkedPresets.map((preset) => preset?.name).filter(Boolean);
+
+        return {
+            visibilityState,
+            statusLabel: visibility.status_label
+                || (visibilityState === 'applied'
+                    ? '최근 반영'
+                    : visibilityState === 'enabled'
+                        ? '활성'
+                        : visibilityState === 'detached'
+                            ? '연결 없음'
+                            : visibilityState === 'disabled'
+                                ? '비활성'
+                                : '상태 미상'),
+            statusMessage: visibility.status_message || linkage.message || '',
+            policyTypeLabel: visibility.policy_type_label || '',
+            linkedPresetCount,
+            linkedDefaultPresetCount,
+            linkedPresetNames,
+            linkageMessage: linkage.message || '',
+            latestExecution,
+            hasLatestExecution: Boolean(latestExecution),
+            recentUsageState: visibility.recent_usage_state || (latestExecution ? 'recent' : 'empty')
+        };
+    }
+
+    function buildSourcePolicyVisibilityBadge(policy = {}) {
+        const visibility = resolveSourcePolicyVisibility(policy);
+        const toneClass = visibility.visibilityState === 'applied'
+            ? 'bg-green-100 text-green-800'
+            : visibility.visibilityState === 'enabled'
+                ? 'bg-blue-100 text-blue-800'
+                : visibility.visibilityState === 'detached'
+                    ? 'bg-amber-100 text-amber-800'
+                    : visibility.visibilityState === 'disabled'
+                        ? 'bg-slate-100 text-slate-700'
+                        : 'bg-slate-100 text-slate-700';
+
+        return `<span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneClass}">${visibility.statusLabel}</span>`;
+    }
+
+    function buildSourcePolicyMetaHtml(policy = {}) {
+        const visibility = resolveSourcePolicyVisibility(policy);
+        const parts = [];
+
+        if (visibility.policyTypeLabel) {
+            parts.push(`<p class="mt-2 text-sm text-gray-500">${visibility.policyTypeLabel}</p>`);
+        }
+        if (visibility.statusMessage) {
+            parts.push(`<p class="mt-1 text-sm text-gray-500">${visibility.statusMessage}</p>`);
+        }
+        if (visibility.linkedPresetCount > 0) {
+            const names = visibility.linkedPresetNames.slice(0, 3).join(', ');
+            const defaultSuffix = visibility.linkedDefaultPresetCount > 0
+                ? ` · 기본 ${visibility.linkedDefaultPresetCount}개`
+                : '';
+            parts.push(`<p class="mt-1 text-xs text-gray-500">연결된 프리셋 ${visibility.linkedPresetCount}개${defaultSuffix}${names ? ` · ${names}` : ''}</p>`);
+        }
+        if (visibility.hasLatestExecution) {
+            const execution = visibility.latestExecution || {};
+            parts.push(
+                `<div class="mt-2 flex flex-wrap items-center gap-2">${
+                    buildExecutionStatusBadge(
+                        resolveExecutionVisibility(execution).statusLabel,
+                        resolveExecutionVisibility(execution).statusCategory
+                    )
+                }<span class="text-xs text-gray-500">최근 실행 ${
+                    formatVisibilityTimestamp(resolveExecutionVisibility(execution).primaryTimestamp) || '-'
+                }</span></div>`
+            );
+            parts.push(buildExecutionMetaHtml(execution));
+        }
+
+        return parts.join('');
     }
 
     function buildSourcePoliciesHtml(sourcePolicies = []) {
@@ -393,8 +500,10 @@
                                     <code class="rounded bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-800">${policy.pattern}</code>
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${typeBadge}">${policy.policy_type}</span>
                                     <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${activeBadge}">${policy.is_active ? 'active' : 'paused'}</span>
+                                    ${buildSourcePolicyVisibilityBadge(policy)}
                                 </div>
                                 <p class="mt-2 text-sm text-gray-500">업데이트: ${updatedAt}</p>
+                                ${buildSourcePolicyMetaHtml(policy)}
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <button onclick="app.editSourcePolicy('${policy.id}')"
@@ -663,8 +772,8 @@
             html: buildSourcePoliciesHtml(sourcePolicies),
             summaryMessage: summary.message,
             summaryTone: 'gray',
-            statusMessage: null,
-            statusTone: 'gray',
+            statusMessage: summary.statusMessage,
+            statusTone: summary.statusTone,
             shouldResetForm: !editingSourcePolicyId
         };
     }
@@ -739,6 +848,7 @@
         buildHistoryListHtml,
         buildSchedulesListHtml,
         buildSourcePoliciesHtml,
+        buildSourcePolicyMetaHtml,
         resolveApprovalVisibility,
         resolveAnalyticsSectionState,
         resolveApprovalsSectionState,
@@ -748,6 +858,7 @@
         resolvePresetSelectionView,
         resolveResultButtonState,
         resolveSchedulesSectionState,
+        resolveSourcePolicyVisibility,
         resolveSourcePoliciesSectionState,
         sortSourcePolicies,
         summarizeSourcePolicies
