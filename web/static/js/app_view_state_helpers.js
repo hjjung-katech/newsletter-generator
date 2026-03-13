@@ -6,6 +6,14 @@
         module.exports = helpers;
     }
 })(typeof window !== 'undefined' ? window : globalThis, function() {
+    const approvalStateLabelMap = {
+        pending: '승인 대기',
+        approved: '승인 완료',
+        rejected: '반려됨',
+        unavailable: '승인 불필요',
+        unknown: '승인 상태 미상'
+    };
+
     function formatParamsLabel(params = {}) {
         return params?.keywords
             ? `키워드: ${Array.isArray(params.keywords) ? params.keywords.join(', ') : params.keywords}`
@@ -46,6 +54,46 @@
         };
     }
 
+    function resolveApprovalVisibility(source = {}) {
+        const visibility = source?.approval_visibility || {};
+        const executionVisibility = resolveExecutionVisibility(source);
+        const hasApprovableContent = Boolean(source?.result?.html_content);
+        const rawApprovalStatus = visibility.raw_approval_status || source?.approval_status || '';
+        const approvalState = visibility.approval_state
+            || (!rawApprovalStatus || rawApprovalStatus === 'not_requested'
+                ? 'unavailable'
+                : rawApprovalStatus === 'pending' || rawApprovalStatus === 'approved' || rawApprovalStatus === 'rejected'
+                    ? rawApprovalStatus
+                    : 'unknown');
+        const primaryTimestamp = visibility.primary_timestamp
+            || source?.approved_at
+            || source?.rejected_at
+            || source?.created_at
+            || null;
+
+        return {
+            rawApprovalStatus,
+            approvalState,
+            approvalLabel: visibility.approval_label || approvalStateLabelMap[approvalState] || rawApprovalStatus || '',
+            approvalMessage: visibility.approval_message
+                || (approvalState === 'pending'
+                    ? '검토 후 승인 또는 반려할 수 있습니다.'
+                    : approvalState === 'approved'
+                        ? '승인이 완료되었습니다.'
+                        : approvalState === 'rejected'
+                            ? '반려되어 draft 상태로 유지됩니다.'
+                            : approvalState === 'unavailable'
+                                ? '승인 대상이 아닙니다.'
+                                : '승인 상태를 확인할 수 없습니다.'),
+            primaryTimestamp,
+            timestampLabel: visibility.timestamp_label || (primaryTimestamp ? '기준 시각' : ''),
+            canResolve: Boolean(visibility.can_resolve ?? (approvalState === 'pending' && executionVisibility.statusCategory === 'completed')),
+            canApprove: Boolean(visibility.can_approve ?? (approvalState === 'pending' && executionVisibility.statusCategory === 'completed' && hasApprovableContent)),
+            canReject: Boolean(visibility.can_reject ?? (approvalState === 'pending' && executionVisibility.statusCategory === 'completed')),
+            isResolved: approvalState === 'approved' || approvalState === 'rejected'
+        };
+    }
+
     function buildExecutionStatusBadge(label, statusCategory) {
         const toneClass = statusCategory === 'completed'
             ? 'bg-green-100 text-green-800'
@@ -66,7 +114,7 @@
     }
 
     function buildApprovalStatusBadge(status, label = '') {
-        if (!status || status === 'not_requested') {
+        if (!status || status === 'not_requested' || status === 'unavailable') {
             return '';
         }
 
@@ -74,7 +122,9 @@
             ? 'bg-amber-100 text-amber-800'
             : status === 'approved'
                 ? 'bg-blue-100 text-blue-800'
-                : 'bg-red-100 text-red-800';
+                : status === 'rejected'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-slate-100 text-slate-700';
 
         return `<span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full ${toneClass}">${label || status}</span>`;
     }
@@ -105,14 +155,14 @@
         return new Date(timestamp).toLocaleString();
     }
 
-    function buildExecutionMetaHtml(source = {}, { includeResultTitle = true } = {}) {
+    function buildExecutionMetaHtml(source = {}, { includeResultTitle = true, includeTimestamp = true } = {}) {
         const visibility = resolveExecutionVisibility(source);
         const parts = [];
 
         if (visibility.statusMessage) {
             parts.push(`<p class="mt-2 text-sm text-gray-500">${visibility.statusMessage}</p>`);
         }
-        if (visibility.primaryTimestamp) {
+        if (includeTimestamp && visibility.primaryTimestamp) {
             parts.push(`<p class="mt-1 text-xs text-gray-500">기준 시각: ${formatVisibilityTimestamp(visibility.primaryTimestamp)}</p>`);
         }
         if (includeResultTitle && visibility.resultTitle) {
@@ -122,19 +172,39 @@
         return parts.join('');
     }
 
+    function buildApprovalMetaHtml(source = {}) {
+        const visibility = resolveApprovalVisibility(source);
+        const parts = [];
+
+        if (visibility.approvalState !== 'unavailable' && visibility.approvalMessage) {
+            parts.push(`<p class="mt-2 text-sm text-gray-500">${visibility.approvalMessage}</p>`);
+        }
+        if (visibility.primaryTimestamp && visibility.timestampLabel) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">${visibility.timestampLabel}: ${formatVisibilityTimestamp(visibility.primaryTimestamp)}</p>`);
+        }
+
+        return parts.join('');
+    }
+
     function buildHistoryActionsHtml(item = {}) {
+        const approvalVisibility = resolveApprovalVisibility(item);
+
         if (item.status !== 'completed') {
             return '';
         }
 
-        if (item.approval_status === 'pending') {
+        if (approvalVisibility.canResolve) {
             return `
                                 <button onclick="app.viewHistoryItem('${item.id}')"
                                         class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
+                                ${approvalVisibility.canApprove ? `
                                 <button onclick="app.approveHistoryItem('${item.id}')"
                                         class="text-emerald-600 hover:text-emerald-900 text-sm">승인</button>
+                                ` : ''}
+                                ${approvalVisibility.canReject ? `
                                 <button onclick="app.rejectHistoryItem('${item.id}')"
                                         class="text-red-600 hover:text-red-900 text-sm">반려</button>
+                                ` : ''}
                             `;
         }
 
@@ -154,7 +224,7 @@
                             <h4 class="text-sm font-medium text-gray-900">${formatParamsLabel(item.params || {})}</h4>
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
                             ${buildHistoryStatusBadge(item)}
-                            ${buildApprovalStatusBadge(item.approval_status, resolveExecutionVisibility(item).approvalLabel)}
+                            ${buildApprovalStatusBadge(resolveApprovalVisibility(item).approvalState, resolveApprovalVisibility(item).approvalLabel)}
                             ${buildDeliveryStatusBadge(item.delivery_status, resolveExecutionVisibility(item).deliveryLabel)}
                             ${buildExecutionMetaHtml(item)}
                         </div>
@@ -175,22 +245,23 @@
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
                             <p class="text-sm text-gray-500">이메일: ${item.params?.email || '미지정'}</p>
                             ${buildExecutionStatusBadge(resolveExecutionVisibility(item).statusLabel, resolveExecutionVisibility(item).statusCategory)}
-                            ${buildApprovalStatusBadge(item.approval_status, resolveExecutionVisibility(item).approvalLabel)}
+                            ${buildApprovalStatusBadge(resolveApprovalVisibility(item).approvalState, resolveApprovalVisibility(item).approvalLabel)}
                             ${buildDeliveryStatusBadge(item.delivery_status, resolveExecutionVisibility(item).deliveryLabel)}
                             ${item.approval_note ? `<p class="mt-2 text-sm text-gray-500">메모: ${item.approval_note}</p>` : ''}
-                            ${buildExecutionMetaHtml(item, { includeResultTitle: false })}
+                            ${buildApprovalMetaHtml(item)}
+                            ${buildExecutionMetaHtml(item, { includeResultTitle: false, includeTimestamp: false })}
                         </div>
                         <div class="space-x-2 whitespace-nowrap">
                             <button onclick="app.viewHistoryItem('${item.id}')"
                                     class="text-blue-600 hover:text-blue-900 text-sm">보기</button>
-                            <button onclick="app.approveHistoryItem('${item.id}')"
+                            ${resolveApprovalVisibility(item).canApprove ? `<button onclick="app.approveHistoryItem('${item.id}')"
                                     class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-sm">
                                 승인
-                            </button>
-                            <button onclick="app.rejectHistoryItem('${item.id}')"
+                            </button>` : ''}
+                            ${resolveApprovalVisibility(item).canReject ? `<button onclick="app.rejectHistoryItem('${item.id}')"
                                     class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm">
                                 반려
-                            </button>
+                            </button>` : ''}
                         </div>
                     </div>
                 </div>
@@ -423,7 +494,7 @@
         return resolveListSectionState({
             items: approvals,
             errorMessage,
-            emptyMessage: '승인 대기 중인 뉴스레터가 없습니다.',
+            emptyMessage: '승인 요청 이력이 없습니다.',
             errorTone,
             renderItems: buildApprovalsListHtml
         });
@@ -568,10 +639,12 @@
         buildAnalyticsEventsHtml,
         buildAnalyticsSummaryCardsHtml,
         buildApprovalsListHtml,
+        buildApprovalMetaHtml,
         buildSectionMessageHtml,
         buildHistoryListHtml,
         buildSchedulesListHtml,
         buildSourcePoliciesHtml,
+        resolveApprovalVisibility,
         resolveAnalyticsSectionState,
         resolveApprovalsSectionState,
         resolveHistorySectionState,

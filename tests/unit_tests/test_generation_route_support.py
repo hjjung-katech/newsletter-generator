@@ -223,6 +223,60 @@ def test_build_execution_visibility_exposes_operator_facing_labels() -> None:
     }
 
 
+def test_build_approval_visibility_exposes_operator_facing_labels_and_actions() -> None:
+    visibility = generation_route_support.build_approval_visibility(
+        status="completed",
+        created_at="2026-03-12T00:00:00Z",
+        approval_status="pending",
+        delivery_status="pending_approval",
+        result={"html_content": "<html>ok</html>"},
+    )
+
+    assert visibility == {
+        "raw_approval_status": "pending",
+        "approval_state": "pending",
+        "approval_label": "승인 대기",
+        "approval_message": "검토 후 승인 또는 반려할 수 있습니다.",
+        "primary_timestamp": "2026-03-12T00:00:00Z",
+        "timestamp_label": "요청 시각",
+        "can_resolve": True,
+        "can_approve": True,
+        "can_reject": True,
+    }
+
+
+def test_build_approval_entry_includes_execution_and_approval_visibility() -> None:
+    entry = generation_route_support.build_approval_entry(
+        (
+            "job-approval",
+            '{"keywords":"AI","email":"ops@example.com"}',
+            '{"html_content":"<html>ok</html>","title":"AI Weekly"}',
+            "2026-03-12T00:00:00Z",
+            "completed",
+            "approved",
+            "approved",
+            "2026-03-12T00:05:00Z",
+            None,
+            "Looks good",
+        ),
+        parse_params=json.loads,
+        parse_result=json.loads,
+    )
+
+    assert entry["execution_visibility"]["status_message"] == "생성은 완료되었고 발송 준비가 끝났습니다."
+    assert entry["approval_visibility"] == {
+        "raw_approval_status": "approved",
+        "approval_state": "approved",
+        "approval_label": "승인 완료",
+        "approval_message": "승인이 완료되었습니다. 이제 발송할 수 있습니다.",
+        "primary_timestamp": "2026-03-12T00:05:00Z",
+        "timestamp_label": "승인 시각",
+        "can_resolve": False,
+        "can_approve": False,
+        "can_reject": False,
+    }
+
+
 def test_parse_schedule_create_request_builds_normalized_params() -> None:
     request = generation_route_support.parse_schedule_create_request(
         {

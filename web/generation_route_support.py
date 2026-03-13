@@ -85,6 +85,14 @@ _APPROVAL_LABELS = {
     "not_requested": "승인 불필요",
 }
 
+_APPROVAL_STATE_LABELS = {
+    "pending": "승인 대기",
+    "approved": "승인 완료",
+    "rejected": "반려됨",
+    "unavailable": "승인 불필요",
+    "unknown": "승인 상태 미상",
+}
+
 _DELIVERY_LABELS = {
     "draft": "초안",
     "pending_approval": "승인 대기",
@@ -99,6 +107,15 @@ def _normalize_status_category(status: Any) -> str:
     if not normalized:
         return "unknown"
     return _STATUS_CATEGORY_MAP.get(normalized, "unknown")
+
+
+def _normalize_approval_state(approval_status: Any) -> str:
+    normalized = str(approval_status or "").strip().lower()
+    if not normalized or normalized == "not_requested":
+        return "unavailable"
+    if normalized in {"pending", "approved", "rejected"}:
+        return normalized
+    return "unknown"
 
 
 def _resolve_status_message(
@@ -117,6 +134,8 @@ def _resolve_status_message(
     if category == "completed":
         if approval_status == "pending" or delivery_status == "pending_approval":
             return "생성은 완료되었고 승인 대기 중입니다."
+        if approval_status == "rejected":
+            return "생성은 완료되었지만 반려되어 draft 상태로 유지됩니다."
         if delivery_status == "sent":
             return "생성과 발송이 완료되었습니다."
         if delivery_status == "approved":
@@ -125,6 +144,47 @@ def _resolve_status_message(
     if category == "empty":
         return "아직 실행 이력이 없습니다."
     return "현재 상태를 확인할 수 없습니다."
+
+
+def _resolve_approval_message(
+    *,
+    approval_state: str,
+    delivery_status: str | None,
+    can_resolve: bool,
+) -> str:
+    if approval_state == "pending":
+        if can_resolve:
+            return "검토 후 승인 또는 반려할 수 있습니다."
+        return "승인 대기 상태이지만 현재는 처리할 수 없습니다."
+    if approval_state == "approved":
+        if delivery_status == "sent":
+            return "승인 후 발송까지 완료되었습니다."
+        if delivery_status == "approved":
+            return "승인이 완료되었습니다. 이제 발송할 수 있습니다."
+        return "승인이 완료되었습니다."
+    if approval_state == "rejected":
+        return "반려되어 draft 상태로 유지됩니다."
+    if approval_state == "unavailable":
+        return "승인 대상이 아닙니다."
+    return "승인 상태를 확인할 수 없습니다."
+
+
+def _resolve_approval_timestamp(
+    *,
+    approval_state: str,
+    created_at: str | None,
+    approved_at: str | None,
+    rejected_at: str | None,
+) -> tuple[str | None, str | None]:
+    if approval_state == "approved" and approved_at:
+        return approved_at, "승인 시각"
+    if approval_state == "rejected" and rejected_at:
+        return rejected_at, "반려 시각"
+    if approval_state == "pending" and created_at:
+        return created_at, "요청 시각"
+    if created_at:
+        return created_at, "기준 시각"
+    return None, None
 
 
 def build_execution_visibility(
@@ -171,6 +231,48 @@ def build_execution_visibility(
         "result_title": result_mapping.get("title"),
         "has_result": result is not None,
         "can_view_result": category == "completed" and result is not None,
+    }
+
+
+def build_approval_visibility(
+    *,
+    status: Any,
+    approval_status: str | None,
+    delivery_status: str | None,
+    created_at: str | None = None,
+    approved_at: str | None = None,
+    rejected_at: str | None = None,
+    result: Any = None,
+) -> dict[str, Any]:
+    approval_state = _normalize_approval_state(approval_status)
+    result_mapping = result if isinstance(result, Mapping) else {}
+    status_category = _normalize_status_category(status)
+    can_resolve = approval_state == "pending" and status_category == "completed"
+    can_approve = can_resolve and bool(result_mapping.get("html_content"))
+    can_reject = can_resolve
+    primary_timestamp, timestamp_label = _resolve_approval_timestamp(
+        approval_state=approval_state,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+    )
+
+    return {
+        "raw_approval_status": approval_status,
+        "approval_state": approval_state,
+        "approval_label": _APPROVAL_STATE_LABELS.get(
+            approval_state, _APPROVAL_STATE_LABELS["unknown"]
+        ),
+        "approval_message": _resolve_approval_message(
+            approval_state=approval_state,
+            delivery_status=delivery_status,
+            can_resolve=can_resolve,
+        ),
+        "primary_timestamp": primary_timestamp,
+        "timestamp_label": timestamp_label,
+        "can_resolve": can_resolve,
+        "can_approve": can_approve,
+        "can_reject": can_reject,
     }
 
 
@@ -331,6 +433,15 @@ def build_status_response_from_task(
         result=result,
         error_message=task.get("error"),
     )
+    response["approval_visibility"] = build_approval_visibility(
+        status=task.get("status"),
+        approval_status=response.get("approval_status"),
+        delivery_status=response.get("delivery_status"),
+        created_at=None,
+        approved_at=None,
+        rejected_at=None,
+        result=result,
+    )
     return response
 
 
@@ -387,6 +498,15 @@ def build_status_response_from_row(
         delivery_status=response.get("delivery_status"),
         result=result_data,
     )
+    response["approval_visibility"] = build_approval_visibility(
+        status=status,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+        approval_status=response.get("approval_status"),
+        delivery_status=response.get("delivery_status"),
+        result=result_data,
+    )
     return response
 
 
@@ -423,6 +543,66 @@ def build_history_entry(
         "rejected_at": rejected_at,
         "approval_note": approval_note,
         "execution_visibility": build_execution_visibility(
+            status=status,
+            created_at=created_at,
+            approved_at=approved_at,
+            rejected_at=rejected_at,
+            approval_status=approval_status,
+            delivery_status=delivery_status,
+            result=result_data,
+        ),
+        "approval_visibility": build_approval_visibility(
+            status=status,
+            created_at=created_at,
+            approved_at=approved_at,
+            rejected_at=rejected_at,
+            approval_status=approval_status,
+            delivery_status=delivery_status,
+            result=result_data,
+        ),
+    }
+
+
+def build_approval_entry(
+    row: tuple[Any, ...],
+    *,
+    parse_params: Callable[[str | None], Any],
+    parse_result: Callable[[str | None], Any],
+) -> dict[str, Any]:
+    (
+        job_id,
+        params,
+        result,
+        created_at,
+        status,
+        approval_status,
+        delivery_status,
+        approved_at,
+        rejected_at,
+        approval_note,
+    ) = row
+    result_data = parse_result(result)
+    return {
+        "id": job_id,
+        "params": parse_params(params),
+        "result": result_data,
+        "created_at": created_at,
+        "status": status,
+        "approval_status": approval_status,
+        "delivery_status": delivery_status,
+        "approved_at": approved_at,
+        "rejected_at": rejected_at,
+        "approval_note": approval_note,
+        "execution_visibility": build_execution_visibility(
+            status=status,
+            created_at=created_at,
+            approved_at=approved_at,
+            rejected_at=rejected_at,
+            approval_status=approval_status,
+            delivery_status=delivery_status,
+            result=result_data,
+        ),
+        "approval_visibility": build_approval_visibility(
             status=status,
             created_at=created_at,
             approved_at=approved_at,
