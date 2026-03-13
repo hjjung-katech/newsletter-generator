@@ -5,6 +5,7 @@
 
 const NewsletterAppRequestResponseHelpers = window.NewsletterAppRequestResponseHelpers;
 const NewsletterAppViewStateHelpers = window.NewsletterAppViewStateHelpers;
+const NewsletterAppSelectionVisibilityHelpers = window.NewsletterAppSelectionVisibilityHelpers;
 
 if (!NewsletterAppRequestResponseHelpers) {
     throw new Error('NewsletterAppRequestResponseHelpers must be loaded before app.js');
@@ -12,6 +13,10 @@ if (!NewsletterAppRequestResponseHelpers) {
 
 if (!NewsletterAppViewStateHelpers) {
     throw new Error('NewsletterAppViewStateHelpers must be loaded before app.js');
+}
+
+if (!NewsletterAppSelectionVisibilityHelpers) {
+    throw new Error('NewsletterAppSelectionVisibilityHelpers must be loaded before app.js');
 }
 
 class NewsletterApp {
@@ -150,30 +155,24 @@ class NewsletterApp {
 
     setPresetStatus(message, tone = 'gray') {
         const presetStatus = document.getElementById('presetStatus');
-        presetStatus.className = `mt-2 text-sm text-${tone}-600`;
+        presetStatus.className = NewsletterAppSelectionVisibilityHelpers.buildPresetStatusClassName(tone);
         presetStatus.textContent = message;
     }
 
     syncPresetActions() {
-        const hasSelection = Boolean(this.selectedPresetId);
+        const presetActionState = NewsletterAppSelectionVisibilityHelpers.resolvePresetActionState(this.selectedPresetId);
         ['applyPresetBtn', 'updatePresetBtn', 'deletePresetBtn'].forEach((buttonId) => {
             const button = document.getElementById(buttonId);
-            button.disabled = !hasSelection;
-            button.classList.toggle('opacity-50', !hasSelection);
-            button.classList.toggle('cursor-not-allowed', !hasSelection);
+            button.disabled = presetActionState.disabled;
+            presetActionState.inactiveClasses.forEach((className) => {
+                button.classList.toggle(className, presetActionState.disabled);
+            });
         });
     }
 
     setArchiveStatus(message, tone = 'gray') {
         const status = document.getElementById('archiveStatus');
-        const toneClassMap = {
-            gray: 'text-gray-600',
-            green: 'text-green-600',
-            yellow: 'text-amber-600',
-            red: 'text-red-600'
-        };
-
-        status.className = `text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        status.className = NewsletterAppSelectionVisibilityHelpers.buildArchiveStatusClassName(tone);
         status.textContent = message;
     }
 
@@ -181,61 +180,17 @@ class NewsletterApp {
         return NewsletterAppRequestResponseHelpers.normalizeArchiveReference(entry);
     }
 
-    isArchiveReferenceSelected(jobId) {
-        return this.selectedArchiveReferences.some((reference) => reference.job_id === jobId);
-    }
-
     renderSelectedArchiveReferences() {
         const container = document.getElementById('selectedArchiveReferences');
-
-        if (!this.selectedArchiveReferences.length) {
-            container.innerHTML = '<p class="text-sm text-gray-500">선택된 참고본이 없습니다.</p>';
-            return;
-        }
-
-        container.innerHTML = this.selectedArchiveReferences.map((reference) => `
-            <div class="rounded-md border border-blue-100 bg-blue-50 p-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-sm font-semibold text-gray-900">${reference.title}</p>
-                        <p class="mt-1 text-sm text-gray-600">${reference.snippet}</p>
-                        <p class="mt-2 text-xs text-gray-500">${reference.source_value || reference.job_id}</p>
-                    </div>
-                    <button onclick="app.removeArchiveReference('${reference.job_id}')"
-                            class="rounded-md border border-red-200 bg-white px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
-                        제거
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        container.innerHTML = NewsletterAppSelectionVisibilityHelpers.buildSelectedArchiveReferencesHtml(this.selectedArchiveReferences);
     }
 
     renderArchiveSearchResults() {
         const container = document.getElementById('archiveSearchResults');
-
-        if (!this.archiveSearchResults.length) {
-            container.innerHTML = '<p class="text-sm text-gray-500">검색어를 입력하면 최근 뉴스레터를 불러옵니다.</p>';
-            return;
-        }
-
-        container.innerHTML = this.archiveSearchResults.map((reference) => {
-            const isSelected = this.isArchiveReferenceSelected(reference.job_id);
-            return `
-                <div class="rounded-md border border-gray-200 p-3">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <p class="text-sm font-semibold text-gray-900">${reference.title}</p>
-                            <p class="mt-1 text-sm text-gray-600">${reference.snippet}</p>
-                            <p class="mt-2 text-xs text-gray-500">${reference.source_value || reference.job_id}</p>
-                        </div>
-                        <button onclick="app.toggleArchiveReference('${reference.job_id}')"
-                                class="rounded-md px-2 py-1 text-xs font-medium ${isSelected ? 'bg-red-100 text-red-700 hover:bg-red-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}">
-                            ${isSelected ? '선택 해제' : '참고 추가'}
-                        </button>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        container.innerHTML = NewsletterAppSelectionVisibilityHelpers.buildArchiveSearchResultsHtml(
+            this.archiveSearchResults,
+            this.selectedArchiveReferences
+        );
     }
 
     async loadArchiveSearchResults(queryOverride = null) {
@@ -330,30 +285,31 @@ class NewsletterApp {
     }
 
     toggleArchiveReference(jobId) {
-        if (this.isArchiveReferenceSelected(jobId)) {
-            this.removeArchiveReference(jobId);
+        const selectionResult = NewsletterAppSelectionVisibilityHelpers.resolveArchiveSelectionUpdate({
+            selectedArchiveReferences: this.selectedArchiveReferences,
+            archiveSearchResults: this.archiveSearchResults,
+            jobId
+        });
+
+        if (selectionResult.error) {
+            this.showError(selectionResult.error);
             return;
         }
 
-        if (this.selectedArchiveReferences.length >= 3) {
-            this.showError('과거 뉴스레터 참고본은 최대 3개까지 선택할 수 있습니다.');
-            return;
-        }
-
-        const match = this.archiveSearchResults.find((reference) => reference.job_id === jobId);
-        if (!match) {
-            this.showError('선택한 참고본 정보를 찾을 수 없습니다.');
-            return;
-        }
-
-        this.selectedArchiveReferences = [...this.selectedArchiveReferences, match];
+        this.selectedArchiveReferences = selectionResult.nextSelectedReferences;
         this.renderSelectedArchiveReferences();
         this.renderArchiveSearchResults();
-        this.setArchiveStatus(`${this.selectedArchiveReferences.length}개의 참고본을 선택했습니다.`, 'green');
+
+        if (selectionResult.statusMessage) {
+            this.setArchiveStatus(selectionResult.statusMessage, selectionResult.statusTone || 'gray');
+        }
     }
 
     removeArchiveReference(jobId) {
-        this.selectedArchiveReferences = this.selectedArchiveReferences.filter((reference) => reference.job_id !== jobId);
+        this.selectedArchiveReferences = NewsletterAppSelectionVisibilityHelpers.removeArchiveReference(
+            this.selectedArchiveReferences,
+            jobId
+        );
         this.renderSelectedArchiveReferences();
         this.renderArchiveSearchResults();
     }
@@ -367,27 +323,13 @@ class NewsletterApp {
 
     setSourcePolicyStatus(message, tone = 'gray') {
         const status = document.getElementById('sourcePolicyStatus');
-        const toneClassMap = {
-            gray: 'text-gray-500',
-            green: 'text-green-600',
-            yellow: 'text-amber-600',
-            red: 'text-red-600'
-        };
-
-        status.className = `mt-2 text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        status.className = NewsletterAppSelectionVisibilityHelpers.buildSourcePolicyStatusClassName(tone);
         status.textContent = message;
     }
 
     setSourcePolicySummary(message, tone = 'gray') {
         const summary = document.getElementById('sourcePolicySummary');
-        const toneClassMap = {
-            gray: 'border-gray-200 bg-gray-50 text-gray-600',
-            green: 'border-green-200 bg-green-50 text-green-700',
-            yellow: 'border-amber-200 bg-amber-50 text-amber-700',
-            red: 'border-red-200 bg-red-50 text-red-700'
-        };
-
-        summary.className = `mb-4 rounded-lg border px-4 py-3 text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        summary.className = NewsletterAppSelectionVisibilityHelpers.buildSourcePolicySummaryClassName(tone);
         summary.textContent = message;
     }
 
@@ -516,30 +458,28 @@ class NewsletterApp {
         selectedTab.classList.remove('text-gray-500', 'hover:text-gray-700');
 
         // Show corresponding panel
-        const panelMap = {
-            'generateTab': 'generatePanel',
-            'historyTab': 'historyPanel',
-            'analyticsTab': 'analyticsPanel',
-            'approvalTab': 'approvalPanel',
-            'sourcePolicyTab': 'sourcePolicyPanel',
-            'scheduleManageTab': 'scheduleManagePanel'
-        };
+        const tabState = NewsletterAppSelectionVisibilityHelpers.resolveTabPanelState(tabId);
+        if (tabState.panelId) {
+            document.getElementById(tabState.panelId).classList.remove('hidden');
 
-        const panelId = panelMap[tabId];
-        if (panelId) {
-            document.getElementById(panelId).classList.remove('hidden');
-
-            // Load data for specific tabs
-            if (tabId === 'historyTab') {
+            switch (tabState.loadAction) {
+            case 'history':
                 this.loadHistory();
-            } else if (tabId === 'analyticsTab') {
+                break;
+            case 'analytics':
                 this.loadAnalytics();
-            } else if (tabId === 'approvalTab') {
+                break;
+            case 'approvals':
                 this.loadApprovals();
-            } else if (tabId === 'sourcePolicyTab') {
+                break;
+            case 'sourcePolicies':
                 this.loadSourcePolicies();
-            } else if (tabId === 'scheduleManageTab') {
+                break;
+            case 'schedules':
                 this.loadSchedules();
+                break;
+            default:
+                break;
             }
         }
     }
@@ -548,39 +488,32 @@ class NewsletterApp {
         const method = document.querySelector('input[name="inputMethod"]:checked').value;
         const keywordsInput = document.getElementById('keywordsInput');
         const domainInput = document.getElementById('domainInput');
+        const visibilityState = NewsletterAppSelectionVisibilityHelpers.resolveInputMethodVisibility(method);
 
-        if (method === 'keywords') {
-            keywordsInput.classList.remove('hidden');
-            domainInput.classList.add('hidden');
-        } else {
-            keywordsInput.classList.add('hidden');
-            domainInput.classList.remove('hidden');
-        }
+        keywordsInput.classList.toggle('hidden', visibilityState.keywordsHidden);
+        domainInput.classList.toggle('hidden', visibilityState.domainHidden);
+    }
+
+    applyScheduleView(enabled) {
+        const scheduleSettings = document.getElementById('scheduleSettings');
+        const generateBtn = document.getElementById('generateBtn');
+        const weeklyOptions = document.getElementById('weeklyOptions');
+        const scheduleViewState = NewsletterAppSelectionVisibilityHelpers.resolveScheduleViewState({
+            enabled,
+            frequency: document.getElementById('frequency').value
+        });
+
+        scheduleSettings.classList.toggle('hidden', scheduleViewState.scheduleSettingsHidden);
+        weeklyOptions.classList.toggle('hidden', scheduleViewState.weeklyOptionsHidden);
+        generateBtn.innerHTML = scheduleViewState.generateButtonHtml;
     }
 
     toggleScheduleSettings(enabled) {
-        const scheduleSettings = document.getElementById('scheduleSettings');
-        const generateBtn = document.getElementById('generateBtn');
-        if (enabled) {
-            scheduleSettings.classList.remove('hidden');
-        } else {
-            scheduleSettings.classList.add('hidden');
-        }
-
-        generateBtn.innerHTML = enabled
-            ? '<i class="fas fa-calendar-plus mr-2"></i>예약 저장'
-            : '<i class="fas fa-play mr-2"></i>생성하기';
+        this.applyScheduleView(enabled);
     }
 
     updateScheduleOptions() {
-        const frequency = document.getElementById('frequency').value;
-        const weeklyOptions = document.getElementById('weeklyOptions');
-
-        if (frequency === 'WEEKLY') {
-            weeklyOptions.classList.remove('hidden');
-        } else {
-            weeklyOptions.classList.add('hidden');
-        }
+        this.applyScheduleView(document.getElementById('enableSchedule').checked);
     }
 
     applyScheduleFromRRule(rrule) {
@@ -1143,14 +1076,7 @@ class NewsletterApp {
 
     setAnalyticsStatus(message, tone = 'gray') {
         const status = document.getElementById('analyticsStatus');
-        const toneClassMap = {
-            gray: 'border-gray-200 bg-gray-50 text-gray-600',
-            green: 'border-green-200 bg-green-50 text-green-700',
-            yellow: 'border-amber-200 bg-amber-50 text-amber-700',
-            red: 'border-red-200 bg-red-50 text-red-700'
-        };
-
-        status.className = `mt-4 rounded-lg border px-4 py-3 text-sm ${toneClassMap[tone] || toneClassMap.gray}`;
+        status.className = NewsletterAppSelectionVisibilityHelpers.buildAnalyticsStatusClassName(tone);
         status.textContent = message;
     }
 
