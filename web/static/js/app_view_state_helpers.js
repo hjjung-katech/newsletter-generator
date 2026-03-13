@@ -449,6 +449,100 @@
             `).join('');
     }
 
+    function buildPresetVisibilityBadge(label, toneClass) {
+        return `<span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneClass}">${label}</span>`;
+    }
+
+    function buildPresetSelectionSummaryHtml(preset = {}, { selectedPresetId = '' } = {}) {
+        const visibility = preset?.preset_visibility || {};
+        const latestExecution = preset?.latest_related_execution || {};
+        const executionVisibility = latestExecution?.execution_visibility || {};
+        const sourcePolicyVisibility = preset?.source_policy_visibility || {};
+        const isSelected = Boolean(preset?.id) && preset.id === selectedPresetId;
+
+        const badges = [];
+        if (isSelected) {
+            badges.push(buildPresetVisibilityBadge('선택됨', 'bg-blue-100 text-blue-800'));
+        }
+        if (preset?.is_default) {
+            badges.push(buildPresetVisibilityBadge('기본', 'bg-emerald-100 text-emerald-800'));
+        }
+        if (visibility?.preset_type_label) {
+            badges.push(buildPresetVisibilityBadge(visibility.preset_type_label, 'bg-slate-100 text-slate-700'));
+        }
+        if (visibility?.is_scheduled) {
+            badges.push(buildPresetVisibilityBadge('예약', 'bg-indigo-100 text-indigo-800'));
+        }
+
+        const executionHtml = latestExecution?.job_id
+            ? `
+                <p class="text-sm text-gray-600">
+                    최근 연관 실행:
+                    ${buildExecutionStatusBadge(executionVisibility.statusLabel || latestExecution.status || '상태 미상', executionVisibility.statusCategory || 'unknown')}
+                </p>
+                ${executionVisibility.statusMessage ? `<p class="mt-1 text-xs text-gray-500">${executionVisibility.statusMessage}</p>` : ''}
+                ${latestExecution.created_at ? `<p class="mt-1 text-xs text-gray-500">최근 연관 실행 시각: ${formatVisibilityTimestamp(latestExecution.created_at)}</p>` : ''}
+                ${latestExecution.title ? `<p class="mt-1 text-xs text-gray-500">최근 결과: ${latestExecution.title}</p>` : ''}
+            `
+            : `
+                <p class="text-sm text-gray-600">연관된 최근 실행 이력이 없습니다.</p>
+            `;
+
+        const sourcePolicyHtml = sourcePolicyVisibility?.message
+            ? `<p class="mt-2 text-xs text-gray-500">소스 정책: ${sourcePolicyVisibility.message}</p>`
+            : '';
+
+        const updatedAtHtml = preset?.updated_at
+            ? `<p class="mt-2 text-xs text-gray-500">프리셋 업데이트: ${formatVisibilityTimestamp(preset.updated_at)}</p>`
+            : '';
+
+        return `
+            <div class="mt-3 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700">
+                <div class="flex flex-wrap gap-2">
+                    ${badges.join('')}
+                </div>
+                <div class="mt-3 space-y-1">
+                    ${executionHtml}
+                    ${sourcePolicyHtml}
+                    ${updatedAtHtml}
+                </div>
+            </div>
+        `;
+    }
+
+    function resolvePresetSelectionView({ preset = null, selectedPresetId = '' } = {}) {
+        if (!preset) {
+            return {
+                statusMessage: '운영 토큰이 있으면 프리셋을 저장하고 불러올 수 있습니다.',
+                statusTone: 'gray',
+                detailsHtml: ''
+            };
+        }
+
+        const visibility = preset?.preset_visibility || {};
+        const latestExecution = preset?.latest_related_execution || {};
+        const executionVisibility = latestExecution?.execution_visibility || {};
+        const isSelected = Boolean(preset?.id) && preset.id === selectedPresetId;
+        const description = String(preset?.description || '').trim();
+        const baseMessage = description
+            ? `${preset.name}: ${description}`
+            : `${preset.name} 프리셋이 준비되었습니다.`;
+
+        let statusTone = isSelected ? 'green' : 'gray';
+        if (executionVisibility?.statusCategory === 'failed') {
+            statusTone = 'yellow';
+        }
+        if (visibility?.availability_state === 'empty') {
+            statusTone = 'yellow';
+        }
+
+        return {
+            statusMessage: baseMessage,
+            statusTone,
+            detailsHtml: buildPresetSelectionSummaryHtml(preset, { selectedPresetId })
+        };
+    }
+
     function buildSectionMessageHtml(message = '', tone = 'gray') {
         const toneClass = tone === 'red'
             ? 'text-red-600'
@@ -640,6 +734,7 @@
         buildAnalyticsSummaryCardsHtml,
         buildApprovalsListHtml,
         buildApprovalMetaHtml,
+        buildPresetSelectionSummaryHtml,
         buildSectionMessageHtml,
         buildHistoryListHtml,
         buildSchedulesListHtml,
@@ -650,6 +745,7 @@
         resolveHistorySectionState,
         resolveKeywordSuggestionView,
         resolveListSectionState,
+        resolvePresetSelectionView,
         resolveResultButtonState,
         resolveSchedulesSectionState,
         resolveSourcePoliciesSectionState,

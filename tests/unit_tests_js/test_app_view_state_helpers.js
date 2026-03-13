@@ -282,6 +282,74 @@ test('history and schedule helpers fall back to empty execution visibility for m
     assert.match(schedulesHtml, /아직 실행 이력이 없습니다/);
 });
 
+test('preset selection helper renders default, recent execution, and source policy visibility', () => {
+    const view = helpers.resolvePresetSelectionView({
+        selectedPresetId: 'preset-1',
+        preset: {
+            id: 'preset-1',
+            name: 'Domain Watch',
+            description: 'Monitor Reuters',
+            is_default: true,
+            updated_at: '2026-03-13T09:00:00Z',
+            preset_visibility: {
+                availability_state: 'available',
+                preset_type_label: '도메인 프리셋',
+                is_scheduled: false
+            },
+            latest_related_execution: {
+                job_id: 'job-1',
+                created_at: '2026-03-13T08:00:00Z',
+                title: 'Reuters digest',
+                execution_visibility: {
+                    status_category: 'completed',
+                    status_label: '완료',
+                    status_message: '최근 실행이 완료되었습니다.'
+                }
+            },
+            source_policy_visibility: {
+                link_state: 'matched',
+                message: '활성 소스 정책 1개와 연결됩니다. (allow 1 / block 0)'
+            }
+        }
+    });
+
+    assert.equal(view.statusTone, 'green');
+    assert.match(view.statusMessage, /Domain Watch: Monitor Reuters/);
+    assert.match(view.detailsHtml, /선택됨/);
+    assert.match(view.detailsHtml, /기본/);
+    assert.match(view.detailsHtml, /도메인 프리셋/);
+    assert.match(view.detailsHtml, /최근 연관 실행/);
+    assert.match(view.detailsHtml, /Reuters digest/);
+    assert.match(view.detailsHtml, /활성 소스 정책 1개와 연결됩니다/);
+});
+
+test('preset selection helper falls back when there is no related execution', () => {
+    const view = helpers.resolvePresetSelectionView({
+        selectedPresetId: '',
+        preset: {
+            id: 'preset-2',
+            name: 'Weekly AI',
+            description: '',
+            is_default: false,
+            preset_visibility: {
+                availability_state: 'available',
+                preset_type_label: '키워드 프리셋',
+                is_scheduled: true
+            },
+            source_policy_visibility: {
+                link_state: 'unavailable',
+                message: '키워드 프리셋이라 직접 연결된 소스 정책을 확인할 수 없습니다.'
+            }
+        }
+    });
+
+    assert.equal(view.statusTone, 'gray');
+    assert.match(view.statusMessage, /Weekly AI 프리셋이 준비되었습니다/);
+    assert.match(view.detailsHtml, /연관된 최근 실행 이력이 없습니다/);
+    assert.match(view.detailsHtml, /예약/);
+    assert.match(view.detailsHtml, /키워드 프리셋이라 직접 연결된 소스 정책을 확인할 수 없습니다/);
+});
+
 test('section state helpers preserve empty, error, and content decisions', () => {
     assert.match(
         helpers.resolveHistorySectionState({ history: [] }).html,
