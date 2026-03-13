@@ -12,17 +12,60 @@
             : `도메인: ${params?.domain || 'Unknown'}`;
     }
 
-    function buildHistoryStatusBadge(status) {
-        const toneClass = status === 'completed'
-            ? 'bg-green-100 text-green-800'
-            : status === 'failed'
-                ? 'bg-red-100 text-red-800'
-                : 'bg-yellow-100 text-yellow-800';
-
-        return `<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${toneClass}">${status}</span>`;
+    function resolveExecutionVisibility(source = {}) {
+        const visibility = source?.execution_visibility || source?.latest_execution || {};
+        const hasDerivedScheduleContext = !source?.execution_visibility
+            && !source?.latest_execution
+            && Boolean(source?.next_run);
+        const rawStatus = visibility.raw_status || source.status || 'unknown';
+        const statusCategory = visibility.status_category
+            || (hasDerivedScheduleContext
+                ? 'empty'
+                : null)
+            || (rawStatus === 'completed'
+                ? 'completed'
+                : rawStatus === 'failed'
+                    ? 'failed'
+                    : rawStatus === 'processing'
+                        ? 'running'
+                        : rawStatus === 'pending' || rawStatus === 'queued'
+                            ? 'queued'
+                            : 'unknown');
+        const statusLabel = visibility.status_label
+            || (hasDerivedScheduleContext ? '실행 이력 없음' : rawStatus);
+        return {
+            rawStatus,
+            statusCategory,
+            statusLabel,
+            statusMessage: visibility.status_message
+                || (hasDerivedScheduleContext ? '아직 실행 이력이 없습니다.' : ''),
+            primaryTimestamp: visibility.primary_timestamp || source.created_at || null,
+            approvalLabel: visibility.approval_label || '',
+            deliveryLabel: visibility.delivery_label || '',
+            resultTitle: visibility.result_title || source?.result?.title || ''
+        };
     }
 
-    function buildApprovalStatusBadge(status) {
+    function buildExecutionStatusBadge(label, statusCategory) {
+        const toneClass = statusCategory === 'completed'
+            ? 'bg-green-100 text-green-800'
+            : statusCategory === 'failed'
+                ? 'bg-red-100 text-red-800'
+                : statusCategory === 'running'
+                    ? 'bg-blue-100 text-blue-800'
+                    : statusCategory === 'empty'
+                        ? 'bg-slate-100 text-slate-700'
+                        : 'bg-yellow-100 text-yellow-800';
+
+        return `<span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${toneClass}">${label}</span>`;
+    }
+
+    function buildHistoryStatusBadge(item = {}) {
+        const visibility = resolveExecutionVisibility(item);
+        return buildExecutionStatusBadge(visibility.statusLabel, visibility.statusCategory);
+    }
+
+    function buildApprovalStatusBadge(status, label = '') {
         if (!status || status === 'not_requested') {
             return '';
         }
@@ -33,7 +76,50 @@
                 ? 'bg-blue-100 text-blue-800'
                 : 'bg-red-100 text-red-800';
 
-        return `<span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full ${toneClass}">${status}</span>`;
+        return `<span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full ${toneClass}">${label || status}</span>`;
+    }
+
+    function buildDeliveryStatusBadge(status, label = '') {
+        if (!status) {
+            return '';
+        }
+
+        const toneClass = status === 'sent'
+            ? 'bg-green-100 text-green-800'
+            : status === 'approved'
+                ? 'bg-blue-100 text-blue-800'
+                : status === 'pending_approval'
+                    ? 'bg-amber-100 text-amber-800'
+                    : status === 'send_failed'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-slate-100 text-slate-700';
+
+        return `<span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full ${toneClass}">${label || status}</span>`;
+    }
+
+    function formatVisibilityTimestamp(timestamp) {
+        if (!timestamp) {
+            return '';
+        }
+
+        return new Date(timestamp).toLocaleString();
+    }
+
+    function buildExecutionMetaHtml(source = {}, { includeResultTitle = true } = {}) {
+        const visibility = resolveExecutionVisibility(source);
+        const parts = [];
+
+        if (visibility.statusMessage) {
+            parts.push(`<p class="mt-2 text-sm text-gray-500">${visibility.statusMessage}</p>`);
+        }
+        if (visibility.primaryTimestamp) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">기준 시각: ${formatVisibilityTimestamp(visibility.primaryTimestamp)}</p>`);
+        }
+        if (includeResultTitle && visibility.resultTitle) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">결과: ${visibility.resultTitle}</p>`);
+        }
+
+        return parts.join('');
     }
 
     function buildHistoryActionsHtml(item = {}) {
@@ -67,8 +153,10 @@
                         <div>
                             <h4 class="text-sm font-medium text-gray-900">${formatParamsLabel(item.params || {})}</h4>
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
-                            ${buildHistoryStatusBadge(item.status)}
-                            ${buildApprovalStatusBadge(item.approval_status)}
+                            ${buildHistoryStatusBadge(item)}
+                            ${buildApprovalStatusBadge(item.approval_status, resolveExecutionVisibility(item).approvalLabel)}
+                            ${buildDeliveryStatusBadge(item.delivery_status, resolveExecutionVisibility(item).deliveryLabel)}
+                            ${buildExecutionMetaHtml(item)}
                         </div>
                         <div class="space-x-2">
                             ${buildHistoryActionsHtml(item)}
@@ -86,9 +174,11 @@
                             <h4 class="text-sm font-medium text-gray-900">${formatParamsLabel(item.params || {})}</h4>
                             <p class="text-sm text-gray-500">${new Date(item.created_at).toLocaleString()}</p>
                             <p class="text-sm text-gray-500">이메일: ${item.params?.email || '미지정'}</p>
-                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">${item.approval_status}</span>
-                            <span class="inline-flex ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">${item.delivery_status}</span>
+                            ${buildExecutionStatusBadge(resolveExecutionVisibility(item).statusLabel, resolveExecutionVisibility(item).statusCategory)}
+                            ${buildApprovalStatusBadge(item.approval_status, resolveExecutionVisibility(item).approvalLabel)}
+                            ${buildDeliveryStatusBadge(item.delivery_status, resolveExecutionVisibility(item).deliveryLabel)}
                             ${item.approval_note ? `<p class="mt-2 text-sm text-gray-500">메모: ${item.approval_note}</p>` : ''}
+                            ${buildExecutionMetaHtml(item, { includeResultTitle: false })}
                         </div>
                         <div class="space-x-2 whitespace-nowrap">
                             <button onclick="app.viewHistoryItem('${item.id}')"
@@ -270,6 +360,8 @@
                             <p class="text-sm text-gray-500">
                                 규칙: ${schedule.rrule}
                             </p>
+                            ${buildExecutionStatusBadge(resolveExecutionVisibility(schedule).statusLabel, resolveExecutionVisibility(schedule).statusCategory)}
+                            ${buildExecutionMetaHtml(schedule, { includeResultTitle: false })}
                         </div>
                         <div class="space-x-2">
                             <button onclick="app.runScheduleNow('${schedule.id}')"

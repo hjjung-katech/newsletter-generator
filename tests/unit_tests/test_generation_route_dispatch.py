@@ -72,6 +72,13 @@ def test_build_schedule_helpers_preserve_response_contracts() -> None:
         ),
         parse_params=json.loads,
         serialize_timestamp=lambda value: value,
+        latest_execution={
+            "event_type": "schedule.run_now.completed",
+            "job_id": "job-1",
+            "status": "completed",
+            "payload": {"result_status": "success"},
+            "created_at": "2026-03-12T02:00:00Z",
+        },
     )
 
     created_payload = generation_route_dispatch.build_schedule_created_response(
@@ -88,6 +95,15 @@ def test_build_schedule_helpers_preserve_response_contracts() -> None:
     assert schedule_entry["id"] == "schedule-1"
     assert schedule_entry["params"] == {"keywords": ["AI"]}
     assert schedule_entry["enabled"] is True
+    assert schedule_entry["latest_execution"] == {
+        "event_type": "schedule.run_now.completed",
+        "job_id": "job-1",
+        "status_category": "completed",
+        "status_label": "완료",
+        "status_message": "최근 예약 실행이 완료되었습니다.",
+        "primary_timestamp": "2026-03-12T02:00:00Z",
+        "result_status": "success",
+    }
     assert created_payload == {
         "status": "scheduled",
         "schedule_id": "schedule-1",
@@ -99,6 +115,31 @@ def test_build_schedule_helpers_preserve_response_contracts() -> None:
         "is_test": False,
         "require_approval": True,
         "expires_at": None,
+    }
+
+
+def test_build_schedule_execution_summary_handles_empty_and_failed_events() -> None:
+    empty = generation_route_dispatch.build_schedule_execution_summary(None)
+    failed = generation_route_dispatch.build_schedule_execution_summary(
+        {
+            "event_type": "schedule.run_now.failed",
+            "job_id": "job-2",
+            "status": "failed",
+            "payload": {"error": "queue unavailable"},
+            "created_at": "2026-03-12T03:00:00Z",
+        }
+    )
+
+    assert empty["status_category"] == "empty"
+    assert empty["status_label"] == "실행 이력 없음"
+    assert failed == {
+        "event_type": "schedule.run_now.failed",
+        "job_id": "job-2",
+        "status_category": "failed",
+        "status_label": "실패",
+        "status_message": "queue unavailable",
+        "primary_timestamp": "2026-03-12T03:00:00Z",
+        "result_status": None,
     }
 
 
@@ -401,9 +442,16 @@ def test_get_schedules_delegates_entry_shaping(
         *,
         parse_params: Any,
         serialize_timestamp: Any,
+        latest_execution: Any = None,
     ) -> dict[str, Any]:
         observed["schedule_entry_row"] = row
-        return {"id": row[0], "params": parse_params(row[1]), "enabled": bool(row[5])}
+        observed["schedule_latest_execution"] = latest_execution
+        return {
+            "id": row[0],
+            "params": parse_params(row[1]),
+            "enabled": bool(row[5]),
+            "latest_execution": latest_execution,
+        }
 
     monkeypatch.setattr(
         routes_generation, "build_schedule_entry", fake_build_schedule_entry
@@ -427,3 +475,4 @@ def test_get_schedules_delegates_entry_shaping(
     payload = response.get_json()
     assert payload is not None
     assert observed["schedule_entry_row"][0] == payload[0]["id"]
+    assert observed["schedule_latest_execution"] is None
