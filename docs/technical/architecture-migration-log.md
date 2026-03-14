@@ -56,3 +56,37 @@
 - `python3 scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir .local/artifacts/repo-audit --check-policy --strict`
 - `make check`
 - `python -m scripts.devtools.dev_entrypoint check --full`
+
+## 2026-03-14
+
+### Close-out state
+
+- docs truth alignment, repo hygiene hard gate, legacy burn-down, schedule/history visibility, approval visibility, preset visibility, source policy visibility, personalization visibility, settings provenance/diagnostics 까지를 현재 baseline으로 고정합니다.
+- 추가 구조 분해를 기본 전략으로 두지 않고, hotspot shell을 maintenance mode 대상으로 전환합니다.
+
+### Maintenance mode targets
+
+- `newsletter/llm_factory.py`
+- `newsletter/tools.py`
+- `newsletter/graph.py`
+- `web/routes_generation.py`
+- `web/static/js/app.js`
+
+### Reopen conditions
+
+1. user-facing bug fix 또는 incident 대응 중 동일 영역 수정이 직접 필요할 때
+2. 새로운 제품 요구가 해당 shell 변경을 직접 요구할 때
+3. 중복 로직이 재유입되어 maintenance cost가 다시 커질 때
+4. shell LOC 또는 complexity가 다시 유의미하게 증가할 때
+
+### Optional backlog
+
+- richer mismatch diagnostics
+- deeper provenance lineage
+- time-based settings/result drill-down
+
+### Current validation commands
+
+- `python3 scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir .local/artifacts/repo-audit --check-policy --strict`
+- `make check`
+- `make check-full`
