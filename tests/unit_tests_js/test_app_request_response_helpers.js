@@ -205,6 +205,14 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
             effective_state: 'overridden',
             status_label: '오버라이드된 설정 조합',
             status_message: '기본값 대비 오버라이드가 적용된 현재 설정 조합을 기준으로 결과를 해석할 수 있습니다.',
+            diagnostics: {
+                primary_reason_code: 'personalization_overridden_but_unlinked',
+                reason_codes: ['personalization_overridden_but_unlinked'],
+                summary: '개인화 override는 있지만 preset/source policy linkage가 연결되지 않아 override가 현재 결과에 그대로 반영됐는지 즉시 확인하기 어렵습니다.',
+                details: [
+                    '개인화 override는 있지만 preset/source policy linkage가 연결되지 않아 override가 현재 결과에 그대로 반영됐는지 즉시 확인하기 어렵습니다.'
+                ]
+            },
             preset_name: 'Morning Brief',
             preset_is_default: true,
             default_mode_label: '오버라이드 적용',
@@ -237,6 +245,7 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
     assert.match(html, /Processing Information/);
     assert.match(html, /Effective Settings Provenance/);
     assert.match(html, /오버라이드된 설정 조합/);
+    assert.match(html, /진단: 개인화 override는 있지만/);
     assert.match(html, /프리셋: Morning Brief \(기본\)/);
     assert.match(html, /Personalization Context/);
     assert.match(html, /오버라이드 적용/);

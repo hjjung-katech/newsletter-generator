@@ -485,6 +485,18 @@ test('effective settings provenance helper resolves summary and badge metadata',
             effective_state: 'default',
             status_label: '기본 설정 조합',
             status_message: '현재 결과는 기본 설정 조합을 기준으로 해석됩니다.',
+            diagnostics: {
+                primary_reason_code: 'personalization_default_only',
+                reason_codes: [
+                    'personalization_default_only',
+                    'no_recent_execution_reference'
+                ],
+                summary: '개인화 override가 없어 default-only 상태로 해석됩니다.',
+                details: [
+                    '개인화 override가 없어 default-only 상태로 해석됩니다.',
+                    '현재 설정 조합을 직접 비교할 최근 실행이 없습니다.'
+                ]
+            },
             default_mode_label: '기본값 유지',
             personalization_label: '기본 개인화',
             source_policy_label: '소스 정책 상태 미상',
@@ -500,6 +512,12 @@ test('effective settings provenance helper resolves summary and badge metadata',
             effective_state: 'default',
             status_label: '기본 설정 조합',
             status_message: '현재 결과는 기본 설정 조합을 기준으로 해석됩니다.',
+            diagnostics: {
+                primary_reason_code: 'personalization_default_only',
+                reason_codes: ['personalization_default_only'],
+                summary: '개인화 override가 없어 default-only 상태로 해석됩니다.',
+                details: ['개인화 override가 없어 default-only 상태로 해석됩니다.']
+            },
             summary_tokens: [
                 '개인화: 기본 개인화',
                 '기본값/오버라이드: 기본값 유지'
@@ -509,7 +527,10 @@ test('effective settings provenance helper resolves summary and badge metadata',
 
     assert.equal(visibility.effectiveState, 'default');
     assert.equal(visibility.statusLabel, '기본 설정 조합');
+    assert.equal(visibility.diagnosticPrimaryReasonCode, 'personalization_default_only');
+    assert.match(visibility.diagnosticSummary, /default-only/);
     assert.match(html, /기본 설정 조합/);
+    assert.match(html, /해석: 개인화 override가 없어 default-only 상태로 해석됩니다/);
     assert.match(html, /개인화: 기본 개인화/);
 });
 

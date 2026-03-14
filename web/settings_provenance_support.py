@@ -99,6 +99,124 @@ def _resolve_effective_state(
     return "unknown", "설정 provenance 미상"
 
 
+def _append_diagnostic(
+    reason_codes: list[str], details: list[str], code: str, detail: str
+) -> None:
+    if code not in reason_codes:
+        reason_codes.append(code)
+    if detail and detail not in details:
+        details.append(detail)
+
+
+def _build_provenance_diagnostics(
+    *,
+    effective_state: str,
+    preset_name: str,
+    personalization_state: str,
+    has_personalization_context: bool,
+    source_policy_state: str,
+    linkage_state: str,
+    linked_preset_count: int,
+    has_recent_execution: bool,
+    has_external_recent_execution: bool,
+) -> dict[str, Any]:
+    reason_codes: list[str] = []
+    details: list[str] = []
+
+    if effective_state == "empty":
+        _append_diagnostic(
+            reason_codes,
+            details,
+            "no_settings_context",
+            "preset, source policy, personalization 중 provenance를 재구성할 수 있는 정보가 없어 empty로 표시됩니다.",
+        )
+
+    if has_external_recent_execution and (
+        source_policy_state in {"none", "detached", "unknown", "unavailable"}
+        or linkage_state in {"detached", "unknown", "unavailable"}
+        or (linked_preset_count == 0 and not preset_name)
+    ):
+        _append_diagnostic(
+            reason_codes,
+            details,
+            "recent_execution_not_reflected_by_current_settings",
+            "최근 관련 실행은 있지만 현재 linkage가 달라 같은 설정 조합으로 바로 해석할 수 없습니다.",
+        )
+
+    if source_policy_state in {"detached", "none"} or linkage_state == "detached":
+        if linked_preset_count == 0:
+            _append_diagnostic(
+                reason_codes,
+                details,
+                "source_policy_detached_from_presets",
+                "현재 source policy와 직접 연결된 preset이 없어 detached로 표시됩니다.",
+            )
+        else:
+            _append_diagnostic(
+                reason_codes,
+                details,
+                "settings_linkage_partially_detached",
+                f"연결된 preset {linked_preset_count}개만 확인되어 linkage가 부분적으로 분리된 상태로 보입니다.",
+            )
+
+    if has_personalization_context:
+        if personalization_state == "overridden" and linkage_state != "linked":
+            _append_diagnostic(
+                reason_codes,
+                details,
+                "personalization_overridden_but_unlinked",
+                "개인화 override는 있지만 preset/source policy linkage가 연결되지 않아 override가 현재 결과에 그대로 반영됐는지 즉시 확인하기 어렵습니다.",
+            )
+        elif personalization_state == "default":
+            _append_diagnostic(
+                reason_codes,
+                details,
+                "personalization_default_only",
+                "개인화 override가 없어 default-only 상태로 해석됩니다.",
+            )
+        elif personalization_state == "empty":
+            _append_diagnostic(
+                reason_codes,
+                details,
+                "personalization_empty",
+                "표시 가능한 개인화 설정이 없어 personalization이 empty로 보입니다.",
+            )
+        elif personalization_state == "unknown":
+            _append_diagnostic(
+                reason_codes,
+                details,
+                "personalization_unknown",
+                "현재 payload만으로 개인화 적용 상태를 재구성할 수 없어 unknown으로 표시됩니다.",
+            )
+
+    if source_policy_state in {"unknown", "unavailable"}:
+        _append_diagnostic(
+            reason_codes,
+            details,
+            "source_policy_linkage_unresolved",
+            "현재 정보만으로 source policy linkage를 재구성할 수 없어 unknown 성격으로 보입니다.",
+        )
+
+    if not has_recent_execution and effective_state in {
+        "effective",
+        "overridden",
+        "default",
+    }:
+        _append_diagnostic(
+            reason_codes,
+            details,
+            "no_recent_execution_reference",
+            "현재 설정 조합을 직접 비교할 최근 실행이 없어 provenance를 실행 기준으로 교차검증할 수 없습니다.",
+        )
+
+    return {
+        "primary_reason_code": reason_codes[0] if reason_codes else None,
+        "reason_codes": reason_codes,
+        "summary": details[0] if details else "",
+        "details": details,
+    }
+
+
 def build_effective_settings_provenance(
     *,
     preset: Mapping[str, Any] | None = None,
@@ -146,6 +264,7 @@ def build_effective_settings_provenance(
         latest_execution_mapping.get("job_id")
         or execution_mapping.get("primary_timestamp")
     )
+    has_external_recent_execution = bool(latest_execution_mapping.get("job_id"))
     effective_state, status_label = _resolve_effective_state(
         preset_name=preset_name,
         default_mode_state=default_mode_state,
@@ -199,6 +318,20 @@ def build_effective_settings_provenance(
     if source_policy_message:
         status_message = f"{status_message} {source_policy_message}".strip()
 
+    diagnostics = _build_provenance_diagnostics(
+        effective_state=effective_state,
+        preset_name=preset_name,
+        personalization_state=str(
+            personalization_mapping.get("personalization_state") or "unknown"
+        ),
+        has_personalization_context=bool(personalization_mapping),
+        source_policy_state=source_policy_state,
+        linkage_state=linkage_state,
+        linked_preset_count=linked_preset_count,
+        has_recent_execution=has_recent_execution,
+        has_external_recent_execution=has_external_recent_execution,
+    )
+
     return {
         "effective_state": effective_state,
         "status_label": status_label,
@@ -235,4 +368,5 @@ def build_effective_settings_provenance(
         "recent_execution_timestamp": execution_mapping.get("primary_timestamp")
         or latest_execution_mapping.get("created_at"),
         "summary_tokens": summary_tokens,
+        "diagnostics": diagnostics,
     }
