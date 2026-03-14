@@ -185,6 +185,13 @@
         const summaryTokens = Array.isArray(provenance.summary_tokens)
             ? provenance.summary_tokens
             : [];
+        const diagnostics = provenance.diagnostics || {};
+        const diagnosticReasonCodes = Array.isArray(diagnostics.reason_codes)
+            ? diagnostics.reason_codes
+            : [];
+        const diagnosticDetails = Array.isArray(diagnostics.details)
+            ? diagnostics.details
+            : [];
 
         return {
             effectiveState: provenance.effective_state || 'unknown',
@@ -199,7 +206,11 @@
             recentExecutionLabel: provenance.recent_execution_label || '',
             recentExecutionMessage: provenance.recent_execution_message || '',
             recentExecutionTimestamp: provenance.recent_execution_timestamp || null,
-            summaryTokens
+            summaryTokens,
+            diagnosticPrimaryReasonCode: diagnostics.primary_reason_code || '',
+            diagnosticSummary: diagnostics.summary || '',
+            diagnosticReasonCodes,
+            diagnosticDetails
         };
     }
 
@@ -229,6 +240,12 @@
 
         if (provenance.statusMessage) {
             parts.push(`<p class="mt-1 text-sm text-gray-500">${provenance.statusMessage}</p>`);
+        }
+        if (provenance.diagnosticSummary) {
+            parts.push(`<p class="mt-1 text-xs text-amber-700">해석: ${provenance.diagnosticSummary}</p>`);
+        }
+        if (provenance.diagnosticDetails.length > 1) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">${provenance.diagnosticDetails.slice(1).join(' · ')}</p>`);
         }
         if (provenance.summaryTokens.length > 0) {
             parts.push(`<p class="mt-1 text-xs text-gray-500">${provenance.summaryTokens.join(' · ')}</p>`);

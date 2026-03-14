@@ -184,6 +184,20 @@ def test_build_sync_generation_response_preserves_contract() -> None:
                 "기본값/오버라이드: 기본값 유지",
                 "소스 정책: 소스 정책 상태 미상",
             ],
+            "diagnostics": {
+                "primary_reason_code": "personalization_default_only",
+                "reason_codes": [
+                    "personalization_default_only",
+                    "source_policy_linkage_unresolved",
+                    "no_recent_execution_reference",
+                ],
+                "summary": "개인화 override가 없어 default-only 상태로 해석됩니다.",
+                "details": [
+                    "개인화 override가 없어 default-only 상태로 해석됩니다.",
+                    "현재 정보만으로 source policy linkage를 재구성할 수 없어 unknown 성격으로 보입니다.",
+                    "현재 설정 조합을 직접 비교할 최근 실행이 없어 provenance를 실행 기준으로 교차검증할 수 없습니다.",
+                ],
+            },
         },
         "processing_info": {
             "using_real_cli": True,
@@ -232,6 +246,12 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
         status_response["effective_settings_provenance"]["has_recent_execution"] is True
     )
     assert (
+        status_response["effective_settings_provenance"]["diagnostics"][
+            "primary_reason_code"
+        ]
+        == "personalization_default_only"
+    )
+    assert (
         status_response["execution_visibility"]["primary_timestamp"]
         == "2026-03-12T00:00:00Z"
     )
@@ -268,6 +288,12 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     )
     assert (
         history_entry["effective_settings_provenance"]["recent_execution_label"] == "완료"
+    )
+    assert (
+        history_entry["effective_settings_provenance"]["diagnostics"][
+            "primary_reason_code"
+        ]
+        == "personalization_default_only"
     )
 
 
