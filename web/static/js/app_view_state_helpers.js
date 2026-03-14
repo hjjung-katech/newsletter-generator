@@ -192,6 +192,22 @@
         const diagnosticDetails = Array.isArray(diagnostics.details)
             ? diagnostics.details
             : [];
+        const diagnosticFieldExplanations = Array.isArray(diagnostics.field_explanations)
+            ? diagnostics.field_explanations
+                .filter((item) => item && typeof item === 'object')
+                .map((item) => ({
+                    axis: item.axis || '',
+                    axisLabel: item.axis_label || '',
+                    field: item.field || '',
+                    fieldLabel: item.field_label || '',
+                    expectedValue: item.expected_value,
+                    currentValue: item.current_value,
+                    expectedLabel: item.expected_label || '',
+                    currentLabel: item.current_label || '',
+                    summary: item.summary || '',
+                    detail: item.detail || ''
+                }))
+            : [];
 
         return {
             effectiveState: provenance.effective_state || 'unknown',
@@ -210,7 +226,9 @@
             diagnosticPrimaryReasonCode: diagnostics.primary_reason_code || '',
             diagnosticSummary: diagnostics.summary || '',
             diagnosticReasonCodes,
-            diagnosticDetails
+            diagnosticDetails,
+            diagnosticFieldSummary: diagnostics.field_summary || '',
+            diagnosticFieldExplanations
         };
     }
 
@@ -243,6 +261,19 @@
         }
         if (provenance.diagnosticSummary) {
             parts.push(`<p class="mt-1 text-xs text-amber-700">해석: ${provenance.diagnosticSummary}</p>`);
+        }
+        if (provenance.diagnosticFieldSummary) {
+            parts.push(`<p class="mt-1 text-xs text-sky-700">차이 축: ${provenance.diagnosticFieldSummary}</p>`);
+        }
+        if (provenance.diagnosticFieldExplanations.length > 0) {
+            const detailText = provenance.diagnosticFieldExplanations
+                .map((item) => item.detail || item.summary)
+                .filter(Boolean)
+                .slice(0, 2)
+                .join(' · ');
+            if (detailText) {
+                parts.push(`<p class="mt-1 text-xs text-gray-500">세부: ${detailText}</p>`);
+            }
         }
         if (provenance.diagnosticDetails.length > 1) {
             parts.push(`<p class="mt-1 text-xs text-gray-500">${provenance.diagnosticDetails.slice(1).join(' · ')}</p>`);

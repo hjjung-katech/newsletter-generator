@@ -141,6 +141,12 @@ def test_preset_routes_create_and_list(tmp_path: Path) -> None:
             ]
             == "personalization_overridden_but_unlinked"
         )
+        assert (
+            created["effective_settings_provenance"]["diagnostics"][
+                "field_explanations"
+            ][0]["field"]
+            == "source_policy_link_state"
+        )
         assert created["personalization_visibility"]["override_labels"] == [
             "이메일 호환 모드",
             "기간",
@@ -335,3 +341,4 @@ def test_list_route_adds_recent_execution_and_source_policy_visibility(
         preset["effective_settings_provenance"]["diagnostics"]["primary_reason_code"]
         is None
     )
+    assert preset["effective_settings_provenance"]["diagnostics"]["field_summary"] == ""

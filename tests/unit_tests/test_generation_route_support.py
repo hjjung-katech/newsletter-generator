@@ -197,6 +197,45 @@ def test_build_sync_generation_response_preserves_contract() -> None:
                     "현재 정보만으로 source policy linkage를 재구성할 수 없어 unknown 성격으로 보입니다.",
                     "현재 설정 조합을 직접 비교할 최근 실행이 없어 provenance를 실행 기준으로 교차검증할 수 없습니다.",
                 ],
+                "field_summary": "개인화 축에서 override가 없어 default-only로 보입니다. · 소스 정책 축에서 linkage를 확정할 수 없습니다.",
+                "field_explanations": [
+                    {
+                        "axis": "personalization",
+                        "axis_label": "개인화",
+                        "field": "override_count",
+                        "field_label": "개인화 오버라이드 수",
+                        "expected_value": ">=1",
+                        "current_value": 0,
+                        "expected_label": "오버라이드 1개 이상",
+                        "current_label": "오버라이드 0개",
+                        "summary": "개인화 축에서 override가 없어 default-only로 보입니다.",
+                        "detail": "개인화 override 수가 0개라 기본값만 유지되는 상태로 해석됩니다.",
+                    },
+                    {
+                        "axis": "source_policy",
+                        "axis_label": "소스 정책",
+                        "field": "source_policy_state",
+                        "field_label": "소스 정책 연결 상태",
+                        "expected_value": "resolved",
+                        "current_value": "unknown",
+                        "expected_label": "재구성 가능한 linkage",
+                        "current_label": "소스 정책 상태 미상",
+                        "summary": "소스 정책 축에서 linkage를 확정할 수 없습니다.",
+                        "detail": "현재 payload만으로 source policy linkage를 resolved 상태로 재구성할 수 없어 unknown 성격으로 표시됩니다.",
+                    },
+                    {
+                        "axis": "recent_execution",
+                        "axis_label": "최근 실행",
+                        "field": "recent_execution_reference",
+                        "field_label": "최근 실행 참조",
+                        "expected_value": "present",
+                        "current_value": "missing",
+                        "expected_label": "최근 실행 참조 있음",
+                        "current_label": "최근 실행 참조 없음",
+                        "summary": "최근 실행 축에서 현재 설정과 비교할 참조가 없습니다.",
+                        "detail": "현재 설정 조합을 직접 비교할 최근 실행 reference가 없어 실행 기준 교차검증이 비어 있습니다.",
+                    },
+                ],
             },
         },
         "processing_info": {
@@ -252,6 +291,12 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
         == "personalization_default_only"
     )
     assert (
+        status_response["effective_settings_provenance"]["diagnostics"][
+            "field_explanations"
+        ][0]["axis"]
+        == "personalization"
+    )
+    assert (
         status_response["execution_visibility"]["primary_timestamp"]
         == "2026-03-12T00:00:00Z"
     )
@@ -294,6 +339,10 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
             "primary_reason_code"
         ]
         == "personalization_default_only"
+    )
+    assert (
+        history_entry["effective_settings_provenance"]["diagnostics"]["field_summary"]
+        != ""
     )
 
 
