@@ -19,6 +19,13 @@ except ImportError:
         build_execution_visibility,
     )
 
+try:
+    from settings_provenance_support import build_effective_settings_provenance
+except ImportError:
+    from web.settings_provenance_support import (  # pragma: no cover
+        build_effective_settings_provenance,
+    )
+
 
 def _parse_json_mapping(raw_value: str | None) -> dict[str, Any]:
     if not raw_value:
@@ -289,6 +296,11 @@ def enrich_source_policy_entry(
     enriched["source_policy_visibility"] = build_source_policy_visibility(
         policy,
         linked_presets=linked_presets,
+        latest_related_execution=latest_related_execution,
+    )
+    enriched["effective_settings_provenance"] = build_effective_settings_provenance(
+        source_policy_visibility=enriched["source_policy_visibility"],
+        preset_linkage_visibility=enriched["preset_linkage_visibility"],
         latest_related_execution=latest_related_execution,
     )
     return enriched

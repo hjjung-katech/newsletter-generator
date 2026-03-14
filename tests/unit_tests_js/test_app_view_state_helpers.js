@@ -276,6 +276,19 @@ test('source policy helpers summarize linkage, recent execution, and render badg
                 linked_preset_names: ['Alpha Watch'],
                 recent_usage_state: 'recent',
                 policy_type_label: 'Allow 정책'
+            },
+            effective_settings_provenance: {
+                effective_state: 'effective',
+                status_label: '현재 설정 조합 확인됨',
+                status_message: '현재 결과를 만든 설정 조합이 확인되었습니다.',
+                summary_tokens: [
+                    '프리셋 연결: 1개',
+                    '개인화: 개인화 상태 미상',
+                    '기본값/오버라이드: 기본값 여부 미상',
+                    '소스 정책: 최근 반영',
+                    '최근 실행: 완료'
+                ],
+                recent_execution_timestamp: '2026-03-12T06:00:00Z'
             }
         }
     ];
@@ -289,6 +302,7 @@ test('source policy helpers summarize linkage, recent execution, and render badg
     assert.match(html, /Alpha Watch/);
     assert.match(html, /최근 실행/);
     assert.match(html, /Alpha Brief/);
+    assert.match(html, /현재 설정 조합 확인됨/);
     assert.match(html, /app\.toggleSourcePolicyActive\('policy-block', true\)/);
 });
 
@@ -371,6 +385,21 @@ test('preset selection helper renders default, recent execution, and source poli
                 override_count: 2,
                 override_labels: ['템플릿 스타일', '기간'],
                 source_policy_message: '활성 소스 정책 1개와 연결됩니다. (allow 1 / block 0)'
+            },
+            effective_settings_provenance: {
+                effective_state: 'overridden',
+                status_label: '오버라이드된 설정 조합',
+                status_message: '기본값 대비 오버라이드가 적용된 현재 설정 조합을 기준으로 결과를 해석할 수 있습니다.',
+                preset_name: 'Domain Watch',
+                preset_is_default: true,
+                summary_tokens: [
+                    '프리셋: Domain Watch (기본)',
+                    '개인화: 오버라이드 적용',
+                    '기본값/오버라이드: 오버라이드 적용',
+                    '소스 정책: 활성 소스 정책 1개와 연결됩니다. (allow 1 / block 0)',
+                    '최근 실행: 완료'
+                ],
+                recent_execution_timestamp: '2026-03-13T08:00:00Z'
             }
         }
     });
@@ -380,6 +409,7 @@ test('preset selection helper renders default, recent execution, and source poli
     assert.match(view.detailsHtml, /선택됨/);
     assert.match(view.detailsHtml, /기본/);
     assert.match(view.detailsHtml, /도메인 프리셋/);
+    assert.match(view.detailsHtml, /오버라이드된 설정 조합/);
     assert.match(view.detailsHtml, /오버라이드 적용/);
     assert.match(view.detailsHtml, /개인화: 템플릿 modern · 7일 · 이메일 호환 모드/);
     assert.match(view.detailsHtml, /오버라이드: 템플릿 스타일, 기간/);
@@ -447,6 +477,40 @@ test('personalization helper resolves default and overridden summaries', () => {
     assert.match(overriddenHtml, /개인화: 템플릿 modern · 7일 · 이메일 호환 모드 · 아카이브 1개/);
     assert.match(overriddenHtml, /오버라이드: 템플릿 스타일, 기간, 아카이브 컨텍스트/);
     assert.match(overriddenHtml, /활성 소스 정책 1개와 연결됩니다/);
+});
+
+test('effective settings provenance helper resolves summary and badge metadata', () => {
+    const visibility = helpers.resolveEffectiveSettingsProvenance({
+        effective_settings_provenance: {
+            effective_state: 'default',
+            status_label: '기본 설정 조합',
+            status_message: '현재 결과는 기본 설정 조합을 기준으로 해석됩니다.',
+            default_mode_label: '기본값 유지',
+            personalization_label: '기본 개인화',
+            source_policy_label: '소스 정책 상태 미상',
+            summary_tokens: [
+                '개인화: 기본 개인화',
+                '기본값/오버라이드: 기본값 유지',
+                '소스 정책: 소스 정책 상태 미상'
+            ]
+        }
+    });
+    const html = helpers.buildEffectiveSettingsProvenanceMetaHtml({
+        effective_settings_provenance: {
+            effective_state: 'default',
+            status_label: '기본 설정 조합',
+            status_message: '현재 결과는 기본 설정 조합을 기준으로 해석됩니다.',
+            summary_tokens: [
+                '개인화: 기본 개인화',
+                '기본값/오버라이드: 기본값 유지'
+            ]
+        }
+    });
+
+    assert.equal(visibility.effectiveState, 'default');
+    assert.equal(visibility.statusLabel, '기본 설정 조합');
+    assert.match(html, /기본 설정 조합/);
+    assert.match(html, /개인화: 기본 개인화/);
 });
 
 test('section state helpers preserve empty, error, and content decisions', () => {

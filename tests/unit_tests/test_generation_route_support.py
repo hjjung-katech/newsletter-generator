@@ -155,6 +155,36 @@ def test_build_sync_generation_response_preserves_contract() -> None:
             "recent_usage_label": "연관 실행 없음",
             "recent_usage_timestamp": None,
         },
+        "effective_settings_provenance": {
+            "effective_state": "default",
+            "status_label": "기본 설정 조합",
+            "status_message": "현재 결과는 기본 설정 조합을 기준으로 해석됩니다.",
+            "preset_name": None,
+            "preset_state": "unavailable",
+            "preset_type_label": None,
+            "preset_is_default": False,
+            "source_policy_state": "unknown",
+            "source_policy_label": "소스 정책 상태 미상",
+            "source_policy_message": "",
+            "personalization_state": "default",
+            "personalization_label": "기본 개인화",
+            "default_mode_state": "default",
+            "default_mode_label": "기본값 유지",
+            "linkage_state": "unknown",
+            "linkage_label": "연결 상태 미상",
+            "linked_preset_count": 0,
+            "linked_default_preset_count": 0,
+            "has_recent_execution": False,
+            "recent_execution_state": "empty",
+            "recent_execution_label": "연관 실행 없음",
+            "recent_execution_message": "",
+            "recent_execution_timestamp": None,
+            "summary_tokens": [
+                "개인화: 기본 개인화",
+                "기본값/오버라이드: 기본값 유지",
+                "소스 정책: 소스 정책 상태 미상",
+            ],
+        },
         "processing_info": {
             "using_real_cli": True,
             "template_style": "compact",
@@ -195,6 +225,13 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
         == "default"
     )
     assert (
+        status_response["effective_settings_provenance"]["effective_state"]
+        == "effective"
+    )
+    assert (
+        status_response["effective_settings_provenance"]["has_recent_execution"] is True
+    )
+    assert (
         status_response["execution_visibility"]["primary_timestamp"]
         == "2026-03-12T00:00:00Z"
     )
@@ -225,6 +262,12 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     assert (
         history_entry["personalization_visibility"]["personalization_state"]
         == "default"
+    )
+    assert (
+        history_entry["effective_settings_provenance"]["effective_state"] == "effective"
+    )
+    assert (
+        history_entry["effective_settings_provenance"]["recent_execution_label"] == "완료"
     )
 
 

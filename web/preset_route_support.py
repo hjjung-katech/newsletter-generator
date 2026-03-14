@@ -26,6 +26,13 @@ except ImportError:
         build_personalization_visibility,
     )
 
+try:
+    from settings_provenance_support import build_effective_settings_provenance
+except ImportError:
+    from web.settings_provenance_support import (  # pragma: no cover
+        build_effective_settings_provenance,
+    )
+
 
 def _parse_json_mapping(raw_value: str | None) -> dict[str, Any]:
     if not raw_value:
@@ -312,6 +319,13 @@ def build_preset_entry(
     preset_copy["personalization_visibility"] = build_personalization_visibility(
         preset_copy.get("params"),
         source_policy_visibility=source_policy_visibility,
+        latest_related_execution=latest_related_execution,
+    )
+    preset_copy["effective_settings_provenance"] = build_effective_settings_provenance(
+        preset=preset_copy,
+        preset_visibility=preset_copy["preset_visibility"],
+        source_policy_visibility=source_policy_visibility,
+        personalization_visibility=preset_copy["personalization_visibility"],
         latest_related_execution=latest_related_execution,
     )
     return preset_copy

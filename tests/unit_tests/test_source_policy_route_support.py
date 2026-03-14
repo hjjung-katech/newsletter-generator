@@ -93,6 +93,8 @@ def test_enrich_source_policy_entry_marks_active_policy_as_detached_without_link
     assert enriched["source_policy_visibility"]["visibility_state"] == "detached"
     assert enriched["source_policy_visibility"]["status_label"] == "연결 없음"
     assert enriched["source_policy_visibility"]["recent_usage_state"] == "empty"
+    assert enriched["effective_settings_provenance"]["effective_state"] == "detached"
+    assert enriched["effective_settings_provenance"]["linkage_state"] == "detached"
 
 
 def test_enrich_source_policy_entry_adds_preset_and_execution_visibility(
@@ -157,3 +159,6 @@ def test_enrich_source_policy_entry_adds_preset_and_execution_visibility(
     assert enriched["source_policy_visibility"]["linked_preset_count"] == 1
     assert enriched["source_policy_visibility"]["linked_default_preset_count"] == 1
     assert enriched["source_policy_visibility"]["recent_usage_state"] == "recent"
+    assert enriched["effective_settings_provenance"]["effective_state"] == "effective"
+    assert enriched["effective_settings_provenance"]["linked_preset_count"] == 1
+    assert enriched["effective_settings_provenance"]["has_recent_execution"] is True

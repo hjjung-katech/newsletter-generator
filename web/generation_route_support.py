@@ -20,6 +20,13 @@ except ImportError:
         build_personalization_visibility,
     )
 
+try:
+    from settings_provenance_support import build_effective_settings_provenance
+except ImportError:
+    from web.settings_provenance_support import (  # pragma: no cover
+        build_effective_settings_provenance,
+    )
+
 
 @dataclass(frozen=True)
 class GenerateRequestContext:
@@ -59,6 +66,17 @@ class ScheduleCreateOptions:
     params: dict[str, Any]
     is_test: bool
     expires_at: str | None
+
+
+def _build_source_policy_visibility_from_params(
+    personalization_visibility: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "link_state": personalization_visibility.get("source_policy_link_state"),
+        "status_label": personalization_visibility.get("source_policy_message")
+        or "소스 정책 상태 미상",
+        "message": personalization_visibility.get("source_policy_message") or "",
+    }
 
 
 _STATUS_CATEGORY_MAP = {
@@ -397,6 +415,9 @@ def build_sync_generation_response(
     personalization_params.setdefault("template_style", template_style)
     personalization_params.setdefault("email_compatible", email_compatible)
     personalization_params.setdefault("period", period)
+    personalization_visibility = build_personalization_visibility(
+        personalization_params
+    )
     return {
         "status": result.get("status", "error"),
         "html_content": html_content,
@@ -408,8 +429,12 @@ def build_sync_generation_response(
         "email_sent": email_sent,
         "subject": title,
         "html_size": len(html_content),
-        "personalization_visibility": build_personalization_visibility(
-            personalization_params
+        "personalization_visibility": personalization_visibility,
+        "effective_settings_provenance": build_effective_settings_provenance(
+            personalization_visibility=personalization_visibility,
+            source_policy_visibility=_build_source_policy_visibility_from_params(
+                personalization_visibility
+            ),
         ),
         "processing_info": {
             "using_real_cli": using_real_cli,
@@ -441,7 +466,7 @@ def build_status_response_from_task(
 
     if "error" in task:
         response["error"] = task["error"]
-    response["execution_visibility"] = build_execution_visibility(
+    execution_visibility = build_execution_visibility(
         status=task.get("status"),
         started_at=task.get("started_at"),
         updated_at=task.get("updated_at"),
@@ -450,6 +475,7 @@ def build_status_response_from_task(
         result=result,
         error_message=task.get("error"),
     )
+    response["execution_visibility"] = execution_visibility
     response["approval_visibility"] = build_approval_visibility(
         status=task.get("status"),
         approval_status=response.get("approval_status"),
@@ -465,8 +491,16 @@ def build_status_response_from_task(
         and isinstance(result.get("input_params"), Mapping)
         else {}
     )
-    response["personalization_visibility"] = build_personalization_visibility(
+    personalization_visibility = build_personalization_visibility(
         personalization_params
+    )
+    response["personalization_visibility"] = personalization_visibility
+    response["effective_settings_provenance"] = build_effective_settings_provenance(
+        personalization_visibility=personalization_visibility,
+        source_policy_visibility=_build_source_policy_visibility_from_params(
+            personalization_visibility
+        ),
+        execution_visibility=execution_visibility,
     )
     return response
 
@@ -515,7 +549,7 @@ def build_status_response_from_row(
     elif result_data is not None:
         response["result"] = result_data
 
-    response["execution_visibility"] = build_execution_visibility(
+    execution_visibility = build_execution_visibility(
         status=status,
         created_at=created_at,
         approved_at=approved_at,
@@ -524,6 +558,7 @@ def build_status_response_from_row(
         delivery_status=response.get("delivery_status"),
         result=result_data,
     )
+    response["execution_visibility"] = execution_visibility
     response["approval_visibility"] = build_approval_visibility(
         status=status,
         created_at=created_at,
@@ -539,8 +574,16 @@ def build_status_response_from_row(
         and isinstance(result_data.get("input_params"), Mapping)
         else response["params"]
     )
-    response["personalization_visibility"] = build_personalization_visibility(
+    personalization_visibility = build_personalization_visibility(
         personalization_params
+    )
+    response["personalization_visibility"] = personalization_visibility
+    response["effective_settings_provenance"] = build_effective_settings_provenance(
+        personalization_visibility=personalization_visibility,
+        source_policy_visibility=_build_source_policy_visibility_from_params(
+            personalization_visibility
+        ),
+        execution_visibility=execution_visibility,
     )
     return response
 
@@ -571,6 +614,27 @@ def build_history_entry(
         and isinstance(result_data.get("input_params"), Mapping)
         else parse_params(params)
     )
+    execution_visibility = build_execution_visibility(
+        status=status,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+        approval_status=approval_status,
+        delivery_status=delivery_status,
+        result=result_data,
+    )
+    approval_visibility = build_approval_visibility(
+        status=status,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+        approval_status=approval_status,
+        delivery_status=delivery_status,
+        result=result_data,
+    )
+    personalization_visibility = build_personalization_visibility(
+        personalization_params
+    )
     return {
         "id": job_id,
         "params": parse_params(params),
@@ -583,26 +647,15 @@ def build_history_entry(
         "approved_at": approved_at,
         "rejected_at": rejected_at,
         "approval_note": approval_note,
-        "execution_visibility": build_execution_visibility(
-            status=status,
-            created_at=created_at,
-            approved_at=approved_at,
-            rejected_at=rejected_at,
-            approval_status=approval_status,
-            delivery_status=delivery_status,
-            result=result_data,
-        ),
-        "approval_visibility": build_approval_visibility(
-            status=status,
-            created_at=created_at,
-            approved_at=approved_at,
-            rejected_at=rejected_at,
-            approval_status=approval_status,
-            delivery_status=delivery_status,
-            result=result_data,
-        ),
-        "personalization_visibility": build_personalization_visibility(
-            personalization_params
+        "execution_visibility": execution_visibility,
+        "approval_visibility": approval_visibility,
+        "personalization_visibility": personalization_visibility,
+        "effective_settings_provenance": build_effective_settings_provenance(
+            personalization_visibility=personalization_visibility,
+            source_policy_visibility=_build_source_policy_visibility_from_params(
+                personalization_visibility
+            ),
+            execution_visibility=execution_visibility,
         ),
     }
 
@@ -632,6 +685,27 @@ def build_approval_entry(
         and isinstance(result_data.get("input_params"), Mapping)
         else parse_params(params)
     )
+    execution_visibility = build_execution_visibility(
+        status=status,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+        approval_status=approval_status,
+        delivery_status=delivery_status,
+        result=result_data,
+    )
+    approval_visibility = build_approval_visibility(
+        status=status,
+        created_at=created_at,
+        approved_at=approved_at,
+        rejected_at=rejected_at,
+        approval_status=approval_status,
+        delivery_status=delivery_status,
+        result=result_data,
+    )
+    personalization_visibility = build_personalization_visibility(
+        personalization_params
+    )
     return {
         "id": job_id,
         "params": parse_params(params),
@@ -643,26 +717,15 @@ def build_approval_entry(
         "approved_at": approved_at,
         "rejected_at": rejected_at,
         "approval_note": approval_note,
-        "execution_visibility": build_execution_visibility(
-            status=status,
-            created_at=created_at,
-            approved_at=approved_at,
-            rejected_at=rejected_at,
-            approval_status=approval_status,
-            delivery_status=delivery_status,
-            result=result_data,
-        ),
-        "approval_visibility": build_approval_visibility(
-            status=status,
-            created_at=created_at,
-            approved_at=approved_at,
-            rejected_at=rejected_at,
-            approval_status=approval_status,
-            delivery_status=delivery_status,
-            result=result_data,
-        ),
-        "personalization_visibility": build_personalization_visibility(
-            personalization_params
+        "execution_visibility": execution_visibility,
+        "approval_visibility": approval_visibility,
+        "personalization_visibility": personalization_visibility,
+        "effective_settings_provenance": build_effective_settings_provenance(
+            personalization_visibility=personalization_visibility,
+            source_policy_visibility=_build_source_policy_visibility_from_params(
+                personalization_visibility
+            ),
+            execution_visibility=execution_visibility,
         ),
     }
 
