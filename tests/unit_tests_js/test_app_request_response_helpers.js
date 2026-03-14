@@ -136,6 +136,10 @@ test('normalizeGenerationResultEnvelope merges top-level metadata without mutati
             personalization_state: 'default',
             status_label: '기본 개인화'
         },
+        effective_settings_provenance: {
+            effective_state: 'default',
+            status_label: '기본 설정 조합'
+        },
         result: {
             html_content: '<html>ok</html>',
             status: 'success'
@@ -154,6 +158,10 @@ test('normalizeGenerationResultEnvelope merges top-level metadata without mutati
         personalization_visibility: {
             personalization_state: 'default',
             status_label: '기본 개인화'
+        },
+        effective_settings_provenance: {
+            effective_state: 'default',
+            status_label: '기본 설정 조합'
         }
     });
 });
@@ -193,6 +201,23 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
             archive_reference_count: 1,
             source_policy_message: '활성 소스 정책 1개와 연결됩니다.'
         },
+        effective_settings_provenance: {
+            effective_state: 'overridden',
+            status_label: '오버라이드된 설정 조합',
+            status_message: '기본값 대비 오버라이드가 적용된 현재 설정 조합을 기준으로 결과를 해석할 수 있습니다.',
+            preset_name: 'Morning Brief',
+            preset_is_default: true,
+            default_mode_label: '오버라이드 적용',
+            personalization_label: '오버라이드 적용',
+            source_policy_label: '활성 정책 연결',
+            summary_tokens: [
+                '프리셋: Morning Brief (기본)',
+                '개인화: 오버라이드 적용',
+                '기본값/오버라이드: 오버라이드 적용',
+                '소스 정책: 활성 정책 연결'
+            ],
+            recent_execution_timestamp: '2026-03-12T00:00:00Z'
+        },
         input_params: {
             keywords: 'AI, Robotics',
             domain: 'Mobility'
@@ -210,6 +235,9 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
     assert.match(html, /Generation Statistics/);
     assert.match(html, /Generated Keywords/);
     assert.match(html, /Processing Information/);
+    assert.match(html, /Effective Settings Provenance/);
+    assert.match(html, /오버라이드된 설정 조합/);
+    assert.match(html, /프리셋: Morning Brief \(기본\)/);
     assert.match(html, /Personalization Context/);
     assert.match(html, /오버라이드 적용/);
     assert.match(html, /Overrides: 이메일 호환 모드, 아카이브 컨텍스트/);

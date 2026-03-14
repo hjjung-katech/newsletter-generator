@@ -180,6 +180,66 @@
         };
     }
 
+    function resolveEffectiveSettingsProvenance(source = {}) {
+        const provenance = source?.effective_settings_provenance || {};
+        const summaryTokens = Array.isArray(provenance.summary_tokens)
+            ? provenance.summary_tokens
+            : [];
+
+        return {
+            effectiveState: provenance.effective_state || 'unknown',
+            statusLabel: provenance.status_label || '설정 provenance 미상',
+            statusMessage: provenance.status_message || '',
+            presetName: provenance.preset_name || '',
+            presetIsDefault: Boolean(provenance.preset_is_default),
+            personalizationLabel: provenance.personalization_label || '',
+            sourcePolicyLabel: provenance.source_policy_label || '',
+            defaultModeLabel: provenance.default_mode_label || '',
+            linkageLabel: provenance.linkage_label || '',
+            recentExecutionLabel: provenance.recent_execution_label || '',
+            recentExecutionMessage: provenance.recent_execution_message || '',
+            recentExecutionTimestamp: provenance.recent_execution_timestamp || null,
+            summaryTokens
+        };
+    }
+
+    function buildEffectiveSettingsProvenanceBadge(source = {}) {
+        const provenance = resolveEffectiveSettingsProvenance(source);
+        const toneClass = provenance.effectiveState === 'overridden'
+            ? 'bg-blue-100 text-blue-800'
+            : provenance.effectiveState === 'default'
+                ? 'bg-slate-100 text-slate-700'
+                : provenance.effectiveState === 'detached'
+                    ? 'bg-amber-100 text-amber-800'
+                    : provenance.effectiveState === 'effective'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-700';
+        return `<span class="inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneClass}">${provenance.statusLabel}</span>`;
+    }
+
+    function buildEffectiveSettingsProvenanceMetaHtml(source = {}, { compact = false } = {}) {
+        const provenance = resolveEffectiveSettingsProvenance(source);
+        if (!provenance.statusMessage && provenance.summaryTokens.length === 0) {
+            return '';
+        }
+
+        const parts = [
+            `<div class="${compact ? 'mt-1' : 'mt-2'} flex flex-wrap gap-2">${buildEffectiveSettingsProvenanceBadge(source)}</div>`
+        ];
+
+        if (provenance.statusMessage) {
+            parts.push(`<p class="mt-1 text-sm text-gray-500">${provenance.statusMessage}</p>`);
+        }
+        if (provenance.summaryTokens.length > 0) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">${provenance.summaryTokens.join(' · ')}</p>`);
+        }
+        if (provenance.recentExecutionTimestamp) {
+            parts.push(`<p class="mt-1 text-xs text-gray-500">최근 관련 실행: ${formatVisibilityTimestamp(provenance.recentExecutionTimestamp)}</p>`);
+        }
+
+        return parts.join('');
+    }
+
     function buildPersonalizationVisibilityBadge(source = {}) {
         const visibility = resolvePersonalizationVisibility(source);
         const toneClass = visibility.personalizationState === 'overridden'
@@ -301,6 +361,7 @@
                             ${buildDeliveryStatusBadge(item.delivery_status, resolveExecutionVisibility(item).deliveryLabel)}
                             ${buildExecutionMetaHtml(item)}
                             ${buildPersonalizationMetaHtml(item, { compact: true })}
+                            ${buildEffectiveSettingsProvenanceMetaHtml(item, { compact: true })}
                         </div>
                         <div class="space-x-2">
                             ${buildHistoryActionsHtml(item)}
@@ -325,6 +386,7 @@
                             ${buildApprovalMetaHtml(item)}
                             ${buildExecutionMetaHtml(item, { includeResultTitle: false, includeTimestamp: false })}
                             ${buildPersonalizationMetaHtml(item, { compact: true })}
+                            ${buildEffectiveSettingsProvenanceMetaHtml(item, { compact: true })}
                         </div>
                         <div class="space-x-2 whitespace-nowrap">
                             <button onclick="app.viewHistoryItem('${item.id}')"
@@ -553,6 +615,7 @@
             );
             parts.push(buildExecutionMetaHtml(execution));
         }
+        parts.push(buildEffectiveSettingsProvenanceMetaHtml(policy, { compact: true }));
 
         return parts.join('');
     }
@@ -687,6 +750,7 @@
                     ${badges.join('')}
                 </div>
                 <div class="mt-3 space-y-1">
+                    ${buildEffectiveSettingsProvenanceMetaHtml(preset)}
                     ${buildPersonalizationMetaHtml(preset)}
                     ${executionHtml}
                     ${sourcePolicyHtml}
@@ -920,6 +984,7 @@
         buildAnalyticsSummaryCardsHtml,
         buildApprovalsListHtml,
         buildApprovalMetaHtml,
+        buildEffectiveSettingsProvenanceMetaHtml,
         buildPersonalizationMetaHtml,
         buildPresetSelectionSummaryHtml,
         buildSectionMessageHtml,
@@ -928,6 +993,7 @@
         buildSourcePoliciesHtml,
         buildSourcePolicyMetaHtml,
         resolveApprovalVisibility,
+        resolveEffectiveSettingsProvenance,
         resolveAnalyticsSectionState,
         resolveApprovalsSectionState,
         resolveHistorySectionState,

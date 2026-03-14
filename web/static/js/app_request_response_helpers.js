@@ -134,6 +134,9 @@
         if (result.personalization_visibility) {
             normalized.personalization_visibility = result.personalization_visibility;
         }
+        if (result.effective_settings_provenance) {
+            normalized.effective_settings_provenance = result.effective_settings_provenance;
+        }
 
         return normalized;
     }
@@ -198,6 +201,48 @@
                 ${overrideLabels.length ? `<p class="mt-1 text-sm text-gray-600">Overrides: ${overrideLabels.join(', ')}</p>` : ''}
                 ${visibility.archive_reference_count ? `<p class="mt-1 text-sm text-gray-600">Archive context: ${visibility.archive_reference_count} item(s)</p>` : ''}
                 ${visibility.source_policy_message ? `<p class="mt-1 text-sm text-gray-600">Source policy: ${visibility.source_policy_message}</p>` : ''}
+            </div>
+        `;
+    }
+
+    function buildEffectiveSettingsProvenanceHtml(result = {}) {
+        const provenance = result.effective_settings_provenance || {};
+        if (!provenance || Object.keys(provenance).length === 0) {
+            return '';
+        }
+
+        const effectiveState = provenance.effective_state || 'unknown';
+        const toneClass = effectiveState === 'overridden'
+            ? 'bg-blue-100 text-blue-800'
+            : effectiveState === 'default'
+                ? 'bg-slate-100 text-slate-700'
+                : effectiveState === 'detached'
+                    ? 'bg-amber-100 text-amber-800'
+                    : effectiveState === 'effective'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : 'bg-slate-100 text-slate-700';
+        const summaryTokens = Array.isArray(provenance.summary_tokens)
+            ? provenance.summary_tokens
+            : [];
+        const metaBadges = [
+            provenance.default_mode_label,
+            provenance.personalization_label,
+            provenance.source_policy_label
+        ].filter(Boolean);
+
+        return `
+            <div class="mb-4 p-4 bg-sky-50 rounded-lg border border-sky-200">
+                <h4 class="text-lg font-semibold text-sky-900 mb-3">
+                    <i class="fas fa-route mr-2"></i>Effective Settings Provenance
+                </h4>
+                <div class="flex flex-wrap gap-2 text-sm">
+                    <span class="inline-flex px-2.5 py-1 rounded-full font-semibold ${toneClass}">${provenance.status_label || '설정 provenance 미상'}</span>
+                    ${provenance.preset_name ? `<span class="inline-flex px-2.5 py-1 rounded-full font-semibold bg-white text-gray-700">Preset: ${provenance.preset_name}${provenance.preset_is_default ? ' (기본)' : ''}</span>` : ''}
+                    ${metaBadges.map((badge) => `<span class="inline-flex px-2.5 py-1 rounded-full font-semibold bg-white text-gray-700">${badge}</span>`).join('')}
+                </div>
+                ${provenance.status_message ? `<p class="mt-2 text-sm text-gray-600">${provenance.status_message}</p>` : ''}
+                ${summaryTokens.length ? `<p class="mt-2 text-sm text-gray-600">요약: ${summaryTokens.join(' · ')}</p>` : ''}
+                ${provenance.recent_execution_timestamp ? `<p class="mt-1 text-xs text-gray-500">최근 관련 실행: ${new Date(provenance.recent_execution_timestamp).toLocaleString()}</p>` : ''}
             </div>
         `;
     }
@@ -306,6 +351,7 @@
             `;
         }
 
+        detailsHtml += buildEffectiveSettingsProvenanceHtml(result);
         detailsHtml += buildPersonalizationDetailsHtml(result);
 
         if (result.input_params) {
@@ -385,6 +431,7 @@
         normalizeGenerationResultEnvelope,
         buildStepTimesHtml,
         buildResultDetailsHtml,
-        buildPersonalizationDetailsHtml
+        buildPersonalizationDetailsHtml,
+        buildEffectiveSettingsProvenanceHtml
     });
 });
