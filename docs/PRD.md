@@ -3,7 +3,7 @@
 이 문서는 현재 저장소 기준의 제품 표면과 우선순위를 정리한 PRD입니다.
 새로운 앱 표면이나 지원 정책을 발명하지 않고, 이미 운영 중인 web/CLI/scheduler 현실을 반영합니다.
 
-- 기준일: 2026-03-10
+- 기준일: 2026-03-14
 - 제품/플랫폼 계약 정본:
   - `docs/reference/support-policy.md`
   - `docs/reference/web-api.md`
@@ -21,7 +21,7 @@
 
 1. 운영자는 키워드/도메인 기반 뉴스레터를 반복적으로 생성, 검토, 발송해야 합니다.
 2. 단일 실행 성공보다 schedule, approval, source policy, preset, history 같은 운영 흐름의 안정성이 더 중요합니다.
-3. 현재 구조 부채는 root clutter보다 legacy runtime hotspot에 집중되어 있어, 제품 운영 완성도와 구조 축소를 함께 관리해야 합니다.
+3. 현재 구조 부채는 root clutter보다 legacy runtime hotspot에 집중되어 있었고, 2026-03-14 기준으로는 추가 기계적 분해보다 maintenance mode 유지가 더 중요한 단계입니다.
 
 ## 3. 현재 제품 표면
 
@@ -56,46 +56,39 @@
 | G1 | web 운영 표면에서 주요 작업을 완료 | 진행 중 | generate/preview/send/history/schedule 흐름이 안정적으로 연결됨 |
 | G2 | schedule / approval / preset / source policy 흐름 안정화 | 진행 중 | protected path 회귀 0건 유지 |
 | G3 | CLI/scheduler/web가 같은 core contract를 공유 | 진행 중 | `newsletter_core.public` 경계 사용 유지 |
-| G4 | legacy runtime surface를 축소 | 진행 중 | `newsletter/` 와 hotspot LOC가 점진 감소 |
-| G5 | 운영 계약과 문서 truth를 일치시킴 | 진행 중 | support policy / CI / strategy / PRD가 같은 현실을 설명 |
+| G4 | legacy runtime surface를 maintenance mode로 고정 | 달성 후 유지 단계 | hotspot reopen 조건 없이 기계적 분해가 재개되지 않음 |
+| G5 | 운영 계약과 문서 truth를 일치시킴 | 달성 후 유지 단계 | support policy / CI / strategy / PRD가 같은 현실을 설명 |
 
 ## 5. 다음 90일 우선순위
 
-이번 PRD는 제품 우선순위를 현재 운영 표면 기준으로 고정합니다.
+이번 PRD는 제품 우선순위를 현재 운영 표면 기준으로 고정하되, close-out 이후에는 maintenance mode 유지와 선택 backlog 구분을 우선합니다.
 
 ### 우선순위 상단
 
-1. schedule workflow 완성도
-- 예약 생성, retry safety, preview/run-now, duplicate prevention evidence를 강화합니다.
+1. 운영 안정성 유지
+- schedule, approval, preset, source policy, personalization, settings provenance surface의 현재 semantics와 evidence를 유지합니다.
 
-2. preset lifecycle
-- 저장/적용/갱신/삭제 흐름과 운영 토큰 기반 보호 경계를 안정화합니다.
+2. maintenance mode 경계 유지
+- `newsletter/llm_factory.py`, `newsletter/tools.py`, `newsletter/graph.py`, `web/routes_generation.py`, `web/static/js/app.js` 는 reopen 조건이 없는 한 구조 재작업 대상으로 올리지 않습니다.
 
-3. approval workflow
-- 승인 대기함, 상태 전이, 메모/검토 흐름의 일관성을 높입니다.
+3. docs truthfulness 유지
+- strategy, PRD, architecture, migration log가 같은 baseline과 같은 종료 판단을 설명하도록 유지합니다.
 
-4. source policy management
-- allow/block 정책 편집과 generation 반영 경로를 명확히 유지합니다.
+4. 선택 backlog 관리
+- richer mismatch diagnostics, deeper provenance lineage, time-based settings/result drill-down 은 backlog 로만 유지합니다.
 
-5. execution history visibility
-- archive 검색, 과거 실행 참조, 운영 이력 확인 흐름을 개선합니다.
-
-6. personalization 설정 모델 정리
-- 개인화에 필요한 설정/저장 모델을 정리하되, 신규 앱 표면을 만들지 않습니다.
-
-### 엔지니어링 선행 과제
-
-- legacy surface reduction
-  - `newsletter_core/` 중심 경계를 강화하고, `newsletter/` / hotspot `web/` 파일은 축소합니다.
-- docs truthfulness
-  - strategy, PRD, tests guide, migration log, dev docs가 현재 현실을 설명하도록 유지합니다.
-- ops-safety observability
-  - `check --full`, scheduler retry safety, outbox/dedupe, live smoke 결과를 운영 판단 기준으로 사용합니다.
+reopen 조건:
+- user-facing bug fix 또는 incident 대응 중 동일 shell 수정이 직접 필요할 때
+- 새로운 제품 요구가 해당 shell 변경을 직접 요구할 때
+- 중복 로직 재유입으로 maintenance cost가 다시 커질 때
+- shell LOC/complexity가 다시 유의미하게 증가할 때
 
 ## 6. 현재 비우선 / 비목표
 
 다음 항목은 현재 우선순위로 올리지 않습니다.
 
+- legacy hotspot 추가 extraction
+- deeper settings drill-down 구현
 - 벡터 DB RAG
 - 새로운 웹/모바일 앱 표면 추가
 - 모바일 앱
