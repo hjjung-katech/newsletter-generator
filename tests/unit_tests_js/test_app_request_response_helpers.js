@@ -211,6 +211,21 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
                 summary: '개인화 override는 있지만 preset/source policy linkage가 연결되지 않아 override가 현재 결과에 그대로 반영됐는지 즉시 확인하기 어렵습니다.',
                 details: [
                     '개인화 override는 있지만 preset/source policy linkage가 연결되지 않아 override가 현재 결과에 그대로 반영됐는지 즉시 확인하기 어렵습니다.'
+                ],
+                field_summary: '개인화 축에서 override는 있으나 연결 상태가 linked가 아닙니다.',
+                field_explanations: [
+                    {
+                        axis: 'personalization',
+                        axis_label: '개인화',
+                        field: 'source_policy_link_state',
+                        field_label: '개인화 연결 상태',
+                        expected_value: 'linked',
+                        current_value: 'unknown',
+                        expected_label: 'override가 연결된 상태로 반영됨',
+                        current_label: '연결 상태 미상',
+                        summary: '개인화 축에서 override는 있으나 연결 상태가 linked가 아닙니다.',
+                        detail: 'override 2개(이메일 호환 모드, 아카이브 컨텍스트)가 있지만 현재 linkage는 \'연결 상태 미상\' 이어서 현재 결과 반영 여부를 즉시 확정하기 어렵습니다.'
+                    }
                 ]
             },
             preset_name: 'Morning Brief',
@@ -246,6 +261,8 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
     assert.match(html, /Effective Settings Provenance/);
     assert.match(html, /오버라이드된 설정 조합/);
     assert.match(html, /진단: 개인화 override는 있지만/);
+    assert.match(html, /차이 축: 개인화 축에서 override는 있으나 연결 상태가 linked가 아닙니다/);
+    assert.match(html, /세부: override 2개\(이메일 호환 모드, 아카이브 컨텍스트\)가 있지만 현재 linkage는 '연결 상태 미상' 이어서/);
     assert.match(html, /프리셋: Morning Brief \(기본\)/);
     assert.match(html, /Personalization Context/);
     assert.match(html, /오버라이드 적용/);

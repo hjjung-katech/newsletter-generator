@@ -230,6 +230,12 @@
             provenance.personalization_label,
             provenance.source_policy_label
         ].filter(Boolean);
+        const fieldExplanations = Array.isArray(diagnostics.field_explanations)
+            ? diagnostics.field_explanations
+                .filter((item) => item && typeof item === 'object')
+                .map((item) => item.detail || item.summary)
+                .filter(Boolean)
+            : [];
 
         return `
             <div class="mb-4 p-4 bg-sky-50 rounded-lg border border-sky-200">
@@ -243,6 +249,8 @@
                 </div>
                 ${provenance.status_message ? `<p class="mt-2 text-sm text-gray-600">${provenance.status_message}</p>` : ''}
                 ${diagnostics.summary ? `<p class="mt-2 text-sm text-amber-700">진단: ${diagnostics.summary}</p>` : ''}
+                ${diagnostics.field_summary ? `<p class="mt-1 text-xs text-sky-700">차이 축: ${diagnostics.field_summary}</p>` : ''}
+                ${fieldExplanations.length ? `<p class="mt-1 text-xs text-gray-500">세부: ${fieldExplanations.slice(0, 2).join(' · ')}</p>` : ''}
                 ${Array.isArray(diagnostics.details) && diagnostics.details.length > 1 ? `<p class="mt-1 text-xs text-gray-500">${diagnostics.details.slice(1).join(' · ')}</p>` : ''}
                 ${summaryTokens.length ? `<p class="mt-2 text-sm text-gray-600">요약: ${summaryTokens.join(' · ')}</p>` : ''}
                 ${provenance.recent_execution_timestamp ? `<p class="mt-1 text-xs text-gray-500">최근 관련 실행: ${new Date(provenance.recent_execution_timestamp).toLocaleString()}</p>` : ''}

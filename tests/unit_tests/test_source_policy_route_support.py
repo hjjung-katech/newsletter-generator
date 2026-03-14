@@ -99,6 +99,12 @@ def test_enrich_source_policy_entry_marks_active_policy_as_detached_without_link
         enriched["effective_settings_provenance"]["diagnostics"]["primary_reason_code"]
         == "source_policy_detached_from_presets"
     )
+    assert (
+        enriched["effective_settings_provenance"]["diagnostics"]["field_explanations"][
+            0
+        ]["field"]
+        == "linked_preset_count"
+    )
 
 
 def test_enrich_source_policy_entry_adds_preset_and_execution_visibility(
@@ -169,4 +175,8 @@ def test_enrich_source_policy_entry_adds_preset_and_execution_visibility(
     assert (
         enriched["effective_settings_provenance"]["diagnostics"]["primary_reason_code"]
         is None
+    )
+    assert (
+        enriched["effective_settings_provenance"]["diagnostics"]["field_explanations"]
+        == []
     )

@@ -56,6 +56,8 @@ def test_build_effective_settings_provenance_marks_overridden_linked_context() -
         "reason_codes": [],
         "summary": "",
         "details": [],
+        "field_summary": "",
+        "field_explanations": [],
     }
 
 
@@ -91,6 +93,14 @@ def test_build_effective_settings_provenance_marks_detached_context_without_rece
         "personalization_default_only",
     ]
     assert "detached" in provenance["diagnostics"]["summary"]
+    assert "프리셋 연결 축" in provenance["diagnostics"]["field_summary"]
+    assert (
+        provenance["diagnostics"]["field_explanations"][0]["axis"] == "preset_linkage"
+    )
+    assert (
+        provenance["diagnostics"]["field_explanations"][0]["current_label"]
+        == "연결된 preset 0개"
+    )
 
 
 def test_build_effective_settings_provenance_marks_recent_execution_mismatch() -> None:
@@ -132,3 +142,10 @@ def test_build_effective_settings_provenance_marks_recent_execution_mismatch() -
         "recent_execution_not_reflected_by_current_settings"
     )
     assert "최근 관련 실행은 있지만" in provenance["diagnostics"]["summary"]
+    assert (
+        provenance["diagnostics"]["field_explanations"][0]["axis"] == "recent_execution"
+    )
+    assert (
+        provenance["diagnostics"]["field_explanations"][0]["field"]
+        == "settings_alignment"
+    )

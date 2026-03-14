@@ -108,6 +108,45 @@ def _append_diagnostic(
         details.append(detail)
 
 
+def _append_field_explanation(
+    field_explanations: list[dict[str, Any]],
+    *,
+    axis: str,
+    axis_label: str,
+    field: str,
+    field_label: str,
+    expected_value: Any,
+    current_value: Any,
+    expected_label: str,
+    current_label: str,
+    summary: str,
+    detail: str,
+) -> None:
+    explanation = {
+        "axis": axis,
+        "axis_label": axis_label,
+        "field": field,
+        "field_label": field_label,
+        "expected_value": expected_value,
+        "current_value": current_value,
+        "expected_label": expected_label,
+        "current_label": current_label,
+        "summary": summary,
+        "detail": detail,
+    }
+    if explanation not in field_explanations:
+        field_explanations.append(explanation)
+
+
+def _build_field_summary(field_explanations: list[dict[str, Any]]) -> str:
+    summaries = [
+        str(explanation.get("summary") or "").strip()
+        for explanation in field_explanations
+    ]
+    unique_summaries = [summary for summary in summaries if summary]
+    return " · ".join(unique_summaries[:2])
+
+
 def _build_provenance_diagnostics(
     *,
     effective_state: str,
@@ -115,13 +154,19 @@ def _build_provenance_diagnostics(
     personalization_state: str,
     has_personalization_context: bool,
     source_policy_state: str,
+    source_policy_label: str,
     linkage_state: str,
+    linkage_label: str,
     linked_preset_count: int,
+    linked_default_preset_count: int,
     has_recent_execution: bool,
     has_external_recent_execution: bool,
+    override_count: int,
+    override_labels: list[str],
 ) -> dict[str, Any]:
     reason_codes: list[str] = []
     details: list[str] = []
+    field_explanations: list[dict[str, Any]] = []
 
     if effective_state == "empty":
         _append_diagnostic(
@@ -129,6 +174,19 @@ def _build_provenance_diagnostics(
             details,
             "no_settings_context",
             "preset, source policy, personalization 중 provenance를 재구성할 수 있는 정보가 없어 empty로 표시됩니다.",
+        )
+        _append_field_explanation(
+            field_explanations,
+            axis="provenance",
+            axis_label="설정 provenance",
+            field="settings_context",
+            field_label="설정 컨텍스트",
+            expected_value="available",
+            current_value="missing",
+            expected_label="재구성 가능한 설정 컨텍스트",
+            current_label="재구성 가능한 컨텍스트 없음",
+            summary="설정 provenance 축에서 사용할 컨텍스트가 없습니다.",
+            detail="preset, source policy, personalization 중 provenance를 재구성할 수 있는 입력이 없어 empty로 표시됩니다.",
         )
 
     if has_external_recent_execution and (
@@ -142,6 +200,22 @@ def _build_provenance_diagnostics(
             "recent_execution_not_reflected_by_current_settings",
             "최근 관련 실행은 있지만 현재 linkage가 달라 같은 설정 조합으로 바로 해석할 수 없습니다.",
         )
+        _append_field_explanation(
+            field_explanations,
+            axis="recent_execution",
+            axis_label="최근 실행",
+            field="settings_alignment",
+            field_label="현재 설정 정합성",
+            expected_value="aligned",
+            current_value="mismatched",
+            expected_label="최근 실행과 현재 설정이 같은 조합",
+            current_label=f"최근 실행 있음 + 현재 linkage {linkage_label}",
+            summary="최근 실행 축에서 현재 설정과 최근 실행의 정합성이 맞지 않습니다.",
+            detail=(
+                "최근 관련 실행은 있지만 현재 source policy/preset linkage가 "
+                f"'{source_policy_label}' 상태라 같은 설정 조합으로 바로 해석할 수 없습니다."
+            ),
+        )
 
     if source_policy_state in {"detached", "none"} or linkage_state == "detached":
         if linked_preset_count == 0:
@@ -151,12 +225,41 @@ def _build_provenance_diagnostics(
                 "source_policy_detached_from_presets",
                 "현재 source policy와 직접 연결된 preset이 없어 detached로 표시됩니다.",
             )
+            _append_field_explanation(
+                field_explanations,
+                axis="preset_linkage",
+                axis_label="프리셋 연결",
+                field="linked_preset_count",
+                field_label="연결된 프리셋 수",
+                expected_value=">=1",
+                current_value=linked_preset_count,
+                expected_label="연결된 preset 1개 이상",
+                current_label=f"연결된 preset {linked_preset_count}개",
+                summary="프리셋 연결 축에서 source policy와 연결된 preset이 없습니다.",
+                detail="현재 source policy와 직접 연결된 preset이 0개라 detached로 표시됩니다.",
+            )
         else:
             _append_diagnostic(
                 reason_codes,
                 details,
                 "settings_linkage_partially_detached",
                 f"연결된 preset {linked_preset_count}개만 확인되어 linkage가 부분적으로 분리된 상태로 보입니다.",
+            )
+            _append_field_explanation(
+                field_explanations,
+                axis="preset_linkage",
+                axis_label="프리셋 연결",
+                field="linked_default_preset_count",
+                field_label="기본 프리셋 연결 수",
+                expected_value="fully_linked",
+                current_value=linked_default_preset_count,
+                expected_label="기대한 preset/source policy 연결 유지",
+                current_label=f"기본 프리셋 연결 {linked_default_preset_count}개",
+                summary="프리셋 연결 축에서 일부 linkage만 남아 있습니다.",
+                detail=(
+                    f"연결된 preset은 {linked_preset_count}개지만 기본 프리셋 연결은 "
+                    f"{linked_default_preset_count}개만 확인되어 부분 분리로 보입니다."
+                ),
             )
 
     if has_personalization_context:
@@ -167,12 +270,44 @@ def _build_provenance_diagnostics(
                 "personalization_overridden_but_unlinked",
                 "개인화 override는 있지만 preset/source policy linkage가 연결되지 않아 override가 현재 결과에 그대로 반영됐는지 즉시 확인하기 어렵습니다.",
             )
+            override_label_summary = (
+                f" ({', '.join(override_labels)})" if override_labels else ""
+            )
+            _append_field_explanation(
+                field_explanations,
+                axis="personalization",
+                axis_label="개인화",
+                field="source_policy_link_state",
+                field_label="개인화 연결 상태",
+                expected_value="linked",
+                current_value=linkage_state,
+                expected_label="override가 연결된 상태로 반영됨",
+                current_label=linkage_label,
+                summary="개인화 축에서 override는 있으나 연결 상태가 linked가 아닙니다.",
+                detail=(
+                    f"override {override_count}개{override_label_summary}가 있지만 "
+                    f"현재 linkage는 '{linkage_label}' 이어서 현재 결과 반영 여부를 즉시 확정하기 어렵습니다."
+                ),
+            )
         elif personalization_state == "default":
             _append_diagnostic(
                 reason_codes,
                 details,
                 "personalization_default_only",
                 "개인화 override가 없어 default-only 상태로 해석됩니다.",
+            )
+            _append_field_explanation(
+                field_explanations,
+                axis="personalization",
+                axis_label="개인화",
+                field="override_count",
+                field_label="개인화 오버라이드 수",
+                expected_value=">=1",
+                current_value=override_count,
+                expected_label="오버라이드 1개 이상",
+                current_label=f"오버라이드 {override_count}개",
+                summary="개인화 축에서 override가 없어 default-only로 보입니다.",
+                detail="개인화 override 수가 0개라 기본값만 유지되는 상태로 해석됩니다.",
             )
         elif personalization_state == "empty":
             _append_diagnostic(
@@ -181,12 +316,38 @@ def _build_provenance_diagnostics(
                 "personalization_empty",
                 "표시 가능한 개인화 설정이 없어 personalization이 empty로 보입니다.",
             )
+            _append_field_explanation(
+                field_explanations,
+                axis="personalization",
+                axis_label="개인화",
+                field="personalization_state",
+                field_label="개인화 상태",
+                expected_value="default_or_overridden",
+                current_value=personalization_state,
+                expected_label="기본값 또는 오버라이드 상태",
+                current_label="empty",
+                summary="개인화 축에서 표시 가능한 설정이 비어 있습니다.",
+                detail="personalization payload에 표시 가능한 설정이 없어 empty로 보입니다.",
+            )
         elif personalization_state == "unknown":
             _append_diagnostic(
                 reason_codes,
                 details,
                 "personalization_unknown",
                 "현재 payload만으로 개인화 적용 상태를 재구성할 수 없어 unknown으로 표시됩니다.",
+            )
+            _append_field_explanation(
+                field_explanations,
+                axis="personalization",
+                axis_label="개인화",
+                field="personalization_state",
+                field_label="개인화 상태",
+                expected_value="default_or_overridden",
+                current_value=personalization_state,
+                expected_label="기본값 또는 오버라이드 상태",
+                current_label="unknown",
+                summary="개인화 축에서 적용 상태를 재구성할 수 없습니다.",
+                detail="현재 payload만으로 개인화가 default인지 overridden인지 결정할 수 없어 unknown으로 보입니다.",
             )
 
     if source_policy_state in {"unknown", "unavailable"}:
@@ -195,6 +356,19 @@ def _build_provenance_diagnostics(
             details,
             "source_policy_linkage_unresolved",
             "현재 정보만으로 source policy linkage를 재구성할 수 없어 unknown 성격으로 보입니다.",
+        )
+        _append_field_explanation(
+            field_explanations,
+            axis="source_policy",
+            axis_label="소스 정책",
+            field="source_policy_state",
+            field_label="소스 정책 연결 상태",
+            expected_value="resolved",
+            current_value=source_policy_state,
+            expected_label="재구성 가능한 linkage",
+            current_label=source_policy_label,
+            summary="소스 정책 축에서 linkage를 확정할 수 없습니다.",
+            detail="현재 payload만으로 source policy linkage를 resolved 상태로 재구성할 수 없어 unknown 성격으로 표시됩니다.",
         )
 
     if not has_recent_execution and effective_state in {
@@ -208,12 +382,27 @@ def _build_provenance_diagnostics(
             "no_recent_execution_reference",
             "현재 설정 조합을 직접 비교할 최근 실행이 없어 provenance를 실행 기준으로 교차검증할 수 없습니다.",
         )
+        _append_field_explanation(
+            field_explanations,
+            axis="recent_execution",
+            axis_label="최근 실행",
+            field="recent_execution_reference",
+            field_label="최근 실행 참조",
+            expected_value="present",
+            current_value="missing",
+            expected_label="최근 실행 참조 있음",
+            current_label="최근 실행 참조 없음",
+            summary="최근 실행 축에서 현재 설정과 비교할 참조가 없습니다.",
+            detail="현재 설정 조합을 직접 비교할 최근 실행 reference가 없어 실행 기준 교차검증이 비어 있습니다.",
+        )
 
     return {
         "primary_reason_code": reason_codes[0] if reason_codes else None,
         "reason_codes": reason_codes,
         "summary": details[0] if details else "",
         "details": details,
+        "field_summary": _build_field_summary(field_explanations),
+        "field_explanations": field_explanations,
     }
 
 
@@ -326,10 +515,19 @@ def build_effective_settings_provenance(
         ),
         has_personalization_context=bool(personalization_mapping),
         source_policy_state=source_policy_state,
+        source_policy_label=source_policy_label,
         linkage_state=linkage_state,
+        linkage_label=linkage_label,
         linked_preset_count=linked_preset_count,
+        linked_default_preset_count=linked_default_preset_count,
         has_recent_execution=has_recent_execution,
         has_external_recent_execution=has_external_recent_execution,
+        override_count=int(personalization_mapping.get("override_count") or 0),
+        override_labels=[
+            str(label).strip()
+            for label in personalization_mapping.get("override_labels") or []
+            if str(label).strip()
+        ],
     )
 
     return {
