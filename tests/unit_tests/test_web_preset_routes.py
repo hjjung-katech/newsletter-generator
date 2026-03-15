@@ -147,6 +147,10 @@ def test_preset_routes_create_and_list(tmp_path: Path) -> None:
             ][0]["field"]
             == "source_policy_link_state"
         )
+        assert (
+            created["effective_settings_provenance"]["lineage"]["summary"]
+            == "프리셋 Weekly AI Digest (기본) -> 소스 정책 키워드 프리셋이라 직접 연결된 소스 정책을 확인할 수 없습니다. -> 개인화 오버라이드 적용 -> 최근 실행 연관 실행 없음"
+        )
         assert created["personalization_visibility"]["override_labels"] == [
             "이메일 호환 모드",
             "기간",
@@ -342,3 +346,7 @@ def test_list_route_adds_recent_execution_and_source_policy_visibility(
         is None
     )
     assert preset["effective_settings_provenance"]["diagnostics"]["field_summary"] == ""
+    assert (
+        preset["effective_settings_provenance"]["lineage"]["summary"]
+        == "프리셋 Domain Watch -> 소스 정책 활성 소스 정책 1개와 연결됩니다. (allow 1 / block 0) -> 개인화 오버라이드 적용 -> 최근 실행 완료"
+    )

@@ -51,6 +51,14 @@ def test_build_effective_settings_provenance_marks_overridden_linked_context() -
     assert provenance["has_recent_execution"] is True
     assert provenance["preset_name"] == "Morning Brief"
     assert provenance["summary_tokens"][0] == "프리셋: Morning Brief (기본)"
+    assert (
+        provenance["lineage"]["summary"]
+        == "프리셋 Morning Brief (기본) -> 소스 정책 활성 정책 연결 -> 개인화 오버라이드 적용 -> 최근 실행 완료"
+    )
+    assert provenance["lineage"]["steps"][0]["axis"] == "preset"
+    assert provenance["lineage"]["steps"][1]["axis"] == "source_policy"
+    assert provenance["lineage"]["steps"][2]["axis"] == "personalization"
+    assert provenance["lineage"]["steps"][3]["axis"] == "recent_execution"
     assert provenance["diagnostics"] == {
         "primary_reason_code": None,
         "reason_codes": [],
@@ -101,6 +109,14 @@ def test_build_effective_settings_provenance_marks_detached_context_without_rece
         provenance["diagnostics"]["field_explanations"][0]["current_label"]
         == "연결된 preset 0개"
     )
+    assert (
+        provenance["lineage"]["summary"]
+        == "소스 정책 연결 없음 -> 개인화 기본 개인화 -> 최근 실행 연관 실행 없음"
+    )
+    assert provenance["lineage"]["steps"][0]["detail"] == (
+        "활성 정책이지만 연결된 프리셋이나 최근 적용 이력이 없습니다."
+    )
+    assert provenance["lineage"]["steps"][2]["state"] == "empty"
 
 
 def test_build_effective_settings_provenance_marks_recent_execution_mismatch() -> None:
@@ -148,4 +164,8 @@ def test_build_effective_settings_provenance_marks_recent_execution_mismatch() -
     assert (
         provenance["diagnostics"]["field_explanations"][0]["field"]
         == "settings_alignment"
+    )
+    assert provenance["lineage"]["summary"] == "소스 정책 최근 반영 -> 개인화 기본 개인화 -> 최근 실행 완료"
+    assert provenance["lineage"]["steps"][-1]["reference_timestamp"] == (
+        "2026-03-14T10:30:00Z"
     )

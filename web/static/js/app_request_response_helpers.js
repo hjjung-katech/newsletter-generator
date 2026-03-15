@@ -225,6 +225,13 @@
         const summaryTokens = Array.isArray(provenance.summary_tokens)
             ? provenance.summary_tokens
             : [];
+        const lineage = provenance.lineage || {};
+        const lineageSteps = Array.isArray(lineage.steps)
+            ? lineage.steps
+                .filter((item) => item && typeof item === 'object')
+                .map((item) => item.detail || item.summary)
+                .filter(Boolean)
+            : [];
         const metaBadges = [
             provenance.default_mode_label,
             provenance.personalization_label,
@@ -248,6 +255,8 @@
                     ${metaBadges.map((badge) => `<span class="inline-flex px-2.5 py-1 rounded-full font-semibold bg-white text-gray-700">${badge}</span>`).join('')}
                 </div>
                 ${provenance.status_message ? `<p class="mt-2 text-sm text-gray-600">${provenance.status_message}</p>` : ''}
+                ${lineage.summary ? `<p class="mt-2 text-sm text-indigo-700">적용 경로: ${lineage.summary}</p>` : ''}
+                ${lineageSteps.length ? `<p class="mt-1 text-xs text-gray-500">경로 세부: ${lineageSteps.slice(0, 2).join(' · ')}</p>` : ''}
                 ${diagnostics.summary ? `<p class="mt-2 text-sm text-amber-700">진단: ${diagnostics.summary}</p>` : ''}
                 ${diagnostics.field_summary ? `<p class="mt-1 text-xs text-sky-700">차이 축: ${diagnostics.field_summary}</p>` : ''}
                 ${fieldExplanations.length ? `<p class="mt-1 text-xs text-gray-500">세부: ${fieldExplanations.slice(0, 2).join(' · ')}</p>` : ''}

@@ -485,6 +485,22 @@ test('effective settings provenance helper resolves summary and badge metadata',
             effective_state: 'default',
             status_label: '기본 설정 조합',
             status_message: '현재 결과는 기본 설정 조합을 기준으로 해석됩니다.',
+            lineage: {
+                summary: '소스 정책 소스 정책 상태 미상 -> 개인화 기본 개인화 -> 최근 실행 연관 실행 없음',
+                steps: [
+                    {
+                        axis: 'source_policy',
+                        axis_label: '소스 정책',
+                        source_type: 'effective_source_policy',
+                        source_label: '연결된 소스 정책',
+                        state: 'unknown',
+                        status_label: '소스 정책 상태 미상',
+                        summary: '소스 정책 소스 정책 상태 미상',
+                        detail: '연결 상태 미상 · 연결된 preset 0개',
+                        reference_timestamp: null
+                    }
+                ]
+            },
             diagnostics: {
                 primary_reason_code: 'personalization_default_only',
                 reason_codes: [
@@ -527,6 +543,22 @@ test('effective settings provenance helper resolves summary and badge metadata',
             effective_state: 'default',
             status_label: '기본 설정 조합',
             status_message: '현재 결과는 기본 설정 조합을 기준으로 해석됩니다.',
+            lineage: {
+                summary: '소스 정책 소스 정책 상태 미상 -> 개인화 기본 개인화 -> 최근 실행 연관 실행 없음',
+                steps: [
+                    {
+                        axis: 'source_policy',
+                        axis_label: '소스 정책',
+                        source_type: 'effective_source_policy',
+                        source_label: '연결된 소스 정책',
+                        state: 'unknown',
+                        status_label: '소스 정책 상태 미상',
+                        summary: '소스 정책 소스 정책 상태 미상',
+                        detail: '연결 상태 미상 · 연결된 preset 0개',
+                        reference_timestamp: null
+                    }
+                ]
+            },
             diagnostics: {
                 primary_reason_code: 'personalization_default_only',
                 reason_codes: ['personalization_default_only'],
@@ -557,10 +589,16 @@ test('effective settings provenance helper resolves summary and badge metadata',
 
     assert.equal(visibility.effectiveState, 'default');
     assert.equal(visibility.statusLabel, '기본 설정 조합');
+    assert.equal(
+        visibility.lineageSummary,
+        '소스 정책 소스 정책 상태 미상 -> 개인화 기본 개인화 -> 최근 실행 연관 실행 없음'
+    );
     assert.equal(visibility.diagnosticPrimaryReasonCode, 'personalization_default_only');
     assert.match(visibility.diagnosticSummary, /default-only/);
     assert.match(visibility.diagnosticFieldSummary, /개인화 축/);
     assert.match(html, /기본 설정 조합/);
+    assert.match(html, /적용 경로: 소스 정책 소스 정책 상태 미상/);
+    assert.match(html, /경로 세부: 연결 상태 미상 · 연결된 preset 0개/);
     assert.match(html, /해석: 개인화 override가 없어 default-only 상태로 해석됩니다/);
     assert.match(html, /차이 축: 개인화 축에서 override가 없어 default-only로 보입니다/);
     assert.match(html, /세부: 개인화 override 수가 0개라 기본값만 유지되는 상태로 해석됩니다/);
