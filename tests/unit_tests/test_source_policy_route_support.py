@@ -105,6 +105,10 @@ def test_enrich_source_policy_entry_marks_active_policy_as_detached_without_link
         ]["field"]
         == "linked_preset_count"
     )
+    assert (
+        enriched["effective_settings_provenance"]["lineage"]["summary"]
+        == "소스 정책 연결 없음 -> 최근 실행 연관 실행 없음"
+    )
 
 
 def test_enrich_source_policy_entry_adds_preset_and_execution_visibility(
@@ -179,4 +183,8 @@ def test_enrich_source_policy_entry_adds_preset_and_execution_visibility(
     assert (
         enriched["effective_settings_provenance"]["diagnostics"]["field_explanations"]
         == []
+    )
+    assert (
+        enriched["effective_settings_provenance"]["lineage"]["summary"]
+        == "프리셋 연결 1개 -> 소스 정책 최근 반영 -> 최근 실행 완료"
     )

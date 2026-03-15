@@ -185,12 +185,28 @@
         const summaryTokens = Array.isArray(provenance.summary_tokens)
             ? provenance.summary_tokens
             : [];
+        const lineage = provenance.lineage || {};
         const diagnostics = provenance.diagnostics || {};
         const diagnosticReasonCodes = Array.isArray(diagnostics.reason_codes)
             ? diagnostics.reason_codes
             : [];
         const diagnosticDetails = Array.isArray(diagnostics.details)
             ? diagnostics.details
+            : [];
+        const lineageSteps = Array.isArray(lineage.steps)
+            ? lineage.steps
+                .filter((item) => item && typeof item === 'object')
+                .map((item) => ({
+                    axis: item.axis || '',
+                    axisLabel: item.axis_label || '',
+                    sourceType: item.source_type || '',
+                    sourceLabel: item.source_label || '',
+                    state: item.state || '',
+                    statusLabel: item.status_label || '',
+                    summary: item.summary || '',
+                    detail: item.detail || '',
+                    referenceTimestamp: item.reference_timestamp || null
+                }))
             : [];
         const diagnosticFieldExplanations = Array.isArray(diagnostics.field_explanations)
             ? diagnostics.field_explanations
@@ -223,6 +239,8 @@
             recentExecutionMessage: provenance.recent_execution_message || '',
             recentExecutionTimestamp: provenance.recent_execution_timestamp || null,
             summaryTokens,
+            lineageSummary: lineage.summary || '',
+            lineageSteps,
             diagnosticPrimaryReasonCode: diagnostics.primary_reason_code || '',
             diagnosticSummary: diagnostics.summary || '',
             diagnosticReasonCodes,
@@ -258,6 +276,19 @@
 
         if (provenance.statusMessage) {
             parts.push(`<p class="mt-1 text-sm text-gray-500">${provenance.statusMessage}</p>`);
+        }
+        if (provenance.lineageSummary) {
+            parts.push(`<p class="mt-1 text-xs text-indigo-700">적용 경로: ${provenance.lineageSummary}</p>`);
+        }
+        if (provenance.lineageSteps.length > 0) {
+            const lineageDetailText = provenance.lineageSteps
+                .map((item) => item.detail || item.summary)
+                .filter(Boolean)
+                .slice(0, 2)
+                .join(' · ');
+            if (lineageDetailText) {
+                parts.push(`<p class="mt-1 text-xs text-gray-500">경로 세부: ${lineageDetailText}</p>`);
+            }
         }
         if (provenance.diagnosticSummary) {
             parts.push(`<p class="mt-1 text-xs text-amber-700">해석: ${provenance.diagnosticSummary}</p>`);

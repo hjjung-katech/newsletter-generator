@@ -205,6 +205,33 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
             effective_state: 'overridden',
             status_label: '오버라이드된 설정 조합',
             status_message: '기본값 대비 오버라이드가 적용된 현재 설정 조합을 기준으로 결과를 해석할 수 있습니다.',
+            lineage: {
+                summary: '프리셋 Morning Brief (기본) -> 소스 정책 활성 정책 연결 -> 개인화 오버라이드 적용 -> 최근 실행 완료',
+                steps: [
+                    {
+                        axis: 'preset',
+                        axis_label: '프리셋',
+                        source_type: 'current_preset',
+                        source_label: '현재 프리셋',
+                        state: 'available',
+                        status_label: 'Morning Brief (기본)',
+                        summary: '프리셋 Morning Brief (기본)',
+                        detail: '키워드 프리셋 · 현재 effective settings의 시작점',
+                        reference_timestamp: null
+                    },
+                    {
+                        axis: 'source_policy',
+                        axis_label: '소스 정책',
+                        source_type: 'effective_source_policy',
+                        source_label: '연결된 소스 정책',
+                        state: 'matched',
+                        status_label: '활성 정책 연결',
+                        summary: '소스 정책 활성 정책 연결',
+                        detail: '활성 소스 정책 1개와 연결됩니다.',
+                        reference_timestamp: null
+                    }
+                ]
+            },
             diagnostics: {
                 primary_reason_code: 'personalization_overridden_but_unlinked',
                 reason_codes: ['personalization_overridden_but_unlinked'],
@@ -260,6 +287,8 @@ test('buildResultDetailsHtml renders delivery, stats, input params, and iframe s
     assert.match(html, /Processing Information/);
     assert.match(html, /Effective Settings Provenance/);
     assert.match(html, /오버라이드된 설정 조합/);
+    assert.match(html, /적용 경로: 프리셋 Morning Brief \(기본\) -> 소스 정책 활성 정책 연결 -> 개인화 오버라이드 적용 -> 최근 실행 완료/);
+    assert.match(html, /경로 세부: 키워드 프리셋 · 현재 effective settings의 시작점/);
     assert.match(html, /진단: 개인화 override는 있지만/);
     assert.match(html, /차이 축: 개인화 축에서 override는 있으나 연결 상태가 linked가 아닙니다/);
     assert.match(html, /세부: override 2개\(이메일 호환 모드, 아카이브 컨텍스트\)가 있지만 현재 linkage는 '연결 상태 미상' 이어서/);

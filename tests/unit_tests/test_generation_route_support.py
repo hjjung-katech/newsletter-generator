@@ -184,6 +184,44 @@ def test_build_sync_generation_response_preserves_contract() -> None:
                 "기본값/오버라이드: 기본값 유지",
                 "소스 정책: 소스 정책 상태 미상",
             ],
+            "lineage": {
+                "summary": "소스 정책 소스 정책 상태 미상 -> 개인화 기본 개인화 -> 최근 실행 연관 실행 없음",
+                "steps": [
+                    {
+                        "axis": "source_policy",
+                        "axis_label": "소스 정책",
+                        "source_type": "effective_source_policy",
+                        "source_label": "연결된 소스 정책",
+                        "state": "unknown",
+                        "status_label": "소스 정책 상태 미상",
+                        "summary": "소스 정책 소스 정책 상태 미상",
+                        "detail": "연결 상태 미상 · 연결된 preset 0개",
+                        "reference_timestamp": None,
+                    },
+                    {
+                        "axis": "personalization",
+                        "axis_label": "개인화",
+                        "source_type": "effective_personalization",
+                        "source_label": "현재 개인화",
+                        "state": "default",
+                        "status_label": "기본 개인화",
+                        "summary": "개인화 기본 개인화",
+                        "detail": "현재 개인화 설정은 기본값으로 유지됩니다.",
+                        "reference_timestamp": None,
+                    },
+                    {
+                        "axis": "recent_execution",
+                        "axis_label": "최근 실행",
+                        "source_type": "recent_execution_reference",
+                        "source_label": "최근 관련 실행",
+                        "state": "empty",
+                        "status_label": "연관 실행 없음",
+                        "summary": "최근 실행 연관 실행 없음",
+                        "detail": "현재 lineage는 최근 실행 reference 없이 current settings 기준으로만 재구성됩니다.",
+                        "reference_timestamp": None,
+                    },
+                ],
+            },
             "diagnostics": {
                 "primary_reason_code": "personalization_default_only",
                 "reason_codes": [
@@ -297,6 +335,10 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
         == "personalization"
     )
     assert (
+        status_response["effective_settings_provenance"]["lineage"]["summary"]
+        == "소스 정책 소스 정책 상태 미상 -> 개인화 기본 개인화 -> 최근 실행 완료"
+    )
+    assert (
         status_response["execution_visibility"]["primary_timestamp"]
         == "2026-03-12T00:00:00Z"
     )
@@ -343,6 +385,10 @@ def test_build_status_and_history_helpers_preserve_payload_shape() -> None:
     assert (
         history_entry["effective_settings_provenance"]["diagnostics"]["field_summary"]
         != ""
+    )
+    assert (
+        history_entry["effective_settings_provenance"]["lineage"]["summary"]
+        == "소스 정책 소스 정책 상태 미상 -> 개인화 기본 개인화 -> 최근 실행 완료"
     )
 
 

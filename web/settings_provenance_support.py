@@ -147,6 +147,185 @@ def _build_field_summary(field_explanations: list[dict[str, Any]]) -> str:
     return " · ".join(unique_summaries[:2])
 
 
+def _append_lineage_step(
+    lineage_steps: list[dict[str, Any]],
+    *,
+    axis: str,
+    axis_label: str,
+    source_type: str,
+    source_label: str,
+    state: str,
+    status_label: str,
+    summary: str,
+    detail: str,
+    reference_timestamp: Any = None,
+) -> None:
+    step = {
+        "axis": axis,
+        "axis_label": axis_label,
+        "source_type": source_type,
+        "source_label": source_label,
+        "state": state,
+        "status_label": status_label,
+        "summary": summary,
+        "detail": detail,
+        "reference_timestamp": reference_timestamp,
+    }
+    if step not in lineage_steps:
+        lineage_steps.append(step)
+
+
+def _build_lineage_summary(lineage_steps: list[dict[str, Any]]) -> str:
+    summaries = [str(step.get("summary") or "").strip() for step in lineage_steps]
+    return " -> ".join(summary for summary in summaries if summary)
+
+
+def _build_effective_settings_lineage(
+    *,
+    effective_state: str,
+    preset_name: str,
+    preset_is_default: bool,
+    preset_state: str,
+    preset_type_label: str,
+    source_policy_state: str,
+    source_policy_label: str,
+    source_policy_message: str,
+    personalization_state: str,
+    personalization_label: str,
+    personalization_status_message: str,
+    default_mode_label: str,
+    linkage_state: str,
+    linkage_label: str,
+    linked_preset_count: int,
+    linked_default_preset_count: int,
+    has_personalization_context: bool,
+    has_recent_execution: bool,
+    recent_execution_label: str,
+    recent_execution_message: str,
+    recent_execution_timestamp: Any,
+    override_count: int,
+    override_labels: list[str],
+) -> dict[str, Any]:
+    lineage_steps: list[dict[str, Any]] = []
+
+    if preset_name:
+        preset_display_name = (
+            f"{preset_name} (기본)" if preset_is_default else preset_name
+        )
+        preset_detail_tokens = []
+        if preset_type_label:
+            preset_detail_tokens.append(preset_type_label)
+        if preset_state and preset_state != "available":
+            preset_detail_tokens.append(f"상태 {preset_state}")
+        preset_detail_tokens.append("현재 effective settings의 시작점")
+        _append_lineage_step(
+            lineage_steps,
+            axis="preset",
+            axis_label="프리셋",
+            source_type="current_preset",
+            source_label="현재 프리셋",
+            state=preset_state,
+            status_label=preset_display_name,
+            summary=f"프리셋 {preset_display_name}",
+            detail=" · ".join(preset_detail_tokens),
+        )
+    elif linked_preset_count > 0:
+        _append_lineage_step(
+            lineage_steps,
+            axis="preset",
+            axis_label="프리셋",
+            source_type="linked_preset_reference",
+            source_label="연결된 프리셋",
+            state=linkage_state,
+            status_label=f"연결 프리셋 {linked_preset_count}개",
+            summary=f"프리셋 연결 {linked_preset_count}개",
+            detail=(
+                f"직접 선택된 preset은 없지만 연결된 preset {linked_preset_count}개"
+                f"(기본 {linked_default_preset_count}개)가 provenance reference로 확인됩니다."
+            ),
+        )
+
+    if (
+        source_policy_label
+        or source_policy_state != "unknown"
+        or source_policy_message
+        or linkage_state != "unknown"
+    ):
+        source_policy_detail = source_policy_message or (
+            f"{linkage_label} · 연결된 preset {linked_preset_count}개"
+        )
+        _append_lineage_step(
+            lineage_steps,
+            axis="source_policy",
+            axis_label="소스 정책",
+            source_type="effective_source_policy",
+            source_label="연결된 소스 정책",
+            state=source_policy_state,
+            status_label=source_policy_label,
+            summary=f"소스 정책 {source_policy_label}",
+            detail=source_policy_detail,
+        )
+
+    if has_personalization_context or personalization_state != "unknown":
+        if override_count > 0:
+            override_summary = f"override {override_count}개"
+        elif personalization_state == "overridden":
+            override_summary = "override 정보 있음"
+        else:
+            override_summary = "override 없음"
+        if override_labels:
+            override_summary += f" ({', '.join(override_labels)})"
+        personalization_detail = personalization_status_message or (
+            f"{default_mode_label} · {override_summary}"
+        )
+        _append_lineage_step(
+            lineage_steps,
+            axis="personalization",
+            axis_label="개인화",
+            source_type="effective_personalization",
+            source_label="현재 개인화",
+            state=personalization_state,
+            status_label=personalization_label,
+            summary=f"개인화 {personalization_label}",
+            detail=personalization_detail,
+        )
+
+    if has_recent_execution:
+        recent_execution_detail = recent_execution_message or (
+            "가장 가까운 관련 실행 reference가 현재 settings lineage에 연결됩니다."
+        )
+        _append_lineage_step(
+            lineage_steps,
+            axis="recent_execution",
+            axis_label="최근 실행",
+            source_type="recent_execution_reference",
+            source_label="최근 관련 실행",
+            state="recent",
+            status_label=recent_execution_label,
+            summary=f"최근 실행 {recent_execution_label}",
+            detail=recent_execution_detail,
+            reference_timestamp=recent_execution_timestamp,
+        )
+    elif effective_state in {"effective", "overridden", "default", "detached"}:
+        _append_lineage_step(
+            lineage_steps,
+            axis="recent_execution",
+            axis_label="최근 실행",
+            source_type="recent_execution_reference",
+            source_label="최근 관련 실행",
+            state="empty",
+            status_label="연관 실행 없음",
+            summary="최근 실행 연관 실행 없음",
+            detail="현재 lineage는 최근 실행 reference 없이 current settings 기준으로만 재구성됩니다.",
+            reference_timestamp=recent_execution_timestamp,
+        )
+
+    return {
+        "summary": _build_lineage_summary(lineage_steps),
+        "steps": lineage_steps,
+    }
+
+
 def _build_provenance_diagnostics(
     *,
     effective_state: str,
@@ -529,6 +708,45 @@ def build_effective_settings_provenance(
             if str(label).strip()
         ],
     )
+    lineage = _build_effective_settings_lineage(
+        effective_state=effective_state,
+        preset_name=preset_name,
+        preset_is_default=bool(preset_mapping.get("is_default", False)),
+        preset_state=preset_state,
+        preset_type_label=preset_type_label,
+        source_policy_state=source_policy_state,
+        source_policy_label=source_policy_label,
+        source_policy_message=source_policy_message,
+        personalization_state=str(
+            personalization_mapping.get("personalization_state") or "unknown"
+        ),
+        personalization_label=str(
+            personalization_mapping.get("status_label") or "개인화 상태 미상"
+        ),
+        personalization_status_message=str(
+            personalization_mapping.get("status_message") or ""
+        ),
+        default_mode_label=default_mode_label,
+        linkage_state=linkage_state,
+        linkage_label=linkage_label,
+        linked_preset_count=linked_preset_count,
+        linked_default_preset_count=linked_default_preset_count,
+        has_personalization_context=bool(personalization_mapping),
+        has_recent_execution=has_recent_execution,
+        recent_execution_label=str(
+            execution_mapping.get("status_label")
+            or ("최근 실행 있음" if has_recent_execution else "연관 실행 없음")
+        ),
+        recent_execution_message=str(execution_mapping.get("status_message") or ""),
+        recent_execution_timestamp=execution_mapping.get("primary_timestamp")
+        or latest_execution_mapping.get("created_at"),
+        override_count=int(personalization_mapping.get("override_count") or 0),
+        override_labels=[
+            str(label).strip()
+            for label in personalization_mapping.get("override_labels") or []
+            if str(label).strip()
+        ],
+    )
 
     return {
         "effective_state": effective_state,
@@ -566,5 +784,6 @@ def build_effective_settings_provenance(
         "recent_execution_timestamp": execution_mapping.get("primary_timestamp")
         or latest_execution_mapping.get("created_at"),
         "summary_tokens": summary_tokens,
+        "lineage": lineage,
         "diagnostics": diagnostics,
     }
