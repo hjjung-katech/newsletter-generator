@@ -3,7 +3,7 @@
 이 문서는 현재 저장소 상태를 기준으로 리포 구조/운영 우선순위를 정렬하는 장기 정본(SSOT)입니다.
 새로운 지원 정책이나 제품 비전을 정의하지 않고, 이미 운영 중인 계약을 현재 현실에 맞게 고정합니다.
 
-- 기준일: 2026-03-14
+- 기준일: 2026-03-15
 - 적용 범위: repo structure, docs truthfulness, legacy surface reduction, ops observability
 - 선행 정본:
   - `docs/reference/support-policy.md`
@@ -12,9 +12,25 @@
   - `docs/dev/REPO_HYGIENE_POLICY.md`
   - `docs/README.md`
 
+## 0) Strategy Close-out Declaration
+
+2026-03-15 기준 legacy burn-down 및 운영 완성도 전략 실행은 공식 close-out 상태로 전환합니다.
+
+- 완료된 축:
+  - docs truth alignment
+  - repo hygiene hard gate / strict audit baseline
+  - hotspot burn-down 및 maintenance mode 전환
+  - schedule/history, approval, preset, source policy, personalization visibility 정렬
+  - settings provenance, mismatch diagnostics, field-level explanation, lineage summary/detail baseline
+- 현재 baseline 이후의 기본 운영 방식:
+  - 기계적 extraction 재개 금지
+  - maintenance mode 대상은 예외적 reopen 조건에서만 수정
+  - optional backlog는 구현 약속이 아니라 backlog 로만 유지
+- 이 문서는 close-out 이후의 공식 운영 기준선과 maintenance mode 운영 원칙을 함께 선언합니다.
+
 ## 1) 운영 계약 (Current Operating Contract)
 
-이 문서는 아래 계약을 다시 정의하지 않습니다. 다음 90일 작업은 모두 이 계약 안에서 수행합니다.
+이 문서는 아래 계약을 다시 정의하지 않습니다. close-out 이후 작업은 모두 이 계약 안에서 수행합니다.
 
 1. 지원/플랫폼/entrypoint 계약
 - 정본: `docs/reference/support-policy.md`
@@ -41,11 +57,11 @@
 
 ### 현재 리포 상태
 
-- `repo_audit.py --strict` 기준 top-level entries는 2026-03-14 close-out 시점 36개이며 warnings 는 0건입니다.
+- `repo_audit.py --strict` 기준 top-level entries는 2026-03-15 close-out 시점 36개이며 warnings 는 0건입니다.
 - 루트 실행 스크립트 분산 문제는 대부분 정리되었고, repo hygiene hard gate가 이를 유지합니다.
 - docs hub, support policy, ADR, CI guide가 이미 active 정본으로 운영 중입니다.
 - 현재 제품 표면은 실질적으로 Flask web 운영 표면 중심이며, CLI/scheduler/automation이 이를 보조합니다.
-- 남아 있는 구조 부채의 중심은 root clutter가 아니라 legacy runtime hotspot 이지만, 2026-03-14 기준으로는 추가 기계적 burn-down보다 maintenance mode 유지가 우선입니다.
+- 남아 있는 구조 부채의 중심은 root clutter가 아니라 legacy runtime hotspot 이지만, 2026-03-15 기준으로는 추가 기계적 burn-down보다 maintenance mode 유지가 우선입니다.
 
 ### 현재 위험이 집중된 hotspot
 
@@ -84,10 +100,11 @@
   - `newsletter/llm_factory.py`, `newsletter/tools.py`, `newsletter/graph.py`, `web/routes_generation.py`, `web/static/js/app.js` 는 maintenance mode 대상으로 고정합니다.
 - 운영 완성도 visibility 정렬 완료
   - schedule/history, approval, preset, source policy, personalization, settings provenance, mismatch diagnostics surface를 additive helper 경계로 정렬했습니다.
+  - field-level explanation과 lineage summary/detail까지 현재 baseline에 포함되며, 추가 drill-down은 optional backlog로만 남깁니다.
 
 이 문서의 다음 우선순위는 root cleanup 재개나 추가 기계적 extraction이 아니라, 현재 achieved state를 baseline으로 고정하고 maintenance mode 원칙으로 운영하는 것입니다.
 
-## 4) Maintenance Mode Transition
+## 4) Maintenance Mode Operating Rules
 
 ### A. 공식 maintenance mode 대상
 
@@ -109,20 +126,22 @@
 2. 새로운 제품 요구가 해당 shell 변경을 직접 요구할 때
 3. 중복 로직이 다시 유입되어 maintenance cost가 유의미하게 증가할 때
 4. shell LOC 또는 complexity가 다시 유의미하게 증가해 review cost가 커질 때
+5. 반복된 운영 해석 요청이 현재 optional backlog 범위를 정당화할 때
 
 reopen 원칙:
 - small-batch 로만 진행합니다.
 - 먼저 contract / ops-safety suite를 고정합니다.
 - semantics 보존이 불확실하면 reduction보다 안정성 복구를 우선합니다.
+- reopen 이유가 위 다섯 조건 중 무엇인지 RR 첫머리에 명시되지 않으면 reopen 배치로 취급하지 않습니다.
 
 ### C. optional backlog
 
 다음 항목은 선택 과제로만 남기고, 현재 baseline에는 포함하지 않습니다.
 
-- richer mismatch diagnostics
-- deeper provenance lineage
+- richer causal mismatch diagnostics
+- deeper provenance lineage history
 - time-based settings/result drill-down
-- field-level mismatch explanation
+- deeper causal explanation
 
 ### D. 유지해야 하는 운영 판단 기준
 
@@ -146,7 +165,7 @@ close-out 이후 KPI는 추가 burn-down 양보다 현재 baseline을 깨지 않
 | full gate health | `check --full` 기준 | 유지 | main/close-out 이후 green 유지 |
 | scheduler retry safety | required suites 존재 | 유지/개선 | 관련 suite failure 시 reduction PR 중단 |
 | dedupe/outbox incident 수 | release 기준 추적 | 0 unresolved | duplicate send regression 발생 시 다음 배치를 ops-safety 우선으로 전환 |
-| visibility/provenance surface | additive helper 경계 존재 | 유지 | schedule/history/approval/preset/source policy/personalization/settings diagnostics 의미 일관성 유지 |
+| visibility/provenance surface | additive helper 경계 존재 | 유지 | schedule/history/approval/preset/source policy/personalization/settings diagnostics/lineage 의미 일관성 유지 |
 | live smoke 결과 | source web smoke 사용 가능 | green 유지 | release 전 latest smoke evidence 필요 |
 
 ## 6) Out of Scope
