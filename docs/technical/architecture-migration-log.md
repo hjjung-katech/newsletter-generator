@@ -90,3 +90,42 @@
 - `python3 scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir .local/artifacts/repo-audit --check-policy --strict`
 - `make check`
 - `make check-full`
+
+## 2026-03-15
+
+### Strategy close-out declaration
+
+- 전략 실행은 공식 close-out 상태로 전환합니다.
+- 현재 baseline은 docs truth alignment, repo hygiene hard gate, legacy burn-down, schedule/history visibility, approval visibility, preset visibility, source policy visibility, personalization visibility, settings provenance/diagnostics, field-level mismatch explanation, lineage summary/detail 까지 포함합니다.
+- 이후 기본 운영 원칙은 "추가 구조 분해"가 아니라 maintenance mode 유지와 예외적 reopen 만 허용하는 방식입니다.
+
+### Maintenance mode targets
+
+- `newsletter/llm_factory.py`
+- `newsletter/tools.py`
+- `newsletter/graph.py`
+- `web/routes_generation.py`
+- `web/static/js/app.js`
+
+### Reopen conditions
+
+1. user-facing bug fix 또는 incident 대응 중 동일 영역 수정이 직접 필요할 때
+2. 새로운 제품 요구가 해당 shell 변경을 직접 요구할 때
+3. 중복 로직이 재유입되어 maintenance cost가 다시 커질 때
+4. shell LOC 또는 complexity가 다시 유의미하게 증가할 때
+5. 반복된 운영 해석 요청이 optional backlog 범위를 정당화할 때
+
+### Optional backlog
+
+- richer causal mismatch diagnostics
+- deeper provenance lineage history
+- time-based settings/result drill-down
+- deeper causal explanation
+
+### Current validation commands
+
+- `python3 scripts/repo_audit.py --policy scripts/repo_hygiene_policy.json --output-dir .local/artifacts/repo-audit --check-policy --strict`
+- `make check`
+- `make check-full`
+- `.local/venv/bin/python scripts/check_markdown_links.py`
+- `.local/venv/bin/python scripts/check_markdown_style.py docs/ARCHITECTURE.md docs/dev/LONG_TERM_REPO_STRATEGY.md`
