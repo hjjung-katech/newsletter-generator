@@ -79,7 +79,9 @@ Rollback Boundary:
         "Placeholder `RR: #<n>` must be replaced in `## Delivery Unit` section."
         in errors
     )
-    assert "Missing `Delivery Unit ID: <id>` in `## Delivery Unit` section." in errors
+    assert (
+        "Missing non-empty `Delivery Unit ID:` in `## Delivery Unit` section." in errors
+    )
     assert (
         "Placeholder `Merge Boundary:` value must be replaced in "
         "`## Delivery Unit` section." in errors
