@@ -32,9 +32,13 @@ Use it when you need skill-specific request wording rather than the base RR/PR p
 
 ```text
 Handle this as a PR-sized unit of work.
+- Delivery mode: rr-branch-commit-pr
+- RR Reference: #<n>
 - Goal: <goal>
 - Scope: <in-scope / out-of-scope>
 - Branch: <type>/<scope>-<topic>
+- Base branch: <base-branch>
+- First output must begin with [DELIVERY_CHECK]
 - Required gates: make check, make check-full, make repo-audit
 - Deliverables: commit hashes, PR link, CI status, rollback note
 - Working style: small-batch (target <=300 LOC and <=8 files per PR when practical)

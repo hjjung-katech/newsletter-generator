@@ -74,3 +74,12 @@ body:
       placeholder: docs/workflow-template-standard
     validations:
       required: true
+
+  - type: input
+    id: planned_base_branch
+    attributes:
+      label: Planned Base Branch
+      description: "작업 시작 시 계획한 base branch. 실제 현재 PR base 의 정본은 GitHub PR metadata/UI 입니다."
+      placeholder: main
+    validations:
+      required: true
