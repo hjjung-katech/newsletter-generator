@@ -16,6 +16,12 @@
 - Commits in this PR:
   - `<hash> <summary>`
 
+## Delivery Unit
+RR: #<n>
+Delivery Unit ID:
+Merge Boundary:
+Rollback Boundary:
+
 ## Test & Evidence
 - [ ] `make check`
 - [ ] `make check-full`

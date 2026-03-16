@@ -5,6 +5,35 @@ Global execution behavior is in `~/.codex/AGENTS.md`.
 If guidance conflicts, follow this file for this repository.
 Instruction layout reference: `docs/dev/CODEX_INSTRUCTION_LAYOUT.md`.
 
+## Mandatory Delivery Gate
+- Before modifying repo-tracked files, the first response must include `[DELIVERY_CHECK]`.
+- Required first-output fields:
+  - `Mode`
+  - `RR Reference`
+  - `Branch`
+  - `Base branch`
+  - `Working tree safe`
+  - `Proceed / Stop`
+- Required fields depend on `Mode`:
+  - `analysis-only`: `RR Reference`, `Branch`, `Base branch` may be `n/a`
+  - `local-change-only`: `RR Reference` and `Base branch` may be `n/a`; `Branch` is required when repo-tracked edits are made inside a git repository
+  - `rr-branch-commit-pr`: `RR Reference`, `Branch`, `Base branch` must be non-empty
+- Human-facing delivery blocks use `RR Reference: #<n>`.
+- `Proceed` means "proceed within the declared mode constraints"; `analysis-only` may still be `Proceed`.
+- `Working tree safe` means no unrelated modified/untracked files, or unrelated changes are explicitly listed and declared out of scope. If not safe, `Proceed` must be `Stop`.
+- Handoff minimum before reporting task completion:
+  - changed files
+  - tests run
+  - `RR Reference`
+  - `Delivery Unit ID` (if applicable)
+  - branch
+  - commit list
+  - PR link/draft artifact
+  - rollback point
+  - current CI status if available
+- Handoff and close-out are separate. `AGENTS.md` is authoritative for start-of-task behavior, handoff minimum, and the distinction between handoff and close-out. `docs/dev/CI_CD_GUIDE.md` is authoritative for detailed close-out and contributor workflow.
+- Silence is not permission to skip workflow.
+
 ## Non-negotiables
 - Default to `MOCK_MODE` for local tests and smoke runs unless explicitly testing real APIs.
 - Keep Flask + Postmark as the canonical web runtime stack.

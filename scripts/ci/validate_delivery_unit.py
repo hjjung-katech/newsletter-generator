@@ -9,12 +9,10 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from typing import Any, Iterable, Tuple
+from typing import Any, Iterable
 
-RR_PATTERN = re.compile(r"RR\s*:\s*#(\d+)", re.IGNORECASE)
-DELIVERY_UNIT_PATTERN = re.compile(
-    r"Delivery Unit ID\s*:\s*([A-Za-z0-9._-]+)", re.IGNORECASE
-)
+RR_VALUE_PATTERN = re.compile(r"#(\d+)")
+PLACEHOLDER_PATTERN = re.compile(r"<[^>\n]+>")
 
 EXEMPT_COMMIT_COUNT_LABELS = {"docs-only", "trivial", "hotfix"}
 MIN_COMMITS = 1
@@ -66,12 +64,74 @@ def _github_paginate(url: str, token: str) -> list[dict[str, Any]]:
     return entries
 
 
-def _extract_rr_and_du(pr_body: str) -> Tuple[int | None, str | None]:
-    rr_match = RR_PATTERN.search(pr_body or "")
-    du_match = DELIVERY_UNIT_PATTERN.search(pr_body or "")
+def _extract_field_value(pr_body: str, label: str) -> str | None:
+    pattern = re.compile(
+        rf"(?im)^[ \t]*[-*]?[ \t]*{re.escape(label)}[ \t]*:[ \t]*(.*?)\s*$"
+    )
+    match = pattern.search(pr_body or "")
+    if not match:
+        return None
+    return match.group(1).strip()
 
-    rr_number = int(rr_match.group(1)) if rr_match else None
-    delivery_unit = du_match.group(1).strip() if du_match else None
+
+def _looks_like_placeholder(value: str | None) -> bool:
+    if not value:
+        return False
+    return bool(PLACEHOLDER_PATTERN.search(value.strip()))
+
+
+def _validate_delivery_unit_fields(
+    pr_body: str,
+) -> tuple[list[str], int | None, str | None]:
+    errors: list[str] = []
+    rr_number: int | None = None
+    delivery_unit: str | None = None
+
+    if "## Delivery Unit" not in pr_body:
+        errors.append("Missing PR section: `## Delivery Unit`.")
+
+    rr_value = _extract_field_value(pr_body, "RR")
+    if rr_value is None:
+        errors.append("Missing `RR: #<number>` in `## Delivery Unit` section.")
+    elif _looks_like_placeholder(rr_value):
+        errors.append(
+            "Placeholder `RR: #<n>` must be replaced in `## Delivery Unit` section."
+        )
+    else:
+        rr_match = RR_VALUE_PATTERN.fullmatch(rr_value)
+        if rr_match is None:
+            errors.append("Invalid `RR: #<number>` in `## Delivery Unit` section.")
+        else:
+            rr_number = int(rr_match.group(1))
+
+    delivery_unit_value = _extract_field_value(pr_body, "Delivery Unit ID")
+    if delivery_unit_value is None or not delivery_unit_value:
+        errors.append("Missing `Delivery Unit ID: <id>` in `## Delivery Unit` section.")
+    elif _looks_like_placeholder(delivery_unit_value):
+        errors.append(
+            "Placeholder `Delivery Unit ID:` value must be replaced in "
+            "`## Delivery Unit` section."
+        )
+    else:
+        delivery_unit = delivery_unit_value
+
+    for label in ("Merge Boundary", "Rollback Boundary"):
+        value = _extract_field_value(pr_body, label)
+        if value is None or not value:
+            errors.append(
+                f"Missing non-empty `{label}:` in `## Delivery Unit` section."
+            )
+        elif _looks_like_placeholder(value):
+            errors.append(
+                f"Placeholder `{label}:` value must be replaced in "
+                "`## Delivery Unit` section."
+            )
+
+    return errors, rr_number, delivery_unit
+
+
+def _extract_rr_and_du(pr_body: str) -> tuple[int | None, str | None]:
+    _, rr_number, delivery_unit = _validate_delivery_unit_fields(pr_body or "")
     return rr_number, delivery_unit
 
 
@@ -114,22 +174,8 @@ def main() -> int:
         print("No pull_request payload found in event.")
         return 1
 
-    if "## Delivery Unit" not in pr_body:
-        errors.append("Missing PR section: `## Delivery Unit`.")
-
-    rr_number, delivery_unit = _extract_rr_and_du(pr_body)
-    if rr_number is None:
-        errors.append("Missing `RR: #<number>` in `## Delivery Unit` section.")
-    if not delivery_unit:
-        errors.append("Missing `Delivery Unit ID: <id>` in `## Delivery Unit` section.")
-    if not re.search(r"Merge Boundary\s*:\s*\S+", pr_body, re.IGNORECASE):
-        errors.append(
-            "Missing non-empty `Merge Boundary:` in `## Delivery Unit` section."
-        )
-    if not re.search(r"Rollback Boundary\s*:\s*\S+", pr_body, re.IGNORECASE):
-        errors.append(
-            "Missing non-empty `Rollback Boundary:` in `## Delivery Unit` section."
-        )
+    body_errors, rr_number, delivery_unit = _validate_delivery_unit_fields(pr_body)
+    errors.extend(body_errors)
 
     owner, repo = repository.split("/", 1)
     api_base = f"https://api.github.com/repos/{owner}/{repo}"

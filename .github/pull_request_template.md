@@ -11,10 +11,10 @@
 - <item>
 
 ## Delivery Unit
-- RR: #<issue-number>
-- Delivery Unit ID: DU-YYYYMMDD-<topic>
-- Merge Boundary:
-- Rollback Boundary:
+RR: #<n>
+Delivery Unit ID:
+Merge Boundary:
+Rollback Boundary:
 
 ## Test & Evidence
 - [ ] `make check`

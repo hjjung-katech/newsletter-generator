@@ -159,6 +159,7 @@ python scripts/repo_audit.py \
 2. PR 본문 필수 섹션
 - `## Summary (what / why)`
 - `## Scope`
+- `## Delivery Unit`
 - `## Test & Evidence`
 - `## Risk & Rollback`
 - `## Ops-Safety Addendum (if touching protected paths)`
@@ -168,6 +169,143 @@ python scripts/repo_audit.py \
 - 형식: `<type>(<scope>): <summary>`
 - summary 최대 72자
 
+## Delivery Lifecycle Authorities
+
+- `AGENTS.md` 는 start-of-task behavior, handoff minimum, handoff와 close-out의 구분에 대한 정본입니다.
+- PR templates + workflows + `scripts/ci/validate_delivery_unit.py` 는 machine-checked literals 와 PR body shape 의 정본입니다.
+- `docs/dev/CI_CD_GUIDE.md` 는 detailed close-out 과 contributor workflow 의 정본입니다.
+
+운영 truth 는 아래처럼 분리합니다.
+
+- PR body literals are machine-checked.
+- PR metadata is the system-of-record for the actual current base branch.
+- RR template stores planned branch info, not live PR state.
+
+## Delivery Start Gate
+
+작업 시작 전 첫 응답은 항상 아래 블록으로 시작합니다.
+
+```text
+[DELIVERY_CHECK]
+- Mode:
+- RR Reference:
+- Branch:
+- Base branch:
+- Working tree safe:
+- Proceed / Stop:
+```
+
+- human-facing delivery block 에서는 `RR Reference: #<n>` 형식을 사용합니다.
+- machine-checked PR body 에서는 exact literal `RR: #<n>` 만 허용합니다.
+- `Proceed` means "proceed within the declared mode constraints."
+- `analysis-only` 도 수정 금지 상태로 `Proceed` 일 수 있습니다.
+- `Working tree safe` 는 아래 둘 중 하나일 때만 `yes` 입니다.
+  - unrelated modified/untracked files 가 없음
+  - unrelated changes 가 명시적으로 열거되고 이번 작업 out-of-scope 로 선언됨
+
+Required fields depend on `Mode`.
+
+- `analysis-only`
+  - `RR Reference`, `Branch`, `Base branch` may be `n/a`
+- `local-change-only`
+  - `RR Reference` and `Base branch` may be `n/a`
+  - when repo-tracked edits are made inside a git repository, `Branch` must report the current branch
+- `rr-branch-commit-pr`
+  - `RR Reference`, `Branch`, `Base branch` must be non-empty
+
+`Proceed` must be `Stop` only when a field required for the declared mode is missing or invalid.
+
+## Delivery Handoff and Close-out
+
+handoff 와 close-out 은 같은 시점의 완료 조건이 아닙니다.
+
+- Task handoff complete
+  - merge 전에도 정상 완료 가능
+  - minimum:
+    - changed files
+    - tests run
+    - `RR Reference`
+    - `Delivery Unit ID`
+    - branch
+    - commit list
+    - PR link or PR draft artifact
+    - rollback point
+    - current CI status if available
+- RR close-out complete
+  - merge 후 lifecycle 종료
+  - minimum:
+    - merge result
+    - final CI status if available
+    - RR close status (`auto-closed` / `still open` / `close failed`)
+
+상태 보고는 아래 인터페이스를 기준으로 유지합니다.
+
+```text
+[LIFECYCLE_STATUS]
+- Stage:
+- RR Reference:
+- Delivery Unit ID:
+- Changed files:
+- Branch:
+- Base branch at start:
+- Commits:
+- PR:
+- Tests:
+- CI status:
+- Merge result:
+- RR close status:
+- Rollback point:
+```
+
+- allowed stages:
+  - `analysis-only`
+  - `local-change-only`
+  - `pr-draft-ready`
+  - `pr-open`
+  - `merged`
+  - `rr-closed`
+- `n/a` is allowed only for fields not required by the declared Stage.
+
+Stage minimums:
+
+- `analysis-only` / `local-change-only`
+  - `Stage`
+  - `Changed files`
+  - `Tests` (if any)
+  - `Rollback point` or `n/a` if no repo change
+- `pr-draft-ready` / `pr-open`
+  - `RR Reference`
+  - `Delivery Unit ID`
+  - `Changed files`
+  - `Branch`
+  - `Commits`
+  - `PR`
+  - `Tests`
+  - `Rollback point`
+- `merged` / `rr-closed`
+  - `RR Reference`
+  - `Delivery Unit ID`
+  - `Changed files`
+  - `PR`
+  - `Merge result`
+  - `RR close status`
+  - `Rollback point`
+
+## Machine-checked PR Body Literals
+
+아래 값은 paraphrase 하지 않습니다.
+
+- `## Delivery Unit`
+- `RR: #<n>`
+- `Delivery Unit ID: <id>`
+- `Merge Boundary:`
+- `Rollback Boundary:`
+
+placeholder 규칙:
+
+- Template placeholders must be replaced before `pr-open` or `merged`.
+- Placeholder text is not a valid machine value.
+
 ## Contributor Workflow Standard
 
 기여자 workflow 정본은 이 섹션을 기준으로 유지합니다.
@@ -176,6 +314,8 @@ python scripts/repo_audit.py \
 - GitHub RR 템플릿: `.github/ISSUE_TEMPLATE/review-request.yml`
 - RR 1건은 기본적으로 PR 1건과 1:1로 대응합니다.
 - `Delivery Unit ID` 를 RR과 PR 모두에 유지합니다.
+- RR 템플릿의 `Planned Base Branch` 는 계획값입니다.
+- 실제 현재 PR base branch 의 정본은 GitHub PR metadata/UI 입니다.
 
 2. 브랜치 네이밍
 - 기본 패턴: `<type>/<scope>-<topic>`
@@ -188,7 +328,9 @@ python scripts/repo_audit.py \
 
 4. PR 본문
 - `.github/pull_request_template.md` 의 필수 섹션을 모두 채웁니다.
-- `## Delivery Unit` 섹션에 `RR`, `Delivery Unit ID`, merge/rollback boundary를 명시합니다.
+- `## Delivery Unit` 섹션에는 exact literal `RR: #<n>` 를 사용합니다.
+- `## Delivery Unit` 섹션에 `Delivery Unit ID`, `Merge Boundary:`, `Rollback Boundary:` 를 모두 채웁니다.
+- placeholder 문구(`#<n>`, `<id>` 등)는 `pr-open` 또는 `merged` 전에 실제 값으로 치환해야 합니다.
 
 5. Merge 정책
 - 기본 merge 방식: squash merge
@@ -201,9 +343,13 @@ python scripts/repo_audit.py \
 
 ```text
 이번 작업은 PR 단위로 끝까지 진행해줘.
+- Delivery mode: rr-branch-commit-pr
+- RR Reference: #<n>
 - 목표: <목표>
 - 범위: <in-scope / out-of-scope>
 - 브랜치: <type>/<scope>-<topic>
+- Base branch: <base-branch>
+- First output must begin with [DELIVERY_CHECK]
 - 필수 게이트: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
 - 선택 게이트: make repo-audit (구조/정책 변경 시)
 - 산출물: 커밋 해시, PR 링크, CI 상태, merge 결과, 롤백 메모

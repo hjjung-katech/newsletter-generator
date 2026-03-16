@@ -14,6 +14,12 @@
 ### Out of Scope
 -
 
+## Delivery Unit
+RR: #<n>
+Delivery Unit ID:
+Merge Boundary:
+Rollback Boundary:
+
 ## Test & Evidence
 - [ ] `make check`
 - [ ] `make check-full`
