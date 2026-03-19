@@ -90,3 +90,53 @@ Rollback Boundary:
         "Missing non-empty `Rollback Boundary:` in `## Delivery Unit` section."
         in errors
     )
+
+
+def test_validate_delivery_unit_fields_rejects_fields_outside_delivery_unit_section() -> (
+    None
+):
+    pr_body = """
+RR: #123
+Delivery Unit ID: DU-20260319-delivery-validator-hardening
+Merge Boundary: squash
+Rollback Boundary: revert
+
+## Delivery Unit
+(fields must not be accepted from outside this section)
+"""
+
+    (
+        errors,
+        rr_number,
+        delivery_unit,
+    ) = delivery_validator._validate_delivery_unit_fields(pr_body)
+
+    assert rr_number is None
+    assert delivery_unit is None
+    assert "Missing `RR: #<number>` in `## Delivery Unit` section." in errors
+    assert (
+        "Missing non-empty `Delivery Unit ID:` in `## Delivery Unit` section." in errors
+    )
+    assert (
+        "Missing non-empty `Merge Boundary:` in `## Delivery Unit` section." in errors
+    )
+    assert (
+        "Missing non-empty `Rollback Boundary:` in `## Delivery Unit` section."
+        in errors
+    )
+
+
+def test_validate_rr_issue_requires_review_request_label() -> None:
+    issue = {"labels": []}
+
+    errors = delivery_validator._validate_rr_issue(issue, 381)
+
+    assert errors == ["Referenced RR #381 must have the `review-request` label."]
+
+
+def test_validate_rr_issue_accepts_review_request_issue() -> None:
+    issue = {"labels": [{"name": "review-request"}]}
+
+    errors = delivery_validator._validate_rr_issue(issue, 381)
+
+    assert errors == []
