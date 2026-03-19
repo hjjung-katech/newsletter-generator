@@ -25,7 +25,8 @@
 
 4. `docs-quality.yml`
 - 목적: 문서 링크/스타일 품질 검증
-- 트리거: markdown 변경 `pull_request`/`push`
+- 트리거: `main`/`develop` 대상 `pull_request`/`push`
+- 동작: required check 가 항상 emit 되며, docs 관련 변경이 없으면 no-op pass 로 종료
 
 5. `ops-safety-monitor.yml`
 - 목적: 운영 안전성 점검 모니터링

@@ -24,7 +24,8 @@
 
 4. `docs-quality.yml`
 - Markdown 링크/스타일 품질 검증
-- 문서 변경 push/PR에서 실행
+- `main`/`develop` 대상 push/PR에서 항상 check 를 emit
+- docs 관련 변경이 없으면 no-op pass 로 종료
 
 5. `ops-safety-monitor.yml`
 - 운영 안전성 모니터링(정기/수동)
