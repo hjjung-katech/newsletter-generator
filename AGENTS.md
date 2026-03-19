@@ -9,18 +9,21 @@ Instruction layout reference: `docs/dev/CODEX_INSTRUCTION_LAYOUT.md`.
 - Before modifying repo-tracked files, the first response must include `[DELIVERY_CHECK]`.
 - Required first-output fields:
   - `Mode`
+  - `Lifecycle target`
   - `RR Reference`
   - `Branch`
   - `Base branch`
   - `Working tree safe`
   - `Proceed / Stop`
+- `Lifecycle target` must be one of `analysis-only`, `local-change-only`, `pr-draft-ready`, `pr-open`, `merged`, `rr-closed`.
 - Required fields depend on `Mode`:
-  - `analysis-only`: `RR Reference`, `Branch`, `Base branch` may be `n/a`
-  - `local-change-only`: `RR Reference` and `Base branch` may be `n/a`; `Branch` is required when repo-tracked edits are made inside a git repository
-  - `rr-branch-commit-pr`: `RR Reference`, `Branch`, `Base branch` must be non-empty
+  - `analysis-only`: `Lifecycle target` must be `analysis-only`; `RR Reference`, `Branch`, `Base branch` may be `n/a`
+  - `local-change-only`: `Lifecycle target` must be `local-change-only`; `RR Reference` and `Base branch` may be `n/a`; `Branch` is required when repo-tracked edits are made inside a git repository
+  - `rr-branch-commit-pr`: `RR Reference`, `Branch`, `Base branch` must be non-empty; default to `Mode: rr-branch-commit-pr` and `Lifecycle target: rr-closed` for implementation work unless the user explicitly narrows scope
 - Human-facing delivery blocks use `RR Reference: #<n>`.
 - `Proceed` means "proceed within the declared mode constraints"; `analysis-only` may still be `Proceed`.
 - `Working tree safe` means no unrelated modified/untracked files, or unrelated changes are explicitly listed and declared out of scope. If not safe, `Proceed` must be `Stop`.
+- Do not silently downgrade to `local-change-only`. If RR/base branch/permissions are missing for `rr-branch-commit-pr`, `Proceed / Stop` must be `Stop` and the missing prerequisite must be called out explicitly.
 - Handoff minimum before reporting task completion:
   - changed files
   - tests run
@@ -31,6 +34,16 @@ Instruction layout reference: `docs/dev/CODEX_INSTRUCTION_LAYOUT.md`.
   - PR link/draft artifact
   - rollback point
   - current CI status if available
+- Default completion for `rr-branch-commit-pr` with `Lifecycle target: rr-closed` requires:
+  - RR exists
+  - branch exists
+  - commit list exists
+  - PR exists
+  - local verification ran
+  - required checks are green
+  - merge completed
+  - RR close status confirmed
+  - delivery branch/worktree cleanup confirmed
 - Handoff and close-out are separate. `AGENTS.md` is authoritative for start-of-task behavior, handoff minimum, and the distinction between handoff and close-out. `docs/dev/CI_CD_GUIDE.md` is authoritative for detailed close-out and contributor workflow.
 - Silence is not permission to skip workflow.
 
@@ -90,6 +103,7 @@ Ops-safety-sensitive paths:
 
 ## Workflow Contract (RR/Branch/Commit/PR)
 - Standard flow: RR -> Branch -> Commit -> PR -> Merge.
+- Default lifecycle target for standard implementation work: `rr-closed`.
 - RR template: `.github/ISSUE_TEMPLATE/review-request.yml`
 - Branch naming: `<type>/<scope>-<topic>`
 - Commit messages follow `.gitmessage.txt`.
@@ -99,6 +113,7 @@ Ops-safety-sensitive paths:
 - Keep each PR within about 300 LOC and 8 files when possible.
 - For large refactors, lock contract tests first and split into sequential PRs.
 - Default merge strategy is squash; exceptions require explicit evidence.
+- After merge, verify RR close status and clean up only the delivery branch/worktree created for that task. Never delete unrelated branches, worktrees, or uncommitted changes.
 
 ## Skill Routing (Prefer Skills for Repetitive Playbooks)
 - Keep this file short; move repetitive procedures into `.agents/skills/*/SKILL.md`.

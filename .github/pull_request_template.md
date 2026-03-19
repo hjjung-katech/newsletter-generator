@@ -19,6 +19,7 @@ Rollback Boundary:
 ## Test & Evidence
 - [ ] `make check`
 - [ ] `make check-full`
+- [ ] GitHub required checks green before merge
 - [ ] Additional tests (if needed):
 
 ### Commands and Results

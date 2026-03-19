@@ -188,6 +188,7 @@ python scripts/repo_audit.py \
 ```text
 [DELIVERY_CHECK]
 - Mode:
+- Lifecycle target:
 - RR Reference:
 - Branch:
 - Base branch:
@@ -202,22 +203,42 @@ python scripts/repo_audit.py \
 - `Working tree safe` 는 아래 둘 중 하나일 때만 `yes` 입니다.
   - unrelated modified/untracked files 가 없음
   - unrelated changes 가 명시적으로 열거되고 이번 작업 out-of-scope 로 선언됨
+- `Lifecycle target` allowed values: `analysis-only`, `local-change-only`, `pr-draft-ready`, `pr-open`, `merged`, `rr-closed`
+- 구현 작업을 명시적으로 더 좁히지 않았다면 기본값은 `Mode: rr-branch-commit-pr` 와 `Lifecycle target: rr-closed` 입니다.
+- `local-change-only` 는 explicit opt-in/fallback 용도입니다. RR/base branch/permissions 가 없다는 이유로 자동 강등하지 않습니다.
+
+기본 구현 요청은 아래처럼 시작합니다.
+
+```text
+[DELIVERY_CHECK]
+- Mode: rr-branch-commit-pr
+- Lifecycle target: rr-closed
+- RR Reference: #<n> | pending prerequisite
+- Branch: <type>/<scope>-<topic>
+- Base branch: <base-branch>
+- Working tree safe: yes|no
+- Proceed / Stop: Proceed|Stop
+```
 
 Required fields depend on `Mode`.
 
 - `analysis-only`
+  - `Lifecycle target` must be `analysis-only`
   - `RR Reference`, `Branch`, `Base branch` may be `n/a`
 - `local-change-only`
+  - `Lifecycle target` must be `local-change-only`
   - `RR Reference` and `Base branch` may be `n/a`
   - when repo-tracked edits are made inside a git repository, `Branch` must report the current branch
 - `rr-branch-commit-pr`
+  - default `Lifecycle target` is `rr-closed` unless the request explicitly narrows to `pr-draft-ready`, `pr-open`, or `merged`
   - `RR Reference`, `Branch`, `Base branch` must be non-empty
 
-`Proceed` must be `Stop` only when a field required for the declared mode is missing or invalid.
+`Proceed` must be `Stop` when a field required for the declared mode is missing or invalid, or when RR/base branch/permissions required for `rr-branch-commit-pr` are not available yet.
 
 ## Delivery Handoff and Close-out
 
 handoff 와 close-out 은 같은 시점의 완료 조건이 아닙니다.
+기본 기대 종료 상태는 `rr-closed` 입니다. handoff 는 중간 인계 상태로 허용되지만, 명시적으로 target 을 낮추지 않았다면 기본 완료로 간주하지 않습니다.
 
 - Task handoff complete
   - merge 전에도 정상 완료 가능
@@ -243,6 +264,7 @@ handoff 와 close-out 은 같은 시점의 완료 조건이 아닙니다.
 ```text
 [LIFECYCLE_STATUS]
 - Stage:
+- Lifecycle target:
 - RR Reference:
 - Delivery Unit ID:
 - Changed files:
@@ -254,6 +276,8 @@ handoff 와 close-out 은 같은 시점의 완료 조건이 아닙니다.
 - CI status:
 - Merge result:
 - RR close status:
+- Branch cleanup:
+- Worktree clean:
 - Rollback point:
 ```
 
@@ -270,10 +294,12 @@ Stage minimums:
 
 - `analysis-only` / `local-change-only`
   - `Stage`
+  - `Lifecycle target`
   - `Changed files`
   - `Tests` (if any)
   - `Rollback point` or `n/a` if no repo change
 - `pr-draft-ready` / `pr-open`
+  - `Lifecycle target`
   - `RR Reference`
   - `Delivery Unit ID`
   - `Changed files`
@@ -283,12 +309,15 @@ Stage minimums:
   - `Tests`
   - `Rollback point`
 - `merged` / `rr-closed`
+  - `Lifecycle target`
   - `RR Reference`
   - `Delivery Unit ID`
   - `Changed files`
   - `PR`
   - `Merge result`
   - `RR close status`
+  - `Branch cleanup`
+  - `Worktree clean`
   - `Rollback point`
 
 ## Machine-checked PR Body Literals
@@ -336,23 +365,25 @@ placeholder 규칙:
 - 기본 merge 방식: squash merge
 - merge 전 조건: `python -m scripts.devtools.dev_entrypoint check --full` 및 GitHub required checks green
 - hotfix 등 예외는 `## Not Run` 에 사유를 남깁니다.
+- merge 후에는 RR close status 를 확인하고, 이번 delivery unit 이 만든 branch/worktree 만 정리합니다.
 
 ## Request Entry Patterns
 
 ### Standard RR request
 
 ```text
-이번 작업은 PR 단위로 끝까지 진행해줘.
+이번 작업은 RR close까지 끝내는 delivery unit으로 처리해줘.
 - Delivery mode: rr-branch-commit-pr
+- Lifecycle target: rr-closed
+- Goal: 변경 반영 -> RR 생성 -> branch 생성 -> commit -> PR 생성 -> 로컬/CI 테스트 확인 -> 필요 시 수정 -> required checks green 확인 후 merge -> RR 종료 확인 -> 불필요한 branch/worktree 정리
 - RR Reference: #<n>
-- 목표: <목표>
-- 범위: <in-scope / out-of-scope>
-- 브랜치: <type>/<scope>-<topic>
+- Scope: <in-scope / out-of-scope>
+- Branch: <type>/<scope>-<topic>
 - Base branch: <base-branch>
 - First output must begin with [DELIVERY_CHECK]
-- 필수 게이트: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
-- 선택 게이트: make repo-audit (구조/정책 변경 시)
-- 산출물: 커밋 해시, PR 링크, CI 상태, merge 결과, 롤백 메모
+- If RR/base branch/permissions are missing, stop and ask for the missing prerequisite instead of falling back to local-change-only.
+- Required gates: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
+- Deliverables: commit hashes, PR link, CI status, merge result, RR close status, branch/worktree cleanup status, rollback note
 ```
 
 ### CI failure request

@@ -31,18 +31,23 @@ Use it when you need skill-specific request wording rather than the base RR/PR p
 ### 1) PR-sized structure improvement request
 
 ```text
-Handle this as a PR-sized unit of work.
+Handle this as a delivery unit that closes the RR by default.
 - Delivery mode: rr-branch-commit-pr
+- Lifecycle target: rr-closed
+- Goal: 변경 반영 -> RR 생성 -> branch 생성 -> commit -> PR 생성 -> 로컬/CI 테스트 확인 -> 필요 시 수정 -> required checks green 확인 후 merge -> RR 종료 확인 -> 불필요한 branch/worktree 정리
 - RR Reference: #<n>
-- Goal: <goal>
 - Scope: <in-scope / out-of-scope>
 - Branch: <type>/<scope>-<topic>
 - Base branch: <base-branch>
 - First output must begin with [DELIVERY_CHECK]
+- If RR/base branch/permissions are missing, stop and ask for the missing prerequisite instead of falling back to local-change-only.
 - Required gates: make check, make check-full, make repo-audit
-- Deliverables: commit hashes, PR link, CI status, rollback note
+- Deliverables: commit hashes, PR link, CI status, merge result, RR close status, branch/worktree cleanup status, rollback note
 - Working style: small-batch (target <=300 LOC and <=8 files per PR when practical)
 ```
+
+- default expected end state is `rr-closed`
+- `local-change-only` may only be proposed as a fallback option
 
 ### 2) CI failure response request
 
