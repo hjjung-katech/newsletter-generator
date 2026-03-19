@@ -1,0 +1,17 @@
+Title: Maintainer Weekly Brief
+Intro: Prepared for contributors, internal stakeholders, and partner teams.
+
+[AI]
+- The model evaluation guide was rewritten into a single quick-start, which cut repeated onboarding questions from new contributors.
+- Two flaky benchmark jobs were moved to nightly runs, reducing noise in the pull request queue and helping reviews land faster.
+- A community proposal for structured prompt fixtures is ready for maintainer review after early feedback from three external contributors.
+
+[Mobility]
+- The fleet telemetry parser now handles delayed device events more reliably, lowering the amount of manual triage after field tests.
+- Charging map refreshes were moved to an hourly schedule so support teams and internal operators now see the same station status.
+- A draft adapter guide for municipal traffic feeds is being reviewed internally before the integration work opens to outside contributors.
+
+[Software]
+- Release highlights are now drafted automatically from merged pull requests, leaving maintainers with a short final review instead of a full rewrite.
+- The issue intake template was simplified for non-engineering teammates, making docs gaps and deployment regressions easier to report.
+- A small packaging fix removed an extra Windows setup step, which should reduce support churn for community adopters and internal teams.
