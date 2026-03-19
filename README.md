@@ -23,25 +23,8 @@ Static preview of the default `compact` output shape.
 **Input**
 
 ```text
-Title: Maintainer Communication Brief
-Topic: Maintainer workflow automation
-Date: 2026-03-19
-Issue: 14
-Tagline: Turn weekly project activity into a concise update teams can actually use.
-Audience: Prepared for contributors, internal stakeholders, and partner teams.
-
-[Top Stories]
-- Release notes drafts now start from merged pull requests | The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite. | Project activity · 2026-03-19
-
-[Project Delivery]
-Intro: Updates that reduce repetitive maintainer coordination work.
-- Weekly digest draft is prepared from project activity and issue labels | Release workflow · 2026-03-19
-
-[Definitions]
-- Idempotency key | A stable request identifier used to prevent duplicate jobs or duplicate email sends.
-
-[Things to Watch]
-- If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+Domain: Automotive
+Keywords: autonomous driving, ADAS, Tesla FSD, Waymo
 ```
 
 **Output**
