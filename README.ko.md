@@ -18,38 +18,63 @@
 - 크로스플랫폼 환경과 이메일 배포 워크플로 지원
 
 ## Quick Demo
+기본 `compact` 출력 구조를 보여주는 정적 preview입니다.
+
 **입력**
 
 ```text
-Title: Internal Update
+Title: Maintainer Communication Brief
+Topic: Maintainer workflow automation
+Date: 2026-03-19
+Issue: 14
+Tagline: Turn weekly project activity into a concise update teams can actually use.
+Audience: Prepared for contributors, internal stakeholders, and partner teams.
 
-[Software]
-- Release notes draft is ready.
-- Support inbox volume dropped this week.
+[Top Stories]
+- Release notes drafts now start from merged pull requests | The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite. | Project activity · 2026-03-19
 
-[Mobility]
-- Charging map refresh now runs hourly.
-- Field-test telemetry parsing became more stable.
+[Project Delivery]
+Intro: Updates that reduce repetitive maintainer coordination work.
+- Weekly digest draft is prepared from project activity and issue labels | Release workflow · 2026-03-19
+
+[Definitions]
+- Idempotency key | A stable request identifier used to prevent duplicate jobs or duplicate email sends.
+
+[Things to Watch]
+- If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
 ```
 
 **출력**
 
 ```md
-# Internal Update
+# Maintainer Communication Brief
+_Maintainer workflow automation · Issue 14 · 2026-03-19_
 
-## Software
-- Release notes draft is ready.
-- Support inbox volume dropped this week.
+_Turn weekly project activity into a concise update teams can actually use._
 
-## Mobility
-- Charging map refresh now runs hourly.
-- Field-test telemetry parsing became more stable.
+Prepared for contributors, internal stakeholders, and partner teams.
+
+## 🔥 Must-Read This Week
+### Release notes drafts now start from merged pull requests
+The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite.
+_Project activity · 2026-03-19_
+
+## Project Delivery
+Updates that reduce repetitive maintainer coordination work.
+
+- **Weekly digest draft is prepared from project activity and issue labels** (`Release workflow · 2026-03-19`)
+
+## 📖 Definitions
+- **Idempotency key:** A stable request identifier used to prevent duplicate jobs or duplicate email sends.
+
+## 💡 Things to Watch
+> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
 ```
 
 ## 개요
 메인테이너와 팀은 업데이트를 요약하고 대상별로 다시 쓰는 데 많은 시간을 씁니다. Newsletter Generator는 이 반복 업무를 줄이기 위해 만들어졌습니다. 프로젝트 업데이트 메모를 받아 커뮤니티 공지, 내부 공유, 팀 브리프에 바로 쓸 수 있는 뉴스레터 형태로 정리합니다.
 
-이 저장소는 단순 소개만 담지 않고 실제 운영에 필요한 정보도 함께 유지합니다. 지원 정책, 환경변수 계약, 로컬 실행 가이드, 배포 문서, 검증 게이트를 README와 `docs/`에서 함께 안내해 신규 사용자와 유지보수자가 빠르게 진입할 수 있도록 구성했습니다.
+실제 앱은 `compact`, `detailed`, `email_compatible` HTML 템플릿을 지원합니다. 이 README는 기본값인 `compact` 구조를 영어 기준의 정적 preview로 보여주고, 현재 저장소에 포함된 운영용 템플릿 문구는 한국어 중심입니다. 이 저장소는 단순 소개만 담지 않고 실제 운영에 필요한 정보도 함께 유지합니다. 지원 정책, 환경변수 계약, 로컬 실행 가이드, 배포 문서, 검증 게이트를 README와 `docs/`에서 함께 안내해 신규 사용자와 유지보수자가 빠르게 진입할 수 있도록 구성했습니다.
 
 ## 사용 사례
 - 오픈소스 메인테이너가 주간 또는 월간 프로젝트 업데이트를 기여자와 사용자에게 공유할 때
@@ -65,26 +90,45 @@ Title: Internal Update
 - 웹 기반의 크로스플랫폼 흐름으로 비엔지니어도 쉽게 사용할 수 있는 사용성
 
 ## 예시 출력
-생성 결과 예시는 다음과 같습니다.
+생성 결과 예시는 다음과 같습니다. 아래 예시는 영문 공개 데모 기준이지만, 실제 구조는 기본 `compact` 템플릿 흐름을 따릅니다.
 
 ```md
-# Maintainer Weekly Brief
-기여자, 내부 이해관계자, 파트너 팀을 위한 주간 브리프입니다.
+# Maintainer Communication Brief
+_Maintainer workflow automation · Issue 14 · 2026-03-19_
 
-## AI
-- 모델 평가 가이드를 하나의 빠른 시작 문서로 정리해 신규 기여자의 반복 질문을 줄였습니다.
-- 불안정하던 벤치마크 작업 두 개를 야간 실행으로 옮겨 PR 큐의 잡음을 줄이고 리뷰 처리 속도를 높였습니다.
-- 구조화된 프롬프트 픽스처 제안은 외부 기여자 세 명의 초기 피드백을 반영해 maintainer 검토 단계에 들어갔습니다.
+_Turn weekly project activity into a concise update teams can actually use._
 
-## Mobility
-- 차량 텔레메트리 파서가 지연된 디바이스 이벤트를 더 안정적으로 처리해 현장 테스트 뒤 수동 분류 작업이 줄었습니다.
-- 충전소 맵 갱신을 매시간 실행하도록 바꿔 지원팀과 내부 운영팀이 동일한 상태 정보를 보게 됐습니다.
-- 지자체 교통 피드 연동 가이드는 외부 공개 전에 내부 검토 단계에 있습니다.
+Prepared for contributors, internal stakeholders, and partner teams.
 
-## Software
-- 병합된 PR 기준으로 릴리스 하이라이트 초안을 자동 생성해 maintainer가 최종 확인만 하면 되도록 바뀌었습니다.
-- 이슈 접수 템플릿을 비엔지니어도 쓰기 쉽게 단순화해 문서 공백과 배포 회귀를 더 쉽게 보고할 수 있게 했습니다.
-- Windows 패키징의 추가 설정 단계를 하나 줄여 커뮤니티 사용자와 내부 팀의 지원 부담을 줄였습니다.
+## 🔥 Must-Read This Week
+### Release notes drafts now start from merged pull requests
+The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite.
+_Project activity · 2026-03-19_
+
+### Docs quality checks now catch broken anchors before publish
+Maintainers can fix link and reference regressions before updates go out to contributors or internal readers.
+_Docs pipeline · 2026-03-18_
+
+## Project Delivery
+Updates that reduce repetitive maintainer coordination work.
+
+- **Weekly digest draft is prepared from project activity and issue labels** (`Release workflow · 2026-03-19`)
+- **Issue intake wording was simplified so non-engineers can report docs and deployment gaps faster** (`Support workflow · 2026-03-18`)
+
+## Contributor Experience
+Improvements that make updates easier to consume across community and internal audiences.
+
+- **A single onboarding summary now answers the most repeated contributor setup questions** (`Contributor docs · 2026-03-17`)
+- **Cross-team platform notes are grouped into one digest instead of separate status emails** (`Internal communications · 2026-03-17`)
+
+## 📖 Definitions
+- **Idempotency key:** A stable request identifier used to prevent duplicate jobs or duplicate email sends.
+- **Docs gate:** An automated check that verifies documentation links, required references, and policy consistency.
+
+## 💡 Things to Watch
+> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+
+_Generated as an English compact preview of the production newsletter template._
 ```
 
 ## 왜 중요한가
@@ -100,47 +144,25 @@ Title: Internal Update
 공식 지원 범위와 운영 기준은 지원 정책 문서를 따릅니다. 요약하면 Python 3.11, 3.12가 주요 대상이고 Linux는 canonical production server, Windows는 native desktop bundle 대상, macOS는 source-based development와 smoke 중심 지원입니다.
 
 ## 빠른 시작
-가장 빠르게 체험하려면 저장소에 포함된 데모 CLI를 실행하면 됩니다. 평문 입력을 받아 몇 초 안에 Markdown 뉴스레터를 생성합니다.
-1분 안에 첫 뉴스레터를 생성해 볼 수 있습니다.
+위 Quick Demo는 정적 preview입니다. 실제 제품을 로컬에서 실행하려면 아래 canonical setup과 CLI entrypoint를 사용하면 됩니다.
 
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
-python main.py --input sample_input.txt
-```
-
-환경에 따라 `python3`만 제공된다면 위 명령의 `python`을 `python3`로 바꿔 실행하면 됩니다.
-
-파일로 저장하려면:
-
-```bash
-python main.py --input sample_input.txt --output newsletter.md
-```
-
-전체 저장소 워크플로를 기준으로 시작하려면:
-
-```bash
 python -m scripts.devtools.dev_entrypoint bootstrap
 cp .env.example .env
 python -m scripts.devtools.dev_entrypoint check
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling"
 ```
 
 ## CLI 사용법
-데모 CLI:
-
-```bash
-python main.py --input sample_input.txt
-python main.py --input sample_input.txt --output newsletter.md
-python main.py --text $'Title: Internal Update\n[Software]\n- Release notes draft is ready.\n- Support inbox volume dropped this week.'
-python main.py --sample
-```
-
 소스 체크아웃 기준 canonical entrypoint:
 
 ```bash
 python -m scripts.devtools.dev_entrypoint run web
 python web/init_database.py
 python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling"
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling" --template-style compact
 ```
 
 패키지를 설치한 환경에서는 다음 CLI도 사용할 수 있습니다.

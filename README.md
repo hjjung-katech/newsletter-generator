@@ -18,38 +18,63 @@ Built for open-source maintainers, small teams, and internal technical communica
 - Supports cross-platform use and email distribution
 
 ## Quick Demo
+Static preview of the default `compact` output shape.
+
 **Input**
 
 ```text
-Title: Internal Update
+Title: Maintainer Communication Brief
+Topic: Maintainer workflow automation
+Date: 2026-03-19
+Issue: 14
+Tagline: Turn weekly project activity into a concise update teams can actually use.
+Audience: Prepared for contributors, internal stakeholders, and partner teams.
 
-[Software]
-- Release notes draft is ready.
-- Support inbox volume dropped this week.
+[Top Stories]
+- Release notes drafts now start from merged pull requests | The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite. | Project activity · 2026-03-19
 
-[Mobility]
-- Charging map refresh now runs hourly.
-- Field-test telemetry parsing became more stable.
+[Project Delivery]
+Intro: Updates that reduce repetitive maintainer coordination work.
+- Weekly digest draft is prepared from project activity and issue labels | Release workflow · 2026-03-19
+
+[Definitions]
+- Idempotency key | A stable request identifier used to prevent duplicate jobs or duplicate email sends.
+
+[Things to Watch]
+- If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
 ```
 
 **Output**
 
 ```md
-# Internal Update
+# Maintainer Communication Brief
+_Maintainer workflow automation · Issue 14 · 2026-03-19_
 
-## Software
-- Release notes draft is ready.
-- Support inbox volume dropped this week.
+_Turn weekly project activity into a concise update teams can actually use._
 
-## Mobility
-- Charging map refresh now runs hourly.
-- Field-test telemetry parsing became more stable.
+Prepared for contributors, internal stakeholders, and partner teams.
+
+## 🔥 Must-Read This Week
+### Release notes drafts now start from merged pull requests
+The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite.
+_Project activity · 2026-03-19_
+
+## Project Delivery
+Updates that reduce repetitive maintainer coordination work.
+
+- **Weekly digest draft is prepared from project activity and issue labels** (`Release workflow · 2026-03-19`)
+
+## 📖 Definitions
+- **Idempotency key:** A stable request identifier used to prevent duplicate jobs or duplicate email sends.
+
+## 💡 Things to Watch
+> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
 ```
 
 ## Overview
 Maintainers and teams spend significant time summarizing updates and rewriting information for different audiences. Newsletter Generator is built to reduce that manual effort by turning source notes into a clean newsletter that can be shared across community, product, and internal communication workflows.
 
-This repository also keeps the operational guidance that matters for real use: support policy, environment-variable contracts, local setup, deployment references, and verification gates. The root README stays focused on the main story and entrypoints, while `docs/` remains the source of truth for detailed workflows.
+The production app renders HTML newsletters in `compact`, `detailed`, and `email_compatible` styles. This README keeps a static English preview of the default `compact` structure so first-time visitors can understand the real layout quickly; the shipped production templates in this repository are currently Korean-oriented. This repository also keeps the operational guidance that matters for real use: support policy, environment-variable contracts, local setup, deployment references, and verification gates.
 
 ## Use Cases
 - Open-source maintainers sending weekly or monthly project updates to contributors and users
@@ -68,23 +93,42 @@ This repository also keeps the operational guidance that matters for real use: s
 Example of a generated newsletter:
 
 ```md
-# Maintainer Weekly Brief
+# Maintainer Communication Brief
+_Maintainer workflow automation · Issue 14 · 2026-03-19_
+
+_Turn weekly project activity into a concise update teams can actually use._
+
 Prepared for contributors, internal stakeholders, and partner teams.
 
-## AI
-- The model evaluation guide was rewritten into a single quick-start, which cut repeated onboarding questions from new contributors.
-- Two flaky benchmark jobs were moved to nightly runs, reducing noise in the pull request queue and helping reviews land faster.
-- A community proposal for structured prompt fixtures is ready for maintainer review after early feedback from three external contributors.
+## 🔥 Must-Read This Week
+### Release notes drafts now start from merged pull requests
+The weekly changelog is pre-assembled from merged PR metadata, leaving maintainers with a short editorial pass instead of a full rewrite.
+_Project activity · 2026-03-19_
 
-## Mobility
-- The fleet telemetry parser now handles delayed device events more reliably, lowering the amount of manual triage after field tests.
-- Charging map refreshes were moved to an hourly schedule so support teams and internal operators now see the same station status.
-- A draft adapter guide for municipal traffic feeds is being reviewed internally before the integration work opens to outside contributors.
+### Docs quality checks now catch broken anchors before publish
+Maintainers can fix link and reference regressions before updates go out to contributors or internal readers.
+_Docs pipeline · 2026-03-18_
 
-## Software
-- Release highlights are now drafted automatically from merged pull requests, leaving maintainers with a short final review instead of a full rewrite.
-- The issue intake template was simplified for non-engineering teammates, making docs gaps and deployment regressions easier to report.
-- A small packaging fix removed an extra Windows setup step, which should reduce support churn for community adopters and internal teams.
+## Project Delivery
+Updates that reduce repetitive maintainer coordination work.
+
+- **Weekly digest draft is prepared from project activity and issue labels** (`Release workflow · 2026-03-19`)
+- **Issue intake wording was simplified so non-engineers can report docs and deployment gaps faster** (`Support workflow · 2026-03-18`)
+
+## Contributor Experience
+Improvements that make updates easier to consume across community and internal audiences.
+
+- **A single onboarding summary now answers the most repeated contributor setup questions** (`Contributor docs · 2026-03-17`)
+- **Cross-team platform notes are grouped into one digest instead of separate status emails** (`Internal communications · 2026-03-17`)
+
+## 📖 Definitions
+- **Idempotency key:** A stable request identifier used to prevent duplicate jobs or duplicate email sends.
+- **Docs gate:** An automated check that verifies documentation links, required references, and policy consistency.
+
+## 💡 Things to Watch
+> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+
+_Generated as an English compact preview of the production newsletter template._
 ```
 
 ## Why This Matters
@@ -100,47 +144,25 @@ Maintainers already spend their time reviewing contributions, triaging issues, a
 Supported runtime guidance is defined in the support policy. In short, Python 3.11 and 3.12 are the active targets, Linux is the canonical production server, Windows is the native desktop bundle target, and macOS is supported mainly for source-based development and smoke checks.
 
 ## Getting Started
-The fastest way to try the project is the bundled demo CLI. It uses plain text input and generates a Markdown newsletter in seconds.
-You can generate your first newsletter in under a minute:
+The quick demo above is a static preview. To run the actual product locally, use the canonical setup and CLI entrypoints below:
 
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
-python main.py --input sample_input.txt
-```
-
-If your machine exposes Python as `python3`, use `python3` in the commands above.
-
-To save the generated newsletter to a file:
-
-```bash
-python main.py --input sample_input.txt --output newsletter.md
-```
-
-For the fuller repository workflow:
-
-```bash
 python -m scripts.devtools.dev_entrypoint bootstrap
 cp .env.example .env
 python -m scripts.devtools.dev_entrypoint check
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling"
 ```
 
 ## CLI Usage
-Demo CLI:
-
-```bash
-python main.py --input sample_input.txt
-python main.py --input sample_input.txt --output newsletter.md
-python main.py --text $'Title: Internal Update\n[Software]\n- Release notes draft is ready.\n- Support inbox volume dropped this week.'
-python main.py --sample
-```
-
 Canonical source checkout entrypoints:
 
 ```bash
 python -m scripts.devtools.dev_entrypoint run web
 python web/init_database.py
 python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling"
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling" --template-style compact
 ```
 
 If the package is installed, the CLI entrypoint is also available as:
