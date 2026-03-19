@@ -15,13 +15,16 @@
       "Dockerfile",
       "LICENSE",
       "Makefile",
+      "README.ko.md",
       "README.md",
+      "main.py",
       "nixpacks.toml",
       "pyproject.toml",
       "railway.yml",
       "requirements-dev.txt",
       "requirements.txt",
-      "run_ci_checks.py"
+      "run_ci_checks.py",
+      "sample_input.txt"
     ],
     "allowed_file_globs": [],
     "allowed_directory_names": [
