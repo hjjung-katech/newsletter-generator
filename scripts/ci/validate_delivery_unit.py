@@ -80,6 +80,16 @@ def _looks_like_placeholder(value: str | None) -> bool:
     return bool(PLACEHOLDER_PATTERN.search(value.strip()))
 
 
+def _extract_delivery_unit_section(pr_body: str) -> str | None:
+    match = re.search(
+        r"(?ims)^##[ \t]+Delivery Unit[ \t]*\n(.*?)(?=^##[ \t]+|\Z)",
+        pr_body or "",
+    )
+    if not match:
+        return None
+    return match.group(1)
+
+
 def _validate_delivery_unit_fields(
     pr_body: str,
 ) -> tuple[list[str], int | None, str | None]:
@@ -87,10 +97,12 @@ def _validate_delivery_unit_fields(
     rr_number: int | None = None
     delivery_unit: str | None = None
 
-    if "## Delivery Unit" not in pr_body:
+    delivery_unit_section = _extract_delivery_unit_section(pr_body)
+    if delivery_unit_section is None:
         errors.append("Missing PR section: `## Delivery Unit`.")
+        delivery_unit_section = ""
 
-    rr_value = _extract_field_value(pr_body, "RR")
+    rr_value = _extract_field_value(delivery_unit_section, "RR")
     if rr_value is None:
         errors.append("Missing `RR: #<number>` in `## Delivery Unit` section.")
     elif _looks_like_placeholder(rr_value):
@@ -104,7 +116,9 @@ def _validate_delivery_unit_fields(
         else:
             rr_number = int(rr_match.group(1))
 
-    delivery_unit_value = _extract_field_value(pr_body, "Delivery Unit ID")
+    delivery_unit_value = _extract_field_value(
+        delivery_unit_section, "Delivery Unit ID"
+    )
     if delivery_unit_value is None or not delivery_unit_value:
         errors.append(
             "Missing non-empty `Delivery Unit ID:` in `## Delivery Unit` section."
@@ -118,7 +132,7 @@ def _validate_delivery_unit_fields(
         delivery_unit = delivery_unit_value
 
     for label in ("Merge Boundary", "Rollback Boundary"):
-        value = _extract_field_value(pr_body, label)
+        value = _extract_field_value(delivery_unit_section, label)
         if value is None or not value:
             errors.append(
                 f"Missing non-empty `{label}:` in `## Delivery Unit` section."
@@ -135,6 +149,42 @@ def _validate_delivery_unit_fields(
 def _extract_rr_and_du(pr_body: str) -> tuple[int | None, str | None]:
     _, rr_number, delivery_unit = _validate_delivery_unit_fields(pr_body or "")
     return rr_number, delivery_unit
+
+
+def _github_get_json(url: str, token: str) -> dict[str, Any]:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "delivery-unit-validator",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            payload = json.load(resp)
+            if not isinstance(payload, dict):
+                raise RuntimeError(f"Unexpected GitHub payload type at {url}")
+            return payload
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"GitHub API request failed: {exc.code} {exc.reason} ({url}) {body}"
+        ) from exc
+
+
+def _validate_rr_issue(issue: dict[str, Any], rr_number: int) -> list[str]:
+    if issue.get("pull_request"):
+        return [f"Referenced RR #{rr_number} is a pull request, not an issue."]
+
+    labels = {
+        label if isinstance(label, str) else (label.get("name") or "")
+        for label in issue.get("labels", [])
+    }
+    if "review-request" not in labels:
+        return [f"Referenced RR #{rr_number} must have the `review-request` label."]
+
+    return []
 
 
 def _non_merge_commit_count(commit_data: Iterable[dict[str, Any]]) -> int:
@@ -181,6 +231,14 @@ def main() -> int:
 
     owner, repo = repository.split("/", 1)
     api_base = f"https://api.github.com/repos/{owner}/{repo}"
+
+    if rr_number is not None:
+        try:
+            rr_issue = _github_get_json(f"{api_base}/issues/{rr_number}", token)
+        except RuntimeError as exc:
+            errors.append(str(exc))
+        else:
+            errors.extend(_validate_rr_issue(rr_issue, rr_number))
 
     open_prs = _github_paginate(f"{api_base}/pulls?state=open&per_page=100", token)
     conflicting_rr: list[int] = []
