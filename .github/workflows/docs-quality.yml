@@ -2,16 +2,9 @@ name: Docs Quality
 
 on:
   pull_request:
-    paths:
-      - '**/*.md'
-      - 'scripts/check_markdown_*.py'
-      - '.github/workflows/docs-quality.yml'
+    branches: [ main, develop ]
   push:
-    branches: [ main ]
-    paths:
-      - '**/*.md'
-      - 'scripts/check_markdown_*.py'
-      - '.github/workflows/docs-quality.yml'
+    branches: [ main, develop ]
 
 jobs:
   docs-quality:
@@ -33,17 +26,36 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}" --depth=1
-            git diff --name-only --diff-filter=ACMRTUXB "origin/${{ github.base_ref }}"...HEAD -- '*.md' > /tmp/changed_md.txt
+            git diff --name-only --diff-filter=ACMRTUXB \
+              "origin/${{ github.base_ref }}"...HEAD \
+              -- '*.md' 'scripts/check_markdown_*.py' '.github/workflows/docs-quality.yml' \
+              > /tmp/docs_quality_scope.txt
+            git diff --name-only --diff-filter=ACMRTUXB \
+              "origin/${{ github.base_ref }}"...HEAD -- '*.md' \
+              > /tmp/changed_md.txt
           else
-            git diff --name-only --diff-filter=ACMRTUXB "${{ github.event.before }}" "${{ github.sha }}" -- '*.md' > /tmp/changed_md.txt
+            git diff --name-only --diff-filter=ACMRTUXB \
+              "${{ github.event.before }}" "${{ github.sha }}" \
+              -- '*.md' 'scripts/check_markdown_*.py' '.github/workflows/docs-quality.yml' \
+              > /tmp/docs_quality_scope.txt
+            git diff --name-only --diff-filter=ACMRTUXB \
+              "${{ github.event.before }}" "${{ github.sha }}" -- '*.md' \
+              > /tmp/changed_md.txt
           fi
 
           echo "files=$(tr '\n' ' ' < /tmp/changed_md.txt)" >> "$GITHUB_OUTPUT"
+          if [[ -s /tmp/docs_quality_scope.txt ]]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Check markdown links
+        if: steps.changed_md.outputs.relevant == 'true'
         run: python scripts/check_markdown_links.py
 
       - name: Check markdown style
+        if: steps.changed_md.outputs.relevant == 'true'
         shell: bash
         run: |
           if [[ -n "${{ steps.changed_md.outputs.files }}" ]]; then
@@ -51,3 +63,7 @@ jobs:
           else
             echo "No changed markdown files detected for style check."
           fi
+
+      - name: No docs-related changes detected; docs-quality satisfied.
+        if: steps.changed_md.outputs.relevant != 'true'
+        run: echo "No markdown/docs-quality inputs changed; required docs-quality check emitted as a no-op pass."

@@ -94,3 +94,26 @@ def test_release_ci_platform_manifest_tracks_new_ci_truth_files() -> None:
 
     for entry in required_entries:
         assert entry in manifest
+
+
+def test_docs_quality_workflow_always_emits_required_check_for_merge_targets() -> None:
+    workflow = _read_text(".github/workflows/docs-quality.yml")
+    ci_guide = _read_text("docs/dev/CI_CD_GUIDE.md")
+    workflow_readme = _read_text(".github/workflows/README.md")
+
+    required_entries = [
+        "name: Docs Quality",
+        "pull_request:",
+        "push:",
+        "branches: [ main, develop ]",
+        "scripts/check_markdown_*.py",
+        "steps.changed_md.outputs.relevant == 'true'",
+        "No docs-related changes detected; docs-quality satisfied.",
+    ]
+
+    for entry in required_entries:
+        assert entry in workflow
+
+    assert "paths:" not in workflow
+    assert "항상 check 를 emit" in ci_guide
+    assert "required check 가 항상 emit" in workflow_readme

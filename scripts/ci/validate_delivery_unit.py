@@ -106,7 +106,9 @@ def _validate_delivery_unit_fields(
 
     delivery_unit_value = _extract_field_value(pr_body, "Delivery Unit ID")
     if delivery_unit_value is None or not delivery_unit_value:
-        errors.append("Missing `Delivery Unit ID: <id>` in `## Delivery Unit` section.")
+        errors.append(
+            "Missing non-empty `Delivery Unit ID:` in `## Delivery Unit` section."
+        )
     elif _looks_like_placeholder(delivery_unit_value):
         errors.append(
             "Placeholder `Delivery Unit ID:` value must be replaced in "
