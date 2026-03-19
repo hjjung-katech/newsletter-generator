@@ -14,6 +14,7 @@
 - Week 20 반영: canonical runtime entrypoint를 `python -m ...` 모듈 실행으로 정규화, `apps/`는 `experimental/`만 유지
 - Week 21 반영: root `.env.example` 단일 정본 유지, `web/.env.example` 및 `requirements-minimal.txt` 제거
 - Week 22 반영: strict audit에서 관찰되는 generated root artifacts(`build/`, `newsletter_generator.egg-info/`)를 policy allowlist와 동기화
+- Week 23 반영: maintainer landing page를 위한 root bilingual README와 demo entrypoint(`README.ko.md`, `main.py`, `sample_input.txt`)를 policy allowlist와 동기화
 
 ## Scope
 
@@ -27,10 +28,10 @@
 
 | Entry or Pattern | 결정 | 목표 위치/상태 | 근거 |
 |---|---|---|---|
-| `README.md`, `LICENSE`, `CHANGELOG.md`, `CODEOWNERS` | 유지 | 루트 유지 | 프로젝트 메타 |
+| `README.md`, `README.ko.md`, `LICENSE`, `CHANGELOG.md`, `CODEOWNERS` | 유지 | 루트 유지 | 프로젝트 메타 / bilingual landing page |
 | `pyproject.toml`, `requirements.txt`, `requirements-dev.txt`, `Makefile` | 유지 | 루트 유지 | 빌드/패키징 |
 | `setup.cfg`, `setup.py` | 제거 완료 | `pyproject.toml` 단일 경로 | 패키징 설정 중복 제거 |
-| `run_ci_checks.py` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 |
+| `run_ci_checks.py`, `main.py`, `sample_input.txt` | 유지 | 루트 유지 | 정책상 루트 진입 스크립트 + quick demo entrypoint |
 | `.github/`, `.release/`, `docs/`, `scripts/`, `newsletter/`, `newsletter_core/`, `web/`, `tests/` | 유지 | 루트 유지 | 핵심 운영/도메인 디렉터리 |
 | `apps/` | 유지 | `apps/experimental/`만 유지 | FastAPI 실험 런타임 전용 경계 |
 | `templates/` | 이관 완료 | `newsletter/templates/` | 패키지 상대 경로 템플릿 자산으로 정규화 |

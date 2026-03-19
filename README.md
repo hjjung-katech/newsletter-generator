@@ -1,4 +1,5 @@
 # Newsletter Generator
+[English](README.md) | [한국어](README.ko.md)
 
 [![Main CI](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/main-ci.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/main-ci.yml)
 [![Docs Quality](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/docs-quality.yml/badge.svg?branch=main)](https://github.com/hjjung-katech/newsletter-generator/actions/workflows/docs-quality.yml)
@@ -7,63 +8,168 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy Guide (Railway)](https://img.shields.io/badge/deploy-Railway-0B0D0E?logo=railway)](docs/setup/RAILWAY_DEPLOYMENT.md)
 
-키워드/도메인 기반으로 최신 뉴스를 수집하고 AI 요약 HTML 뉴스레터를 생성·발송하는 프로젝트입니다.
+Automates turning raw project updates into structured newsletters, reducing maintainer communication overhead.
 
-## Start Here (5분)
+Built for open-source maintainers, small teams, and internal technical communication workflows.
 
-1. 빠른 시작: [`docs/setup/QUICK_START_GUIDE.md`](docs/setup/QUICK_START_GUIDE.md)
-2. 지원 정책(SSOT): [`docs/reference/support-policy.md`](docs/reference/support-policy.md)
-3. 환경변수 계약(SSOT): [`docs/reference/environment-variables.md`](docs/reference/environment-variables.md)
-4. 로컬 개발 가이드: [`docs/setup/LOCAL_SETUP.md`](docs/setup/LOCAL_SETUP.md)
-5. 품질 게이트: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
+- Turn raw notes into shareable newsletter drafts
+- Reduce time spent on release notes and recurring updates
+- Usable by non-engineers through a web-based workflow
+- Supports cross-platform use and email distribution
 
-루트는 개요와 진입 링크만 유지하고, 상세 설명은 `docs/` 정본 문서로 관리합니다.
-공식 지원 범위는 Python 3.11/3.12, Linux canonical production server, Windows source development + native bundle, macOS source/smoke 중심입니다.
+## Quick Demo
+**Input**
 
-## Minimal Commands
+```text
+Title: Internal Update
+
+[Software]
+- Release notes draft is ready.
+- Support inbox volume dropped this week.
+
+[Mobility]
+- Charging map refresh now runs hourly.
+- Field-test telemetry parsing became more stable.
+```
+
+**Output**
+
+```md
+# Internal Update
+
+## Software
+- Release notes draft is ready.
+- Support inbox volume dropped this week.
+
+## Mobility
+- Charging map refresh now runs hourly.
+- Field-test telemetry parsing became more stable.
+```
+
+## Overview
+Maintainers and teams spend significant time summarizing updates and rewriting information for different audiences. Newsletter Generator is built to reduce that manual effort by turning source notes into a clean newsletter that can be shared across community, product, and internal communication workflows.
+
+This repository also keeps the operational guidance that matters for real use: support policy, environment-variable contracts, local setup, deployment references, and verification gates. The root README stays focused on the main story and entrypoints, while `docs/` remains the source of truth for detailed workflows.
+
+## Use Cases
+- Open-source maintainers sending weekly or monthly project updates to contributors and users
+- Small teams sharing cross-functional progress without asking engineers to hand-write summaries
+- Internal teams sharing domain-specific technical updates across product, platform, and operations groups
+- Communication automation for recurring community digests, stakeholder briefs, and team newsletters
+
+## Features
+- Automatically summarize raw updates into structured, shareable newsletters
+- Generate clean newsletter drafts that are ready for community or internal distribution
+- Reduce time spent on release notes, status reporting, and recurring update summaries
+- Support email distribution for recurring communication workflows
+- Keep the workflow usable for non-engineers through a web-based, cross-platform experience
+
+## Example Output
+Example of a generated newsletter:
+
+```md
+# Maintainer Weekly Brief
+Prepared for contributors, internal stakeholders, and partner teams.
+
+## AI
+- The model evaluation guide was rewritten into a single quick-start, which cut repeated onboarding questions from new contributors.
+- Two flaky benchmark jobs were moved to nightly runs, reducing noise in the pull request queue and helping reviews land faster.
+- A community proposal for structured prompt fixtures is ready for maintainer review after early feedback from three external contributors.
+
+## Mobility
+- The fleet telemetry parser now handles delayed device events more reliably, lowering the amount of manual triage after field tests.
+- Charging map refreshes were moved to an hourly schedule so support teams and internal operators now see the same station status.
+- A draft adapter guide for municipal traffic feeds is being reviewed internally before the integration work opens to outside contributors.
+
+## Software
+- Release highlights are now drafted automatically from merged pull requests, leaving maintainers with a short final review instead of a full rewrite.
+- The issue intake template was simplified for non-engineering teammates, making docs gaps and deployment regressions easier to report.
+- A small packaging fix removed an extra Windows setup step, which should reduce support churn for community adopters and internal teams.
+```
+
+## Why This Matters
+Maintainers already spend their time reviewing contributions, triaging issues, and keeping releases moving. Communication work is necessary, but it should not become another manual backlog. This project directly reduces maintainer workload in communication-heavy workflows such as updates, release notes, and stakeholder reporting.
+
+## Start Here
+1. Quick start: [`docs/setup/QUICK_START_GUIDE.md`](docs/setup/QUICK_START_GUIDE.md)
+2. Support policy: [`docs/reference/support-policy.md`](docs/reference/support-policy.md)
+3. Environment-variable contract: [`docs/reference/environment-variables.md`](docs/reference/environment-variables.md)
+4. Local development: [`docs/setup/LOCAL_SETUP.md`](docs/setup/LOCAL_SETUP.md)
+5. Verification gates: `python -m scripts.devtools.dev_entrypoint check`, `python -m scripts.devtools.dev_entrypoint check --full`
+
+Supported runtime guidance is defined in the support policy. In short, Python 3.11 and 3.12 are the active targets, Linux is the canonical production server, Windows is the native desktop bundle target, and macOS is supported mainly for source-based development and smoke checks.
+
+## Getting Started
+The fastest way to try the project is the bundled demo CLI. It uses plain text input and generates a Markdown newsletter in seconds.
+You can generate your first newsletter in under a minute:
 
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
 cd newsletter-generator
+python main.py --input sample_input.txt
+```
+
+If your machine exposes Python as `python3`, use `python3` in the commands above.
+
+To save the generated newsletter to a file:
+
+```bash
+python main.py --input sample_input.txt --output newsletter.md
+```
+
+For the fuller repository workflow:
+
+```bash
 python -m scripts.devtools.dev_entrypoint bootstrap
 cp .env.example .env
 python -m scripts.devtools.dev_entrypoint check
 ```
 
-기존 `make bootstrap`, `make check`, `make check-full`는 backward-compatible thin wrapper로 유지됩니다.
+## CLI Usage
+Demo CLI:
 
-Experimental FastAPI entrypoint uses a separate sample at
-[`apps/experimental/.env.example`](apps/experimental/.env.example).
+```bash
+python main.py --input sample_input.txt
+python main.py --input sample_input.txt --output newsletter.md
+python main.py --text $'Title: Internal Update\n[Software]\n- Release notes draft is ready.\n- Support inbox volume dropped this week.'
+python main.py --sample
+```
 
-소스 체크아웃 기준 canonical entrypoints:
+Canonical source checkout entrypoints:
 
 ```bash
 python -m scripts.devtools.dev_entrypoint run web
 python web/init_database.py
-python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "AI"
+python -m scripts.devtools.dev_entrypoint run newsletter run --keywords "open source, maintainer tooling"
 ```
 
-웹 실행/CLI/배포 절차는 아래 정본 문서를 사용하세요.
+If the package is installed, the CLI entrypoint is also available as:
 
-## Docs Hub
+```bash
+newsletter run --keywords "open source, maintainer tooling"
+```
 
-| 목적 | 문서 |
+## Roadmap
+- GitHub integration for pulling updates directly from repositories
+- Pull request and issue summaries for recurring maintainer digests
+- Release note generation for changelogs and stakeholder updates
+
+## Project Docs
+| Purpose | Reference |
 |---|---|
-| 문서 허브(SSOT) | [`docs/README.md`](docs/README.md) |
-| 문서 전수조사표 | [`docs/DOCUMENT_INVENTORY.md`](docs/DOCUMENT_INVENTORY.md) |
-| 설치/온보딩 | [`docs/setup/INSTALLATION.md`](docs/setup/INSTALLATION.md), [`docs/setup/QUICK_START_GUIDE.md`](docs/setup/QUICK_START_GUIDE.md) |
-| 로컬 개발 | [`docs/setup/LOCAL_SETUP.md`](docs/setup/LOCAL_SETUP.md), [`docs/dev/DEVELOPMENT_GUIDE.md`](docs/dev/DEVELOPMENT_GUIDE.md) |
-| 지원/API/환경변수 계약 | [`docs/reference/support-policy.md`](docs/reference/support-policy.md), [`docs/reference/web-api.md`](docs/reference/web-api.md), [`docs/reference/environment-variables.md`](docs/reference/environment-variables.md) |
-| 배포 | [`docs/setup/RAILWAY_DEPLOYMENT.md`](docs/setup/RAILWAY_DEPLOYMENT.md) |
-| 구조/운영 전략 | [`docs/dev/LONG_TERM_REPO_STRATEGY.md`](docs/dev/LONG_TERM_REPO_STRATEGY.md), [`docs/dev/REPO_HYGIENE_POLICY.md`](docs/dev/REPO_HYGIENE_POLICY.md) |
+| Docs hub | [`docs/README.md`](docs/README.md) |
+| Document inventory | [`docs/DOCUMENT_INVENTORY.md`](docs/DOCUMENT_INVENTORY.md) |
+| Installation and onboarding | [`docs/setup/INSTALLATION.md`](docs/setup/INSTALLATION.md), [`docs/setup/QUICK_START_GUIDE.md`](docs/setup/QUICK_START_GUIDE.md) |
+| Local development | [`docs/setup/LOCAL_SETUP.md`](docs/setup/LOCAL_SETUP.md), [`docs/dev/DEVELOPMENT_GUIDE.md`](docs/dev/DEVELOPMENT_GUIDE.md) |
+| Support, API, and env contracts | [`docs/reference/support-policy.md`](docs/reference/support-policy.md), [`docs/reference/web-api.md`](docs/reference/web-api.md), [`docs/reference/environment-variables.md`](docs/reference/environment-variables.md) |
+| Deployment | [`docs/setup/RAILWAY_DEPLOYMENT.md`](docs/setup/RAILWAY_DEPLOYMENT.md) |
+| Repo strategy and hygiene | [`docs/dev/LONG_TERM_REPO_STRATEGY.md`](docs/dev/LONG_TERM_REPO_STRATEGY.md), [`docs/dev/REPO_HYGIENE_POLICY.md`](docs/dev/REPO_HYGIENE_POLICY.md) |
 
-## 기여
+## Contributing
+- RR template: [`.github/ISSUE_TEMPLATE/review-request.yml`](.github/ISSUE_TEMPLATE/review-request.yml)
+- PR template: [`.github/pull_request_template.md`](.github/pull_request_template.md)
+- Commit template: [`.gitmessage.txt`](.gitmessage.txt)
+- Repo rules: [`AGENTS.md`](AGENTS.md)
 
-- RR 템플릿: [`.github/ISSUE_TEMPLATE/review-request.yml`](.github/ISSUE_TEMPLATE/review-request.yml)
-- PR 템플릿: [`.github/pull_request_template.md`](.github/pull_request_template.md)
-- 커밋 템플릿: [`.gitmessage.txt`](.gitmessage.txt)
-- 운영 규칙: [`AGENTS.md`](AGENTS.md)
-
-## 라이선스
-
-- `LICENSE`
+## License
+`LICENSE`
