@@ -128,8 +128,43 @@ class ShutdownManager:
 
         return SafeLogger(self._logger)
 
+    def _on_shutdown_event(self, context: str) -> None:
+        """Shared state management for any shutdown signal or console event."""
+        with self._lock:
+            self._shutdown_request_count += 1
+            if self._first_shutdown_time is None:
+                self._first_shutdown_time = time.time()
+
+            if self._shutdown_request_count >= 2:
+                elapsed = time.time() - self._first_shutdown_time
+                if elapsed < 3.0:
+                    self._safe_log.warning(
+                        f"Second {context} received within "
+                        f"{elapsed:.1f}s - forcing exit"
+                    )
+                    import os
+
+                    os._exit(1)
+
+            if self._shutdown_completed:
+                self._safe_log.warning(
+                    f"Shutdown already completed but still receiving "
+                    f"{context} - forcing exit"
+                )
+                import os
+
+                os._exit(1)
+
+        self.shutdown()
+
     def _setup_signal_handlers(self):
-        """Setup signal handlers for graceful shutdown"""
+        """Register platform-appropriate signal handlers via _signal module."""
+        from newsletter_core.infrastructure.platform._signal import (
+            setup_signal_handlers,
+        )
+        from newsletter_core.public.platform import get_platform_adapter
+
+        adapter = get_platform_adapter()
 
         def signal_handler(signum, frame):
             signal_name = (
@@ -138,139 +173,31 @@ class ShutdownManager:
                 else str(signum)
             )
             self._safe_log.info(f"Received signal {signal_name} ({signum})")
+            self._on_shutdown_event("shutdown signal")
 
-            with self._lock:
-                self._shutdown_request_count += 1
-                if self._first_shutdown_time is None:
-                    self._first_shutdown_time = time.time()
+        _CTRL_NAMES = {
+            0: "CTRL_C_EVENT",
+            1: "CTRL_BREAK_EVENT",
+            2: "CTRL_CLOSE_EVENT",
+            5: "CTRL_LOGOFF_EVENT",
+            6: "CTRL_SHUTDOWN_EVENT",
+        }
 
-                # If this is the second Ctrl+C within 3 seconds, force exit
-                if self._shutdown_request_count >= 2:
-                    elapsed = time.time() - self._first_shutdown_time
-                    if elapsed < 3.0:
-                        self._safe_log.warning(
-                            "Second shutdown signal received within "
-                            f"{elapsed:.1f}s - forcing exit"
-                        )
-                        import os
+        def console_event_handler(ctrl_type):
+            ctrl_name = _CTRL_NAMES.get(ctrl_type, f"UNKNOWN({ctrl_type})")
+            self._safe_log.info(f"Windows console control event: {ctrl_name}")
+            self._on_shutdown_event("console event")
+            return True
 
-                        os._exit(1)
-
-                # If shutdown is complete and signals keep coming, force exit.
-                if self._shutdown_completed:
-                    self._safe_log.warning(
-                        "Shutdown already completed but still receiving signals "
-                        "- forcing exit"
-                    )
-                    import os
-
-                    os._exit(1)
-
-            self.shutdown()
-
-        # Handle common termination signals
-        signals_to_handle = [signal.SIGINT, signal.SIGTERM]
-
-        # Windows-specific signal handling
-        if sys.platform.startswith("win"):
-            try:
-                # Add Windows-specific signals if available
-                if hasattr(signal, "SIGBREAK"):
-                    signals_to_handle.append(signal.SIGBREAK)
-
-                # Setup console control handler for Windows
-                self._setup_windows_console_handler()
-
-            except Exception as e:
-                self._safe_log.warning(
-                    f"Failed to setup Windows-specific signal handling: {e}"
-                )
-
-        for sig in signals_to_handle:
-            try:
-                signal.signal(sig, signal_handler)
-                self._safe_log.debug(f"Signal handler registered for {sig}")
-            except (OSError, ValueError) as e:
-                self._safe_log.warning(
-                    f"Could not register signal handler for {sig}: {e}"
-                )
-
-    def _setup_windows_console_handler(self):
-        """Setup Windows console control handler"""
-        if not sys.platform.startswith("win"):
-            return
-
-        try:
-            import ctypes
-            from ctypes import wintypes
-
-            kernel32 = ctypes.windll.kernel32
-
-            def console_ctrl_handler(ctrl_type):
-                """Handle Windows console control events"""
-                ctrl_types = {
-                    0: "CTRL_C_EVENT",
-                    1: "CTRL_BREAK_EVENT",
-                    2: "CTRL_CLOSE_EVENT",
-                    5: "CTRL_LOGOFF_EVENT",
-                    6: "CTRL_SHUTDOWN_EVENT",
-                }
-
-                ctrl_name = ctrl_types.get(ctrl_type, f"UNKNOWN({ctrl_type})")
-                self._safe_log.info(f"Windows console control event: {ctrl_name}")
-
-                # Handle repeated Ctrl+C for force exit
-                with self._lock:
-                    self._shutdown_request_count += 1
-                    if self._first_shutdown_time is None:
-                        self._first_shutdown_time = time.time()
-
-                    # If this is the second Ctrl+C within 3 seconds, force exit
-                    if self._shutdown_request_count >= 2:
-                        elapsed = time.time() - self._first_shutdown_time
-                        if elapsed < 3.0:
-                            self._safe_log.warning(
-                                "Second console event received within "
-                                f"{elapsed:.1f}s - forcing exit"
-                            )
-                            import os
-
-                            os._exit(1)
-
-                    # If shutdown is complete and signals keep coming, force exit.
-                    if self._shutdown_completed:
-                        self._safe_log.warning(
-                            "Shutdown already completed but still receiving "
-                            "console events - forcing exit"
-                        )
-                        import os
-
-                        os._exit(1)
-
-                # Start graceful shutdown
-                self.shutdown()
-
-                # Return True to indicate we handled the event
-                return True
-
-            # Define the handler function type
-            HANDLER_ROUTINE = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.DWORD)
-            handler = HANDLER_ROUTINE(console_ctrl_handler)
-
-            # Register the handler
-            if kernel32.SetConsoleCtrlHandler(handler, True):
-                self._safe_log.debug(
-                    "Windows console control handler registered successfully"
-                )
-                # Keep a reference to prevent garbage collection
-                self._console_handler = handler
-            else:
-                self._safe_log.warning(
-                    "Failed to register Windows console control handler"
-                )
-
-        except Exception as e:
-            self._safe_log.warning(f"Could not setup Windows console handler: {e}")
+        console_handler_ref = setup_signal_handlers(
+            signal_handler, console_event_handler, adapter
+        )
+        if console_handler_ref is not None:
+            # Keep a reference to prevent garbage collection
+            self._console_handler = console_handler_ref
+            self._safe_log.debug(
+                "Windows console control handler registered successfully"
+            )
 
     def _setup_exit_hooks(self):
         """Setup exit hooks for cleanup"""

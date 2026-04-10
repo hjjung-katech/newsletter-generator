@@ -197,3 +197,89 @@ class TestFrozenDetection:
         root = get_bundle_root()
         # Should point to the _frozen.py parent directory
         assert root.is_dir()
+
+
+# ── Signal registration ──────────────────────────────────────────────
+
+
+class TestSignalHandlerRegistration:
+    def test_posix_signals_registered_on_unix(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """setup_signal_handlers registers SIGINT and SIGTERM on Unix."""
+        import signal as _signal
+
+        from newsletter_core.infrastructure.platform._signal import (
+            setup_signal_handlers,
+        )
+
+        registered: list[int] = []
+
+        def _fake_signal(sig, handler):
+            registered.append(int(sig))
+
+        monkeypatch.setattr(_signal, "signal", _fake_signal)
+
+        adapter = UnixPlatformAdapter()
+        result = setup_signal_handlers(lambda s, f: None, lambda c: True, adapter)
+
+        assert result is None  # no console handler on Unix
+        assert int(_signal.SIGINT) in registered
+        assert int(_signal.SIGTERM) in registered
+
+    def test_no_sigbreak_on_unix(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """SIGBREAK must not be registered on Unix (it may not exist)."""
+        import signal as _signal
+
+        from newsletter_core.infrastructure.platform._signal import (
+            setup_signal_handlers,
+        )
+
+        registered_names: list[str] = []
+
+        def _fake_signal(sig, handler):
+            try:
+                registered_names.append(_signal.Signals(sig).name)
+            except ValueError:
+                registered_names.append(str(sig))
+
+        monkeypatch.setattr(_signal, "signal", _fake_signal)
+
+        adapter = UnixPlatformAdapter()
+        setup_signal_handlers(lambda s, f: None, lambda c: True, adapter)
+
+        assert "SIGBREAK" not in registered_names
+
+    def test_windows_adapter_signal_names_include_sigbreak(self) -> None:
+        names = WindowsPlatformAdapter().signal_names()
+        assert "SIGBREAK" in names
+        assert "SIGINT" in names
+        assert "SIGTERM" in names
+
+    def test_setup_signal_handlers_calls_windows_console_on_windows_adapter(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """On a Windows adapter, _register_windows_console_handler is invoked."""
+        import newsletter_core.infrastructure.platform._signal as _sig_mod
+
+        called: list[bool] = []
+
+        def _fake_register(handler):
+            called.append(True)
+            return object()  # non-None sentinel
+
+        monkeypatch.setattr(
+            _sig_mod, "_register_windows_console_handler", _fake_register
+        )
+
+        import signal as _signal
+
+        monkeypatch.setattr(_signal, "signal", lambda s, h: None)
+
+        adapter = WindowsPlatformAdapter()
+        result = _sig_mod.setup_signal_handlers(
+            lambda s, f: None, lambda c: True, adapter
+        )
+
+        assert called, "_register_windows_console_handler should have been called"
+        assert result is not None
