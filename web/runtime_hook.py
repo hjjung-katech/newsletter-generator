@@ -169,9 +169,14 @@ def _setup_environment_variables() -> None:
         os.environ.pop("CLOUDSDK_CONFIG", None)
 
         # UTF-8 인코딩 강제 설정 (Windows 환경)
-        if sys.platform.startswith("win"):
-            os.environ["PYTHONIOENCODING"] = "utf-8"
-            os.environ["PYTHONUTF8"] = "1"
+        try:
+            from newsletter_core.public.platform import get_platform_adapter
+
+            get_platform_adapter().configure_utf8_io()
+        except ImportError:
+            if sys.platform.startswith("win"):
+                os.environ["PYTHONIOENCODING"] = "utf-8"
+                os.environ["PYTHONUTF8"] = "1"
 
         # 🔴 CRITICAL FIX: .env 파일 로딩
         if getattr(sys, "frozen", False):
