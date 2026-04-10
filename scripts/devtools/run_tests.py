@@ -20,17 +20,16 @@
 - --list: 테스트 목록 조회
 """
 
+import argparse
 import os
+import subprocess
 import sys
+from pathlib import Path
 
 # Platform-specific UTF-8 I/O configuration (Windows)
 from newsletter_core.public.platform import get_platform_adapter
 
 get_platform_adapter().configure_utf8_io()
-
-import argparse
-import subprocess
-from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 

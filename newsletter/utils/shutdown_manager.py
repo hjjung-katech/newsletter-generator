@@ -202,8 +202,6 @@ class ShutdownManager:
     def _setup_exit_hooks(self):
         """Setup exit hooks for cleanup"""
         # Skip atexit registration during pytest to avoid logging errors during teardown
-        import sys
-
         if "pytest" in sys.modules or os.getenv("TESTING") == "1":
             self._safe_log.debug("Skipping exit hooks registration in test mode")
             return
