@@ -157,7 +157,7 @@ class ShutdownManager:
 
         self.shutdown()
 
-    def _setup_signal_handlers(self):
+    def _setup_signal_handlers(self) -> None:
         """Register platform-appropriate signal handlers via _signal module."""
         from newsletter_core.infrastructure.platform._signal import (
             setup_signal_handlers,
@@ -166,7 +166,7 @@ class ShutdownManager:
 
         adapter = get_platform_adapter()
 
-        def signal_handler(signum, frame):
+        def signal_handler(signum: int, frame: Any) -> None:
             signal_name = (
                 signal.Signals(signum).name
                 if hasattr(signal, "Signals")
@@ -183,7 +183,7 @@ class ShutdownManager:
             6: "CTRL_SHUTDOWN_EVENT",
         }
 
-        def console_event_handler(ctrl_type):
+        def console_event_handler(ctrl_type: int) -> bool:
             ctrl_name = _CTRL_NAMES.get(ctrl_type, f"UNKNOWN({ctrl_type})")
             self._safe_log.info(f"Windows console control event: {ctrl_name}")
             self._on_shutdown_event("console event")
@@ -199,7 +199,7 @@ class ShutdownManager:
                 "Windows console control handler registered successfully"
             )
 
-    def _setup_exit_hooks(self):
+    def _setup_exit_hooks(self) -> None:
         """Setup exit hooks for cleanup"""
         # Skip atexit registration during pytest to avoid logging errors during teardown
         if "pytest" in sys.modules or os.getenv("TESTING") == "1":
