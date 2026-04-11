@@ -11,14 +11,15 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
-
-def _is_frozen() -> bool:
-    return bool(getattr(sys, "frozen", False))
+from newsletter_core.infrastructure.platform._frozen import (
+    get_bundle_root as _core_bundle_root,
+)
+from newsletter_core.infrastructure.platform._frozen import is_frozen_any as _is_frozen
 
 
 def _bundle_root() -> Path:
-    if _is_frozen() and hasattr(sys, "_MEIPASS"):
-        return Path(getattr(sys, "_MEIPASS"))
+    if _is_frozen():
+        return Path(_core_bundle_root())
     return Path(__file__).resolve().parent
 
 

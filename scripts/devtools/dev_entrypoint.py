@@ -86,10 +86,9 @@ def repo_paths(repo_root: Path = REPO_ROOT) -> RepoPaths:
 
 
 def venv_python(venv_dir: Path) -> Path:
-    scripts_python = venv_dir / "Scripts" / "python.exe"
-    if scripts_python.exists():
-        return scripts_python
-    return venv_dir / "bin" / "python"
+    from newsletter_core.public.platform import get_platform_adapter
+
+    return get_platform_adapter().venv_python_path(venv_dir)
 
 
 def resolve_existing_venv_python(paths: RepoPaths) -> Path | None:

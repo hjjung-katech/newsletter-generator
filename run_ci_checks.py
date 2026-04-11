@@ -20,15 +20,10 @@ import time
 from pathlib import Path
 from typing import List, Tuple
 
-# Windows 한글 인코딩 설정
-if sys.platform.startswith("win"):
-    os.environ["PYTHONIOENCODING"] = "utf-8"
-    os.environ["PYTHONUTF8"] = "1"
-    # Windows 콘솔 UTF-8 설정
-    import io
+# Platform-specific UTF-8 I/O configuration (Windows)
+from newsletter_core.public.platform import get_platform_adapter
 
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+get_platform_adapter().configure_utf8_io()
 
 # Legacy strict-gate exclusions removed: all runtime modules are now enforced.
 LEGACY_RUNTIME_GATE_EXCLUDES: set[str] = set()

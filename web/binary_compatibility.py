@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 def is_frozen() -> bool:
     """PyInstaller로 빌드된 바이너리에서 실행 중인지 확인"""
-    return getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+    from newsletter_core.infrastructure.platform._frozen import (
+        is_frozen as _core_is_frozen,
+    )
+
+    return bool(_core_is_frozen())
 
 
 def get_base_path() -> str:

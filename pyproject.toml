@@ -160,6 +160,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = [
     "newsletter_core.*",
+    "newsletter.utils.shutdown_manager",
 ]
 ignore_errors = true
 

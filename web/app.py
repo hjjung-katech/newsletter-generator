@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import logging
 import os
-import platform
 from collections.abc import Callable
 from typing import Any, cast
 
@@ -71,8 +70,10 @@ def _create_task_queue(app: Flask) -> tuple[Any, Any]:
     redis_url = app.config["REDIS_URL"]
 
     try:
-        if platform.system() == "Windows":
-            log_warning(logger, "app.redis.disabled_for_windows")
+        from web.platform_adapter import is_queue_enabled_for_platform
+
+        if not is_queue_enabled_for_platform():
+            log_warning(logger, "app.redis.disabled_for_platform")
             return None, None
 
         from rq import Queue

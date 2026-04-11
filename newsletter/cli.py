@@ -44,34 +44,9 @@ _CLI_BOOTSTRAPPED = False
 
 
 def _configure_windows_utf8_io() -> None:
-    if sys.platform.startswith("win"):
-        import io
-        import locale
+    from newsletter_core.public.platform import get_platform_adapter
 
-        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
-        os.environ.setdefault("PYTHONUTF8", "1")
-
-        try:
-            locale.setlocale(locale.LC_ALL, "ko_KR.UTF-8")
-        except locale.Error:
-            try:
-                locale.setlocale(locale.LC_ALL, ".65001")
-            except locale.Error:
-                pass
-
-        if hasattr(sys.stdout, "reconfigure"):
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        else:  # pragma: no cover - legacy Python fallback
-            sys.stdout = io.TextIOWrapper(
-                sys.stdout.buffer, encoding="utf-8", errors="replace"
-            )
-            sys.stderr = io.TextIOWrapper(
-                sys.stderr.buffer, encoding="utf-8", errors="replace"
-            )
-
-        if hasattr(sys, "_setdefaultencoding"):  # pragma: no cover
-            sys._setdefaultencoding("utf-8")
+    get_platform_adapter().configure_utf8_io()
 
 
 def _load_project_dotenv_if_present() -> None:
