@@ -3,91 +3,49 @@ Runtime-aware path helpers for web app bootstrap.
 
 This module keeps filesystem decisions deterministic between development mode
 and PyInstaller one-file runtime.
+
+Path-resolution logic now lives in
+``newsletter_core.infrastructure.platform._paths``; this module delegates to it
+so that existing call-sites continue to work unchanged.
+
+``__file__`` is forwarded so that test-suite monkeypatching of
+``runtime_paths.__file__`` continues to control path resolution correctly.
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-from typing import Iterable
-
-from newsletter_core.infrastructure.platform._frozen import (
-    get_bundle_root as _core_bundle_root,
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_database_path as _resolve_database_path,
 )
-from newsletter_core.infrastructure.platform._frozen import is_frozen_any as _is_frozen
-
-
-def _bundle_root() -> Path:
-    if _is_frozen():
-        return Path(_core_bundle_root())
-    return Path(__file__).resolve().parent
-
-
-def _web_dir() -> Path:
-    return Path(__file__).resolve().parent
-
-
-def _project_root() -> Path:
-    if _is_frozen():
-        return _bundle_root()
-    return _web_dir().parent
-
-
-def _first_existing_dir(candidates: Iterable[Path]) -> Path:
-    candidate_list = list(candidates)
-    for candidate in candidate_list:
-        if candidate.is_dir():
-            return candidate
-    return candidate_list[0]
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_env_file_path as _resolve_env_file_path,
+)
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_project_root as _resolve_project_root,
+)
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_static_dir as _resolve_static_dir,
+)
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_template_dir as _resolve_template_dir,
+)
 
 
 def resolve_template_dir() -> str:
-    web_dir = _web_dir()
-    if _is_frozen():
-        bundle_root = _bundle_root()
-        exe_dir = Path(sys.executable).resolve().parent
-        return str(
-            _first_existing_dir(
-                [
-                    exe_dir / "templates",
-                    bundle_root / "templates",
-                    bundle_root / "web" / "templates",
-                ]
-            )
-        )
-    return str(
-        _first_existing_dir([web_dir / "templates", web_dir.parent / "templates"])
-    )
+    return str(_resolve_template_dir(__file__))
 
 
 def resolve_static_dir() -> str:
-    web_dir = _web_dir()
-    if _is_frozen():
-        bundle_root = _bundle_root()
-        exe_dir = Path(sys.executable).resolve().parent
-        return str(
-            _first_existing_dir(
-                [
-                    exe_dir / "static",
-                    bundle_root / "static",
-                    bundle_root / "web" / "static",
-                ]
-            )
-        )
-    return str(_first_existing_dir([web_dir / "static", web_dir.parent / "static"]))
+    return str(_resolve_static_dir(__file__))
 
 
 def resolve_database_path() -> str:
-    if _is_frozen():
-        return str(Path(sys.executable).resolve().parent / "storage.db")
-    return str(_project_root() / ".local" / "state" / "web" / "storage.db")
+    return str(_resolve_database_path(__file__))
 
 
 def resolve_project_root() -> str:
-    return str(_project_root())
+    return str(_resolve_project_root(__file__))
 
 
 def resolve_env_file_path() -> str:
-    if _is_frozen():
-        return str(Path(sys.executable).resolve().parent / ".env")
-    return str(Path(resolve_project_root()) / ".env")
+    return str(_resolve_env_file_path(__file__))
