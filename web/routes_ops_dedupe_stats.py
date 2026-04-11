@@ -132,23 +132,19 @@ def compute_dedupe_stats(
                 }
             )
 
-    top_recipient_list = sorted(
-        (
-            {"recipient": recipient, "count": count}
-            for recipient, count in recipient_counter.items()
-        ),
-        key=lambda item: item["count"],
-        reverse=True,
-    )[:top_recipients]
+    top_recipient_list: list[dict[str, Any]] = [
+        {"recipient": recipient, "count": count}
+        for recipient, count in sorted(
+            recipient_counter.items(), key=lambda pair: pair[1], reverse=True
+        )[:top_recipients]
+    ]
 
-    top_job_list = sorted(
-        (
-            {"job_id": job_id, "count": count}
-            for job_id, count in job_counter.items()
-        ),
-        key=lambda item: item["count"],
-        reverse=True,
-    )[:top_recipients]
+    top_job_list: list[dict[str, Any]] = [
+        {"job_id": job_id, "count": count}
+        for job_id, count in sorted(
+            job_counter.items(), key=lambda pair: pair[1], reverse=True
+        )[:top_recipients]
+    ]
 
     return {
         "window_days": window_days,

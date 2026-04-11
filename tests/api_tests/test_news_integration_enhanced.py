@@ -3,22 +3,21 @@
 - tools.py와 collect.py 모두 업데이트된 내용이 올바르게 적용되었는지 확인합니다.
 """
 
-import json
 import os
 import sys
 import unittest
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from newsletter import config
-from newsletter.sources import NewsSourceManager
+from newsletter import config  # noqa: E402
 
 # 필요한 모듈 임포트
-from newsletter.tools import search_news_articles
-from newsletter_core.application.generation.collect import collect_articles
+from newsletter.tools import search_news_articles  # noqa: E402
+from newsletter_core.application.generation.collect import (  # noqa: E402
+    collect_articles,
+)
 
 
 class TestNewsIntegrationEnhanced(unittest.TestCase):
@@ -85,19 +84,13 @@ class TestNewsIntegrationEnhanced(unittest.TestCase):
 
         # 검증: tools.py 결과
         self.assertIsNotNone(articles_from_tools, "tools.py에서 검색 결과가 None입니다")
-        self.assertIsInstance(
-            articles_from_tools, list, "tools.py에서 검색 결과가 리스트가 아닙니다"
-        )
-        self.assertGreaterEqual(
-            len(articles_from_tools), 1, "tools.py에서 검색 결과가 없습니다"
-        )
+        self.assertIsInstance(articles_from_tools, list, "tools.py에서 검색 결과가 리스트가 아닙니다")
+        self.assertGreaterEqual(len(articles_from_tools), 1, "tools.py에서 검색 결과가 없습니다")
 
         # 첫 번째 기사 형식 검증
         if articles_from_tools:
             first_article = articles_from_tools[0]
-            self.assertIsInstance(
-                first_article, dict, "tools.py의 기사 항목이 딕셔너리가 아닙니다"
-            )
+            self.assertIsInstance(first_article, dict, "tools.py의 기사 항목이 딕셔너리가 아닙니다")
 
             # 필수 필드 검증
             required_fields = ["title", "link", "source"]
@@ -113,9 +106,7 @@ class TestNewsIntegrationEnhanced(unittest.TestCase):
             articles_from_collect = collect_articles(test_keywords)
 
             # 검증: collect.py 결과
-            self.assertIsNotNone(
-                articles_from_collect, "collect.py에서 검색 결과가 None입니다"
-            )
+            self.assertIsNotNone(articles_from_collect, "collect.py에서 검색 결과가 None입니다")
 
             # 키워드에 따라 결과가 변할 수 있으므로 정확한 수 검증보다는 형식 검증 수행
             if articles_from_collect:
@@ -225,9 +216,7 @@ class TestNewsIntegrationEnhanced(unittest.TestCase):
                 )
 
         except Exception as e:
-            self.skipTest(
-                f"collect_articles 함수 호출 실패로 호환성 테스트를 건너뜁니다: {e}"
-            )
+            self.skipTest(f"collect_articles 함수 호출 실패로 호환성 테스트를 건너뜁니다: {e}")
 
 
 if __name__ == "__main__":

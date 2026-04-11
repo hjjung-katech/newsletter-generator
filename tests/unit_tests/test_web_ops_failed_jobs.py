@@ -228,9 +228,7 @@ def test_failed_jobs_retry_404_when_missing(tmp_path: Path) -> None:
 
     app = _build_app(str(db_path))
     with app.test_client() as client:
-        response = client.post(
-            f"/api/ops/failed-jobs/outbox/{uuid.uuid4().hex}/retry"
-        )
+        response = client.post(f"/api/ops/failed-jobs/outbox/{uuid.uuid4().hex}/retry")
 
     assert response.status_code == 404
 
@@ -249,8 +247,6 @@ def test_failed_jobs_retry_409_when_not_failed(tmp_path: Path) -> None:
 
     app = _build_app(str(db_path))
     with app.test_client() as client:
-        response = client.post(
-            "/api/ops/failed-jobs/outbox/sk-already-sent/retry"
-        )
+        response = client.post("/api/ops/failed-jobs/outbox/sk-already-sent/retry")
 
     assert response.status_code == 409

@@ -5,10 +5,10 @@ import sys
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-import unittest
-from unittest.mock import MagicMock, Mock, patch
+import unittest  # noqa: E402
+from unittest.mock import MagicMock, patch  # noqa: E402
 
-from newsletter import config
+from newsletter import config  # noqa: E402
 
 _SUMMARIZE_MODULE_PATH = "newsletter_core.application.generation.summarize"
 

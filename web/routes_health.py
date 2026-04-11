@@ -177,10 +177,7 @@ def register_health_route(
             }
             if drift_status == "error":
                 overall_status = "error"
-            elif (
-                drift_status == "degraded"
-                and overall_status == "healthy"
-            ):
+            elif drift_status == "degraded" and overall_status == "healthy":
                 overall_status = "degraded"
         except Exception as e:
             deps["schedule_drift"] = {

@@ -65,12 +65,18 @@ def test_resolve_drift_threshold_defaults_and_overrides() -> None:
     assert resolve_drift_threshold_seconds() == 15 * 60
     assert resolve_drift_threshold_seconds(explicit=30) == 30
     assert resolve_drift_threshold_seconds(explicit=-5) == 1
-    assert resolve_drift_threshold_seconds(
-        environ={"SCHEDULE_DRIFT_THRESHOLD_SECONDS": "120"},
-    ) == 120
-    assert resolve_drift_threshold_seconds(
-        environ={"SCHEDULE_DRIFT_THRESHOLD_SECONDS": "not-a-number"},
-    ) == 15 * 60
+    assert (
+        resolve_drift_threshold_seconds(
+            environ={"SCHEDULE_DRIFT_THRESHOLD_SECONDS": "120"},
+        )
+        == 120
+    )
+    assert (
+        resolve_drift_threshold_seconds(
+            environ={"SCHEDULE_DRIFT_THRESHOLD_SECONDS": "not-a-number"},
+        )
+        == 15 * 60
+    )
 
 
 def test_drift_report_status_levels() -> None:
@@ -260,9 +266,7 @@ def test_ops_schedule_drift_endpoint_respects_threshold_query(
     app = _build_app(str(db_path))
     with app.test_client() as client:
         # Large threshold -> should not consider the row drifted
-        response = client.get(
-            "/api/ops/schedule-drift?threshold_seconds=3600"
-        )
+        response = client.get("/api/ops/schedule-drift?threshold_seconds=3600")
 
     assert response.status_code == 200
     payload = response.get_json()
