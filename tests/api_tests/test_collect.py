@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import requests  # requests 모듈 임포트 추가
 
-from newsletter.collect import (  # collect_articles_from_serper 추가
+from newsletter_core.application.generation.collect import (  # collect_articles_from_serper 추가
     collect_articles,
     collect_articles_from_serper,
 )
@@ -18,8 +18,8 @@ from newsletter.collect import (  # collect_articles_from_serper 추가
 
 class TestCollect(unittest.TestCase):
 
-    @patch("newsletter.collect.article_filter.remove_duplicate_articles")
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.article_filter.remove_duplicate_articles")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     def test_collect_articles_with_multiple_sources(
         self, mock_configure_sources, mock_remove_duplicates
     ):
@@ -55,7 +55,7 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["title"], "Test Article 1")
 
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     def test_collect_articles_with_no_sources(self, mock_configure_sources):
         """소스가 없는 경우 테스트"""
         # 소스가 없는 모의 NewsSourceManager 생성
@@ -76,7 +76,7 @@ class TestCollect(unittest.TestCase):
         # 결과는 빈 목록
         self.assertEqual(result, [])
 
-    @patch("newsletter.collect.requests.request")
+    @patch("newsletter_core.application.generation.collect.requests.request")
     @patch(
         "newsletter.config.SERPER_API_KEY", "fake_api_key"
     )  # SERPER_API_KEY 모의 처리
@@ -124,7 +124,7 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(result[0]["url"], "http://example.com/article1")
         self.assertEqual(result[0]["content"], "This is a test snippet for article 1.")
 
-    @patch("newsletter.collect.requests.request")
+    @patch("newsletter_core.application.generation.collect.requests.request")
     @patch("newsletter.config.SERPER_API_KEY", "fake_api_key")
     def test_collect_articles_from_serper_empty_keywords_string(self, mock_request):
         # Serper API가 빈 문자열에 대해 어떻게 반응하는지에 따라 mock_response 설정 필요
@@ -136,7 +136,7 @@ class TestCollect(unittest.TestCase):
         mock_request.assert_called_once()
         self.assertEqual(result, [])
 
-    @patch("newsletter.collect.requests.request")
+    @patch("newsletter_core.application.generation.collect.requests.request")
     @patch("newsletter.config.SERPER_API_KEY", "fake_api_key")
     def test_collect_articles_from_serper_search_error(self, mock_request):
         mock_request.side_effect = requests.exceptions.RequestException(
@@ -149,7 +149,7 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(result, [])
         mock_request.assert_called_once()  # 예외가 발생해도 호출은 시도됨
 
-    @patch("newsletter.collect.requests.request")
+    @patch("newsletter_core.application.generation.collect.requests.request")
     @patch("newsletter.config.SERPER_API_KEY", None)  # API 키가 없는 경우
     def test_collect_articles_from_serper_no_api_key(self, mock_request):
         keywords_string = "test keyword"

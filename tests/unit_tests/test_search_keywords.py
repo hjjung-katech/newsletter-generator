@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from newsletter.compose import compose_newsletter_html
 from newsletter.template_paths import get_newsletter_template_dir
+from newsletter_core.application.generation.compose import compose_newsletter_html
 
 
 def test_search_keywords_in_template():

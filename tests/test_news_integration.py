@@ -11,11 +11,11 @@ from unittest.mock import MagicMock, patch
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from newsletter.collect import collect_articles
 from newsletter.sources import NewsSourceManager, SerperAPISource
 
 # 테스트할 모듈 임포트
 from newsletter.tools import search_news_articles
+from newsletter_core.application.generation.collect import collect_articles
 
 
 class TestNewsIntegration(unittest.TestCase):
@@ -56,8 +56,8 @@ class TestNewsIntegration(unittest.TestCase):
             articles_from_collect, list, "collect.py의 검색 결과가 리스트가 아닙니다"
         )
 
-    @patch("newsletter.collect.requests.request")
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.requests.request")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     def test_mocked_integration(self, mock_configure_sources, mock_request):
         """모의 응답을 사용한 통합 테스트"""
         # 모의 응답 설정

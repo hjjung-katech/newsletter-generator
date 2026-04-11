@@ -15,11 +15,11 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from newsletter.chains import get_newsletter_chain  # noqa: E402
-from newsletter.compose import (  # noqa: E402
+from newsletter.template_paths import get_newsletter_template_dir  # noqa: E402
+from newsletter_core.application.generation.compose import (  # noqa: E402
     compose_compact_newsletter_html,
     extract_key_definitions_for_compact,
 )
-from newsletter.template_paths import get_newsletter_template_dir  # noqa: E402
 
 TEMPLATE_DIR = get_newsletter_template_dir()
 

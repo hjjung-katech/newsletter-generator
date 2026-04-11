@@ -37,6 +37,7 @@ _PROTECTED_PREFIXES: tuple[str, ...] = (
     "/api/send-email",
     "/api/email-config",
     "/api/test-email",
+    "/api/ops",
 )
 
 

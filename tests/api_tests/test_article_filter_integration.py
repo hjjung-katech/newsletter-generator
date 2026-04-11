@@ -12,8 +12,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 # 필요한 모듈을 패치
 with patch.dict("sys.modules", {"langchain_google_genai": MagicMock()}):
-    from newsletter import article_filter, cli, collect, config
+    from newsletter import article_filter, cli, config
     from newsletter.sources import NewsSourceManager, SerperAPISource
+    from newsletter_core.application.generation import collect
 
 
 class TestArticleFilterIntegration(unittest.TestCase):
@@ -68,9 +69,9 @@ class TestArticleFilterIntegration(unittest.TestCase):
             },
         ]
 
-    @patch("newsletter.collect.console")
+    @patch("newsletter_core.application.generation.collect.console")
     @patch("newsletter.article_filter.console")
-    @patch("newsletter.collect.configure_default_sources")
+    @patch("newsletter_core.application.generation.collect.configure_default_sources")
     @pytest.mark.skip(
         reason="Complex mocking issues with article collection integration"
     )
@@ -200,7 +201,7 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch.object(
                 NewsSourceManager, "fetch_all_sources", return_value=duplicates
             ) as mock_fetch_all_sources,
-            patch("newsletter.collect.console") as mock_collect_console,
+            patch("newsletter_core.application.generation.collect.console") as mock_collect_console,
             patch("newsletter.article_filter.console") as mock_filter_console,
         ):
 
@@ -236,7 +237,7 @@ class TestArticleFilterIntegration(unittest.TestCase):
 
         config.SERPER_API_KEY = original_serper_key  # 원래 키로 복원
 
-    @patch("newsletter.collect.console")
+    @patch("newsletter_core.application.generation.collect.console")
     @patch("newsletter.article_filter.console")
     @patch("newsletter.sources.configure_default_sources")
     @pytest.mark.skip(reason="API dependency - uses external news sources")
@@ -356,7 +357,7 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch.object(
                 NewsSourceManager, "fetch_all_sources", return_value=mixed_sources
             ) as mock_fetch_all,
-            patch("newsletter.collect.console") as mock_collect_console,
+            patch("newsletter_core.application.generation.collect.console") as mock_collect_console,
             patch("newsletter.article_filter.console") as mock_filter_console,
         ):
 

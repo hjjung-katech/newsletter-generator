@@ -110,7 +110,8 @@ def run(
         generate_newsletter as generate_newsletter_public,
     )
 
-    from . import deliver as news_deliver
+    from newsletter_core.application.generation import deliver as news_deliver
+
     from . import tools
 
     # 로깅 레벨 설정
