@@ -7,6 +7,13 @@ from newsletter_core.infrastructure.platform._frozen import (
     is_frozen,
     is_frozen_any,
 )
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_database_path,
+    resolve_env_file_path,
+    resolve_project_root,
+    resolve_static_dir,
+    resolve_template_dir,
+)
 from newsletter_core.infrastructure.platform._resolver import get_platform_adapter
 
 __all__ = [
@@ -14,4 +21,9 @@ __all__ = [
     "is_frozen",
     "is_frozen_any",
     "get_bundle_root",
+    "resolve_template_dir",
+    "resolve_static_dir",
+    "resolve_database_path",
+    "resolve_project_root",
+    "resolve_env_file_path",
 ]
