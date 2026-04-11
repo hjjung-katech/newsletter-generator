@@ -32,20 +32,20 @@ from newsletter_core.infrastructure.platform._paths import (
 
 
 def resolve_template_dir() -> str:
-    return _resolve_template_dir(__file__)
+    return str(_resolve_template_dir(__file__))
 
 
 def resolve_static_dir() -> str:
-    return _resolve_static_dir(__file__)
+    return str(_resolve_static_dir(__file__))
 
 
 def resolve_database_path() -> str:
-    return _resolve_database_path(__file__)
+    return str(_resolve_database_path(__file__))
 
 
 def resolve_project_root() -> str:
-    return _resolve_project_root(__file__)
+    return str(_resolve_project_root(__file__))
 
 
 def resolve_env_file_path() -> str:
-    return _resolve_env_file_path(__file__)
+    return str(_resolve_env_file_path(__file__))

@@ -6,16 +6,6 @@ Handles path resolution for both development and PyInstaller exe environments
 import sys
 from pathlib import Path
 
-from newsletter_core.infrastructure.platform._paths import (
-    resolve_database_path as _resolve_database_path,
-)
-from newsletter_core.infrastructure.platform._paths import (
-    resolve_env_file_path as _resolve_env_file_path,
-)
-from newsletter_core.infrastructure.platform._paths import (
-    resolve_template_dir as _resolve_template_dir,
-)
-
 
 class PathManager:
     """Centralized path management for development and exe environments"""
@@ -72,7 +62,7 @@ class PathManager:
 
     def get_database_path(self):
         """Get database file path as string"""
-        return _resolve_database_path()
+        return str(self.database_path)
 
     def get_output_dir(self):
         """Get output directory path as string"""
@@ -88,7 +78,7 @@ class PathManager:
 
     def get_templates_dir(self):
         """Get templates directory path as string"""
-        return _resolve_template_dir()
+        return str(self.templates_dir)
 
     def get_newsletter_file_path(self, filename):
         """Get full path for a newsletter file"""
@@ -122,7 +112,7 @@ class PathManager:
 
     def get_env_file_path(self):
         """Get .env file path"""
-        return _resolve_env_file_path()
+        return str(self.base_dir / ".env")
 
     def get_env_example_path(self):
         """Get .env.example file path"""
