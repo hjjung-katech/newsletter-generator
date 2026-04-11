@@ -13,16 +13,16 @@ from newsletter_core.public.platform import get_platform_adapter as _get
 def get_platform_name() -> str:
     """Return the current OS name as reported by Python."""
 
-    return _get().name
+    return str(_get().name)
 
 
 def is_windows() -> bool:
     """Return whether the current runtime is Windows."""
 
-    return _get().is_windows
+    return bool(_get().is_windows)
 
 
 def is_queue_enabled_for_platform() -> bool:
     """Mirror the current queue policy without changing app behavior yet."""
 
-    return _get().is_queue_supported()
+    return bool(_get().is_queue_supported())

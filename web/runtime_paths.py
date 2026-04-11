@@ -19,7 +19,7 @@ from newsletter_core.infrastructure.platform._frozen import is_frozen_any as _is
 
 def _bundle_root() -> Path:
     if _is_frozen():
-        return _core_bundle_root()
+        return Path(_core_bundle_root())
     return Path(__file__).resolve().parent
 
 

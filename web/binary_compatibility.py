@@ -18,7 +18,7 @@ def is_frozen() -> bool:
         is_frozen as _core_is_frozen,
     )
 
-    return _core_is_frozen()
+    return bool(_core_is_frozen())
 
 
 def get_base_path() -> str:
