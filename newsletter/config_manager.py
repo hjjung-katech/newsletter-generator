@@ -99,42 +99,42 @@ def _build_default_llm_config() -> Dict[str, Any]:
         "models": {
             "keyword_generation": {
                 "provider": "gemini",
-                "model": "gemini-2.5-pro-preview-03-25",
+                "model": "gemini-2.5-pro",
                 "temperature": 0.7,
                 "max_retries": 2,
                 "timeout": 60,
             },
             "theme_extraction": {
                 "provider": "gemini",
-                "model": "gemini-1.5-flash-latest",
+                "model": "gemini-2.5-flash",
                 "temperature": 0.2,
                 "max_retries": 2,
                 "timeout": 60,
             },
             "news_summarization": {
                 "provider": "gemini",
-                "model": "gemini-2.5-pro-preview-03-25",
+                "model": "gemini-2.5-pro",
                 "temperature": 0.3,
                 "max_retries": 3,
                 "timeout": 120,
             },
             "section_regeneration": {
                 "provider": "gemini",
-                "model": "gemini-1.5-pro",
+                "model": "gemini-2.5-flash",
                 "temperature": 0.3,
                 "max_retries": 2,
                 "timeout": 120,
             },
             "introduction_generation": {
                 "provider": "gemini",
-                "model": "gemini-1.5-pro",
+                "model": "gemini-2.5-flash",
                 "temperature": 0.4,
                 "max_retries": 2,
                 "timeout": 60,
             },
             "html_generation": {
                 "provider": "gemini",
-                "model": "gemini-2.5-pro-preview-03-25",
+                "model": "gemini-2.5-pro",
                 "temperature": 0.2,
                 "max_retries": 3,
                 "timeout": 180,
@@ -142,9 +142,9 @@ def _build_default_llm_config() -> Dict[str, Any]:
         },
         "provider_models": {
             "gemini": {
-                "fast": "gemini-1.5-flash-latest",
-                "standard": "gemini-1.5-pro",
-                "advanced": "gemini-2.5-pro-preview-03-25",
+                "fast": "gemini-2.5-flash-lite",
+                "standard": "gemini-2.5-flash",
+                "advanced": "gemini-2.5-pro",
             },
             "openai": {
                 "fast": "gpt-4o-mini",
@@ -152,9 +152,9 @@ def _build_default_llm_config() -> Dict[str, Any]:
                 "advanced": "gpt-4o",
             },
             "anthropic": {
-                "fast": "claude-3-haiku-20240307",
-                "standard": "claude-3-sonnet-20240229",
-                "advanced": "claude-3-5-sonnet-20241022",
+                "fast": "claude-haiku-4-5-20251001",
+                "standard": "claude-sonnet-4-6",
+                "advanced": "claude-opus-4-6",
             },
         },
     }
