@@ -30,6 +30,9 @@ from web.routes_generation import register_generation_routes
 from web.routes_health import register_health_route
 from web.routes_newsletter_html import register_newsletter_html_route
 from web.routes_ops import register_ops_routes
+from web.routes_ops_dedupe_stats import register_dedupe_stats_routes
+from web.routes_ops_failed_jobs import register_failed_jobs_routes
+from web.routes_ops_schedule_drift import register_schedule_drift_routes
 from web.routes_presets import register_preset_routes
 from web.routes_send_email import register_send_email_route
 from web.routes_source_policies import register_source_policy_routes
@@ -163,6 +166,9 @@ def _register_routes(app: Flask) -> None:
         get_newsletter_cli=_resolve_newsletter_cli,
     )
     register_ops_routes(app, DATABASE_PATH)
+    register_failed_jobs_routes(app, DATABASE_PATH)
+    register_schedule_drift_routes(app, DATABASE_PATH)
+    register_dedupe_stats_routes(app, DATABASE_PATH)
     register_send_email_route(app, DATABASE_PATH)
     register_approval_routes(app, DATABASE_PATH)
     register_email_api_routes(app)

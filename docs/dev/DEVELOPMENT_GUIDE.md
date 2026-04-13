@@ -335,7 +335,7 @@ class TestComposeNewsletter:
 ```python
 import pytest
 import responses
-from newsletter.collect import collect_from_serper
+from newsletter_core.application.generation.collect import collect_from_serper
 
 class TestSerperAPI:
     """Serper API 테스트."""

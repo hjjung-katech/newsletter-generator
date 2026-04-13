@@ -20,7 +20,8 @@ import pytest
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from newsletter.compose import (  # noqa: E402
+from newsletter.template_paths import get_newsletter_template_dir  # noqa: E402
+from newsletter_core.application.generation.compose import (  # noqa: E402
     NewsletterConfig,
     compose_newsletter,
     create_grouped_sections,
@@ -28,7 +29,6 @@ from newsletter.compose import (  # noqa: E402
     extract_definitions,
     extract_food_for_thought,
 )
-from newsletter.template_paths import get_newsletter_template_dir  # noqa: E402
 
 
 def create_test_data() -> Dict[str, Any]:

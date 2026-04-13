@@ -5,7 +5,6 @@ Mock 기반 뉴스레터 생성 테스트
 실제 API 호출 없이 뉴스레터 생성 로직을 검증합니다.
 """
 
-import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -16,9 +15,11 @@ import pytest
 project_root = str(Path(__file__).parent.parent)
 sys.path.insert(0, project_root)
 
-from newsletter.chains import get_newsletter_chain
-from newsletter.compose import compose_compact_newsletter_html, compose_newsletter_html
-from newsletter.graph import generate_newsletter
+from newsletter.chains import get_newsletter_chain  # noqa: E402
+from newsletter_core.application.generation.compose import (  # noqa: E402
+    compose_compact_newsletter_html,
+    compose_newsletter_html,
+)
 
 
 class TestNewsletterMocked:
@@ -211,13 +212,11 @@ class TestNewsletterMocked:
             test_data = {"articles": self.mock_articles, "keywords": "test"}
 
             try:
-                result = chain.invoke(test_data)
+                chain.invoke(test_data)
                 # 오류가 발생하거나 결과가 나올 수 있음
                 print("✅ Mock 에러 처리 테스트 - 체인 구조 정상")
             except Exception as e:
-                print(
-                    f"✅ Mock 에러 처리 테스트 - 예상된 오류 처리: {type(e).__name__}"
-                )
+                print(f"✅ Mock 에러 처리 테스트 - 예상된 오류 처리: {type(e).__name__}")
 
     @pytest.mark.mock_api
     def test_data_validation_with_mock(self):
@@ -227,9 +226,6 @@ class TestNewsletterMocked:
         chain = get_newsletter_chain(is_compact=True)
         assert chain is not None
 
-        # 잘못된 형식의 데이터
-        invalid_data = {"articles": [], "keywords": ""}  # 빈 기사 목록  # 빈 키워드
-
         # 체인 구조 자체는 정상이어야 함
         assert hasattr(chain, "invoke"), "체인에 invoke 메서드가 있어야 함"
 
@@ -238,13 +234,6 @@ class TestNewsletterMocked:
     @pytest.mark.mock_api
     def test_compose_functions_basic(self):
         """기본적인 compose 함수들 테스트 (Mock 없이)"""
-
-        # 테스트 데이터 - 실제 템플릿 없이도 작동하도록
-        test_data = {
-            "newsletter_topic": "AI 기술 테스트",
-            "sections": [],
-            "definitions": [],
-        }
 
         # compose 함수들이 존재하고 호출 가능한지 확인
         try:
@@ -263,7 +252,9 @@ class TestNewsletterMocked:
         """데이터 처리 로직 테스트 (템플릿 제외)"""
 
         # extract_key_definitions_for_compact 함수 테스트
-        from newsletter.compose import extract_key_definitions_for_compact
+        from newsletter_core.application.generation.compose import (
+            extract_key_definitions_for_compact,
+        )
 
         test_sections = [
             {

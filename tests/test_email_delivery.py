@@ -23,8 +23,8 @@ import pytest
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from newsletter import config
-from newsletter import deliver as news_deliver
+from newsletter import config  # noqa: E402
+from newsletter_core.application.generation import deliver as news_deliver  # noqa: E402
 
 
 class TestEmailDelivery(unittest.TestCase):
@@ -46,7 +46,7 @@ class TestEmailDelivery(unittest.TestCase):
         """
 
     @pytest.mark.mock_api
-    @patch("newsletter.deliver.requests.post")
+    @patch("newsletter_core.application.generation.deliver.requests.post")
     def test_send_email_success(self, mock_post):
         """이메일 발송 성공 테스트 (모킹) - GitHub Actions 안전"""
         # Mock successful response
@@ -66,7 +66,6 @@ class TestEmailDelivery(unittest.TestCase):
             patch.object(config, "POSTMARK_SERVER_TOKEN", "test-token"),
             patch.object(config, "EMAIL_SENDER", "test@example.com"),
         ):
-
             result = news_deliver.send_email(
                 to_email=self.test_email,
                 subject=self.test_subject,
@@ -96,7 +95,7 @@ class TestEmailDelivery(unittest.TestCase):
         self.assertIn("테스트 이메일입니다", payload["HtmlBody"])
 
     @pytest.mark.mock_api
-    @patch("newsletter.deliver.requests.post")
+    @patch("newsletter_core.application.generation.deliver.requests.post")
     def test_send_email_failure(self, mock_post):
         """이메일 발송 실패 테스트 (모킹) - GitHub Actions 안전"""
         # Mock failed response
@@ -109,7 +108,6 @@ class TestEmailDelivery(unittest.TestCase):
             patch.object(config, "POSTMARK_SERVER_TOKEN", "test-token"),
             patch.object(config, "EMAIL_SENDER", "test@example.com"),
         ):
-
             result = news_deliver.send_email(
                 to_email="invalid-email",
                 subject=self.test_subject,
@@ -133,7 +131,7 @@ class TestEmailDelivery(unittest.TestCase):
         self.assertTrue(result)
 
     @pytest.mark.mock_api
-    @patch("newsletter.deliver.requests.post")
+    @patch("newsletter_core.application.generation.deliver.requests.post")
     def test_send_email_network_error(self, mock_post):
         """네트워크 오류 테스트 - GitHub Actions 안전"""
         # Mock network error
@@ -143,7 +141,6 @@ class TestEmailDelivery(unittest.TestCase):
             patch.object(config, "POSTMARK_SERVER_TOKEN", "test-token"),
             patch.object(config, "EMAIL_SENDER", "test@example.com"),
         ):
-
             result = news_deliver.send_email(
                 to_email=self.test_email,
                 subject=self.test_subject,
@@ -233,13 +230,12 @@ class TestEmailDelivery(unittest.TestCase):
             # CLI 명령어 시뮬레이션
             from unittest.mock import patch
 
-            from newsletter.cli import test_email
-
-            with patch("newsletter.deliver.send_email") as mock_send:
+            with patch(
+                "newsletter_core.application.generation.deliver.send_email"
+            ) as mock_send:
                 mock_send.return_value = True
 
                 # test_email 함수 직접 호출 (CLI 대신)
-                import typer
                 from typer.testing import CliRunner
 
                 from newsletter.cli import app
@@ -461,7 +457,7 @@ def create_test_html_file():
     </head>
     <body>
         <h1>📰 주간 기술 뉴스 클리핑</h1>
-        
+
         <div class="article">
             <div class="title">AI 기술의 최신 동향</div>
             <div class="summary">
@@ -469,7 +465,7 @@ def create_test_html_file():
                 특히 자연어 처리와 컴퓨터 비전 분야에서 괄목할 만한 성과를 보이고 있습니다.
             </div>
         </div>
-        
+
         <div class="article">
             <div class="title">클라우드 컴퓨팅의 미래</div>
             <div class="summary">
@@ -477,7 +473,7 @@ def create_test_html_file():
                 엣지 컴퓨팅과 서버리스 아키텍처가 주목받고 있습니다.
             </div>
         </div>
-        
+
         <div class="article">
             <div class="title">사이버 보안 트렌드</div>
             <div class="summary">
@@ -485,7 +481,7 @@ def create_test_html_file():
                 차세대 보안 솔루션으로 각광받고 있습니다.
             </div>
         </div>
-        
+
         <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666;">
             <p>이 뉴스레터는 Newsletter Generator에 의해 자동 생성되었습니다.</p>
         </footer>

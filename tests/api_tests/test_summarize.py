@@ -5,22 +5,32 @@ import sys
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-import unittest
-from unittest.mock import MagicMock, Mock, patch
+import unittest  # noqa: E402
+from unittest.mock import MagicMock, patch  # noqa: E402
 
-from newsletter import config
+from newsletter import config  # noqa: E402
+
+_SUMMARIZE_MODULE_PATH = "newsletter_core.application.generation.summarize"
+
+
+def _reload_summarize():
+    """Import and reload the canonical summarize module and return it."""
+    import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
+    import newsletter_core.application.generation.summarize as _newsletter_summarize
+
+    importlib.reload(newsletter.llm_factory)
+    importlib.reload(_newsletter_summarize)
+    return _newsletter_summarize
 
 
 class TestSummarize(unittest.TestCase):
     def setUp(self):
         self.maxDiff = None
-        # google.generativeai는 더 이상 사용하지 않음
-        pass
 
     def tearDown(self):
         # Clean up modules that are reloaded during tests
         for mod_key in [
-            "newsletter.summarize",
+            _SUMMARIZE_MODULE_PATH,
             "newsletter.llm_factory",
             "langchain_core",
             "langchain_google_genai",
@@ -33,28 +43,21 @@ class TestSummarize(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.content = "<html><body>Mocked HTML Summary</body></html>"
         mock_llm_instance.invoke.return_value = mock_response
-        # mock_get_llm.return_value will be set by patch.object later
 
         for mod_key_to_delete in [
-            "newsletter.summarize",
+            _SUMMARIZE_MODULE_PATH,
             "newsletter.llm_factory",
             "langchain_google_genai",
         ]:
             if mod_key_to_delete in sys.modules:
                 del sys.modules[mod_key_to_delete]
 
-        # Import and reload to ensure we get fresh modules
         import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
-        import newsletter.summarize
 
-        importlib.reload(newsletter.llm_factory)  # Reload llm_factory first
-        importlib.reload(
-            newsletter.summarize
-        )  # Then reload summarize, which imports the reloaded llm_factory
-        summarize_articles_func = newsletter.summarize.summarize_articles
+        newsletter_summarize = _reload_summarize()
+        summarize_articles_func = newsletter_summarize.summarize_articles
 
         with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
-            # Patch get_llm_for_task on the reloaded llm_factory module object
             with patch.object(
                 newsletter.llm_factory,
                 "get_llm_for_task",
@@ -84,7 +87,7 @@ class TestSummarize(unittest.TestCase):
 
     def test_summarize_with_missing_module(self):
         """LLM 팩토리에서 모든 제공자가 사용 불가능할 때 테스트 - F-14 중앙화된 설정"""
-        import newsletter.summarize
+        import newsletter_core.application.generation.summarize as newsletter_summarize
 
         keywords = ["AI"]
         articles = [
@@ -93,7 +96,7 @@ class TestSummarize(unittest.TestCase):
 
         # F-14: 중앙화된 설정에 의해 자동으로 fallback LLM이 사용되므로
         # 이 테스트는 이제 성공적으로 요약을 생성합니다
-        html_output = newsletter.summarize.summarize_articles(keywords, articles)
+        html_output = newsletter_summarize.summarize_articles(keywords, articles)
 
         # F-14 시스템은 fallback 메커니즘으로 성공적인 결과를 생성
         self.assertIn("html", html_output)
@@ -101,7 +104,7 @@ class TestSummarize(unittest.TestCase):
 
     def test_summarize_articles_no_api_key(self):
         """API 키가 없을 때 테스트 - F-14 중앙화된 설정"""
-        import newsletter.summarize
+        import newsletter_core.application.generation.summarize as newsletter_summarize
 
         # F-14 중앙화된 설정에서는 fallback 메커니즘이 작동
         keywords = ["테스트"]
@@ -109,7 +112,7 @@ class TestSummarize(unittest.TestCase):
             {"title": "Test", "url": "http://test.com", "content": "Test content"}
         ]
 
-        html_output = newsletter.summarize.summarize_articles(keywords, articles)
+        html_output = newsletter_summarize.summarize_articles(keywords, articles)
 
         # F-14 시스템의 intelligent fallback으로 성공적인 결과 생성
         self.assertIn("html", html_output)
@@ -124,7 +127,7 @@ class TestSummarize(unittest.TestCase):
 
         # Clean up modules first
         for mod_key_to_delete in [
-            "newsletter.summarize",
+            _SUMMARIZE_MODULE_PATH,
             "newsletter.llm_factory",
             "langchain_google_genai",
             "google.generativeai",
@@ -134,7 +137,6 @@ class TestSummarize(unittest.TestCase):
 
         # Ensure google.generativeai is a benign mock
         mock_genai_module = MagicMock()
-        # If llm_factory fails and summarize.py tries to use genai directly, make it also fail
         mock_genai_model = MagicMock()
         mock_genai_model.generate_content.side_effect = Exception(
             "Gemini API Error via genai fallback"
@@ -142,16 +144,12 @@ class TestSummarize(unittest.TestCase):
         mock_genai_module.GenerativeModel.return_value = mock_genai_model
         sys.modules["google.generativeai"] = mock_genai_module
 
-        # Import and reload to ensure we get fresh modules
         import newsletter.llm_factory
-        import newsletter.summarize
 
-        importlib.reload(newsletter.llm_factory)
-        importlib.reload(newsletter.summarize)
-        summarize_articles = newsletter.summarize.summarize_articles
+        newsletter_summarize = _reload_summarize()
+        summarize_articles = newsletter_summarize.summarize_articles
 
         with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
-            # Patch get_llm_for_task on the reloaded llm_factory module object
             with patch.object(
                 newsletter.llm_factory,
                 "get_llm_for_task",
@@ -176,7 +174,6 @@ class TestSummarize(unittest.TestCase):
                     "news_summarization", unittest.mock.ANY, enable_fallback=False
                 )
                 mock_llm_instance.invoke.assert_called_once()
-                # Ensure the direct genai mock was not used if llm_factory path was taken
                 mock_genai_module.GenerativeModel.assert_not_called()
 
     def test_summarize_articles_empty_articles(self):
@@ -194,10 +191,8 @@ class TestSummarize(unittest.TestCase):
             if mod_key in sys.modules:
                 del sys.modules[mod_key]
 
-        import newsletter.summarize
-
-        importlib.reload(newsletter.summarize)
-        summarize_articles = newsletter.summarize.summarize_articles
+        newsletter_summarize = _reload_summarize()
+        summarize_articles = newsletter_summarize.summarize_articles
 
         keywords = ["빈 기사"]
         articles = []
@@ -210,10 +205,9 @@ class TestSummarize(unittest.TestCase):
         mock_response = MagicMock()
         mock_response.content = "<html><body>Empty Keywords Summary</body></html>"
         mock_llm_instance.invoke.return_value = mock_response
-        # mock_get_llm.return_value will be set by patch.object later
 
         for mod_key_to_delete in [
-            "newsletter.summarize",
+            _SUMMARIZE_MODULE_PATH,
             "newsletter.llm_factory",
             "langchain_google_genai",
             "google.generativeai",
@@ -224,18 +218,12 @@ class TestSummarize(unittest.TestCase):
         mock_genai_module_for_summarize_import = MagicMock()
         sys.modules["google.generativeai"] = mock_genai_module_for_summarize_import
 
-        # Import and reload to ensure we get fresh modules
-        import newsletter.llm_factory  # Ensure llm_factory is loaded to be patched
-        import newsletter.summarize
+        import newsletter.llm_factory
 
-        importlib.reload(newsletter.llm_factory)  # Reload llm_factory first
-        importlib.reload(
-            newsletter.summarize
-        )  # Then reload summarize, which imports the reloaded llm_factory
-        summarize_articles_func = newsletter.summarize.summarize_articles
+        newsletter_summarize = _reload_summarize()
+        summarize_articles_func = newsletter_summarize.summarize_articles
 
         with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
-            # Patch get_llm_for_task on the reloaded llm_factory module object
             with patch.object(
                 newsletter.llm_factory,
                 "get_llm_for_task",
