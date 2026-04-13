@@ -197,8 +197,6 @@ def test_reset_clears_in_process_fallback() -> None:
 
 
 def test_reset_with_redis_still_resets_fallback() -> None:
-    fake = _FakeRedis()
-    limiter = RedisRateLimiter(get_redis=lambda: fake)
     # Drive the fallback to its limit by temporarily making Redis unavailable
     broken = MagicMock()
     broken.eval.side_effect = RuntimeError("temp error")
