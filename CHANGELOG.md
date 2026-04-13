@@ -1,5 +1,111 @@
 # Changelog
 
+## [0.9.0] - 2026-04-13 - Ops-Security, Web Feature Hardening & Architecture Cleanup
+
+### 🔒 Security (RR-26 / RR-27 / RR-28)
+
+#### RR-26: Scoped multi-token authentication (#397)
+- Protected routes (`/ops/*`, `/api/admin/*`) gated behind scope-checked bearer tokens
+- `web/access_control.py`: multi-token registry with per-token scope enforcement
+- Token verification middleware wired into Flask request lifecycle
+
+#### RR-27: Redis-backed sliding-window rate limiter (#404)
+- `web/redis_rate_limiter.py`: per-client sliding-window limiter with Redis backend
+- In-process fallback when Redis is unavailable (zero-dependency degradation)
+- Rate-limit headers (`X-RateLimit-*`) added to all generation endpoint responses
+
+#### RR-28: Quota / abuse observability for generation endpoints (#396)
+- `web/routes_ops_quota_abuse.py`: real-time quota usage and abuse signal dashboard
+- Per-token request counters tracked in Redis; ops route exposes current state
+- Alert threshold configuration via `centralized_settings`
+
+### 🚀 Features
+
+#### Operations visibility (#396)
+- **Failed jobs dashboard**: `web/routes_ops_failed_jobs.py` — inspect and retry failed generation jobs
+- **Schedule drift monitor**: `web/routes_ops_schedule_drift.py` — detect and surface cron schedule drift
+- **Dedupe stats**: `web/routes_ops_dedupe_stats.py` — idempotency hit-rate and deduplication statistics
+
+#### Web UI: approval, presets, source policies, archive
+- Draft approval gate for deliveries before send (#189)
+- Approval inbox actions (approve / reject) exposed via API and UI (#190)
+- Saved generation presets: persist, load, and wire into the generation form (#191, #192)
+- Source allow/block policy management UI and enforcement (#194, #196)
+- Analytics dashboard for runtime metrics with event capture (#198, #200)
+- Archive search API and compose-flow reuse of prior newsletters (#203, #204)
+- Schedule and execution history visibility across API and web (#343)
+- Personalization, source policy, and preset lifecycle visibility hardening (#347, #349, #351)
+
+#### Ops logging and access control
+- Canonical runtime ops logging structure (#184)
+- Minimal access control for sensitive ops routes (#180)
+- Request throttles (per-IP rate limiting) for generation endpoints (#208)
+- Debug helper routes gated by environment (#164)
+- CORS origins restricted to canonical Flask allowlist (#165)
+
+### 🔧 Refactor
+
+#### Platform adapter consolidation (Phase 4–5)
+- `newsletter_core/infrastructure/platform/` — all OS-specific code behind `PlatformAdapter` protocol (#384, #386)
+- Path resolution helpers consolidated into `_paths.py`; `web/runtime_paths.py` thinned to delegation layer (#389)
+- Full test coverage pass + code review follow-up (#391)
+
+#### Web routes extraction
+- `routes_generation.py` decomposed into bounded helper modules:
+  `generation_route_actions.py`, `generation_route_dispatch.py`, `generation_route_support.py` (#327–#333)
+- `web/static/js/app.js` view-state, request, selection, visibility, and render helpers extracted (#335–#341)
+- Scheduler enqueue telemetry, scan reschedule helpers, and DB schema core extracted (#233–#238)
+
+#### newsletter_core extraction (graph / tools / LLM factory / compose)
+- `newsletter/graph.py` → `newsletter_core/application/graph_workflow*`, `graph_node_helpers*`, `graph_composition*` (#321–#325)
+- `newsletter/tools.py` → `newsletter_core/application/tools_search_flow*`, `tools_support*`, `infrastructure/tools_search_runtime*` (#315–#319)
+- `newsletter/llm_factory.py` → `newsletter_core/application/llm_factory*`, `llm_factory_fallback*`, `infrastructure/llm_factory_runtime*` (#309–#313)
+- Compose orchestrator slimmed; renderer, context, section, and input helpers extracted (#242–#250)
+
+#### Config / settings
+- Runtime settings routed through `newsletter_core.public.settings` accessors (#183)
+- Config manager adapter slimmed; config file loader extracted (#222, #231)
+- Legacy config shims lazy-loaded to eliminate import-time side effects (#167)
+- Centralized runtime accessors finalized (#207)
+
+### 🐛 Fixes
+
+- `fix(web)`: ensure project root in `sys.path` for `newsletter_core` import (#393)
+- `fix(runtime)`: remove import-time bootstrap side effects (#169)
+- `fix(web)`: normalize schedule route timestamps to UTC (#173)
+- `fix(web)`: restore preview and run-now actions (#163)
+- `fix(web)`: share email outbox send helper (#171)
+- Multiple Windows exe encoding and bootstrap fixes (cp1252 safety, Rich fallback, Sentry setup, RQ deferred import) (#127)
+- CI stabilization: Windows signing, self-signed cert dry-run, ASCII guard, mypy annotations (#128–#147)
+
+### 🧹 Chore
+
+#### Legacy shim removal (Step 1)
+- Deleted `newsletter/collect.py`, `newsletter/summarize.py`, `newsletter/main.py` — zero live-import pure shims (PR #404)
+- Migrated `newsletter/cli.py` and `newsletter/cli_test.py` relative imports to `newsletter_core.application.generation`
+- Cleaned PyInstaller hook strings and `web/binary_compatibility.py` module check
+
+#### Deprecation schedule
+- `docs/technical/shim-deprecation-schedule.md` updated: version basis changed to CHANGELOG versions (PR #406)
+- N+2 (0.9.0) and N+3 (1.0.0) removal targets documented per file
+
+#### Governance and repo hygiene
+- `CLAUDE.md` added: Claude Code workflow contract for this repository (#397)
+- Delivery lifecycle gates hardened; RR auto-close on merged PR (#123, #369)
+- Repo hygiene: devtools migration, `.local/` isolation, root cleanup (#83–#125)
+- RR/PR/commit workflow templates standardized (#84, #85)
+- CI: delivery unit governance enforced, docs-quality scope aligned (#107, #380)
+
+### 🔧 Breaking Changes
+- None (backward-compatible shim removal: only zero-consumer files deleted)
+
+### 🔖 Shim Removal Status (as of 0.9.0)
+- **Removed**: `newsletter/collect.py`, `newsletter/summarize.py`, `newsletter/main.py`
+- **Remaining Step 2 (target 1.0.0)**: `newsletter/api.py`, `newsletter/compose.py`, `newsletter/deliver.py`
+- See `docs/technical/shim-deprecation-schedule.md` for full plan
+
+---
+
 ## [0.8.0] - 2026-02-23 - Ops Safety Lock (PR-1 ~ PR-3)
 
 ### 🚀 주요 기능

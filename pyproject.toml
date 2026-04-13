@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "newsletter-generator"
-version = "0.6.0"
+version = "0.9.0"
 description = "AI Newsletter Generator"
 readme = "README.md"
 license = "MIT"
