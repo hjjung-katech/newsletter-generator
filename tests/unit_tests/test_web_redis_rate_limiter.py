@@ -11,8 +11,7 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -21,7 +20,6 @@ if str(WEB_DIR) not in sys.path:
     sys.path.insert(0, str(WEB_DIR))
 
 from redis_rate_limiter import RedisRateLimiter  # noqa: E402
-from request_limits import RateLimitDecision  # noqa: E402
 
 pytestmark = [pytest.mark.unit, pytest.mark.mock_api]
 
