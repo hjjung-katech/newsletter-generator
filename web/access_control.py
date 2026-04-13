@@ -29,12 +29,23 @@ Auth flow (production-like runtimes)
    If matching but wrong scope → 403 (Insufficient token scope).
    If no match at all → 401 (Admin API token required).
    If no tokens configured at all → 503 (misconfiguration).
+
+Quota / Abuse observability
+----------------------------
+Rate-limit violations on ``/api/generate`` and ``/newsletter`` are recorded
+in a per-process ``_QuotaAbuseTracker`` stored in
+``app.extensions["quota_abuse_tracker"]``.  The ``/api/ops/quota-abuse``
+endpoint (requires ``SCOPE_OPS``) exposes these events to operators without
+requiring direct database or log access.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import threading
+import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from hmac import compare_digest
@@ -54,9 +65,12 @@ ADMIN_TOKEN_ENV_VAR = "ADMIN_API_TOKEN"  # nosec B105
 ADMIN_TOKEN_HEADER = "X-Admin-Token"  # nosec B105
 DEFAULT_GENERATE_RATE_LIMIT = 5
 DEFAULT_GENERATE_WINDOW_SECONDS = 60
+DEFAULT_NEWSLETTER_RATE_LIMIT = 5
+DEFAULT_NEWSLETTER_WINDOW_SECONDS = 60
 DEFAULT_PROTECTED_RATE_LIMIT = 30
 DEFAULT_PROTECTED_WINDOW_SECONDS = 60
 DEFAULT_GENERATE_MAX_BODY_BYTES = 32 * 1024
+_QUOTA_ABUSE_TRACKER_MAXLEN = 1000
 
 # ---------------------------------------------------------------------------
 # Scope constants
@@ -144,6 +158,69 @@ class _TokenConfig:
     value: str
     scopes: frozenset[str]
     label: str
+
+
+@dataclass(frozen=True)
+class AbuseEvent:
+    """A single rate-limit violation event recorded for ops observability."""
+
+    timestamp: str  # ISO-8601 UTC
+    client_id: str  # IP or X-Forwarded-For first segment
+    path: str  # request path that triggered the limit
+    retry_after_seconds: int
+
+
+class _QuotaAbuseTracker:
+    """Thread-safe bounded ring buffer for rate-limit violation events.
+
+    Stored in ``app.extensions["quota_abuse_tracker"]`` by
+    ``configure_access_control()``.  The ``/api/ops/quota-abuse`` endpoint
+    reads from it without importing this class directly.
+    """
+
+    def __init__(self, maxlen: int = _QUOTA_ABUSE_TRACKER_MAXLEN) -> None:
+        self._lock = threading.Lock()
+        self._events: deque[AbuseEvent] = deque(maxlen=maxlen)
+        self._total: int = 0  # cumulative count, not capped by maxlen
+
+    def record(self, event: AbuseEvent) -> None:
+        with self._lock:
+            self._events.append(event)
+            self._total += 1
+
+    def recent(self, limit: int = 100) -> list[AbuseEvent]:
+        with self._lock:
+            events = list(self._events)
+        return events[-limit:]
+
+    @property
+    def total_recorded(self) -> int:
+        with self._lock:
+            return self._total
+
+
+def _record_abuse_event(
+    tracker: _QuotaAbuseTracker,
+    client_id: str,
+    path: str,
+    retry_after_seconds: int,
+) -> None:
+    """Log and record a rate-limit violation event."""
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    LOGGER.warning(
+        "abuse.rate_limit_exceeded path=%s client=%s retry_after_seconds=%d",
+        path,
+        client_id,
+        retry_after_seconds,
+    )
+    tracker.record(
+        AbuseEvent(
+            timestamp=timestamp,
+            client_id=client_id,
+            path=path,
+            retry_after_seconds=retry_after_seconds,
+        )
+    )
 
 
 def _resolve_all_token_configs(
@@ -265,6 +342,8 @@ def configure_access_control(
     prefixes: tuple[str, ...] = _PROTECTED_PREFIXES,
     generate_rate_limit: int = DEFAULT_GENERATE_RATE_LIMIT,
     generate_window_seconds: int = DEFAULT_GENERATE_WINDOW_SECONDS,
+    newsletter_rate_limit: int = DEFAULT_NEWSLETTER_RATE_LIMIT,
+    newsletter_window_seconds: int = DEFAULT_NEWSLETTER_WINDOW_SECONDS,
     protected_rate_limit: int = DEFAULT_PROTECTED_RATE_LIMIT,
     protected_window_seconds: int = DEFAULT_PROTECTED_WINDOW_SECONDS,
     generate_max_body_bytes: int = DEFAULT_GENERATE_MAX_BODY_BYTES,
@@ -277,13 +356,20 @@ def configure_access_control(
     all worker processes enforce a single consistent limit.  When ``None`` (or
     when Redis is unavailable at request time), each process falls back to its
     own in-process ``SlidingWindowRateLimiter``.
+
+    Rate-limit violations on generation endpoints are recorded in
+    ``app.extensions["quota_abuse_tracker"]`` for ops observability.
     """
     env = environ or os.environ
     generate_limiter = RedisRateLimiter(get_redis=get_redis_conn)
+    newsletter_limiter = RedisRateLimiter(get_redis=get_redis_conn)
     protected_limiter = RedisRateLimiter(get_redis=get_redis_conn)
+    abuse_tracker = _QuotaAbuseTracker()
     app.extensions.setdefault("request_limiters", {})
     app.extensions["request_limiters"]["generate"] = generate_limiter
+    app.extensions["request_limiters"]["newsletter"] = newsletter_limiter
     app.extensions["request_limiters"]["protected"] = protected_limiter
+    app.extensions["quota_abuse_tracker"] = abuse_tracker
 
     @app.before_request  # type: ignore[untyped-decorator]
     def require_admin_api_token() -> ResponseReturnValue | None:
@@ -309,8 +395,33 @@ def configure_access_control(
                 window_seconds=generate_window_seconds,
             )
             if not decision.allowed:
+                _record_abuse_event(
+                    abuse_tracker,
+                    client_identifier,
+                    request.path,
+                    decision.retry_after_seconds,
+                )
                 return _rate_limit_response(
                     message="Generate rate limit exceeded",
+                    retry_after_seconds=decision.retry_after_seconds,
+                )
+            return None
+
+        if request.path == "/newsletter":
+            decision = newsletter_limiter.check(
+                f"newsletter:{client_identifier}",
+                limit=newsletter_rate_limit,
+                window_seconds=newsletter_window_seconds,
+            )
+            if not decision.allowed:
+                _record_abuse_event(
+                    abuse_tracker,
+                    client_identifier,
+                    request.path,
+                    decision.retry_after_seconds,
+                )
+                return _rate_limit_response(
+                    message="Newsletter rate limit exceeded",
                     retry_after_seconds=decision.retry_after_seconds,
                 )
             return None
