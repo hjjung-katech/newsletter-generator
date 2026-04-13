@@ -70,10 +70,9 @@ except ImportError:
 
 try:
     from archive import inject_archive_references
-    from runtime_paths import resolve_database_path
 except ImportError:
     from web.archive import inject_archive_references  # pragma: no cover
-    from web.runtime_paths import resolve_database_path  # pragma: no cover
+from newsletter_core.infrastructure.platform._paths import resolve_database_path
 
 DATABASE_PATH = resolve_database_path()
 logger = logging.getLogger("web.tasks")

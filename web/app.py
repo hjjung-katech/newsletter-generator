@@ -17,6 +17,11 @@ from typing import Any, cast
 import redis
 from flask import Flask, render_template
 
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_database_path,
+    resolve_static_dir,
+    resolve_template_dir,
+)
 from newsletter_core.public.settings import get_setting_value
 from web.access_control import configure_access_control
 from web.cors_config import configure_cors
@@ -37,11 +42,6 @@ from web.routes_ops_schedule_drift import register_schedule_drift_routes
 from web.routes_presets import register_preset_routes
 from web.routes_send_email import register_send_email_route
 from web.routes_source_policies import register_source_policy_routes
-from web.runtime_paths import (
-    resolve_database_path,
-    resolve_static_dir,
-    resolve_template_dir,
-)
 from web.sentry_integration import setup_sentry
 from web.suggest import bp as suggest_bp
 

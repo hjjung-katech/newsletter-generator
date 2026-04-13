@@ -7,14 +7,10 @@ import logging
 import os
 import sys
 
-try:
-    from runtime_paths import resolve_env_file_path, resolve_project_root
-except ImportError:
-    from web.runtime_paths import (  # pragma: no cover
-        resolve_env_file_path,
-        resolve_project_root,
-    )
-
+from newsletter_core.infrastructure.platform._paths import (
+    resolve_env_file_path,
+    resolve_project_root,
+)
 from newsletter_core.public.generation import (
     GenerateNewsletterRequest,
     NewsletterGenerationError,

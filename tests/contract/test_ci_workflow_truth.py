@@ -35,7 +35,6 @@ def test_main_ci_enforces_release_and_platform_contracts() -> None:
         "tests/contract/test_ci_workflow_truth.py",
         "tests/unit_tests/test_validate_release_manifest.py",
         "tests/unit_tests/test_web_import_side_effects.py",
-        "tests/unit_tests/web/test_runtime_paths.py",
         "tests/contract/test_web_runtime_contract.py",
         "docker build -t newsletter-generator:ci .",
         "scripts/devtools/web_health_smoke.py --mode http",

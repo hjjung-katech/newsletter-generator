@@ -12,13 +12,20 @@ import sqlite3
 import sys
 from datetime import datetime
 
+# Ensure project root is in sys.path when this script is run directly
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_HERE)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 try:
     from db_state import ensure_database_schema
-    from runtime_paths import resolve_database_path
 except ImportError:
     from web.db_state import ensure_database_schema  # pragma: no cover
-    from web.runtime_paths import resolve_database_path  # pragma: no cover
 
+from newsletter_core.infrastructure.platform._paths import (  # noqa: E402
+    resolve_database_path,
+)
 
 DEFAULT_DATABASE_PATH = resolve_database_path()
 
