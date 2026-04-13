@@ -227,7 +227,7 @@ def suggest_keywords(domain: str, count: int = 10) -> list[str]:
     from . import tools
 
     # 기존 검증된 키워드 생성 함수 사용
-    return cast(list[str], tools.generate_keywords_with_gemini(domain, count=count))
+    return tools.generate_keywords_with_gemini(domain, count=count)
 
 
 if __name__ == "__main__":

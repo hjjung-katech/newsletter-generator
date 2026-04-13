@@ -8,12 +8,12 @@ import logging
 import os
 import re
 from datetime import datetime
-from typing import Any, Dict, Final, List
+from typing import Any, Dict, Final, List, Optional
 
 import feedparser
-import requests
+import requests  # type: ignore[import-untyped]
 from bs4 import BeautifulSoup
-from requests.adapters import HTTPAdapter
+from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
 from rich.console import Console
 from urllib3.util.retry import Retry
 
@@ -51,7 +51,10 @@ def create_requests_session() -> requests.Session:
 
 
 def fetch_url_content(
-    url: str, headers: dict = None, method: str = "GET", data: dict = None
+    url: str,
+    headers: Optional[dict] = None,
+    method: str = "GET",
+    data: Optional[dict] = None,
 ) -> str:
     """URL에서 컨텐츠를 안전하게 가져옴"""
     session = create_requests_session()
@@ -63,7 +66,7 @@ def fetch_url_content(
         else:
             response = session.get(url, headers=headers, timeout=TIMEOUT_SECONDS)
         response.raise_for_status()
-        return response.text
+        return response.text  # type: ignore[no-any-return]
     except requests.RequestException as e:
         logger.error(f"URL 요청 실패: {url}, 메소드: {method}, 에러: {str(e)}")
         raise
@@ -118,7 +121,7 @@ class NewsSource:
 class SerperAPISource(NewsSource):
     """Serper.dev API를 사용하여 뉴스 기사를 검색하는 소스"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("SerperAPI")
         self.api_key = get_setting_value("SERPER_API_KEY")
 
@@ -203,7 +206,7 @@ class RSSFeedSource(NewsSource):
     ) -> List[Dict[str, Any]]:
         """RSS 피드에서 뉴스 기사를 가져옴"""
         all_articles = []
-        keyword_article_counts = {}
+        keyword_article_counts: Dict[str, int] = {}
 
         for feed_url in self.feed_urls:
             try:
@@ -232,21 +235,21 @@ class RSSFeedSource(NewsSource):
                         if isinstance(entry, dict)
                         else getattr(entry, "description", "").lower()
                     )
-                    content = (
+                    entry_content: Any = (
                         entry.get("content", None)
                         if isinstance(entry, dict)
                         else getattr(entry, "content", None)
                     )
                     content_value = ""
-                    if content:
-                        if isinstance(content, list):
+                    if entry_content:
+                        if isinstance(entry_content, list):
                             content_value = (
-                                content[0].get("value", "")
-                                if isinstance(content[0], dict)
-                                else str(content[0])
+                                entry_content[0].get("value", "")
+                                if isinstance(entry_content[0], dict)
+                                else str(entry_content[0])
                             )
                         else:
-                            content_value = str(content)
+                            content_value = str(entry_content)
                     content_value = content_value.lower()
 
                     # 키워드 매칭 여부 확인 (title, description, content_value 중 하나라도 포함되면 True)
@@ -262,7 +265,7 @@ class RSSFeedSource(NewsSource):
                                 or re.search(keyword_pattern, content_value)
                             )
                         else:
-                            match = (
+                            match = bool(  # type: ignore[assignment]
                                 keyword_lower in title
                                 or keyword_lower in description
                                 or keyword_lower in content_value
@@ -309,7 +312,7 @@ class RSSFeedSource(NewsSource):
         self._last_keyword_counts = keyword_article_counts
         return all_articles
 
-    def _parse_rss_date(self, entry) -> str:
+    def _parse_rss_date(self, entry: Any) -> str:
         """RSS 피드 항목의 날짜 정보를 파싱"""
         # feedparser가 자동으로 파싱한 published_parsed 필드 사용
         date_field = None
@@ -328,7 +331,7 @@ class RSSFeedSource(NewsSource):
                     # 날짜 변환 실패시 다음 필드 시도
             for field in ["published", "updated", "created"]:
                 if field in entry and entry[field]:
-                    return entry[field]
+                    return entry[field]  # type: ignore[no-any-return]
         else:
             for field in ["published_parsed", "updated_parsed", "created_parsed"]:
                 if hasattr(entry, field) and getattr(entry, field):
@@ -343,14 +346,14 @@ class RSSFeedSource(NewsSource):
                     # 날짜 변환 실패시 다음 필드 시도
             for field in ["published", "updated", "created"]:
                 if hasattr(entry, field) and getattr(entry, field):
-                    return getattr(entry, field)
+                    return getattr(entry, field)  # type: ignore[no-any-return]
         return "날짜 없음"
 
 
 class NaverNewsAPISource(NewsSource):
     """네이버 뉴스 검색 API를 사용하여 뉴스 기사를 검색하는 소스"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__("NaverNewsAPI")
         self.client_id = get_setting_value("NAVER_CLIENT_ID")
         self.client_secret = get_setting_value("NAVER_CLIENT_SECRET")
@@ -420,8 +423,8 @@ class NaverNewsAPISource(NewsSource):
 class NewsSourceManager:
     """여러 뉴스 소스를 관리하고 통합 결과를 제공하는 관리자 클래스"""
 
-    def __init__(self):
-        self.sources = []
+    def __init__(self) -> None:
+        self.sources: List[Any] = []
         # 주요 언론사 설정은 config에서 중앙 관리
 
     def add_source(self, source: NewsSource) -> None:
@@ -429,7 +432,7 @@ class NewsSourceManager:
         self.sources.append(source)
 
     def fetch_all_sources(
-        self, keywords: List[str], num_results_per_source: int = 10
+        self, keywords: Any, num_results_per_source: int = 10
     ) -> List[Dict[str, Any]]:
         """모든 소스에서 뉴스 기사 수집"""
         if isinstance(keywords, str):
@@ -449,7 +452,7 @@ class NewsSourceManager:
 
         # 키워드별 수집 결과 간략 표시
         # 키워드별 기사 수 집계
-        keyword_counts = {}
+        keyword_counts: Dict[str, int] = {}
         for source in self.sources:
             if hasattr(source, "_last_keyword_counts"):
                 for keyword, count in source._last_keyword_counts.items():
@@ -552,7 +555,9 @@ class NewsSourceManager:
             키워드별 기사 그룹 (키워드: 기사 목록)
         """
         # 키워드별 빈 목록 초기화
-        grouped_articles = {keyword: [] for keyword in keywords}
+        grouped_articles: Dict[str, List[Dict[str, Any]]] = {
+            keyword: [] for keyword in keywords
+        }
 
         # 각 기사에 대해 일치하는 모든 키워드 찾기
         for article in articles:

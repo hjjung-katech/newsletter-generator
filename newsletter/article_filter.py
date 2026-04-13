@@ -5,7 +5,7 @@ Newsletter Generator - Article Filtering and Grouping
 
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from rich.console import Console
 
@@ -103,7 +103,9 @@ def group_articles_by_keywords(
     )
     logger.debug(f"Keywords: {keywords}")
 
-    grouped_articles = {keyword: [] for keyword in keywords}
+    grouped_articles: Dict[str, List[Dict[str, Any]]] = {
+        keyword: [] for keyword in keywords
+    }
 
     def _tokenize(text: str) -> List[str]:
         return re.findall(r"[가-힣a-zA-Z0-9]+", text.lower())
@@ -171,7 +173,7 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
     """
     unique_articles = []
     seen_urls = set()
-    seen_titles = set()
+    seen_titles: set[str] = set()
 
     def normalize_url(url: str) -> str:
         """URL을 정규화하여 중복 검사에 사용"""
@@ -282,7 +284,7 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
 
 def filter_articles_by_domains(
     articles: List[Dict[str, Any]],
-    preferred_domains: List[str] = None,
+    preferred_domains: Optional[List[str]] = None,
     max_per_domain: int = 2,
 ) -> List[Dict[str, Any]]:
     """동일 도메인의 기사 수를 제한
@@ -299,7 +301,7 @@ def filter_articles_by_domains(
         preferred_domains = []
 
     # 도메인별 기사 그룹화
-    domain_groups = {}
+    domain_groups: Dict[str, List[Dict[str, Any]]] = {}
 
     import re
     from urllib.parse import urlparse
@@ -404,7 +406,7 @@ def calculate_article_importance(article: Dict[str, Any]) -> float:
     else:
         recency = 0.0
     score += recency
-    return score
+    return score  # type: ignore[no-any-return]
 
 
 def select_top_articles(

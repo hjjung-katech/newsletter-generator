@@ -49,7 +49,7 @@ def load_scoring_weights_from_config(
 
         weights = config_manager.get_scoring_weights()
         logger.info("✅ 스코어링 가중치를 config_manager에서 로드했습니다.")
-        return weights
+        return weights  # type: ignore[no-any-return]
     except ImportError:
         logger.warning("config_manager를 가져올 수 없습니다. fallback 모드로 전환합니다.")
     except Exception as e:
@@ -65,7 +65,7 @@ def load_scoring_weights_from_config(
     }
 
     try:
-        import yaml
+        import yaml  # type: ignore[import-untyped]
 
         if os.path.exists(config_file):
             with open(config_file, "r", encoding="utf-8") as f:
@@ -141,7 +141,7 @@ def _parse_llm_json(text: str) -> Dict[str, float]:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         try:
-            return json.loads(match.group(0))
+            return json.loads(match.group(0))  # type: ignore[no-any-return]
         except Exception as e:
             handle_exception(e, "점수 JSON 파싱", log_level=logging.INFO)
             return {"relevance": 1, "impact": 1, "novelty": 1}
@@ -149,7 +149,7 @@ def _parse_llm_json(text: str) -> Dict[str, float]:
 
 
 def request_llm_scores(
-    article: Dict[str, Any], domain: str, llm=None
+    article: Dict[str, Any], domain: str, llm: Any = None
 ) -> Dict[str, float]:
     if llm is None:
         llm = get_llm(temperature=0)
@@ -175,7 +175,7 @@ def calculate_priority_score(
     article: Dict[str, Any],
     domain: str,
     weights: Optional[Dict[str, float]] = None,
-    llm=None,
+    llm: Any = None,
 ) -> float:
     """Calculate a weighted priority score for a single article.
 
@@ -219,7 +219,7 @@ def score_articles(
     domain: str,
     top_n: Optional[int] = 10,
     weights: Optional[Dict[str, float]] = None,
-    llm=None,
+    llm: Any = None,
 ) -> List[Dict[str, Any]]:
     """Score and rank a list of articles.
 
@@ -250,7 +250,7 @@ def score_articles(
     scored_list.sort(key=lambda a: a["priority_score"], reverse=True)
 
     # Tier별 통계 출력
-    tier_stats = {}
+    tier_stats: Dict[str, Any] = {}
     for article in scored_list:
         tier_name = article.get("source_tier_name", "Unknown")
         if tier_name not in tier_stats:
