@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 # 필요한 모듈을 패치
 with patch.dict("sys.modules", {"langchain_google_genai": MagicMock()}):
-    from newsletter import article_filter, config  # noqa: E402
+    from newsletter import article_filter  # noqa: E402
     from newsletter.sources import NewsSourceManager  # noqa: E402
     from newsletter_core.application.generation import collect  # noqa: E402
 
@@ -191,8 +191,8 @@ class TestArticleFilterIntegration(unittest.TestCase):
         # SERPER_API_KEY가 테스트 환경에 설정되어 있다고 가정합니다.
         # 이렇게 하면 configure_default_sources가 SerperAPISource를 추가하여
         # source_manager.sources가 비어있지 않게 됩니다.
-        original_serper_key = config.SERPER_API_KEY
-        config.SERPER_API_KEY = "test_key_for_sources_check"  # 임시 키 설정
+        original_serper_key = os.environ.get("SERPER_API_KEY")
+        os.environ["SERPER_API_KEY"] = "test_key_for_sources_check"  # 임시 키 설정
 
         # NewsSourceManager의 fetch_all_sources 메소드만 직접 패치합니다.
         with (
@@ -232,7 +232,10 @@ class TestArticleFilterIntegration(unittest.TestCase):
                 mock_fetch_all_sources.assert_called_once_with("AI반도체", 10)
                 mock_remove_disabled.assert_not_called()
 
-        config.SERPER_API_KEY = original_serper_key  # 원래 키로 복원
+        if original_serper_key is not None:
+            os.environ["SERPER_API_KEY"] = original_serper_key
+        else:
+            os.environ.pop("SERPER_API_KEY", None)
 
     @patch("newsletter_core.application.generation.collect.console")
     @patch("newsletter.article_filter.console")
@@ -346,8 +349,8 @@ class TestArticleFilterIntegration(unittest.TestCase):
             },
         ]
 
-        original_serper_key = config.SERPER_API_KEY
-        config.SERPER_API_KEY = "test_key_for_sources_check_major_filter"
+        original_serper_key = os.environ.get("SERPER_API_KEY")
+        os.environ["SERPER_API_KEY"] = "test_key_for_sources_check_major_filter"
 
         # NewsSourceManager의 fetch_all_sources 메소드를 직접 패치합니다.
         with (
@@ -406,7 +409,10 @@ class TestArticleFilterIntegration(unittest.TestCase):
                     "All articles should be included when use_major_sources_filter=False",
                 )
 
-        config.SERPER_API_KEY = original_serper_key
+        if original_serper_key is not None:
+            os.environ["SERPER_API_KEY"] = original_serper_key
+        else:
+            os.environ.pop("SERPER_API_KEY", None)
 
     @patch("newsletter.cli.collect")
     def test_cli_integration(self, mock_collect):
