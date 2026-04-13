@@ -35,17 +35,18 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from hmac import compare_digest
-from typing import Mapping
+from typing import Any, Mapping
 
 from flask import Flask, jsonify, request
 from flask.typing import ResponseReturnValue
 
 try:
-    from request_limits import SlidingWindowRateLimiter
-except ImportError:
-    from web.request_limits import SlidingWindowRateLimiter  # pragma: no cover
+    from redis_rate_limiter import RedisRateLimiter
+except ImportError:  # pragma: no cover
+    from web.redis_rate_limiter import RedisRateLimiter  # type: ignore[no-redef]
 
 LOGGER = logging.getLogger(__name__)
 
@@ -267,11 +268,19 @@ def configure_access_control(
     protected_rate_limit: int = DEFAULT_PROTECTED_RATE_LIMIT,
     protected_window_seconds: int = DEFAULT_PROTECTED_WINDOW_SECONDS,
     generate_max_body_bytes: int = DEFAULT_GENERATE_MAX_BODY_BYTES,
+    get_redis_conn: Callable[[], Any] | None = None,
 ) -> None:
-    """Register a minimal admin-token guard for sensitive operational routes."""
+    """Register rate limiting and admin-token guard for operational routes.
+
+    ``get_redis_conn`` — optional callable that returns a live Redis connection.
+    When provided, rate limiting uses a shared Redis sliding-window counter so
+    all worker processes enforce a single consistent limit.  When ``None`` (or
+    when Redis is unavailable at request time), each process falls back to its
+    own in-process ``SlidingWindowRateLimiter``.
+    """
     env = environ or os.environ
-    generate_limiter = SlidingWindowRateLimiter()
-    protected_limiter = SlidingWindowRateLimiter()
+    generate_limiter = RedisRateLimiter(get_redis=get_redis_conn)
+    protected_limiter = RedisRateLimiter(get_redis=get_redis_conn)
     app.extensions.setdefault("request_limiters", {})
     app.extensions["request_limiters"]["generate"] = generate_limiter
     app.extensions["request_limiters"]["protected"] = protected_limiter
