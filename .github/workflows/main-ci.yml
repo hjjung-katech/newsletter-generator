@@ -386,7 +386,6 @@ jobs:
           EMAIL_SENDER: test@example.com
         run: >
           python -m pytest
-          tests/unit_tests/web/test_runtime_paths.py
           tests/unit_tests/web/test_runtime_hook_bootstrap.py
           tests/unit_tests/test_web_import_side_effects.py
           tests/contract/test_web_runtime_contract.py

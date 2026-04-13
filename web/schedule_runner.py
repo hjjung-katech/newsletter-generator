@@ -14,9 +14,12 @@ from typing import Any, Dict, List, Optional, cast
 import redis
 from rq import Queue
 
-# Add current directory to path
+# Add current directory and project root to path (needed when run directly)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
+_project_root = os.path.dirname(current_dir)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 # Import task functions
 from tasks import generate_newsletter_task
@@ -75,10 +78,7 @@ except ImportError:
         run_sync_fallback,
     )
 
-try:
-    from runtime_paths import resolve_database_path
-except ImportError:
-    from web.runtime_paths import resolve_database_path  # pragma: no cover
+from newsletter_core.infrastructure.platform._paths import resolve_database_path
 
 # Configure logging
 logging.basicConfig(
