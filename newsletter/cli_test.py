@@ -11,7 +11,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from . import collect as news_collect
+from newsletter_core.application.generation import collect as news_collect
+
 from . import tools
 
 console = Console()

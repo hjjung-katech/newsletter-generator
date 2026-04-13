@@ -20,13 +20,13 @@ from .utils.logger import get_logger, set_log_level
 # 로거 초기화
 logger = get_logger()
 
-from . import collect as news_collect
+from newsletter_core.application.generation import collect as news_collect
+
 from . import compose as news_compose
 from . import graph  # 새로운 LangGraph 모듈 임포트
 from . import tools  # Import the tools module
 from . import config
 from . import deliver as news_deliver
-from . import summarize as news_summarize
 from .cli_diagnostics import (
     check_config,
     check_llm,
