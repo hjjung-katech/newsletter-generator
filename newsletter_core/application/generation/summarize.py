@@ -4,7 +4,6 @@ import os
 import uuid
 from typing import Any, Dict, List, Union
 
-from newsletter import config  # Import config module
 from newsletter.utils.error_handling import handle_exception
 from newsletter.utils.logger import get_logger
 

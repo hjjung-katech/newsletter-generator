@@ -31,8 +31,8 @@ from rich.console import Console  # noqa: E402
 from rich.panel import Panel  # noqa: E402
 from rich.table import Table  # noqa: E402
 
-from newsletter import config  # noqa: E402
 from newsletter_core.application.generation import deliver as news_deliver  # noqa: E402
+from newsletter_core.public.settings import get_setting_value  # noqa: E402
 
 console = Console()
 
@@ -47,23 +47,21 @@ def check_email_configuration():
     table.add_column("값", style="yellow")
 
     # Postmark 토큰 확인
-    postmark_status = "✅ 설정됨" if config.POSTMARK_SERVER_TOKEN else "❌ 설정되지 않음"
-    postmark_value = (
-        config.POSTMARK_SERVER_TOKEN[:10] + "..."
-        if config.POSTMARK_SERVER_TOKEN
-        else "없음"
-    )
+    postmark_token = get_setting_value("POSTMARK_SERVER_TOKEN")
+    postmark_status = "✅ 설정됨" if postmark_token else "❌ 설정되지 않음"
+    postmark_value = postmark_token[:10] + "..." if postmark_token else "없음"
     table.add_row("POSTMARK_SERVER_TOKEN", postmark_status, postmark_value)
 
     # 발송자 이메일 확인
-    sender_status = "✅ 설정됨" if config.EMAIL_SENDER else "❌ 설정되지 않음"
-    sender_value = config.EMAIL_SENDER if config.EMAIL_SENDER else "없음"
+    email_sender = get_setting_value("EMAIL_SENDER")
+    sender_status = "✅ 설정됨" if email_sender else "❌ 설정되지 않음"
+    sender_value = email_sender if email_sender else "없음"
     table.add_row("EMAIL_SENDER", sender_status, sender_value)
 
     console.print(table)
 
     # 설정 검증
-    if not config.POSTMARK_SERVER_TOKEN or not config.EMAIL_SENDER:
+    if not postmark_token or not email_sender:
         console.print("\n[red]⚠️  이메일 설정이 완전하지 않습니다.[/red]")
         console.print("[yellow].env 파일에 다음 설정을 추가해주세요:[/yellow]")
         console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_server_token[/cyan]")
@@ -144,7 +142,7 @@ def send_default_email(to_email, send_real=False):
             <ul>
                 <li><strong>발송 시간:</strong> {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')}</li>
                 <li><strong>수신자:</strong> {to_email}</li>
-                <li><strong>발송자:</strong> {config.EMAIL_SENDER}</li>
+                <li><strong>발송자:</strong> {get_setting_value("EMAIL_SENDER")}</li>
                 <li><strong>테스트 모드:</strong> {'실제 발송' if send_real else 'DRY RUN'}</li>
             </ul>
         </div>

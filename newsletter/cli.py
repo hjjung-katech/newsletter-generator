@@ -25,10 +25,10 @@ from newsletter_core.application.generation.compose import (
     compose_compact_newsletter_html,
     compose_newsletter_html,
 )
+from newsletter_core.public.settings import get_setting_value
 
 from . import graph  # 새로운 LangGraph 모듈 임포트
 from . import tools  # Import the tools module
-from . import config
 from .cli_diagnostics import (
     check_config,
     check_llm,
@@ -173,7 +173,7 @@ def suggest(
 
     logger.info(f"Suggesting {count} keywords for domain: '{domain}'")
 
-    if not config.GEMINI_API_KEY:  # GOOGLE_API_KEY 대신 GEMINI_API_KEY 사용
+    if not get_setting_value("GEMINI_API_KEY"):  # GOOGLE_API_KEY 대신 GEMINI_API_KEY 사용
         logger.error(
             "GEMINI_API_KEY is not set in the environment variables or .env file."
         )
@@ -227,7 +227,7 @@ def suggest_keywords(domain: str, count: int = 10) -> list[str]:
     from . import tools
 
     # 기존 검증된 키워드 생성 함수 사용
-    return cast(list[str], tools.generate_keywords_with_gemini(domain, count=count))
+    return tools.generate_keywords_with_gemini(domain, count=count)
 
 
 if __name__ == "__main__":

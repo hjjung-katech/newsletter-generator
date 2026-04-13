@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import newsletter.tools as tools_module
-from newsletter import config
 from newsletter_core.application.tools_search_flow import (
     SerperKeywordFailure,
     SerperKeywordReport,
@@ -246,7 +245,7 @@ def test_legacy_search_news_articles_delegates_to_core_search_flow(
 ) -> None:
     calls: dict[str, object] = {}
 
-    monkeypatch.setattr(config, "SERPER_API_KEY", "dummy-tools-key")
+    monkeypatch.setenv("SERPER_API_KEY", "dummy-tools-key")
 
     def fake_resolve_search_request(keywords: str, num_results: int) -> SearchRequest:
         calls["raw_request"] = (keywords, num_results)

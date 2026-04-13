@@ -10,11 +10,9 @@ import pytest
 # 모듈 경로 추가 (루트 디렉토리 기준)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from newsletter import config
-from newsletter.llm_factory import (
+from newsletter.llm_factory import (  # noqa: E402
     get_available_providers,
     get_llm_for_task,
-    get_provider_info,
 )
 
 
@@ -25,13 +23,15 @@ class TestLLMSystem:
         """API 키 설정 상태를 테스트합니다."""
         print("\n=== API 키 상태 테스트 ===")
 
+        from newsletter_core.public.settings import get_setting_value
+
         # Gemini는 필수이므로 반드시 설정되어야 함
-        assert config.GEMINI_API_KEY is not None, "GEMINI_API_KEY는 필수입니다"
-        print(f"✅ GEMINI_API_KEY: 설정됨")
+        assert get_setting_value("GEMINI_API_KEY") is not None, "GEMINI_API_KEY는 필수입니다"
+        print("✅ GEMINI_API_KEY: 설정됨")
 
         # 다른 API 키들은 선택사항이지만 상태 확인
-        openai_status = "설정됨" if config.OPENAI_API_KEY else "미설정"
-        anthropic_status = "설정됨" if config.ANTHROPIC_API_KEY else "미설정"
+        openai_status = "설정됨" if get_setting_value("OPENAI_API_KEY") else "미설정"
+        anthropic_status = "설정됨" if get_setting_value("ANTHROPIC_API_KEY") else "미설정"
 
         print(f"🔧 OPENAI_API_KEY: {openai_status}")
         print(f"🔧 ANTHROPIC_API_KEY: {anthropic_status}")
@@ -51,22 +51,22 @@ class TestLLMSystem:
         available_any = any(
             provider in available_providers for provider in expected_providers
         )
-        assert (
-            available_any
-        ), f"기본 제공자들({expected_providers}) 중 하나는 사용 가능해야 합니다"
+        assert available_any, f"기본 제공자들({expected_providers}) 중 하나는 사용 가능해야 합니다"
 
     def test_llm_config_validation(self):
         """LLM 설정 구조를 검증합니다."""
         print("\n=== LLM 설정 구조 테스트 ===")
 
+        from newsletter_core.public.settings import get_llm_config
+
         # 기본 설정 확인
-        assert "default_provider" in config.LLM_CONFIG, "기본 제공자 설정이 없습니다"
-        default_provider = config.LLM_CONFIG["default_provider"]
+        assert "default_provider" in get_llm_config(), "기본 제공자 설정이 없습니다"
+        default_provider = get_llm_config()["default_provider"]
         print(f"✅ 기본 제공자: {default_provider}")
 
         # 모델 설정 확인
-        assert "models" in config.LLM_CONFIG, "모델 설정이 없습니다"
-        models = config.LLM_CONFIG["models"]
+        assert "models" in get_llm_config(), "모델 설정이 없습니다"
+        models = get_llm_config()["models"]
 
         # 필수 작업들이 설정되어 있는지 확인
         required_tasks = [
@@ -190,7 +190,7 @@ def test_suite_runner():
         from newsletter.centralized_settings import get_settings
 
         settings = get_settings()
-        print(f"✅ F-14 중앙화된 설정 로드 성공")
+        print("✅ F-14 중앙화된 설정 로드 성공")
         print(f"   LLM 요청 타임아웃: {settings.llm_request_timeout}초")
         print(f"   테스트 타임아웃: {settings.llm_test_timeout}초")
         print(f"   최대 재시도: {settings.llm_max_retries}회")
@@ -237,13 +237,13 @@ def test_suite_runner():
         passed = sum(1 for result in test_results.values() if result)
         total = len(test_results)
 
-        print(f"\n📊 F-14 테스트 결과 요약:")
+        print("\n📊 F-14 테스트 결과 요약:")
         print(f"   통과: {passed}/{total}")
         print(f"   실패: {total - passed}/{total}")
 
         # F-14: pytest 경고 해결 - return 대신 assert 사용
         assert passed == total, f"F-14 테스트 실패: {passed}/{total}만 통과"
-        print(f"🎉 모든 F-14 LLM 테스트 통과!")
+        print("🎉 모든 F-14 LLM 테스트 통과!")
 
     except Exception as e:
         error_msg = f"F-14 테스트 실행 중 오류: {e}"

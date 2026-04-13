@@ -8,7 +8,8 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from . import config
+from newsletter_core.public.settings import get_setting_value
+
 from .utils.logger import get_logger, set_log_level
 
 console = Console()
@@ -130,8 +131,8 @@ def run(
         console.print(f"[cyan]수신자:[/cyan] {to}")
 
         # EMAIL_SENDER 설정 상태 확인 및 표시
-        if config.EMAIL_SENDER:
-            console.print(f"[cyan]발송자:[/cyan] {config.EMAIL_SENDER}")
+        if get_setting_value("EMAIL_SENDER"):
+            console.print(f"[cyan]발송자:[/cyan] {get_setting_value('EMAIL_SENDER')}")
             console.print("[green]✅ 이메일 발송자 설정 완료[/green]")
         else:
             console.print("[red]❌ EMAIL_SENDER가 설정되지 않았습니다![/red]")
@@ -143,7 +144,7 @@ def run(
             raise typer.Exit(code=1)
 
         # POSTMARK_SERVER_TOKEN 설정 상태 확인
-        if config.POSTMARK_SERVER_TOKEN:
+        if get_setting_value("POSTMARK_SERVER_TOKEN"):
             console.print("[green]✅ Postmark 토큰 설정 완료[/green]")
         else:
             console.print("[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다![/red]")
@@ -287,7 +288,7 @@ def run(
         with logger.step_context(
             "keyword_generation", f"도메인 '{domain}'에서 {suggest_count}개 키워드 생성"
         ):
-            if not config.GEMINI_API_KEY:
+            if not get_setting_value("GEMINI_API_KEY"):
                 logger.error(
                     "GEMINI_API_KEY is not set. Cannot generate keywords from domain."
                 )
@@ -503,7 +504,7 @@ def run(
 
             # 이메일 발송 시 발송자 정보 다시 확인 및 표시
             console.print(f"\n[cyan]📤 이메일 발송 중...[/cyan]")
-            console.print(f"[info]발송자: {config.EMAIL_SENDER}[/info]")
+            console.print(f"[info]발송자: {get_setting_value('EMAIL_SENDER')}[/info]")
             console.print(f"[info]수신자: {to}[/info]")
             console.print(f"[info]제목: {email_subject}[/info]")
 

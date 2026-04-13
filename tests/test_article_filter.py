@@ -1,14 +1,12 @@
 import os
 import sys
 import unittest
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from newsletter import config
-from newsletter.article_filter import (
+from newsletter.article_filter import (  # noqa: E402
     filter_articles_by_domains,
     filter_articles_by_major_sources,
     group_articles_by_keywords,
@@ -76,9 +74,9 @@ class TestArticleFilter(unittest.TestCase):
         result = filter_articles_by_major_sources(self.test_articles, max_per_topic=3)
 
         # 티어1 소스 기사가 우선 선택되었는지 확인
-        tier1_sources = [
-            source.lower() for source in config.MAJOR_NEWS_SOURCES["tier1"]
-        ]
+        from newsletter_core.public.settings import get_major_news_sources
+
+        tier1_sources = [source.lower() for source in get_major_news_sources()["tier1"]]
         tier1_articles = [
             a for a in result if any(s in a["source"].lower() for s in tier1_sources)
         ]

@@ -8,8 +8,7 @@ import typer
 from rich.console import Console
 
 from newsletter_core.application.generation import deliver as news_deliver
-
-from . import config
+from newsletter_core.public.settings import get_llm_config, get_setting_value
 
 console = Console()
 
@@ -23,19 +22,23 @@ def check_config() -> None:
     console.print("\n[bold yellow]📧 이메일 발송 설정[/bold yellow]")
 
     # EMAIL_SENDER 확인
-    if config.EMAIL_SENDER:
-        console.print(f"[green]✅ EMAIL_SENDER:[/green] {config.EMAIL_SENDER}")
+    if get_setting_value("EMAIL_SENDER"):
+        console.print(
+            f"[green]✅ EMAIL_SENDER:[/green] {get_setting_value('EMAIL_SENDER')}"
+        )
         console.print("   - Postmark에서 인증된 이메일 주소인지 확인하세요")
     else:
         console.print("[red]❌ EMAIL_SENDER:[/red] 설정되지 않음")
         console.print("   - .env 파일에 EMAIL_SENDER=your_email@domain.com 추가 필요")
 
     # POSTMARK_SERVER_TOKEN 확인
-    if config.POSTMARK_SERVER_TOKEN:
+    if get_setting_value("POSTMARK_SERVER_TOKEN"):
         # 토큰의 일부만 표시 (보안상 전체 표시 안함)
         masked_token = (
-            config.POSTMARK_SERVER_TOKEN[:8] + "..." + config.POSTMARK_SERVER_TOKEN[-4:]
-            if len(config.POSTMARK_SERVER_TOKEN) > 12
+            get_setting_value("POSTMARK_SERVER_TOKEN")[:8]
+            + "..."
+            + get_setting_value("POSTMARK_SERVER_TOKEN")[-4:]
+            if len(get_setting_value("POSTMARK_SERVER_TOKEN")) > 12
             else "***"
         )
         console.print(f"[green]✅ POSTMARK_SERVER_TOKEN:[/green] {masked_token}")
@@ -44,7 +47,9 @@ def check_config() -> None:
         console.print("   - .env 파일에 POSTMARK_SERVER_TOKEN=your_token 추가 필요")
 
     # 이메일 발송 가능 여부 종합 판단
-    email_ready = config.EMAIL_SENDER and config.POSTMARK_SERVER_TOKEN
+    email_ready = get_setting_value("EMAIL_SENDER") and get_setting_value(
+        "POSTMARK_SERVER_TOKEN"
+    )
     if email_ready:
         console.print("\n[green]🎉 이메일 발송 설정 완료![/green]")
         console.print("   newsletter run --to your@email.com 명령어로 이메일 발송 가능")
@@ -56,10 +61,12 @@ def check_config() -> None:
     console.print("\n[bold yellow]🤖 LLM 설정[/bold yellow]")
 
     # Gemini API Key 확인
-    if config.GEMINI_API_KEY:
+    if get_setting_value("GEMINI_API_KEY"):
         masked_key = (
-            config.GEMINI_API_KEY[:8] + "..." + config.GEMINI_API_KEY[-4:]
-            if len(config.GEMINI_API_KEY) > 12
+            get_setting_value("GEMINI_API_KEY")[:8]
+            + "..."
+            + get_setting_value("GEMINI_API_KEY")[-4:]
+            if len(get_setting_value("GEMINI_API_KEY")) > 12
             else "***"
         )
         console.print(f"[green]✅ GEMINI_API_KEY:[/green] {masked_key}")
@@ -147,7 +154,10 @@ def check_config() -> None:
     console.print("=" * 60)
 
     required_settings = [
-        ("LLM API Key", config.GEMINI_API_KEY or openai_key or anthropic_key),
+        (
+            "LLM API Key",
+            get_setting_value("GEMINI_API_KEY") or openai_key or anthropic_key,
+        ),
     ]
 
     optional_settings = [
@@ -220,7 +230,7 @@ def check_llm() -> None:
 
         # 현재 LLM 설정 표시
         console.print("\n[bold blue]📋 현재 LLM 설정[/bold blue]")
-        llm_config = config.LLM_CONFIG
+        llm_config = get_llm_config()
         default_provider = llm_config.get("default_provider", "gemini")
         console.print(f"기본 제공자: [blue]{default_provider}[/blue]")
 
@@ -334,7 +344,7 @@ def list_providers() -> None:
         )
 
         # 기본 제공자 표시
-        default_provider = config.LLM_CONFIG.get("default_provider", "gemini")
+        default_provider = get_llm_config().get("default_provider", "gemini")
         console.print(f"[blue]기본 제공자:[/blue] {default_provider}")
 
         # 각 제공자의 상세 정보 표시
@@ -350,8 +360,10 @@ def list_providers() -> None:
                     console.print(f"  Standard: {models.get('standard', 'N/A')}")
                     console.print(f"  Advanced: {models.get('advanced', 'N/A')}")
             else:
-                api_key_name = config.LLM_CONFIG.get("api_keys", {}).get(
-                    provider_name, f"{provider_name.upper()}_API_KEY"
+                api_key_name = (
+                    get_llm_config()
+                    .get("api_keys", {})
+                    .get(provider_name, f"{provider_name.upper()}_API_KEY")
                 )
                 console.print(f"  [yellow]API 키가 설정되지 않음: {api_key_name}[/yellow]")
 
@@ -359,7 +371,7 @@ def list_providers() -> None:
         console.print("\n[bold cyan]기능별 모델 설정[/bold cyan]")
         console.print("=" * 50)
 
-        models_config = config.LLM_CONFIG.get("models", {})
+        models_config = get_llm_config().get("models", {})
         for task, task_config in models_config.items():
             provider = task_config.get("provider", "N/A")
             model = task_config.get("model", "N/A")
@@ -404,8 +416,8 @@ def test_email(
     console.print("\n[bold yellow]📋 이메일 설정 확인[/bold yellow]")
 
     # EMAIL_SENDER 상태 확인
-    if config.EMAIL_SENDER:
-        console.print(f"[cyan]발송자 이메일:[/cyan] {config.EMAIL_SENDER}")
+    if get_setting_value("EMAIL_SENDER"):
+        console.print(f"[cyan]발송자 이메일:[/cyan] {get_setting_value('EMAIL_SENDER')}")
         console.print("[green]✅ EMAIL_SENDER 설정 완료[/green]")
     else:
         console.print("[red]❌ EMAIL_SENDER가 설정되지 않았습니다![/red]")
@@ -420,12 +432,14 @@ def test_email(
             raise typer.Exit(code=1)
 
     # POSTMARK_SERVER_TOKEN 상태 확인
-    if config.POSTMARK_SERVER_TOKEN:
+    if get_setting_value("POSTMARK_SERVER_TOKEN"):
         console.print("[green]✅ POSTMARK_SERVER_TOKEN 설정 완료[/green]")
         # 토큰의 일부만 표시 (보안상 전체 표시 안함)
         masked_token = (
-            config.POSTMARK_SERVER_TOKEN[:8] + "..." + config.POSTMARK_SERVER_TOKEN[-4:]
-            if len(config.POSTMARK_SERVER_TOKEN) > 12
+            get_setting_value("POSTMARK_SERVER_TOKEN")[:8]
+            + "..."
+            + get_setting_value("POSTMARK_SERVER_TOKEN")[-4:]
+            if len(get_setting_value("POSTMARK_SERVER_TOKEN")) > 12
             else "***"
         )
         console.print(f"[cyan]Postmark 토큰:[/cyan] {masked_token}")
@@ -525,7 +539,7 @@ def test_email(
                 <li><strong>발송 시간:</strong> {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분 %S초')}</li>
                 <li><strong>수신자:</strong> {to}</li>
                 <li><strong>이메일 서비스:</strong> Postmark API</li>
-                <li><strong>발송자:</strong> {config.EMAIL_SENDER}</li>
+                <li><strong>발송자:</strong> {get_setting_value("EMAIL_SENDER")}</li>
             </ul>
 
             <h3>🔧 다음 단계</h3>
@@ -550,11 +564,11 @@ newsletter run --keywords \"AI,머신러닝\" --to {to} --output-format html
         console.print(f"[cyan]제목:[/cyan] {subject}")
         console.print(f"[cyan]내용 길이:[/cyan] {len(html_content)} 문자")
         console.print(
-            f"[cyan]Postmark 토큰 설정 여부:[/cyan] {'✅ 설정됨' if config.POSTMARK_SERVER_TOKEN else '❌ 설정되지 않음'}"
+            f"[cyan]Postmark 토큰 설정 여부:[/cyan] {'✅ 설정됨' if get_setting_value('POSTMARK_SERVER_TOKEN') else '❌ 설정되지 않음'}"
         )
-        console.print(f"[cyan]발송자 이메일:[/cyan] {config.EMAIL_SENDER}")
+        console.print(f"[cyan]발송자 이메일:[/cyan] {get_setting_value('EMAIL_SENDER')}")
 
-        if not config.POSTMARK_SERVER_TOKEN:
+        if not get_setting_value("POSTMARK_SERVER_TOKEN"):
             console.print("\n[red]⚠️  POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
             console.print("[yellow].env 파일에 POSTMARK_SERVER_TOKEN을 설정해주세요.[/yellow]")
 
@@ -562,14 +576,14 @@ newsletter run --keywords \"AI,머신러닝\" --to {to} --output-format html
         return
 
     # Check Postmark configuration
-    if not config.POSTMARK_SERVER_TOKEN:
+    if not get_setting_value("POSTMARK_SERVER_TOKEN"):
         console.print("\n[red]❌ POSTMARK_SERVER_TOKEN이 설정되지 않았습니다.[/red]")
         console.print("[yellow]이메일 발송을 위해 .env 파일에 다음을 설정해주세요:[/yellow]")
         console.print("[cyan]POSTMARK_SERVER_TOKEN=your_postmark_server_token[/cyan]")
         console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
         raise typer.Exit(code=1)
 
-    if not config.EMAIL_SENDER:
+    if not get_setting_value("EMAIL_SENDER"):
         console.print("\n[red]❌ EMAIL_SENDER가 설정되지 않았습니다.[/red]")
         console.print("[yellow].env 파일에 EMAIL_SENDER를 설정해주세요:[/yellow]")
         console.print("[cyan]EMAIL_SENDER=your_verified_sender@example.com[/cyan]")
@@ -577,7 +591,7 @@ newsletter run --keywords \"AI,머신러닝\" --to {to} --output-format html
 
     # Send the test email
     console.print("\n[cyan]📤 이메일 발송 중...[/cyan]")
-    console.print(f"[info]발송자: {config.EMAIL_SENDER}[/info]")
+    console.print(f"[info]발송자: {get_setting_value('EMAIL_SENDER')}[/info]")
     console.print(f"[info]수신자: {to}[/info]")
     console.print(f"[info]제목: {subject}[/info]")
 

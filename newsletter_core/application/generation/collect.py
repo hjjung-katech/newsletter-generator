@@ -5,8 +5,9 @@ from typing import Any, Dict, List, Union
 import requests
 from rich.console import Console
 
-from newsletter import article_filter, config
+from newsletter import article_filter
 from newsletter.sources import NewsSourceManager, configure_default_sources
+from newsletter_core.public.settings import get_setting_value
 
 console = Console()
 
@@ -134,7 +135,7 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
     # 키워드별 기사 수를 저장할 딕셔너리
     keyword_article_counts = {}
 
-    if not config.SERPER_API_KEY:
+    if not get_setting_value("SERPER_API_KEY"):
         print("Error: SERPER_API_KEY not found. Please set it in the .env file.")
         return []  # 뉴스 전용 엔드포인트로 변경
     url = "https://google.serper.dev/news"
@@ -152,7 +153,7 @@ def collect_articles_from_serper(keywords, num_results: int = 10):
             }
         )
         headers = {
-            "X-API-KEY": config.SERPER_API_KEY,
+            "X-API-KEY": get_setting_value("SERPER_API_KEY"),
             "Content-Type": "application/json",
         }
 

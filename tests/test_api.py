@@ -5,7 +5,7 @@ Web API 통합 테스트
 import json
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -17,13 +17,13 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "web"))
 
 # 환경 설정 (app import 전에 설정)
-import os
+import os  # noqa: E402
 
 os.environ["MOCK_MODE"] = "false"  # 실제 모드로 테스트
 os.environ["SERPER_API_KEY"] = "test_key"
 os.environ["OPENAI_API_KEY"] = "test_openai_key"
 
-from web.app import app
+from web.app import app  # noqa: E402
 
 
 @pytest.fixture
@@ -40,7 +40,10 @@ def mock_newsletter_generation():
     with patch("web.app.newsletter_cli") as mock_cli:
         mock_cli.generate_newsletter.return_value = {
             "status": "success",
-            "content": "<html><body><h1>AI Technology Newsletter</h1><p>Generated with authentic data from various sources</p></body></html>",
+            "content": (
+                "<html><body><h1>AI Technology Newsletter</h1>"
+                "<p>Generated with authentic data from various sources</p></body></html>"
+            ),
             "title": "AI Newsletter",
             "generation_stats": {
                 "articles_found": 15,
@@ -211,19 +214,12 @@ class TestMockModeValidation:
     @patch.dict(os.environ, {"MOCK_MODE": "true"})
     def test_mock_mode_disabled(self, client):
         """Mock 모드가 비활성화되었는지 확인"""
-        # 환경 변수를 다시 로드하기 위해 config 모듈 재임포트
-        import importlib
-
-        from newsletter import config
-
-        importlib.reload(config)
-
         response = client.get("/health")
         data = json.loads(response.data)
 
         # Mock 모드 상태 확인
         mock_mode_info = data["dependencies"]["mock_mode"]
-        assert mock_mode_info["enabled"] == True  # 환경 변수로 설정됨
+        assert mock_mode_info["enabled"] is True  # 환경 변수로 설정됨
 
     @patch.dict(os.environ, {"MOCK_MODE": "false"})
     def test_production_mode_enabled(self, client):
@@ -232,7 +228,7 @@ class TestMockModeValidation:
         data = json.loads(response.data)
 
         mock_mode_info = data["dependencies"]["mock_mode"]
-        assert mock_mode_info["enabled"] == False
+        assert mock_mode_info["enabled"] is False
 
 
 class TestContentValidation:
@@ -243,11 +239,11 @@ class TestContentValidation:
         # 더 큰 콘텐츠로 Mock 응답 수정
         mock_newsletter_generation.generate_newsletter.return_value = {
             "status": "success",
-            "content": f"<html><head><title>Technology Newsletter</title></head><body>"
-            + f"<h1>Weekly Technology Update</h1>"
-            + f"<p>{'Article content with detailed information. ' * 100}</p>"
-            + f"<div>{'More comprehensive newsletter content. ' * 50}</div>"
-            + f"</body></html>",
+            "content": "<html><head><title>Technology Newsletter</title></head><body>"
+            + "<h1>Weekly Technology Update</h1>"
+            + "<p>{}</p>".format("Article content with detailed information. " * 100)
+            + "<div>{}</div>".format("More comprehensive newsletter content. " * 50)
+            + "</body></html>",
             "title": "Technology Newsletter",
             "generation_stats": {
                 "articles_found": 15,
@@ -268,7 +264,10 @@ class TestContentValidation:
         # Mock 문자열이 포함되지 않은 실제같은 응답
         mock_newsletter_generation.generate_newsletter.return_value = {
             "status": "success",
-            "content": "<html><body><h1>AI Newsletter</h1><p>Latest developments in autonomous vehicles and artificial intelligence</p></body></html>",
+            "content": (
+                "<html><body><h1>AI Newsletter</h1>"
+                "<p>Latest developments in autonomous vehicles and artificial intelligence</p></body></html>"
+            ),
             "title": "AI Newsletter",
             "generation_stats": {
                 "articles_found": 15,

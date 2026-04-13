@@ -8,8 +8,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 import unittest  # noqa: E402
 from unittest.mock import MagicMock, patch  # noqa: E402
 
-from newsletter import config  # noqa: E402
-
 _SUMMARIZE_MODULE_PATH = "newsletter_core.application.generation.summarize"
 
 
@@ -57,7 +55,7 @@ class TestSummarize(unittest.TestCase):
         newsletter_summarize = _reload_summarize()
         summarize_articles_func = newsletter_summarize.summarize_articles
 
-        with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
+        with unittest.mock.patch.dict(os.environ, {"GEMINI_API_KEY": "fake_api_key"}):
             with patch.object(
                 newsletter.llm_factory,
                 "get_llm_for_task",
@@ -149,7 +147,7 @@ class TestSummarize(unittest.TestCase):
         newsletter_summarize = _reload_summarize()
         summarize_articles = newsletter_summarize.summarize_articles
 
-        with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
+        with unittest.mock.patch.dict(os.environ, {"GEMINI_API_KEY": "fake_api_key"}):
             with patch.object(
                 newsletter.llm_factory,
                 "get_llm_for_task",
@@ -223,7 +221,7 @@ class TestSummarize(unittest.TestCase):
         newsletter_summarize = _reload_summarize()
         summarize_articles_func = newsletter_summarize.summarize_articles
 
-        with unittest.mock.patch.object(config, "GEMINI_API_KEY", "fake_api_key"):
+        with unittest.mock.patch.dict(os.environ, {"GEMINI_API_KEY": "fake_api_key"}):
             with patch.object(
                 newsletter.llm_factory,
                 "get_llm_for_task",

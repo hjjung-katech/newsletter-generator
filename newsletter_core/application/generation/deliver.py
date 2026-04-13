@@ -5,11 +5,11 @@ import os
 import markdownify  # For HTML to Markdown conversion
 import requests
 
-from newsletter import config
 from newsletter.html_utils import (  # Import the clean_html_markers function
     clean_html_markers,
 )
 from newsletter.utils.logger import get_logger
+from newsletter_core.public.settings import get_setting_value
 
 # 로거 초기화
 logger = get_logger()
@@ -56,7 +56,7 @@ def save_to_drive(
         )
         return False
 
-    if not config.GOOGLE_APPLICATION_CREDENTIALS:
+    if not get_setting_value("GOOGLE_APPLICATION_CREDENTIALS"):
         logger.warning(
             "Warning: GOOGLE_APPLICATION_CREDENTIALS not set. Skipping Google Drive upload."
         )
@@ -67,7 +67,7 @@ def save_to_drive(
         cleaned_html_content = clean_html_markers(html_content)
 
         creds = Credentials.from_service_account_file(
-            config.GOOGLE_APPLICATION_CREDENTIALS,
+            get_setting_value("GOOGLE_APPLICATION_CREDENTIALS"),
             scopes=["https://www.googleapis.com/auth/drive.file"],
         )
         service = build("drive", "v3", credentials=creds)
@@ -195,7 +195,7 @@ def process_html_for_email(html_content: str) -> str:
 def send_email(to_email: str, subject: str, html_content: str):
     """Send an email via Postmark.
 
-    If ``config.POSTMARK_SERVER_TOKEN`` is not set, the function simulates a
+    If ``get_setting_value("POSTMARK_SERVER_TOKEN")`` is not set, the function simulates a
     successful send so that tests do not fail in CI environments.
 
     Args:
@@ -214,7 +214,7 @@ def send_email(to_email: str, subject: str, html_content: str):
     logger.info(f"   내용 길이: {len(html_content)} 문자")
 
     # EMAIL_SENDER 설정 확인
-    if not config.EMAIL_SENDER:
+    if not get_setting_value("EMAIL_SENDER"):
         logger.error("❌ 오류: EMAIL_SENDER가 설정되지 않았습니다!")
         logger.info("💡 해결 방법:")
         logger.info("   .env 파일에 다음을 추가하세요:")
@@ -222,10 +222,10 @@ def send_email(to_email: str, subject: str, html_content: str):
         logger.info("   (주의: Postmark에서 인증된 이메일 주소여야 합니다)")
         return False
 
-    logger.info(f"   발송자: {config.EMAIL_SENDER}")
+    logger.info(f"   발송자: {get_setting_value('EMAIL_SENDER')}")
 
     # POSTMARK_SERVER_TOKEN 설정 확인
-    if not config.POSTMARK_SERVER_TOKEN:
+    if not get_setting_value("POSTMARK_SERVER_TOKEN"):
         logger.error("❌ 오류: POSTMARK_SERVER_TOKEN이 설정되지 않았습니다!")
         logger.info("💡 해결 방법:")
         logger.info("   .env 파일에 다음을 추가하세요:")
@@ -236,8 +236,10 @@ def send_email(to_email: str, subject: str, html_content: str):
 
     # 토큰 마스킹 표시 (보안상)
     masked_token = (
-        config.POSTMARK_SERVER_TOKEN[:8] + "..." + config.POSTMARK_SERVER_TOKEN[-4:]
-        if len(config.POSTMARK_SERVER_TOKEN) > 12
+        get_setting_value("POSTMARK_SERVER_TOKEN")[:8]
+        + "..."
+        + get_setting_value("POSTMARK_SERVER_TOKEN")[-4:]
+        if len(get_setting_value("POSTMARK_SERVER_TOKEN")) > 12
         else "***"
     )
     logger.info(f"   Postmark 토큰: {masked_token}")
@@ -252,10 +254,10 @@ def send_email(to_email: str, subject: str, html_content: str):
             headers={
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "X-Postmark-Server-Token": config.POSTMARK_SERVER_TOKEN,
+                "X-Postmark-Server-Token": get_setting_value("POSTMARK_SERVER_TOKEN"),
             },
             json={
-                "From": config.EMAIL_SENDER,
+                "From": get_setting_value("EMAIL_SENDER"),
                 "To": to_email,
                 "Subject": subject,
                 "HtmlBody": cleaned_html_content,
@@ -268,7 +270,7 @@ def send_email(to_email: str, subject: str, html_content: str):
             message_id = response_data.get("MessageID", "N/A")
             logger.info(f"✅ 이메일 발송 성공!")
             logger.info(f"   메시지 ID: {message_id}")
-            logger.info(f"   발송자: {config.EMAIL_SENDER}")
+            logger.info(f"   발송자: {get_setting_value('EMAIL_SENDER')}")
             logger.info(f"   수신자: {to_email}")
             return True
         else:
@@ -296,7 +298,7 @@ def send_email(to_email: str, subject: str, html_content: str):
                         logger.info("\n💡 해결 방법 (잘못된 발송자 이메일):")
                         logger.info("   1. EMAIL_SENDER가 Postmark에서 인증된 이메일인지 확인하세요")
                         logger.info("   2. Postmark 대시보드 → Signatures에서 인증 상태 확인")
-                        logger.info(f"   3. 현재 설정: {config.EMAIL_SENDER}")
+                        logger.info(f"   3. 현재 설정: {get_setting_value('EMAIL_SENDER')}")
                     else:
                         logger.info("\n💡 일반적인 해결 방법:")
                         logger.info("   1. 이메일 주소 형식 확인")
