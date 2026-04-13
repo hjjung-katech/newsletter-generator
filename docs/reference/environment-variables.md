@@ -26,7 +26,11 @@
 | `LOG_LEVEL` | 선택 | runtime/application log level |
 | `LOG_FORMAT` | 선택 | logging format (`standard`/`json`) |
 | `SECRET_KEY` | 프로덕션 권장(웹) | Flask 시크릿 키 |
-| `ADMIN_API_TOKEN` | 민감 운영 API 보호 시 필수 | `/api/history`, `/api/schedule*`, `/api/send-email`, `/api/email-config`, `/api/test-email` 보호 토큰 |
+| `ADMIN_API_TOKEN` | 민감 운영 API 보호 시 필수 | 모든 스코프(data·schedule·email·ops)를 허용하는 root 토큰. 기존 단일 토큰 방식과 완전히 하위호환. |
+| `ADMIN_API_TOKEN_DATA` | 선택 | `data` 스코프 전용 토큰 — `/api/history`, `/api/analytics`, `/api/archive`, `/api/presets`, `/api/approvals`, `/api/source-policies` |
+| `ADMIN_API_TOKEN_SCHEDULE` | 선택 | `schedule` 스코프 전용 토큰 — `/api/schedule*`, `/api/schedules*` |
+| `ADMIN_API_TOKEN_EMAIL` | 선택 | `email` 스코프 전용 토큰 — `/api/send-email`, `/api/email-config`, `/api/test-email` |
+| `ADMIN_API_TOKEN_OPS` | 선택 | `ops` 스코프 전용 토큰 — `/api/ops/*` |
 | `ALLOWED_ORIGINS` | 선택 | canonical Flask runtime CORS allow-list |
 
 ### Search / LLM / Delivery
@@ -128,12 +132,19 @@ DEBUG_COST_TRACKING=false
 POSTMARK_SERVER_TOKEN=ps_xxx
 EMAIL_SENDER=newsletter@example.com
 
-# 웹/운영
+# 웹/운영 — root token (기존 방식, 모든 스코프 허용)
 APP_ENV=production
 SECRET_KEY=replace-me-in-production
 ADMIN_API_TOKEN=replace-me-with-an-ops-token
 ALLOWED_ORIGINS=https://app.example.com
 REDIS_URL=redis://localhost:6379/0
+
+# 웹/운영 — 스코프별 분리 방식 (더 강한 보안)
+# 각 시스템/서비스에 필요한 최소 스코프만 발급
+# ADMIN_API_TOKEN_SCHEDULE=scheduler-service-token
+# ADMIN_API_TOKEN_EMAIL=mailer-service-token
+# ADMIN_API_TOKEN_DATA=analytics-service-token
+# ADMIN_API_TOKEN_OPS=ops-monitoring-token
 
 # 선택적 compatibility alias
 # FLASK_ENV=production
