@@ -74,9 +74,9 @@ def _create_task_queue(app: Flask) -> tuple[Any, Any]:
     redis_url = app.config["REDIS_URL"]
 
     try:
-        from web.platform_adapter import is_queue_enabled_for_platform
+        from newsletter_core.public.platform import get_platform_adapter
 
-        if not is_queue_enabled_for_platform():
+        if not get_platform_adapter().is_queue_supported():
             log_warning(logger, "app.redis.disabled_for_platform")
             return None, None
 
