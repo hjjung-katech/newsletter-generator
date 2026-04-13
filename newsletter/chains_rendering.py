@@ -9,9 +9,9 @@ from typing import Any
 from langchain_core.runnables import RunnableLambda
 
 from newsletter.article_filter import select_top_articles
+from newsletter_core.application.generation.compose import compose_newsletter
 
 from .chains_prompts import HTML_TEMPLATE
-from .compose import compose_newsletter
 from .template_manager import TemplateManager
 from .template_paths import get_newsletter_template_dir
 from .utils.logger import get_logger

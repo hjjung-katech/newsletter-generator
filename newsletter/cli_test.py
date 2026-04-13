@@ -78,7 +78,10 @@ def test(
                 console.print(f"[cyan]Email compatibility mode enabled[/cyan]")
 
             # 템플릿 스타일에 따른 compose_newsletter 함수 사용
-            from .compose import compose_newsletter
+            from newsletter_core.application.generation.compose import (
+                compose_newsletter,
+            )
+
             from .template_paths import get_newsletter_template_dir
 
             template_dir = get_newsletter_template_dir()
