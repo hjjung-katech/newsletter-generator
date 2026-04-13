@@ -1,9 +1,41 @@
-"""Minimal access control for sensitive Flask operational routes."""
+"""Minimal access control for sensitive Flask operational routes.
+
+Token model
+-----------
+``ADMIN_API_TOKEN`` (root/bootstrap token) — grants all scopes.  Used as the
+single shared credential in existing deployments and remains fully
+backward-compatible.
+
+Scoped tokens — each grants access only to the named scope:
+
+  * ``ADMIN_API_TOKEN_DATA``     — read/write history, analytics, archive,
+                                    presets, approvals, source-policies
+  * ``ADMIN_API_TOKEN_SCHEDULE`` — schedule management endpoints
+  * ``ADMIN_API_TOKEN_EMAIL``    — email send/config/test endpoints
+  * ``ADMIN_API_TOKEN_OPS``      — ops diagnostics endpoints
+
+Using scoped tokens reduces the blast radius of a leak: an email-service token
+cannot access schedule management, and vice versa.  Different deployments or
+automation systems should each receive the smallest token that satisfies their
+needs.
+
+Auth flow (production-like runtimes)
+-------------------------------------
+1. Rate-limit check (shared sliding-window limiter).
+2. Find all configured tokens from environment.
+3. Determine the required scope for the requested path.
+4. Walk token list, compare with ``hmac.compare_digest`` (constant-time).
+5. If a matching token is found and it holds the required scope → 200.
+   If matching but wrong scope → 403 (Insufficient token scope).
+   If no match at all → 401 (Admin API token required).
+   If no tokens configured at all → 503 (misconfiguration).
+"""
 
 from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from hmac import compare_digest
 from typing import Mapping
 
@@ -25,20 +57,45 @@ DEFAULT_PROTECTED_RATE_LIMIT = 30
 DEFAULT_PROTECTED_WINDOW_SECONDS = 60
 DEFAULT_GENERATE_MAX_BODY_BYTES = 32 * 1024
 
-_PROTECTED_PREFIXES: tuple[str, ...] = (
-    "/api/history",
-    "/api/analytics",
-    "/api/presets",
-    "/api/approvals",
-    "/api/source-policies",
-    "/api/archive",
-    "/api/schedule",
-    "/api/schedules",
-    "/api/send-email",
-    "/api/email-config",
-    "/api/test-email",
-    "/api/ops",
+# ---------------------------------------------------------------------------
+# Scope constants
+# ---------------------------------------------------------------------------
+
+SCOPE_DATA = "data"
+SCOPE_SCHEDULE = "schedule"
+SCOPE_EMAIL = "email"
+SCOPE_OPS = "ops"
+
+ALL_SCOPES: frozenset[str] = frozenset(
+    {SCOPE_DATA, SCOPE_SCHEDULE, SCOPE_EMAIL, SCOPE_OPS}
 )
+
+# Map each protected route prefix to its required scope.
+_ROUTE_SCOPE_MAP: dict[str, str] = {
+    "/api/history": SCOPE_DATA,
+    "/api/analytics": SCOPE_DATA,
+    "/api/presets": SCOPE_DATA,
+    "/api/approvals": SCOPE_DATA,
+    "/api/source-policies": SCOPE_DATA,
+    "/api/archive": SCOPE_DATA,
+    "/api/schedule": SCOPE_SCHEDULE,
+    "/api/schedules": SCOPE_SCHEDULE,
+    "/api/send-email": SCOPE_EMAIL,
+    "/api/email-config": SCOPE_EMAIL,
+    "/api/test-email": SCOPE_EMAIL,
+    "/api/ops": SCOPE_OPS,
+}
+
+# Scoped token env-var names (one per scope).
+_SCOPED_TOKEN_ENV_VARS: dict[str, str] = {  # nosec B105
+    SCOPE_DATA: "ADMIN_API_TOKEN_DATA",
+    SCOPE_SCHEDULE: "ADMIN_API_TOKEN_SCHEDULE",
+    SCOPE_EMAIL: "ADMIN_API_TOKEN_EMAIL",
+    SCOPE_OPS: "ADMIN_API_TOKEN_OPS",
+}
+
+# Derived from _ROUTE_SCOPE_MAP so the two stay in sync automatically.
+_PROTECTED_PREFIXES: tuple[str, ...] = tuple(_ROUTE_SCOPE_MAP.keys())
 
 
 def _is_dev_like(app: Flask, environ: Mapping[str, str] | None = None) -> bool:
@@ -77,6 +134,83 @@ def is_protected_route(
 ) -> bool:
     """Return whether the request path should require the admin API token."""
     return any(path == prefix or path.startswith(f"{prefix}/") for prefix in prefixes)
+
+
+@dataclass(frozen=True)
+class _TokenConfig:
+    """A configured token with its granted scopes and a human-readable label."""
+
+    value: str
+    scopes: frozenset[str]
+    label: str
+
+
+def _resolve_all_token_configs(
+    environ: Mapping[str, str] | None = None,
+) -> list[_TokenConfig]:
+    """Return every token configured in the environment.
+
+    The root ``ADMIN_API_TOKEN`` is granted ``ALL_SCOPES``.  Each scoped token
+    (``ADMIN_API_TOKEN_<SCOPE>``) is granted only the corresponding scope.
+    """
+    env = environ or os.environ
+    configs: list[_TokenConfig] = []
+
+    root_token = env.get(ADMIN_TOKEN_ENV_VAR, "").strip()
+    if root_token:
+        configs.append(_TokenConfig(value=root_token, scopes=ALL_SCOPES, label="root"))
+
+    for scope, env_var in _SCOPED_TOKEN_ENV_VARS.items():
+        scoped_token = env.get(env_var, "").strip()
+        if scoped_token:
+            configs.append(
+                _TokenConfig(
+                    value=scoped_token,
+                    scopes=frozenset({scope}),
+                    label=env_var,
+                )
+            )
+
+    return configs
+
+
+def _scope_for_path(path: str) -> str | None:
+    """Return the scope required for *path*, or ``None`` if no mapping exists."""
+    for prefix, scope in _ROUTE_SCOPE_MAP.items():
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return scope
+    return None
+
+
+def _check_token_auth(
+    provided: str,
+    required_scope: str,
+    configs: list[_TokenConfig],
+) -> tuple[bool, str | None]:
+    """Constant-time multi-token check.
+
+    Scans every config to avoid short-circuit timing leaks.
+
+    Returns:
+        (authorized, label): ``(True, label)`` if a token matched and holds the
+        required scope; ``(False, label)`` if a token matched but lacks scope;
+        ``(False, None)`` if no token matched.
+    """
+    matched_label: str | None = None
+    scope_granted: bool = False
+
+    for config in configs:
+        if compare_digest(provided, config.value):
+            matched_label = config.label
+            if required_scope in config.scopes:
+                scope_granted = True
+
+    return (scope_granted and matched_label is not None), matched_label
+
+
+# ---------------------------------------------------------------------------
+# Legacy single-token helpers — kept for internal backward compat only.
+# ---------------------------------------------------------------------------
 
 
 def _resolve_expected_admin_token(
@@ -186,8 +320,8 @@ def configure_access_control(
                 retry_after_seconds=decision.retry_after_seconds,
             )
 
-        expected_token = _resolve_expected_admin_token(env)
-        if not expected_token:
+        configs = _resolve_all_token_configs(env)
+        if not configs:
             LOGGER.error(
                 "Protected web routes are enabled without %s configured.",
                 ADMIN_TOKEN_ENV_VAR,
@@ -200,7 +334,46 @@ def configure_access_control(
             )
 
         provided_token = _resolve_provided_admin_token()
-        if not provided_token or not compare_digest(provided_token, expected_token):
+        if not provided_token:
             return jsonify({"error": "Admin API token required"}), 401
 
-        return None
+        required_scope = _scope_for_path(request.path)
+        if required_scope is None:
+            # Protected prefix with no scope mapping — fail closed.
+            LOGGER.warning(
+                "Protected route %s has no scope mapping; denying access.",
+                request.path,
+            )
+            return jsonify({"error": "Admin API token required"}), 401
+
+        authorized, token_label = _check_token_auth(
+            provided_token, required_scope, configs
+        )
+        if authorized:
+            LOGGER.debug(
+                "Request authorized: path=%s scope=%s token=%s",
+                request.path,
+                required_scope,
+                token_label,
+            )
+            return None
+
+        if token_label is not None:
+            # Token was recognised but lacks the required scope.
+            LOGGER.warning(
+                "Token %s lacks scope '%s' required for path %s",
+                token_label,
+                required_scope,
+                request.path,
+            )
+            return (
+                jsonify(
+                    {
+                        "error": "Insufficient token scope",
+                        "required_scope": required_scope,
+                    }
+                ),
+                403,
+            )
+
+        return jsonify({"error": "Admin API token required"}), 401
