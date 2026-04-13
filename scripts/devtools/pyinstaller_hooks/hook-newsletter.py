@@ -184,8 +184,6 @@ newsletter_modules = [
     "newsletter.settings",
     "newsletter.sources",
     "newsletter.article_filter",
-    "newsletter.compose",
-    "newsletter.deliver",
     "newsletter.chains",
     "newsletter.graph",
     "newsletter.tools",

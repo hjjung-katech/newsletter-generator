@@ -27,12 +27,12 @@ from datetime import datetime
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
+from rich.console import Console  # noqa: E402
+from rich.panel import Panel  # noqa: E402
+from rich.table import Table  # noqa: E402
 
-from newsletter import config
-from newsletter import deliver as news_deliver
+from newsletter import config  # noqa: E402
+from newsletter_core.application.generation import deliver as news_deliver  # noqa: E402
 
 console = Console()
 
@@ -47,9 +47,7 @@ def check_email_configuration():
     table.add_column("값", style="yellow")
 
     # Postmark 토큰 확인
-    postmark_status = (
-        "✅ 설정됨" if config.POSTMARK_SERVER_TOKEN else "❌ 설정되지 않음"
-    )
+    postmark_status = "✅ 설정됨" if config.POSTMARK_SERVER_TOKEN else "❌ 설정되지 않음"
     postmark_value = (
         config.POSTMARK_SERVER_TOKEN[:10] + "..."
         if config.POSTMARK_SERVER_TOKEN
@@ -158,9 +156,7 @@ def send_default_email(to_email, send_real=False):
     """
 
     if not send_real:
-        console.print(
-            "[yellow]🔍 DRY RUN 모드 - 실제 이메일은 발송되지 않습니다[/yellow]"
-        )
+        console.print("[yellow]🔍 DRY RUN 모드 - 실제 이메일은 발송되지 않습니다[/yellow]")
         console.print(f"[cyan]수신자:[/cyan] {to_email}")
         console.print(f"[cyan]제목:[/cyan] {subject}")
         console.print(f"[cyan]내용 길이:[/cyan] {len(html_content)} 문자")
@@ -172,29 +168,19 @@ def send_default_email(to_email, send_real=False):
         )
 
         if success:
-            console.print(
-                "[green]✅ 기본 테스트 이메일이 성공적으로 발송되었습니다![/green]"
-            )
+            console.print("[green]✅ 기본 테스트 이메일이 성공적으로 발송되었습니다![/green]")
             return True
         else:
             console.print("[red]❌ 기본 테스트 이메일 발송에 실패했습니다.[/red]")
             console.print("[yellow]💡 문제 해결 팁:[/yellow]")
-            console.print(
-                "   - 422 오류: 수신자가 비활성화됨 → 다른 이메일 주소로 테스트"
-            )
-            console.print(
-                "   - 401 오류: 잘못된 토큰 → Postmark 대시보드에서 토큰 확인"
-            )
-            console.print(
-                "   - 403 오류: 계정 승인 대기 → 같은 도메인 내 이메일로 테스트"
-            )
+            console.print("   - 422 오류: 수신자가 비활성화됨 → 다른 이메일 주소로 테스트")
+            console.print("   - 401 오류: 잘못된 토큰 → Postmark 대시보드에서 토큰 확인")
+            console.print("   - 403 오류: 계정 승인 대기 → 같은 도메인 내 이메일로 테스트")
             return False
 
     except Exception as e:
         console.print(f"[red]❌ 이메일 발송 중 오류 발생: {e}[/red]")
-        console.print(
-            "[yellow]💡 네트워크 연결이나 Postmark 설정을 확인해주세요.[/yellow]"
-        )
+        console.print("[yellow]💡 네트워크 연결이나 Postmark 설정을 확인해주세요.[/yellow]")
         return False
 
 
@@ -209,17 +195,13 @@ def send_newsletter_email(to_email, html_file, send_real=False):
             html_content = f.read()
 
         filename = os.path.basename(html_file)
-        subject = (
-            f"뉴스레터 테스트: {filename} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
-        )
+        subject = f"뉴스레터 테스트: {filename} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
         console.print(f"[cyan]파일:[/cyan] {filename}")
         console.print(f"[cyan]크기:[/cyan] {len(html_content):,} 문자")
 
         if not send_real:
-            console.print(
-                "[yellow]🔍 DRY RUN 모드 - 실제 이메일은 발송되지 않습니다[/yellow]"
-            )
+            console.print("[yellow]🔍 DRY RUN 모드 - 실제 이메일은 발송되지 않습니다[/yellow]")
             console.print(f"[cyan]수신자:[/cyan] {to_email}")
             console.print(f"[cyan]제목:[/cyan] {subject}")
             return True
@@ -229,36 +211,24 @@ def send_newsletter_email(to_email, html_file, send_real=False):
         )
 
         if success:
-            console.print(
-                "[green]✅ 뉴스레터 이메일이 성공적으로 발송되었습니다![/green]"
-            )
+            console.print("[green]✅ 뉴스레터 이메일이 성공적으로 발송되었습니다![/green]")
             return True
         else:
             console.print("[red]❌ 뉴스레터 이메일 발송에 실패했습니다.[/red]")
             console.print("[yellow]💡 문제 해결 팁:[/yellow]")
-            console.print(
-                "   - 422 오류: 수신자가 비활성화됨 → 다른 이메일 주소로 테스트"
-            )
-            console.print(
-                "   - 401 오류: 잘못된 토큰 → Postmark 대시보드에서 토큰 확인"
-            )
-            console.print(
-                "   - 403 오류: 계정 승인 대기 → 같은 도메인 내 이메일로 테스트"
-            )
+            console.print("   - 422 오류: 수신자가 비활성화됨 → 다른 이메일 주소로 테스트")
+            console.print("   - 401 오류: 잘못된 토큰 → Postmark 대시보드에서 토큰 확인")
+            console.print("   - 403 오류: 계정 승인 대기 → 같은 도메인 내 이메일로 테스트")
             return False
 
     except Exception as e:
         console.print(f"[red]❌ 뉴스레터 이메일 발송 중 오류 발생: {e}[/red]")
-        console.print(
-            "[yellow]💡 네트워크 연결이나 Postmark 설정을 확인해주세요.[/yellow]"
-        )
+        console.print("[yellow]💡 네트워크 연결이나 Postmark 설정을 확인해주세요.[/yellow]")
         return False
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Newsletter Generator 이메일 발송 통합 테스트"
-    )
+    parser = argparse.ArgumentParser(description="Newsletter Generator 이메일 발송 통합 테스트")
     parser.add_argument("--to", required=True, help="테스트 이메일을 받을 이메일 주소")
     parser.add_argument(
         "--send-real", action="store_true", help="실제 이메일 발송 (기본값: dry-run)"
@@ -289,9 +259,7 @@ def main():
         if os.path.exists(args.newsletter_file):
             send_newsletter_email(args.to, args.newsletter_file, args.send_real)
         else:
-            console.print(
-                f"[red]❌ 지정된 파일을 찾을 수 없습니다: {args.newsletter_file}[/red]"
-            )
+            console.print(f"[red]❌ 지정된 파일을 찾을 수 없습니다: {args.newsletter_file}[/red]")
     else:
         html_files = find_html_files()
         if html_files:

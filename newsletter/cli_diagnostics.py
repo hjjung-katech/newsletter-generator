@@ -7,8 +7,9 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from newsletter_core.application.generation import deliver as news_deliver
+
 from . import config
-from . import deliver as news_deliver
 
 console = Console()
 

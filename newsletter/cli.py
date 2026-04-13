@@ -21,12 +21,14 @@ from .utils.logger import get_logger, set_log_level
 logger = get_logger()
 
 from newsletter_core.application.generation import collect as news_collect
+from newsletter_core.application.generation.compose import (
+    compose_compact_newsletter_html,
+    compose_newsletter_html,
+)
 
-from . import compose as news_compose
 from . import graph  # 새로운 LangGraph 모듈 임포트
 from . import tools  # Import the tools module
 from . import config
-from . import deliver as news_deliver
 from .cli_diagnostics import (
     check_config,
     check_llm,
@@ -36,7 +38,6 @@ from .cli_diagnostics import (
 )
 from .cli_run import run
 from .cli_test import test
-from .compose import compose_compact_newsletter_html, compose_newsletter_html
 
 app = typer.Typer()
 console = Console()

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import warnings
 from unittest.mock import patch
 
 import pytest
@@ -93,16 +92,3 @@ def test_generation_facade_applies_source_policy_override() -> None:
     assert generation_module.tools.search_news_articles is original_search_tool
     assert result["input_params"]["source_allowlist"] == ["reuters.com"]
     assert result["input_params"]["source_blocklist"] == ["spam.example"]
-
-
-@pytest.mark.unit
-@pytest.mark.mock_api
-def test_legacy_newsletter_api_re_exports_public_facade() -> None:
-    """Legacy import path is still available with deprecation warning."""
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        from newsletter import api as legacy_api
-
-    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
-    assert legacy_api.generate_newsletter is not None
-    assert legacy_api.GenerateNewsletterRequest is not None

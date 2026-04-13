@@ -7,8 +7,13 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage
 
+from newsletter_core.application.generation.compose import (
+    NewsletterConfig,
+    compose_newsletter,
+    create_grouped_sections,
+)
+
 from .chains_llm_utils import get_llm
-from .compose import NewsletterConfig, compose_newsletter, create_grouped_sections
 from .template_manager import TemplateManager
 from .template_paths import get_newsletter_template_dir
 from .utils.logger import get_logger
