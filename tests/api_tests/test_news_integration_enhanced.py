@@ -14,11 +14,11 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from newsletter import config
-from newsletter.collect import collect_articles
 from newsletter.sources import NewsSourceManager
 
 # 필요한 모듈 임포트
 from newsletter.tools import search_news_articles
+from newsletter_core.application.generation.collect import collect_articles
 
 
 class TestNewsIntegrationEnhanced(unittest.TestCase):

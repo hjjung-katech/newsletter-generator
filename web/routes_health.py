@@ -11,6 +11,11 @@ from flask.typing import ResponseReturnValue
 
 from newsletter_core.public.settings import get_setting_value
 
+try:
+    from schedule_drift import detect_schedule_drift
+except ImportError:
+    from web.schedule_drift import detect_schedule_drift  # pragma: no cover
+
 
 def register_health_route(
     app: Flask,
@@ -148,6 +153,42 @@ def register_health_route(
                 "message": f"File system error: {str(e)}",
             }
             overall_status = "error"
+
+        try:
+            drift_report = detect_schedule_drift(database_path)
+            drift_payload = drift_report.to_dict()
+            drift_status = drift_payload["status"]
+            if drift_status == "healthy":
+                drift_message = (
+                    f"No drifted schedules "
+                    f"(active={drift_payload['active_schedule_count']})"
+                )
+            else:
+                drift_message = (
+                    f"{drift_payload['drifted_count']} drifted schedule(s) "
+                    f"beyond {drift_payload['threshold_seconds']}s"
+                )
+            deps["schedule_drift"] = {
+                "status": drift_status,
+                "message": drift_message,
+                "drifted_count": drift_payload["drifted_count"],
+                "active_schedule_count": drift_payload["active_schedule_count"],
+                "threshold_seconds": drift_payload["threshold_seconds"],
+            }
+            if drift_status == "error":
+                overall_status = "error"
+            elif (
+                drift_status == "degraded"
+                and overall_status == "healthy"
+            ):
+                overall_status = "degraded"
+        except Exception as e:
+            deps["schedule_drift"] = {
+                "status": "error",
+                "message": f"Schedule drift check failed: {str(e)}",
+            }
+            if overall_status == "healthy":
+                overall_status = "degraded"
 
         health_status["status"] = overall_status
         health_status["dependencies"] = deps

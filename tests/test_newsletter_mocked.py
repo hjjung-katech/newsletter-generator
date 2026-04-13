@@ -17,8 +17,11 @@ project_root = str(Path(__file__).parent.parent)
 sys.path.insert(0, project_root)
 
 from newsletter.chains import get_newsletter_chain
-from newsletter.compose import compose_compact_newsletter_html, compose_newsletter_html
 from newsletter.graph import generate_newsletter
+from newsletter_core.application.generation.compose import (
+    compose_compact_newsletter_html,
+    compose_newsletter_html,
+)
 
 
 class TestNewsletterMocked:
@@ -263,7 +266,9 @@ class TestNewsletterMocked:
         """데이터 처리 로직 테스트 (템플릿 제외)"""
 
         # extract_key_definitions_for_compact 함수 테스트
-        from newsletter.compose import extract_key_definitions_for_compact
+        from newsletter_core.application.generation.compose import (
+            extract_key_definitions_for_compact,
+        )
 
         test_sections = [
             {

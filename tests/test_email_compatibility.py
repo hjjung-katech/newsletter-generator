@@ -17,8 +17,8 @@ import pytest
 from bs4 import BeautifulSoup
 
 from newsletter.chains import get_newsletter_chain
-from newsletter.compose import compose_newsletter
 from newsletter.template_paths import get_newsletter_template_dir
+from newsletter_core.application.generation.compose import compose_newsletter
 
 TEMPLATE_DIR = get_newsletter_template_dir()
 

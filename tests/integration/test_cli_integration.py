@@ -54,7 +54,10 @@ def test_cli_run_uses_public_generation_facade(
         "newsletter_core.public.generation.generate_newsletter",
         fake_generate_newsletter,
     )
-    monkeypatch.setattr("newsletter.deliver.save_locally", fake_save_locally)
+    monkeypatch.setattr(
+        "newsletter_core.application.generation.deliver.save_locally",
+        fake_save_locally,
+    )
 
     result = runner.invoke(
         app,

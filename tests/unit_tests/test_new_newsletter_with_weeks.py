@@ -2,9 +2,9 @@ import os
 import re
 from datetime import datetime, timedelta
 
-from newsletter.compose import compose_newsletter_html
 from newsletter.date_utils import standardize_date
 from newsletter.template_paths import get_newsletter_template_dir
+from newsletter_core.application.generation.compose import compose_newsletter_html
 
 # Create test data that includes various date formats including "weeks ago"
 test_articles = [

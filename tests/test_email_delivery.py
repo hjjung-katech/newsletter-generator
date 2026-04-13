@@ -24,7 +24,7 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
 from newsletter import config
-from newsletter import deliver as news_deliver
+from newsletter_core.application.generation import deliver as news_deliver
 
 
 class TestEmailDelivery(unittest.TestCase):
@@ -46,7 +46,7 @@ class TestEmailDelivery(unittest.TestCase):
         """
 
     @pytest.mark.mock_api
-    @patch("newsletter.deliver.requests.post")
+    @patch("newsletter_core.application.generation.deliver.requests.post")
     def test_send_email_success(self, mock_post):
         """이메일 발송 성공 테스트 (모킹) - GitHub Actions 안전"""
         # Mock successful response
@@ -96,7 +96,7 @@ class TestEmailDelivery(unittest.TestCase):
         self.assertIn("테스트 이메일입니다", payload["HtmlBody"])
 
     @pytest.mark.mock_api
-    @patch("newsletter.deliver.requests.post")
+    @patch("newsletter_core.application.generation.deliver.requests.post")
     def test_send_email_failure(self, mock_post):
         """이메일 발송 실패 테스트 (모킹) - GitHub Actions 안전"""
         # Mock failed response
@@ -133,7 +133,7 @@ class TestEmailDelivery(unittest.TestCase):
         self.assertTrue(result)
 
     @pytest.mark.mock_api
-    @patch("newsletter.deliver.requests.post")
+    @patch("newsletter_core.application.generation.deliver.requests.post")
     def test_send_email_network_error(self, mock_post):
         """네트워크 오류 테스트 - GitHub Actions 안전"""
         # Mock network error
@@ -235,7 +235,7 @@ class TestEmailDelivery(unittest.TestCase):
 
             from newsletter.cli import test_email
 
-            with patch("newsletter.deliver.send_email") as mock_send:
+            with patch("newsletter_core.application.generation.deliver.send_email") as mock_send:
                 mock_send.return_value = True
 
                 # test_email 함수 직접 호출 (CLI 대신)
