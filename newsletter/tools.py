@@ -289,7 +289,7 @@ def generate_keywords_with_gemini(
                 return []
 
             llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-pro",  # 더 안정적인 모델로 변경
+                model="gemini-2.5-flash",
                 temperature=0.7,
                 google_api_key=config.GEMINI_API_KEY,
                 transport="rest",

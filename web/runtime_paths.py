@@ -14,19 +14,29 @@ so that existing call-sites continue to work unchanged.
 
 from __future__ import annotations
 
-from newsletter_core.infrastructure.platform._paths import (
+import sys
+from pathlib import Path
+
+# Ensure project root is in sys.path so newsletter_core is importable
+# when this module is loaded from the web/ directory directly
+# (e.g. `python web/init_database.py`).
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+
+from newsletter_core.infrastructure.platform._paths import (  # noqa: E402
     resolve_database_path as _resolve_database_path,
 )
-from newsletter_core.infrastructure.platform._paths import (
+from newsletter_core.infrastructure.platform._paths import (  # noqa: E402
     resolve_env_file_path as _resolve_env_file_path,
 )
-from newsletter_core.infrastructure.platform._paths import (
+from newsletter_core.infrastructure.platform._paths import (  # noqa: E402
     resolve_project_root as _resolve_project_root,
 )
-from newsletter_core.infrastructure.platform._paths import (
+from newsletter_core.infrastructure.platform._paths import (  # noqa: E402
     resolve_static_dir as _resolve_static_dir,
 )
-from newsletter_core.infrastructure.platform._paths import (
+from newsletter_core.infrastructure.platform._paths import (  # noqa: E402
     resolve_template_dir as _resolve_template_dir,
 )
 
