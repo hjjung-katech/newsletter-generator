@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.0.0] - 2026-04-13 - Shim Removal Complete
+
+### 🏗️ Chore
+
+#### Shim removal Step 3 — N+2(0.9.0) shim files removed (#410)
+- Deleted `newsletter/api.py` — deprecated facade for `newsletter_core.public.generation`
+- Deleted `newsletter/compose.py` — wildcard re-export of `newsletter_core.application.generation.compose`
+- Deleted `newsletter/deliver.py` — wildcard re-export of `newsletter_core.application.generation.deliver`
+- Migrated all consumers (`chains_no_articles`, `chains_compact_flow`, `chains_rendering`, `cli`, `cli_diagnostics`, `cli_test`) to direct `newsletter_core` imports
+- Removed `test_compose_contract_lock.py` (shim contract lock test, no longer valid)
+- Removed `test_legacy_newsletter_api_re_exports_public_facade` from facade contract test
+- Removed `newsletter.compose` and `newsletter.deliver` strings from PyInstaller hook
+
+### 💥 Breaking Changes
+
+None. All migrated imports resolve to identical underlying symbols in `newsletter_core`.
+
+### Shim Removal Status
+
+| Milestone | Files | Status |
+|---|---|---|
+| Step 1 (N+1 / 0.8.0) | `collect.py`, `summarize.py`, `main.py` | ✅ Removed (PR #404) |
+| Step 2 (N+2 / 0.9.0) | `api.py`, `compose.py`, `deliver.py` | ✅ Removed (PR #410) |
+| Step 3 (N+3 / 1.0.0) | `config.py`, `compat_env.py`, `settings.py`, `web/platform_adapter.py`, `web/runtime_paths.py` | 🔜 Long-term roadmap |
+
+---
+
 ## [0.9.0] - 2026-04-13 - Ops-Security, Web Feature Hardening & Architecture Cleanup
 
 ### 🔒 Security (RR-26 / RR-27 / RR-28)
