@@ -31,10 +31,7 @@ from typing import Any
 try:
     from request_limits import RateLimitDecision, SlidingWindowRateLimiter
 except ImportError:  # pragma: no cover
-    from web.request_limits import (  # type: ignore[no-redef]
-        RateLimitDecision,
-        SlidingWindowRateLimiter,
-    )
+    from web.request_limits import RateLimitDecision, SlidingWindowRateLimiter
 
 LOGGER = logging.getLogger(__name__)
 

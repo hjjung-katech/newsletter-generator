@@ -46,7 +46,7 @@ from flask.typing import ResponseReturnValue
 try:
     from redis_rate_limiter import RedisRateLimiter
 except ImportError:  # pragma: no cover
-    from web.redis_rate_limiter import RedisRateLimiter  # type: ignore[no-redef]
+    from web.redis_rate_limiter import RedisRateLimiter
 
 LOGGER = logging.getLogger(__name__)
 
