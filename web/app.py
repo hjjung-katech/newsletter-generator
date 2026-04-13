@@ -192,7 +192,7 @@ def create_app() -> Flask:
         static_folder=resolve_static_dir(),
     )
     configure_cors(app)
-    configure_access_control(app)
+    configure_access_control(app, get_redis_conn=lambda: _resolve_redis_conn(app))
 
     app.config["SECRET_KEY"] = get_setting_value(
         "SECRET_KEY", "dev-key-change-in-production"
