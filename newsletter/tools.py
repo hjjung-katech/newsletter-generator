@@ -36,8 +36,8 @@ from newsletter_core.application.tools_support import (
 from newsletter_core.infrastructure.tools_search_runtime import (
     execute_serper_search_request,
 )
+from newsletter_core.public.settings import get_setting_value
 
-from . import config
 from .html_utils import clean_html_markers
 from .utils.error_handling import handle_exception
 from .utils.logger import get_logger, show_collection_brief
@@ -62,12 +62,12 @@ def search_news_articles(keywords: str, num_results: int = 10) -> List[Dict]:
       Returns:
         A list of article dictionaries with 'title', 'url', 'snippet', 'source', and 'date' keys.
     """
-    if not config.SERPER_API_KEY:
+    if not get_setting_value("SERPER_API_KEY"):
         raise ToolException("SERPER_API_KEY not found. Please set it in the .env file.")
 
     search_request = resolve_search_request(keywords, num_results)
     search_plans = build_serper_search_plans(
-        search_request, api_key=config.SERPER_API_KEY
+        search_request, api_key=get_setting_value("SERPER_API_KEY")
     )
     keyword_reports: list[SerperKeywordReport] = []
 
@@ -282,7 +282,7 @@ def generate_keywords_with_gemini(
         except Exception as e:
             logger.warning(f"LLM factory failed, using fallback: {e}")
             # Fallback to stable Gemini model
-            if not config.GEMINI_API_KEY:
+            if not get_setting_value("GEMINI_API_KEY"):
                 logger.error(
                     "GEMINI_API_KEY is not configured. Cannot generate keywords."
                 )
@@ -291,7 +291,7 @@ def generate_keywords_with_gemini(
             llm = ChatGoogleGenerativeAI(
                 model="gemini-2.5-flash",
                 temperature=0.7,
-                google_api_key=config.GEMINI_API_KEY,
+                google_api_key=get_setting_value("GEMINI_API_KEY"),
                 transport="rest",
                 convert_system_message_to_human=True,
                 callbacks=callbacks,
@@ -402,13 +402,13 @@ def extract_common_theme_from_keywords(
 
     # Check if any API keys are available before attempting LLM calls
     if not api_key:
-        api_key = config.GEMINI_API_KEY
+        api_key = get_setting_value("GEMINI_API_KEY")
 
     # Also check for other API keys that might be used by LLM factory
     has_any_api_key = (
         api_key
-        or getattr(config, "OPENAI_API_KEY", None)
-        or getattr(config, "ANTHROPIC_API_KEY", None)
+        or get_setting_value("OPENAI_API_KEY")
+        or get_setting_value("ANTHROPIC_API_KEY")
     )
 
     if not has_any_api_key:

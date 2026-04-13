@@ -1,11 +1,7 @@
-import os
-from datetime import datetime
-from pathlib import Path
-
 import pytest
 
-from newsletter import config
 from newsletter.tools import extract_common_theme_from_keywords
+from newsletter_core.public.settings import get_setting_value
 
 
 @pytest.mark.api
@@ -13,7 +9,7 @@ def test_extract_common_theme_with_api():
     """API를 사용한 키워드 공통 주제 추출 테스트 (API 키가 설정된 경우에만 실행)"""
 
     # API 키가 없으면 테스트를 건너뜁니다
-    if not config.GEMINI_API_KEY:
+    if not get_setting_value("GEMINI_API_KEY"):
         pytest.skip("No GEMINI_API_KEY set")
 
     # 테스트 케이스: AI 관련 키워드

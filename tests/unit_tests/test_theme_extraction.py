@@ -1,10 +1,3 @@
-import os
-from datetime import datetime
-from pathlib import Path
-
-import pytest
-
-from newsletter import config
 from newsletter.tools import (
     extract_common_theme_fallback,
     extract_common_theme_from_keywords,
@@ -38,17 +31,15 @@ def test_extract_common_theme_fallback():
 def test_extract_common_theme_with_mock():
     """키워드 공통 주제 추출 메인 함수 테스트 (API 호출 없이)"""
 
-    # 테스트를 위해 모든 API 키를 비활성화
-    original_config_gemini_key = config.GEMINI_API_KEY
-    original_config_openai_key = getattr(config, "OPENAI_API_KEY", None)
-    original_config_anthropic_key = getattr(config, "ANTHROPIC_API_KEY", None)
+    # 테스트를 위해 모든 API 키를 비활성화 (env var 제거)
+    import os
+    from unittest.mock import patch
 
-    # config 모두 비활성화
-    config.GEMINI_API_KEY = None
-    config.OPENAI_API_KEY = None
-    config.ANTHROPIC_API_KEY = None
+    env_overrides = {}
+    for key in ("GEMINI_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+        env_overrides[key] = ""
 
-    try:
+    with patch.dict(os.environ, env_overrides):
         # 테스트 케이스: 여러 키워드
         keywords = ["인공지능", "머신러닝", "딥러닝"]
         result = extract_common_theme_from_keywords(keywords)
@@ -67,12 +58,6 @@ def test_extract_common_theme_with_mock():
         result_str = extract_common_theme_from_keywords(keywords_str)
         expected_str = extract_common_theme_fallback(keywords_str)
         assert result_str == expected_str
-
-    finally:
-        # config 복원
-        config.GEMINI_API_KEY = original_config_gemini_key
-        config.OPENAI_API_KEY = original_config_openai_key
-        config.ANTHROPIC_API_KEY = original_config_anthropic_key
 
 
 if __name__ == "__main__":

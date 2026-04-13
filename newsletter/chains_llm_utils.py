@@ -6,7 +6,8 @@ from typing import Any
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from . import config
+from newsletter_core.public.settings import get_setting_value
+
 from .utils.error_handling import handle_exception
 from .utils.logger import get_logger
 
@@ -118,12 +119,12 @@ def get_llm(
             )
 
         # Fallback to original Gemini implementation
-        if not config.GEMINI_API_KEY:
+        if not get_setting_value("GEMINI_API_KEY"):
             raise ValueError("GEMINI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
 
         return ChatGoogleGenerativeAI(
             model="gemini-2.5-flash",
-            google_api_key=config.GEMINI_API_KEY,
+            google_api_key=get_setting_value("GEMINI_API_KEY"),
             temperature=temperature,
             transport="rest",
             callbacks=callbacks,

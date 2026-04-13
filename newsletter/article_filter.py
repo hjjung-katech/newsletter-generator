@@ -9,7 +9,8 @@ from typing import Any, Dict, List
 
 from rich.console import Console
 
-from . import config
+from newsletter_core.public.settings import get_major_news_sources
+
 from .utils.logger import get_logger
 
 # 로거 초기화
@@ -50,18 +51,18 @@ def filter_articles_by_major_sources(
         # 티어에 따라 분류
         if any(
             major_source.lower() in source_norm
-            for major_source in config.MAJOR_NEWS_SOURCES["tier1"]
+            for major_source in get_major_news_sources()["tier1"]
         ):
             tier1_articles.append(article)
         elif any(
             major_source.lower() in source_norm
-            for major_source in config.MAJOR_NEWS_SOURCES["tier2"]
+            for major_source in get_major_news_sources()["tier2"]
         ):
             tier2_articles.append(article)
         else:
             other_articles.append(article)
 
-    console.print(f"[cyan]News source distribution:[/cyan]")
+    console.print("[cyan]News source distribution:[/cyan]")
     console.print(
         f"[green]- Tier 1 (major sources): {len(tier1_articles)} articles[/green]"
     )
@@ -128,7 +129,7 @@ def group_articles_by_keywords(
     for i, article in enumerate(articles):
         full_text = f"{article.get('title', '')} {article.get('content', '')}".lower()
         tokens = _tokenize(full_text)
-        logger.debug(f"Processing article {i+1}: {full_text[:50]}...")
+        logger.debug(f"Processing article {i + 1}: {full_text[:50]}...")
 
         for keyword in keywords:
             variations = SYNONYMS.get(keyword, [keyword])
@@ -145,11 +146,11 @@ def group_articles_by_keywords(
                 if matched:
                     grouped_articles[keyword].append(article)
                     logger.debug(
-                        f"Article {i+1} matched keyword '{keyword}' via variant '{variant}'"
+                        f"Article {i + 1} matched keyword '{keyword}' via variant '{variant}'"
                     )
                     break
             if not matched:
-                logger.debug(f"Article {i+1} did not match keyword '{keyword}'")
+                logger.debug(f"Article {i + 1} did not match keyword '{keyword}'")
 
     for keyword in grouped_articles:
         logger.info(
@@ -190,7 +191,7 @@ def remove_duplicate_articles(articles: List[Dict[str, Any]]) -> List[Dict[str, 
             # 정규화된 URL 생성 (쿼리 파라미터 제외)
             normalized = f"{domain}{path}"
             return normalized
-        except:
+        except Exception:
             return url.lower()
 
     def normalize_title(title: str) -> str:
@@ -313,7 +314,7 @@ def filter_articles_by_domains(
             domain = urlparse(url).netloc
             # www. 제거
             domain = re.sub(r"^www\.", "", domain)
-        except:
+        except Exception:
             # URL 파싱 실패시 전체 URL 사용
             domain = url
 
@@ -382,16 +383,16 @@ def remove_similar_articles(
     return unique_articles
 
 
-from .date_utils import parse_date_string
+from .date_utils import parse_date_string  # noqa: E402
 
 
 def calculate_article_importance(article: Dict[str, Any]) -> float:
     """Calculate a simple importance score for an article."""
     score = 0.0
     source = article.get("source", "")
-    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier1"]):
+    if any(s.lower() in source.lower() for s in get_major_news_sources()["tier1"]):
         score += 2.0
-    elif any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier2"]):
+    elif any(s.lower() in source.lower() for s in get_major_news_sources()["tier2"]):
         score += 1.0
 
     date_obj = parse_date_string(article.get("date"))

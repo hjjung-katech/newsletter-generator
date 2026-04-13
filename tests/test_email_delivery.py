@@ -23,7 +23,6 @@ import pytest
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, project_root)
 
-from newsletter import config  # noqa: E402
 from newsletter_core.application.generation import deliver as news_deliver  # noqa: E402
 
 
@@ -62,9 +61,9 @@ class TestEmailDelivery(unittest.TestCase):
         mock_post.return_value = mock_response
 
         # Mock config values
-        with (
-            patch.object(config, "POSTMARK_SERVER_TOKEN", "test-token"),
-            patch.object(config, "EMAIL_SENDER", "test@example.com"),
+        with patch.dict(
+            os.environ,
+            {"POSTMARK_SERVER_TOKEN": "test-token", "EMAIL_SENDER": "test@example.com"},
         ):
             result = news_deliver.send_email(
                 to_email=self.test_email,
@@ -104,9 +103,9 @@ class TestEmailDelivery(unittest.TestCase):
         mock_response.text = "Invalid email address"
         mock_post.return_value = mock_response
 
-        with (
-            patch.object(config, "POSTMARK_SERVER_TOKEN", "test-token"),
-            patch.object(config, "EMAIL_SENDER", "test@example.com"),
+        with patch.dict(
+            os.environ,
+            {"POSTMARK_SERVER_TOKEN": "test-token", "EMAIL_SENDER": "test@example.com"},
         ):
             result = news_deliver.send_email(
                 to_email="invalid-email",
@@ -120,12 +119,16 @@ class TestEmailDelivery(unittest.TestCase):
     @pytest.mark.unit
     def test_send_email_no_token(self):
         """Postmark 토큰이 없을 때 테스트 - GitHub Actions 안전"""
-        with patch.object(config, "POSTMARK_SERVER_TOKEN", None):
+        saved = os.environ.pop("POSTMARK_SERVER_TOKEN", None)
+        try:
             result = news_deliver.send_email(
                 to_email=self.test_email,
                 subject=self.test_subject,
                 html_content=self.test_html_content,
             )
+        finally:
+            if saved is not None:
+                os.environ["POSTMARK_SERVER_TOKEN"] = saved
 
         # Should return True (simulation mode)
         self.assertTrue(result)
@@ -137,9 +140,9 @@ class TestEmailDelivery(unittest.TestCase):
         # Mock network error
         mock_post.side_effect = Exception("Network error")
 
-        with (
-            patch.object(config, "POSTMARK_SERVER_TOKEN", "test-token"),
-            patch.object(config, "EMAIL_SENDER", "test@example.com"),
+        with patch.dict(
+            os.environ,
+            {"POSTMARK_SERVER_TOKEN": "test-token", "EMAIL_SENDER": "test@example.com"},
         ):
             result = news_deliver.send_email(
                 to_email=self.test_email,
@@ -166,13 +169,17 @@ class TestEmailDelivery(unittest.TestCase):
         </html>
         """
 
-        with patch.object(config, "POSTMARK_SERVER_TOKEN", None):
+        saved = os.environ.pop("POSTMARK_SERVER_TOKEN", None)
+        try:
             # This will trigger the cleaning function
             result = news_deliver.send_email(
                 to_email=self.test_email,
                 subject=self.test_subject,
                 html_content=dirty_html,
             )
+        finally:
+            if saved is not None:
+                os.environ["POSTMARK_SERVER_TOKEN"] = saved
 
         # Should still return True (simulation mode)
         self.assertTrue(result)
@@ -192,12 +199,16 @@ class TestEmailDelivery(unittest.TestCase):
         </html>
         """
 
-        with patch.object(config, "POSTMARK_SERVER_TOKEN", None):
+        saved = os.environ.pop("POSTMARK_SERVER_TOKEN", None)
+        try:
             result = news_deliver.send_email(
                 to_email=self.test_email,
                 subject="한글 제목 테스트 📧",
                 html_content=korean_content,
             )
+        finally:
+            if saved is not None:
+                os.environ["POSTMARK_SERVER_TOKEN"] = saved
 
         self.assertTrue(result)
 
@@ -320,14 +331,13 @@ class TestEmailDelivery(unittest.TestCase):
     @pytest.mark.unit
     def test_email_config_validation(self):
         """이메일 설정 검증 테스트 - GitHub Actions 안전"""
-        from unittest.mock import patch
-
         from typer.testing import CliRunner
 
         from newsletter.cli import app
 
         # POSTMARK_SERVER_TOKEN이 없는 경우 테스트
-        with patch("newsletter.config.POSTMARK_SERVER_TOKEN", None):
+        saved = os.environ.pop("POSTMARK_SERVER_TOKEN", None)
+        try:
             runner = CliRunner()
             result = runner.invoke(
                 app, ["test-email", "--to", self.test_email, "--dry-run"]
@@ -337,6 +347,9 @@ class TestEmailDelivery(unittest.TestCase):
             # Rich 색상 태그나 이모지와 상관없이 핵심 메시지만 확인
             self.assertIn("POSTMARK_SERVER_TOKEN", result.stdout)
             self.assertIn("설정되지 않았습니다", result.stdout)
+        finally:
+            if saved is not None:
+                os.environ["POSTMARK_SERVER_TOKEN"] = saved
 
     @pytest.mark.unit
     def test_email_with_real_newsletter_file(self):
@@ -421,7 +434,7 @@ class TestEmailIntegration(unittest.TestCase):
             </div>
             <div class="content">
                 <p>이것은 Newsletter Generator의 실제 이메일 발송 기능을 테스트하는 자동화된 테스트입니다.</p>
-                <p><strong>테스트 시간:</strong> {os.environ.get('GENERATION_DATE', 'Unknown')} {os.environ.get('GENERATION_TIMESTAMP', 'Unknown')}</p>
+                <p><strong>테스트 시간:</strong> {os.environ.get('GENERATION_DATE', 'Unknown')}</p>
                 <p><strong>수신자:</strong> {test_recipient}</p>
                 <p>이 이메일을 받으셨다면 Postmark 통합이 정상적으로 작동하고 있습니다! ✅</p>
             </div>

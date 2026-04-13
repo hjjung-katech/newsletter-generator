@@ -11,8 +11,6 @@ from unittest.mock import MagicMock, patch
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from newsletter import config  # noqa: E402
-
 # 필요한 모듈 임포트
 from newsletter.tools import search_news_articles  # noqa: E402
 from newsletter_core.application.generation.collect import (  # noqa: E402
@@ -24,14 +22,14 @@ class TestNewsIntegrationEnhanced(unittest.TestCase):
     """도구와 수집 모듈 간의 통합 테스트 케이스"""
 
     def setUp(self):
-        self.original_serper_key = getattr(config, "SERPER_API_KEY", None)
-        config.SERPER_API_KEY = "dummy_test_key_news_integration"
+        self.original_serper_key = os.environ.get("SERPER_API_KEY")
+        os.environ["SERPER_API_KEY"] = "dummy_test_key_news_integration"
 
     def tearDown(self):
         if self.original_serper_key is not None:
-            config.SERPER_API_KEY = self.original_serper_key
-        elif hasattr(config, "SERPER_API_KEY"):
-            del config.SERPER_API_KEY
+            os.environ["SERPER_API_KEY"] = self.original_serper_key
+        else:
+            os.environ.pop("SERPER_API_KEY", None)
 
     @patch("newsletter.sources.NewsSourceManager.fetch_all_sources")
     @patch("newsletter.tools.requests.request")

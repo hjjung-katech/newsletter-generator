@@ -77,8 +77,8 @@ class TestCollect(unittest.TestCase):
         # 결과는 빈 목록
         self.assertEqual(result, [])
 
+    @patch.dict(os.environ, {"SERPER_API_KEY": "fake_api_key"})
     @patch("newsletter_core.application.generation.collect.requests.request")
-    @patch("newsletter.config.SERPER_API_KEY", "fake_api_key")  # SERPER_API_KEY 모의 처리
     def test_collect_articles_from_serper_success(self, mock_request):
         """레거시 Serper 전용 수집 함수 테스트"""
         mock_response = mock_request.return_value
@@ -119,8 +119,8 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(result[0]["url"], "http://example.com/article1")
         self.assertEqual(result[0]["content"], "This is a test snippet for article 1.")
 
+    @patch.dict(os.environ, {"SERPER_API_KEY": "fake_api_key"})
     @patch("newsletter_core.application.generation.collect.requests.request")
-    @patch("newsletter.config.SERPER_API_KEY", "fake_api_key")
     def test_collect_articles_from_serper_empty_keywords_string(self, mock_request):
         # Serper API가 빈 문자열에 대해 어떻게 반응하는지에 따라 mock_response 설정 필요
         mock_response = mock_request.return_value
@@ -131,8 +131,8 @@ class TestCollect(unittest.TestCase):
         mock_request.assert_called_once()
         self.assertEqual(result, [])
 
+    @patch.dict(os.environ, {"SERPER_API_KEY": "fake_api_key"})
     @patch("newsletter_core.application.generation.collect.requests.request")
-    @patch("newsletter.config.SERPER_API_KEY", "fake_api_key")
     def test_collect_articles_from_serper_search_error(self, mock_request):
         mock_request.side_effect = requests.exceptions.RequestException(
             "Search API Error"
@@ -144,13 +144,20 @@ class TestCollect(unittest.TestCase):
         self.assertEqual(result, [])
         mock_request.assert_called_once()  # 예외가 발생해도 호출은 시도됨
 
-    @patch("newsletter_core.application.generation.collect.requests.request")
-    @patch("newsletter.config.SERPER_API_KEY", None)  # API 키가 없는 경우
-    def test_collect_articles_from_serper_no_api_key(self, mock_request):
-        keywords_string = "test keyword"
-        result = collect_articles_from_serper(keywords_string)
-        self.assertEqual(result, [])
-        mock_request.assert_not_called()  # API 키가 없으면 requests.request가 호출되지 않아야 함
+    def test_collect_articles_from_serper_no_api_key(self):
+        # API 키가 없는 경우 — env var을 제거하고 테스트
+        saved = os.environ.pop("SERPER_API_KEY", None)
+        try:
+            with patch(
+                "newsletter_core.application.generation.collect.requests.request"
+            ) as mock_request:
+                keywords_string = "test keyword"
+                result = collect_articles_from_serper(keywords_string)
+                self.assertEqual(result, [])
+                mock_request.assert_not_called()  # API 키가 없으면 requests.request가 호출되지 않아야 함
+        finally:
+            if saved is not None:
+                os.environ["SERPER_API_KEY"] = saved
 
 
 if __name__ == "__main__":

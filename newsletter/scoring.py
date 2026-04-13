@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import re
@@ -11,11 +12,12 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage
 
-from . import config
+from newsletter_core.public.settings import get_major_news_sources
+
 from .chains import get_llm
 from .date_utils import parse_date_string
-from .utils.logger import get_logger
 from .utils.error_handling import handle_exception
+from .utils.logger import get_logger
 
 # Default weights for priority score calculation
 DEFAULT_WEIGHTS = {
@@ -49,13 +51,9 @@ def load_scoring_weights_from_config(
         logger.info("✅ 스코어링 가중치를 config_manager에서 로드했습니다.")
         return weights
     except ImportError:
-        logger.warning(
-            "config_manager를 가져올 수 없습니다. fallback 모드로 전환합니다."
-        )
+        logger.warning("config_manager를 가져올 수 없습니다. fallback 모드로 전환합니다.")
     except Exception as e:
-        logger.warning(
-            f"config_manager에서 가중치 로드 실패: {e}. fallback 모드로 전환합니다."
-        )
+        logger.warning(f"config_manager에서 가중치 로드 실패: {e}. fallback 모드로 전환합니다.")
 
     # 2순위: 직접 yaml 파일 읽기 (fallback)
     fallback_weights = {
@@ -85,9 +83,7 @@ def load_scoring_weights_from_config(
                     total = sum(weights.values())
 
                     if abs(total - 1.0) < 0.01:  # Allow small floating point errors
-                        logger.info(
-                            f"✅ 스코어링 가중치를 {config_file}에서 로드했습니다."
-                        )
+                        logger.info(f"✅ 스코어링 가중치를 {config_file}에서 로드했습니다.")
                         return weights
                     else:
                         logger.warning(
@@ -95,13 +91,9 @@ def load_scoring_weights_from_config(
                         )
                 else:
                     missing_keys = required_keys - config_keys
-                    logger.warning(
-                        f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다."
-                    )
+                    logger.warning(f"스코어링 가중치 키가 누락되었습니다: {missing_keys}. 기본값을 사용합니다.")
     except Exception as e:
-        logger.warning(
-            f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다."
-        )
+        logger.warning(f"스코어링 가중치를 {config_file}에서 로드할 수 없습니다: {e}. 기본값을 사용합니다.")
 
     logger.info("⚠️  기본 스코어링 가중치를 사용합니다.")
     return fallback_weights
@@ -118,18 +110,18 @@ Summary: {summary}
 
 def _get_source_tier(source: str) -> float:
     """Get source tier score and tier name for display."""
-    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier1"]):
+    if any(s.lower() in source.lower() for s in get_major_news_sources()["tier1"]):
         return 1.0
-    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier2"]):
+    if any(s.lower() in source.lower() for s in get_major_news_sources()["tier2"]):
         return 0.6  # 0.8 → 0.6으로 차이 확대
     return 0.3  # 0.6 → 0.3으로 차이 확대
 
 
 def _get_source_tier_info(source: str) -> tuple[float, str]:
     """Get source tier score and tier name for display."""
-    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier1"]):
+    if any(s.lower() in source.lower() for s in get_major_news_sources()["tier1"]):
         return 1.0, "Tier 1 (주요 언론사)"
-    if any(s.lower() in source.lower() for s in config.MAJOR_NEWS_SOURCES["tier2"]):
+    if any(s.lower() in source.lower() for s in get_major_news_sources()["tier2"]):
         return 0.6, "Tier 2 (보조 언론사)"
     return 0.3, "Tier 3 (기타 소스)"
 
@@ -271,9 +263,7 @@ def score_articles(
         avg_score = (
             sum(stats["scores"]) / len(stats["scores"]) if stats["scores"] else 0
         )
-        logger.info(
-            f"  • {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}"
-        )
+        logger.info(f"  • {tier_name}: {stats['count']}개 기사, 평균 점수: {avg_score:.1f}")
 
     if top_n is None:
         return scored_list

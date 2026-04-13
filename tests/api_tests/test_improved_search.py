@@ -10,8 +10,6 @@ from unittest.mock import MagicMock, patch
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from newsletter import config  # noqa: E402
-
 # 테스트할 모듈 임포트
 from newsletter.tools import search_news_articles  # noqa: E402
 
@@ -21,15 +19,15 @@ class TestImprovedSearch(unittest.TestCase):
 
     def setUp(self):
         """각 테스트 전에 SERPER_API_KEY를 임시로 설정합니다."""
-        self.original_serper_key = getattr(config, "SERPER_API_KEY", None)
-        config.SERPER_API_KEY = "dummy_test_key_improved_search"
+        self.original_serper_key = os.environ.get("SERPER_API_KEY")
+        os.environ["SERPER_API_KEY"] = "dummy_test_key_improved_search"
 
     def tearDown(self):
         """각 테스트 후에 SERPER_API_KEY를 원래대로 복원합니다."""
         if self.original_serper_key is not None:
-            config.SERPER_API_KEY = self.original_serper_key
-        elif hasattr(config, "SERPER_API_KEY"):
-            del config.SERPER_API_KEY  # 원래 키가 없었다면 삭제
+            os.environ["SERPER_API_KEY"] = self.original_serper_key
+        else:
+            os.environ.pop("SERPER_API_KEY", None)
 
     @patch("newsletter_core.infrastructure.tools_search_runtime.requests.request")
     def test_improved_search_functionality(self, mock_request):

@@ -5,14 +5,15 @@ LLM 제공자별 상세 테스트
 import os
 import sys
 import time
+from unittest.mock import patch
 
 import pytest
 
 # 모듈 경로 추가 (루트 디렉토리 기준)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from newsletter import config
-from newsletter.llm_factory import get_llm_for_task, llm_factory
+from newsletter.llm_factory import get_llm_for_task, llm_factory  # noqa: E402
+from newsletter_core.public.settings import get_llm_config  # noqa: E402
 
 # F-14: 중앙집중식 설정 시스템 import
 try:
@@ -136,9 +137,7 @@ class TestLLMProviders:
             successful_creations == total_tasks
         ), f"F-14: {successful_creations}/{total_tasks}개 작업만 성공"
 
-        print(
-            f"🎉 F-14: 모든 작업 LLM 생성 성공 ({successful_creations}/{total_tasks})"
-        )
+        print(f"🎉 F-14: 모든 작업 LLM 생성 성공 ({successful_creations}/{total_tasks})")
 
     def test_llm_response_quality(self):
         """각 LLM의 응답 품질을 테스트합니다."""
@@ -230,72 +229,62 @@ class TestLLMProviders:
         fallback_tasks = provider_distribution.get("LLMWithFallback", [])
         total_tasks = sum(len(tasks) for tasks in provider_distribution.values())
 
-        print(
-            f"✅ F-14: Fallback 메커니즘 사용 비율: {len(fallback_tasks)}/{total_tasks}"
-        )
+        print(f"✅ F-14: Fallback 메커니즘 사용 비율: {len(fallback_tasks)}/{total_tasks}")
         # F-14: 테스트 모드에서는 더 유연한 검증
         if CENTRALIZED_SETTINGS_AVAILABLE:
             settings = get_settings()
             if getattr(settings, "test_mode", False):
                 assert total_tasks > 0, "F-14: 최소한 하나의 작업이 처리되어야 합니다"
             else:
-                assert (
-                    len(fallback_tasks) > 0
-                ), "F-14: Fallback 메커니즘이 사용되지 않았습니다"
+                assert len(fallback_tasks) > 0, "F-14: Fallback 메커니즘이 사용되지 않았습니다"
         else:
-            assert (
-                len(fallback_tasks) > 0
-            ), "F-14: Fallback 메커니즘이 사용되지 않았습니다"
+            assert len(fallback_tasks) > 0, "F-14: Fallback 메커니즘이 사용되지 않았습니다"
 
     def test_fallback_mechanism_detailed(self):
         """상세한 Fallback 메커니즘 테스트"""
         print("\n=== 상세한 Fallback 메커니즘 테스트 ===")
 
-        # 원본 설정 백업
-        original_config = config.LLM_CONFIG.copy()
+        # 원본 설정 백업 (읽기 전용 — env-based settings는 복원 불필요)
+        original_config = get_llm_config().copy()
 
-        try:
-            # 잘못된 설정으로 테스트
-            test_scenarios = [
-                {
-                    "name": "존재하지 않는 제공자",
-                    "config": {
-                        "provider": "nonexistent_provider",
-                        "model": "nonexistent_model",
-                        "temperature": 0.5,
-                    },
+        # 잘못된 설정으로 테스트
+        test_scenarios = [
+            {
+                "name": "존재하지 않는 제공자",
+                "config": {
+                    "provider": "nonexistent_provider",
+                    "model": "nonexistent_model",
+                    "temperature": 0.5,
                 },
-                {
-                    "name": "잘못된 모델명",
-                    "config": {
-                        "provider": "gemini",
-                        "model": "nonexistent_gemini_model",
-                        "temperature": 0.5,
-                    },
+            },
+            {
+                "name": "잘못된 모델명",
+                "config": {
+                    "provider": "gemini",
+                    "model": "nonexistent_gemini_model",
+                    "temperature": 0.5,
                 },
-            ]
+            },
+        ]
 
-            for scenario in test_scenarios:
-                print(f"\n🧪 테스트 시나리오: {scenario['name']}")
+        for scenario in test_scenarios:
+            print(f"\n🧪 테스트 시나리오: {scenario['name']}")
 
-                # 임시 설정 적용
-                test_config = original_config.copy()
-                test_config["models"] = {"test_fallback_task": scenario["config"]}
-                config.LLM_CONFIG = test_config
+            # 임시 설정 적용
+            test_config = original_config.copy()
+            test_config["models"] = {"test_fallback_task": scenario["config"]}
 
+            with patch(
+                "newsletter_core.public.settings.get_llm_config",
+                return_value=test_config,
+            ):
                 try:
                     llm = get_llm_for_task("test_fallback_task")
-                    assert (
-                        llm is not None
-                    ), f"Fallback LLM이 생성되지 않음: {scenario['name']}"
+                    assert llm is not None, f"Fallback LLM이 생성되지 않음: {scenario['name']}"
                     print(f"✅ {scenario['name']}: {type(llm).__name__} Fallback 성공")
 
                 except Exception as e:
                     pytest.fail(f"Fallback 실패 - {scenario['name']}: {e}")
-
-        finally:
-            # 원본 설정 복원
-            config.LLM_CONFIG = original_config
 
     def test_performance_benchmarks(self):
         """성능 벤치마크 테스트"""
@@ -314,9 +303,7 @@ class TestLLMProviders:
                     "news_summarization": {"time": 2.5, "type": "LLMWithFallback"},
                     "html_generation": {"time": 3.1, "type": "LLMWithFallback"},
                 }
-                assert (
-                    len(performance_results) > 0
-                ), "F-14 테스트 모드 성능 결과 생성 성공"
+                assert len(performance_results) > 0, "F-14 테스트 모드 성능 결과 생성 성공"
                 return
 
         # 빠른 작업과 느린 작업 구분
@@ -335,7 +322,7 @@ class TestLLMProviders:
                     try:
                         llm = get_llm_for_task(task_id)
                         start_time = time.time()
-                        response = llm.invoke(test_prompt)
+                        response = llm.invoke(test_prompt)  # noqa: F841
                         response_time = time.time() - start_time
 
                         performance_results[task_id] = {
@@ -345,9 +332,7 @@ class TestLLMProviders:
                         }
                         group_times.append(response_time)
 
-                        print(
-                            f"✅ {task_id}: {response_time:.2f}초 ({task_group} 그룹)"
-                        )
+                        print(f"✅ {task_id}: {response_time:.2f}초 ({task_group} 그룹)")
 
                     except Exception as e:
                         print(f"❌ {task_id}: 성능 테스트 실패 - {e}")
@@ -400,9 +385,7 @@ def test_comprehensive_suite():
         total_tests = len(results)
 
         print(f"\n🎉 종합 테스트 결과: {passed_tests}/{total_tests} 통과")
-        assert (
-            passed_tests == total_tests
-        ), f"일부 테스트 실패: {passed_tests}/{total_tests}"
+        assert passed_tests == total_tests, f"일부 테스트 실패: {passed_tests}/{total_tests}"
 
     except Exception as e:
         error_msg = f"종합 테스트 실패: {e}"
