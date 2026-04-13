@@ -147,7 +147,6 @@ def verify_critical_modules() -> Dict[str, bool]:
         "sqlite3": False,
         # 뉴스레터 핵심 모듈들
         "newsletter": False,
-        "newsletter.collect": False,
         "newsletter.chains": False,
         "newsletter.llm_factory": False,
         # AI/LLM 모듈들
