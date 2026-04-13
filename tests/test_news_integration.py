@@ -11,11 +11,13 @@ from unittest.mock import MagicMock, patch
 # 프로젝트 루트 디렉토리를 sys.path에 추가
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from newsletter.sources import NewsSourceManager, SerperAPISource
+from newsletter.sources import NewsSourceManager, SerperAPISource  # noqa: E402
 
 # 테스트할 모듈 임포트
-from newsletter.tools import search_news_articles
-from newsletter_core.application.generation.collect import collect_articles
+from newsletter.tools import search_news_articles  # noqa: E402
+from newsletter_core.application.generation.collect import (  # noqa: E402
+    collect_articles,
+)
 
 
 class TestNewsIntegration(unittest.TestCase):
@@ -34,9 +36,7 @@ class TestNewsIntegration(unittest.TestCase):
 
         # 기본 검증
         self.assertIsNotNone(articles_from_tools, "tools.py의 검색 결과가 None입니다")
-        self.assertIsInstance(
-            articles_from_tools, list, "tools.py의 검색 결과가 리스트가 아닙니다"
-        )
+        self.assertIsInstance(articles_from_tools, list, "tools.py의 검색 결과가 리스트가 아닙니다")
 
         # collect_articles 함수에 전달할 데이터 준비
         # collect.py의 collect_articles 함수는 키워드 목록과 결과 수를 받습니다
@@ -49,9 +49,7 @@ class TestNewsIntegration(unittest.TestCase):
         )
 
         # 기본 검증
-        self.assertIsNotNone(
-            articles_from_collect, "collect.py의 검색 결과가 None입니다"
-        )
+        self.assertIsNotNone(articles_from_collect, "collect.py의 검색 결과가 None입니다")
         self.assertIsInstance(
             articles_from_collect, list, "collect.py의 검색 결과가 리스트가 아닙니다"
         )
@@ -99,9 +97,7 @@ class TestNewsIntegration(unittest.TestCase):
 
         # 검증
         self.assertEqual(len(articles), 1, "예상된 기사 수와 일치하지 않습니다")
-        self.assertEqual(
-            articles[0]["title"], "테스트 기사 제목", "기사 제목이 일치하지 않습니다"
-        )
+        self.assertEqual(articles[0]["title"], "테스트 기사 제목", "기사 제목이 일치하지 않습니다")
         self.assertEqual(
             articles[0]["url"],
             "https://example.com/article1",

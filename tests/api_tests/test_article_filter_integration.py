@@ -1,9 +1,7 @@
-import argparse  # Add import for argparse
 import os
 import sys
 import unittest
-from typing import Any, Dict, List
-from unittest.mock import MagicMock, PropertyMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,9 +10,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 # 필요한 모듈을 패치
 with patch.dict("sys.modules", {"langchain_google_genai": MagicMock()}):
-    from newsletter import article_filter, cli, config
-    from newsletter.sources import NewsSourceManager, SerperAPISource
-    from newsletter_core.application.generation import collect
+    from newsletter import article_filter, config  # noqa: E402
+    from newsletter.sources import NewsSourceManager  # noqa: E402
+    from newsletter_core.application.generation import collect  # noqa: E402
 
 
 class TestArticleFilterIntegration(unittest.TestCase):
@@ -201,17 +199,16 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch.object(
                 NewsSourceManager, "fetch_all_sources", return_value=duplicates
             ) as mock_fetch_all_sources,
-            patch("newsletter_core.application.generation.collect.console") as mock_collect_console,
-            patch("newsletter.article_filter.console") as mock_filter_console,
+            patch("newsletter_core.application.generation.collect.console"),
+            patch("newsletter.article_filter.console"),
         ):
-
             # Test with duplicate filtering enabled
             with patch.object(
                 article_filter,
                 "remove_duplicate_articles",
                 wraps=article_filter.remove_duplicate_articles,
             ) as wrapped_remove:
-                result = collect.collect_articles(
+                collect.collect_articles(
                     keywords="AI반도체",
                     filter_duplicates=True,
                     group_by_keywords=False,
@@ -226,7 +223,7 @@ class TestArticleFilterIntegration(unittest.TestCase):
             with patch.object(
                 article_filter, "remove_duplicate_articles"
             ) as mock_remove_disabled:
-                result_disabled = collect.collect_articles(
+                collect.collect_articles(
                     keywords="AI반도체",
                     filter_duplicates=False,
                     group_by_keywords=False,
@@ -357,10 +354,9 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch.object(
                 NewsSourceManager, "fetch_all_sources", return_value=mixed_sources
             ) as mock_fetch_all,
-            patch("newsletter_core.application.generation.collect.console") as mock_collect_console,
-            patch("newsletter.article_filter.console") as mock_filter_console,
+            patch("newsletter_core.application.generation.collect.console"),
+            patch("newsletter.article_filter.console"),
         ):
-
             # Test with major sources filtering enabled
             with (
                 patch.object(
@@ -374,7 +370,7 @@ class TestArticleFilterIntegration(unittest.TestCase):
                     return_value=mixed_sources,
                 ) as mock_domains_filter,
             ):
-                result_enabled = collect.collect_articles(
+                collect.collect_articles(
                     keywords="테스트",
                     filter_duplicates=False,
                     group_by_keywords=False,
@@ -427,8 +423,6 @@ class TestArticleFilterIntegration(unittest.TestCase):
         }
 
         # We'll skip running the actual function and just verify the mock was called correctly
-        from newsletter.cli import run
-
         # Mock the run function to avoid side effects
         with (
             patch("newsletter.cli.console"),
@@ -437,10 +431,6 @@ class TestArticleFilterIntegration(unittest.TestCase):
             patch("newsletter.cli.datetime"),
             patch("newsletter.cli.os"),
         ):
-
-            # Only construct the argument object but don't run
-            from newsletter import cli
-
             # Mock the CLI call with filtering options
             keywords = "AI반도체"
             filter_duplicates = True

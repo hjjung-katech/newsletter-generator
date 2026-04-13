@@ -55,9 +55,7 @@ def _insert_analytics_event(
                 None,
                 json.dumps(payload or {}),
                 created_at
-                or datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
+                or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             ),
         )
         conn.commit()
@@ -156,8 +154,10 @@ def test_compute_dedupe_stats_ignores_events_outside_window(
     ensure_database_schema(str(db_path))
 
     old_ts = (
-        datetime.now(timezone.utc) - timedelta(days=30)
-    ).isoformat().replace("+00:00", "Z")
+        (datetime.now(timezone.utc) - timedelta(days=30))
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
     _insert_analytics_event(
         str(db_path),
@@ -203,9 +203,7 @@ def test_compute_dedupe_stats_handles_malformed_payload(tmp_path: Path) -> None:
                 "email.deduplicated",
                 "job-broken",
                 "not-json",
-                datetime.now(timezone.utc)
-                .isoformat()
-                .replace("+00:00", "Z"),
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 1,
             ),
         )
@@ -261,9 +259,7 @@ def test_ops_dedupe_stats_clamps_query_arguments(tmp_path: Path) -> None:
 
     app = _build_app(str(db_path))
     with app.test_client() as client:
-        response = client.get(
-            "/api/ops/dedupe-stats?window_days=9999&top=9999"
-        )
+        response = client.get("/api/ops/dedupe-stats?window_days=9999&top=9999")
 
     assert response.status_code == 200
     payload = response.get_json()

@@ -17,13 +17,9 @@ from flask import Flask, jsonify, request
 from flask.typing import ResponseReturnValue
 
 try:
-    from db_state import (
-        DELIVERY_STATUS_SEND_FAILED,
-    )
+    from db_state import DELIVERY_STATUS_SEND_FAILED
 except ImportError:
-    from web.db_state import (  # pragma: no cover
-        DELIVERY_STATUS_SEND_FAILED,
-    )
+    from web.db_state import DELIVERY_STATUS_SEND_FAILED  # pragma: no cover
 
 try:
     from ops_logging import log_exception, log_info
@@ -72,9 +68,7 @@ def _error_summary(result_payload: dict[str, Any] | None) -> str | None:
     return None
 
 
-def _fetch_failed_history(
-    database_path: str, limit: int
-) -> list[dict[str, Any]]:
+def _fetch_failed_history(database_path: str, limit: int) -> list[dict[str, Any]]:
     conn = _connect(database_path)
     try:
         cursor = conn.cursor()
@@ -120,9 +114,7 @@ def _fetch_failed_history(
     return results
 
 
-def _fetch_failed_outbox(
-    database_path: str, limit: int
-) -> list[dict[str, Any]]:
+def _fetch_failed_outbox(database_path: str, limit: int) -> list[dict[str, Any]]:
     conn = _connect(database_path)
     try:
         cursor = conn.cursor()
@@ -169,18 +161,14 @@ def _count_outbox_by_status(database_path: str) -> dict[str, int]:
     conn = _connect(database_path)
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT status, COUNT(*) FROM email_outbox GROUP BY status"
-        )
+        cursor.execute("SELECT status, COUNT(*) FROM email_outbox GROUP BY status")
         rows = cursor.fetchall()
     finally:
         conn.close()
     return {str(row[0]): int(row[1]) for row in rows}
 
 
-def _reset_outbox_record_for_retry(
-    database_path: str, send_key: str
-) -> str:
+def _reset_outbox_record_for_retry(database_path: str, send_key: str) -> str:
     """Mark an outbox record as pending so the next send attempt will go through.
 
     Returns one of: ``"retry_queued"``, ``"not_found"``, ``"not_failed"``.
@@ -274,9 +262,7 @@ def register_failed_jobs_routes(app: Flask, database_path: str) -> None:
             return jsonify({"error": "outbox record not found"}), 404
         if outcome == "not_failed":
             return (
-                jsonify(
-                    {"error": "outbox record is not in failed state"}
-                ),
+                jsonify({"error": "outbox record is not in failed state"}),
                 409,
             )
 

@@ -102,6 +102,7 @@ def run(
     This command creates a newsletter by searching for recent news articles,
     processing them using AI, and optionally sending via email or saving to various formats.
     """
+    from newsletter_core.application.generation import deliver as news_deliver
     from newsletter_core.public.generation import (
         GenerateNewsletterRequest,
         NewsletterGenerationError,
@@ -109,8 +110,6 @@ def run(
     from newsletter_core.public.generation import (
         generate_newsletter as generate_newsletter_public,
     )
-
-    from newsletter_core.application.generation import deliver as news_deliver
 
     from . import tools
 
