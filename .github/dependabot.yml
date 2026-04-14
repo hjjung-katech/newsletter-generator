@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Weekly update PRs for langchain-family runtime dependencies.
+  # Upper bounds (<0.4.0 / <2.2.0) were added in PR #424 to block
+  # resolver-driven regressions; dependabot opens PRs to widen the
+  # allowed range on new minor releases so maintainers can review
+  # the jump rather than silently inherit it.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Seoul
+    labels:
+      - dependencies
+      - langchain
+    commit-message:
+      prefix: "chore(deps)"
+      include: scope
+    open-pull-requests-limit: 4
+    allow:
+      - dependency-name: langchain
+      - dependency-name: langchain-openai
+      - dependency-name: langchain-anthropic
+      - dependency-name: langchain-google-genai
