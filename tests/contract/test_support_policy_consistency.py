@@ -83,7 +83,7 @@ def test_workflow_count_docs_match_repository() -> None:
     workflow_files = sorted(
         path.name for path in (REPO_ROOT / ".github" / "workflows").glob("*.yml")
     )
-    assert len(workflow_files) == 7
+    assert len(workflow_files) == 8
 
     ci_guide = _read_text("docs/dev/CI_CD_GUIDE.md")
     ci_guide_match = re.search(r"현재 운영 워크플로우는 아래 (\d+)개입니다\.", ci_guide)

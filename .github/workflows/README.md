@@ -1,6 +1,6 @@
 # GitHub Actions Workflows
 
-이 디렉터리의 canonical 워크플로우는 아래 7개입니다.
+이 디렉터리의 canonical 워크플로우는 아래 8개입니다.
 
 ## Active Workflows (Canonical)
 
@@ -40,9 +40,13 @@
 - 목적: 머지된 PR 본문의 `RR: #<n>`를 기준으로 RR 이슈 자동 종료
 - 트리거: `pull_request` (`closed`, merged only)
 
+8. `shell-size-gate.yml`
+- 목적: freeze 모듈 5개 LOC/복잡도 측정 — soft-gate(항상 통과), PR comment + Step Summary 출력
+- 트리거: `pull_request` (main 대상)
+
 ## Policy
 
-- 위 7개만 운영 워크플로우로 유지합니다.
+- 위 8개만 운영 워크플로우로 유지합니다.
 - 중복/레거시 워크플로우 파일은 저장소에 두지 않습니다.
 - 변경 시 이 문서와 실제 파일 목록을 항상 1:1로 맞춥니다.
 - `main-ci.yml`은 PR gate와 long gate를 같이 담지만, contributor-facing canonical command는 `python -m scripts.devtools.dev_entrypoint ...`를 유지합니다.
@@ -76,3 +80,4 @@ ls .github/workflows
 - `ops-safety-monitor.yml`
 - `pr-policy-check.yml`
 - `rr-lifecycle-close.yml`
+- `shell-size-gate.yml`

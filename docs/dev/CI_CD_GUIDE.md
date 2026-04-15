@@ -7,7 +7,7 @@
 
 ## Active GitHub Actions Workflows
 
-현재 운영 워크플로우는 아래 7개입니다.
+현재 운영 워크플로우는 아래 8개입니다.
 
 1. `main-ci.yml`
 - 코드 품질, 테스트, 빌드 검증
@@ -38,6 +38,11 @@
 7. `rr-lifecycle-close.yml`
 - 머지된 PR 본문의 `RR: #<n>`를 기준으로 RR 이슈 자동 종료
 - PR closed(merged only) 이벤트에서 실행
+
+8. `shell-size-gate.yml`
+- freeze 모듈 5개의 LOC/복잡도 측정 — soft-gate(항상 통과)
+- PR comment + GitHub Step Summary 출력
+- PR 이벤트(`pull_request`, main 대상)에서 실행
 
 ## Current Verification Truth
 
