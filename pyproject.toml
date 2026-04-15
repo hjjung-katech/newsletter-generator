@@ -62,6 +62,9 @@ dev = [
     "detect-secrets>=1.4.0",
     "responses>=0.23.0",
 ]
+e2e = [
+    "playwright>=1.40.0",
+]
 security = [
     "detect-secrets>=1.4.0",
     "bandit>=1.7.0",

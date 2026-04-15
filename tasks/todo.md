@@ -25,3 +25,9 @@
 ## P1-B — newsletter_core.public mypy 활성화
 - [x] pyproject.toml: newsletter_core.public.* ignore_errors = false 전환
 - [x] newsletter_core/public/generation.py: 타입 annotation 2건 수정
+
+## P1-D — Playwright E2E 스모크 테스트 추가
+- [x] tests/e2e/conftest.py 신규 작성 (live_server + browser + page fixtures)
+- [x] tests/e2e/test_smoke.py 신규 작성 (GET /health, GET / 2개 스모크 테스트)
+- [x] .github/workflows/e2e-smoke.yml 신규 작성 (blocking CI gate)
+- [x] workflow count 업데이트 (8→9): README.md, CI_CD_GUIDE.md, contract test
