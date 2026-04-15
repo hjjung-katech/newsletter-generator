@@ -1,5 +1,10 @@
 # Tasks
 
+## TASK-C — requirements-e2e.txt + hygiene allowlist + E2E setup docs
+- [x] requirements-e2e.txt 신규 작성 (playwright>=1.40.0 pinned)
+- [x] scripts/repo_hygiene_policy.json: requirements-e2e.txt allowlist 추가
+- [x] docs/setup/LOCAL_SETUP.md: Section 14 "E2E 스모크 테스트 로컬 실행" 추가
+
 ## TASK-B — Register e2e-smoke as required status check + doc update
 - [x] GitHub branch protection: added `e2e-smoke` to main required checks (via gh API)
 - [x] .github/workflows/README.md: added `e2e-smoke` to required checks list
