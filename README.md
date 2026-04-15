@@ -8,14 +8,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy Guide (Railway)](https://img.shields.io/badge/deploy-Railway-0B0D0E?logo=railway)](docs/setup/RAILWAY_DEPLOYMENT.md)
 
-Automates turning raw project updates into structured newsletters, reducing maintainer communication overhead.
+Operator-facing workflow system for Korean news curation and newsletter delivery.
 
-Built for open-source maintainers, small teams, and internal technical communication workflows.
+Built for internal operators managing recurring newsletter generation, review, approval, and distribution workflows.
 
-- Turn raw notes into shareable newsletter drafts
-- Reduce time spent on release notes and recurring updates
-- Usable by non-engineers through a web-based workflow
-- Supports cross-platform use and email distribution
+- Collect news by keyword or domain and generate structured HTML newsletters
+- Preview, approve, and send through a web-based operator workflow
+- Schedule recurring runs with retry safety and execution history
+- Distribute via email with deduplication and outbox safety
 
 ## Quick Demo
 Static preview of the default `compact` output shape.
@@ -66,11 +66,11 @@ The production app renders HTML newsletters in `compact`, `detailed`, and `email
 - Communication automation for recurring community digests, stakeholder briefs, and team newsletters
 
 ## Features
-- Automatically summarize raw updates into structured, shareable newsletters
-- Generate clean newsletter drafts that are ready for community or internal distribution
-- Reduce time spent on release notes, status reporting, and recurring update summaries
-- Support email distribution for recurring communication workflows
-- Keep the workflow usable for non-engineers through a web-based, cross-platform experience
+- Collect news from Serper, RSS, and Naver sources by keyword or domain
+- Generate HTML newsletters via AI summarization (LangGraph + multi-LLM pipeline)
+- Preview, approve, and send through a web-based operator workflow
+- Schedule recurring runs with retry safety, deduplication, and execution history
+- Manage presets, source policies, and archive references from the web surface
 
 ## Example Output
 Example of a generated newsletter:
@@ -154,10 +154,12 @@ If the package is installed, the CLI entrypoint is also available as:
 newsletter run --keywords "open source, maintainer tooling"
 ```
 
-## Roadmap
-- GitHub integration for pulling updates directly from repositories
-- Pull request and issue summaries for recurring maintainer digests
-- Release note generation for changelogs and stakeholder updates
+## Current Priorities
+- Maintain stable generate/preview/send/history/schedule flows in the web surface (G1)
+- Keep schedule, approval, preset, and source policy workflows regression-free (G2)
+- Maintain shared core contract across CLI, scheduler, and web via `newsletter_core.public` (G3)
+- Hold legacy runtime surface in maintenance mode — no structural reopening without explicit trigger (G4)
+- Keep operational contracts, support policy, and documentation aligned to the same production reality (G5)
 
 ## Project Docs
 | Purpose | Reference |
