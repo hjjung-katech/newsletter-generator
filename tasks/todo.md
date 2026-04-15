@@ -17,3 +17,7 @@
 ## P1-A — .env.example 가독성 개선
 - [x] .env.example 기능별 블록 헤더 추가 및 Required/Optional 인라인 주석 추가
 - [x] docs/reference/environment-variables.md 섹션명 정렬 및 SERPER_API_KEY 필수 여부 수정
+
+## P1-C — shell size soft-gate CI job
+- [x] scripts/measure_module_size.py 신규 작성 (freeze 모듈 5개 LOC/complexity 측정)
+- [x] .github/workflows/shell-size-gate.yml 신규 작성 (PR comment + Step Summary)
