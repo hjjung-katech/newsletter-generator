@@ -143,3 +143,45 @@ PR #448 (chore/p1-c-shell-size-soft-gate), 2026-04-15
 
 ### 적용 범위
 모든 커밋 타입 선택 시 적용. CI 관련 변경(워크플로우, 스크립트)은 chore 사용.
+
+## LESSON-005: CI mypy 는 --follow-imports=skip 모드로 실행되어 local 과 동작 차이 발생
+
+### 발생 시점
+PR #450 (chore/p1-b-mypy-public-enable), 2026-04-15
+
+### 무슨 일이 있었나
+- local `mypy newsletter_core/public/` → 0 errors
+- CI `mypy --ignore-missing-imports --follow-imports=skip <file>` → 2 errors
+  - `[untyped-decorator]`: `@tool` decorator (langchain)가 skip 모드에서 Any 처리
+  - `[no-any-return]`: 같은 패키지 내 함수의 반환 타입이 skip으로 Any 처리
+- `# type: ignore` 방식은 `warn_unused_ignores = true` 충돌
+  (로컬에서는 ignore가 unused, CI에서는 used → 서로 다른 환경에서 반대 에러)
+
+### 근본 원인
+- CI mypy가 파일별로 `--follow-imports=skip` 실행 (main-ci.yml 참조)
+- skip 모드에서는 같은 패키지 내 모듈 import도 `Any`로 처리
+- `warn_unused_ignores = true`와 조합 시 inline `# type: ignore` 방식은 환경간 충돌
+
+### 올바른 지시 패턴
+CI mypy 동작을 local에서 재현한 후 수정:
+
+  # CI mypy 재현
+  python -m mypy --ignore-missing-imports --follow-imports=skip <파일>
+
+  # 수정 방법 (우선순위):
+  # 1. 타입이 명시된 중간 변수로 반환 타입 확정 (# type: ignore 불필요)
+  filtered: List[Dict[str, Any]] = some_func(args)
+  return filtered
+
+  # 2. pyproject.toml override 로 특정 check 비활성화 (모듈 전체 억제)
+  # [[tool.mypy.overrides]]
+  # module = ["newsletter_core.public.*"]
+  # disallow_untyped_decorators = false  # @tool 등 외부 라이브러리 데코레이터
+
+  # 피해야 할 패턴:
+  return some_func(args)  # type: ignore[no-any-return]
+  # → local에서 unused ignore 에러 발생
+
+### 적용 범위
+CI mypy 오류 수정 시 항상 `--follow-imports=skip` 모드 재현 후 수정.
+inline # type: ignore 대신 중간 변수 또는 pyproject.toml override 우선 사용.
