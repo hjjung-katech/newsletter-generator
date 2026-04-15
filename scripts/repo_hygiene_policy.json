@@ -39,6 +39,7 @@
       "newsletter",
       "newsletter_core",
       "scripts",
+      "tasks",
       "tests",
       "web"
     ],
