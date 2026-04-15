@@ -123,11 +123,12 @@ def _build_filtered_search_tool(
         articles = original_search_tool.invoke(
             {"keywords": keywords, "num_results": num_results}
         )
-        return filter_articles_by_source_policies(
+        filtered: List[Dict[str, Any]] = filter_articles_by_source_policies(
             articles,
             allowlist=allowlist or [],
             blocklist=blocklist or [],
         )
+        return filtered
 
     return filtered_search_news_articles
 

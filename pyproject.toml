@@ -173,8 +173,12 @@ ignore_errors = true
 # newsletter_core.public.* is the stable typed API surface.
 # This override takes precedence over the broader newsletter_core.*
 # suppression above (mypy applies the last matching pattern).
+# disallow_untyped_decorators = false: langchain's @tool decorator lacks
+# complete stubs in CI (--follow-imports=skip mode), so we relax this
+# check for the public facade layer rather than suppressing per-line.
 module = ["newsletter_core.public", "newsletter_core.public.*"]
 ignore_errors = false
+disallow_untyped_decorators = false
 
 [tool.coverage.run]
 source = ["newsletter", "newsletter_core", "web"]
