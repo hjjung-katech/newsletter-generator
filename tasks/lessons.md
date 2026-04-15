@@ -112,3 +112,34 @@ PR 계획 단계 (2026-04-15, Step 6 pre-write checklist 항목으로 식별)
 
 ### 적용 범위
 newsletter_core/, newsletter/, web/ 하위 모든 신규 디렉토리 추가 시 필수.
+
+## LESSON-004: ci 커밋 타입은 허용 목록에 없다 — chore 를 사용한다
+
+### 발생 시점
+PR #448 (chore/p1-c-shell-size-soft-gate), 2026-04-15
+
+### 무슨 일이 있었나
+- GitHub Actions 워크플로우 파일 추가 커밋에 `ci(size-gate):` 타입 사용
+- pr-policy-check.yml 이 허용 커밋 타입을 `feat|fix|chore|docs|refactor|release|codex` 로
+  제한하며, ci 는 이 목록에 포함되지 않음
+- 결과: policy-check CI gate 실패 → 커밋을 `chore(size-gate):` 로 amend 후 force-push
+
+### 근본 원인
+- CLAUDE.md Workflow Contract 에 허용 타입 목록이 명시되어 있으나
+  커밋 작성 전 확인하지 않음
+- ci 는 Conventional Commits 표준에는 존재하지만 이 저장소 정책에서는 금지
+
+### 올바른 지시 패턴
+커밋 작성 전 항상 허용 타입 목록 확인:
+
+  # 허용 목록 (CLAUDE.md Workflow Contract / pr-policy-check.yml)
+  feat | fix | chore | docs | refactor | release | codex
+
+  # 나쁜 예
+  ci(size-gate): add freeze module size gate workflow
+
+  # 좋은 예
+  chore(size-gate): add freeze module size gate workflow
+
+### 적용 범위
+모든 커밋 타입 선택 시 적용. CI 관련 변경(워크플로우, 스크립트)은 chore 사용.

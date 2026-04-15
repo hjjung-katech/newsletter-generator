@@ -112,7 +112,7 @@ def _resolve_keywords(request: GenerateNewsletterRequest) -> List[str]:
 def _build_filtered_search_tool(
     allowlist: List[str] | None,
     blocklist: List[str] | None,
-):
+) -> Any:
     original_search_tool = tools.search_news_articles
 
     @tool
@@ -203,7 +203,7 @@ def generate_newsletter(request: GenerateNewsletterRequest) -> NewsletterResult:
 
 def suggest_keywords(domain: str, count: int = 10) -> List[str]:
     """Suggest keywords for a domain via stable public facade."""
-    return tools.generate_keywords_with_gemini(domain, count=count)
+    return tools.generate_keywords_with_gemini(domain, count=count)  # type: ignore[no-any-return]
 
 
 __all__ = [
