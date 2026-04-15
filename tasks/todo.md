@@ -1,5 +1,10 @@
 # Tasks
 
+## TASK-B — Register e2e-smoke as required status check + doc update
+- [x] GitHub branch protection: added `e2e-smoke` to main required checks (via gh API)
+- [x] .github/workflows/README.md: added `e2e-smoke` to required checks list
+- [x] docs/dev/CI_CD_GUIDE.md: updated count 12→13, added `e2e-smoke` to PR gate list
+
 ## TASK-A — Pre-existing failing tests: add explicit skip markers
 - [x] tests/api_tests/test_article_filter_integration.py::test_cli_integration — skip (news_summarize removed)
 - [x] tests/unit_tests/test_llm.py::TestLLMSystem::test_api_keys_configuration — skip (requires GEMINI_API_KEY)
