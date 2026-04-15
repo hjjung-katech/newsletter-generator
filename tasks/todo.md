@@ -21,3 +21,7 @@
 ## P1-C — shell size soft-gate CI job
 - [x] scripts/measure_module_size.py 신규 작성 (freeze 모듈 5개 LOC/complexity 측정)
 - [x] .github/workflows/shell-size-gate.yml 신규 작성 (PR comment + Step Summary)
+
+## P1-B — newsletter_core.public mypy 활성화
+- [x] pyproject.toml: newsletter_core.public.* ignore_errors = false 전환
+- [x] newsletter_core/public/generation.py: 타입 annotation 2건 수정
