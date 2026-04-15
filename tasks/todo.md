@@ -13,6 +13,8 @@
 ## Lessons 정비
 - [x] tasks/lessons.md 에 LESSON-002 (test/ prefix 불허) 추가
 - [x] tasks/lessons.md 에 LESSON-003 (__init__.py 필수) 추가
+- [x] tasks/lessons.md 에 LESSON-006 (playwright 단독 사용) 추가
+- [x] tasks/lessons.md 에 LESSON-007 (CI requirements.txt 방식) 추가
 
 ## P1-A — .env.example 가독성 개선
 - [x] .env.example 기능별 블록 헤더 추가 및 Required/Optional 인라인 주석 추가
