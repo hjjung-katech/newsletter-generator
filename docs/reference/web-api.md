@@ -80,6 +80,12 @@ source runtime contract와 API 예제의 기준 포트는 `8000`입니다.
 ### `POST /api/schedule/<schedule_id>/run`
 스케줄 즉시 실행.
 
+응답:
+- `200`: `{ "job_id": "...", "status": "queued|completed", "idempotency_key": "..." }`
+- `400`: 스케줄 비활성화 상태
+- `404`: 스케줄 없음
+- `500`: 실행 실패
+
 ### `GET /api/newsletter-html/<job_id>`
 완료된 작업의 HTML 본문 직접 반환 (`text/html`).
 
