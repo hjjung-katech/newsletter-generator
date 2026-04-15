@@ -11,6 +11,20 @@ on:
         required: false
         type: boolean
         default: true
+  pull_request:
+    paths:
+      - '**.py'
+      - 'requirements*.txt'
+      - 'pyproject.toml'
+      - 'Dockerfile'
+      - '.github/workflows/security-scan.yml'
+      - '.secrets.baseline'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: read
 
 jobs:
   detect-secrets:
@@ -20,31 +34,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 전체 히스토리 필요
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
       - name: Install detect-secrets
         run: |
+          python -m pip install --upgrade pip
           pip install detect-secrets
 
-      - name: Run detect-secrets scan
+      - name: Run detect-secrets against baseline
         run: |
-          detect-secrets scan > .secrets.new
-          if [ -f .secrets.baseline ]; then
-            diff .secrets.baseline .secrets.new || true
-            mv .secrets.new .secrets.baseline
-          else
-            mv .secrets.new .secrets.baseline
+          if [ ! -f .secrets.baseline ]; then
+            echo "::error::.secrets.baseline missing — run 'detect-secrets scan > .secrets.baseline' and commit."
+            exit 1
+          fi
+          # Snapshot results (excluding volatile generated_at) before scan
+          jq 'del(.generated_at)' .secrets.baseline > /tmp/baseline.before.json
+          # Update baseline in-place (merges new findings while preserving audit labels)
+          detect-secrets scan --baseline .secrets.baseline
+          jq 'del(.generated_at)' .secrets.baseline > /tmp/baseline.after.json
+          # Fail if substantive content changed — new unaudited secrets were detected
+          if ! diff -q /tmp/baseline.before.json /tmp/baseline.after.json > /dev/null; then
+            echo "::error::New secrets detected. Review diff, audit via 'detect-secrets audit .secrets.baseline', then commit the updated baseline."
+            diff -u /tmp/baseline.before.json /tmp/baseline.after.json || true
+            exit 1
           fi
 
       - name: Upload scan results
@@ -62,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -71,13 +88,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          pip install safety
 
-      - name: Run Bandit security scan
+      - name: Run Bandit security scan (high severity / high confidence only)
         run: |
-          bandit -r newsletter/ -f json -o bandit-report.json --skip B104,B110,B404,B603 || true
-          bandit -r newsletter/ -f txt --skip B104,B110,B404,B603 || true
+          bandit -r newsletter/ newsletter_core/ web/ \
+            -f json -o bandit-report.json \
+            --severity-level high --confidence-level high \
+            --skip B104,B110,B404,B603 || BANDIT_EXIT=$?
+          bandit -r newsletter/ newsletter_core/ web/ \
+            -f txt \
+            --severity-level high --confidence-level high \
+            --skip B104,B110,B404,B603 || true
+          exit ${BANDIT_EXIT:-0}
 
-      - name: Run Safety check
+      - name: Run Safety check (advisory)
         run: |
           safety check --json --output safety-report.json || true
           safety check || true
@@ -110,9 +135,10 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-fs-results.sarif'
+          category: trivy-fs
 
       - name: Run Trivy vulnerability scanner (table output)
         uses: aquasecurity/trivy-action@master
@@ -145,9 +171,10 @@ jobs:
 
       - name: Upload Trivy Docker scan results
         if: always()
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-docker-results.sarif'
+          category: trivy-docker
 
       - name: Run Trivy Docker scan (table output)
         uses: aquasecurity/trivy-action@master
@@ -165,7 +192,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Dependency Review
-        uses: actions/dependency-review-action@v3
+        uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
 
@@ -184,10 +211,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "## Scan Results:" >> $GITHUB_STEP_SUMMARY
           echo "- **Secret Detection**: ${{ needs.detect-secrets.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Python Security**: ${{ needs.bandit-security.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Filesystem Scan**: ${{ needs.trivy-fs-scan.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Security (Bandit)**: ${{ needs.bandit-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Filesystem Scan (Trivy)**: ${{ needs.trivy-fs-scan.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## 🛡️ F-14 Centralized Settings Security Features:" >> $GITHUB_STEP_SUMMARY
+          echo "## 🛡️ Centralized Settings Security Features:" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ SecretStr type for sensitive data" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Automatic secret masking in logs" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Environment variable validation" >> $GITHUB_STEP_SUMMARY
@@ -195,6 +222,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
 
           if [ -f security-reports/bandit-report.json ]; then
-            echo "## Bandit Issues Found:" >> $GITHUB_STEP_SUMMARY
-            jq -r '.results[] | "- **\(.issue_severity)**: \(.issue_text) (\(.filename):\(.line_number))"' security-reports/bandit-report.json >> $GITHUB_STEP_SUMMARY || true
+            echo "## Bandit Issues (HIGH severity / HIGH confidence):" >> $GITHUB_STEP_SUMMARY
+            jq -r '.results[] | "- **\(.issue_severity)**: \(.issue_text) (\(.filename):\(.line_number))"' security-reports/bandit-report.json >> $GITHUB_STEP_SUMMARY || echo "_No issues found or report unreadable._" >> $GITHUB_STEP_SUMMARY
           fi
