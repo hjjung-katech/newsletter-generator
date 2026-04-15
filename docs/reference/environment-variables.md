@@ -13,7 +13,7 @@
 
 ## Canonical Runtime Contract
 
-### Core Runtime / Web Ops
+### App Environment, Server & Web / Ops
 
 | 변수 | 필수 여부 | 용도 |
 |---|---|---|
@@ -25,7 +25,7 @@
 | `PORT` | 배포 시 선택 | canonical source runtime 웹 포트 (`.env.example` 기준 `8000`, Windows EXE packaging entrypoint는 현재 compatibility default `5000`) |
 | `LOG_LEVEL` | 선택 | runtime/application log level |
 | `LOG_FORMAT` | 선택 | logging format (`standard`/`json`) |
-| `SECRET_KEY` | 프로덕션 권장(웹) | Flask 시크릿 키 |
+| `SECRET_KEY` | 프로덕션 필수(웹) | Flask 시크릿 키 |
 | `ADMIN_API_TOKEN` | 민감 운영 API 보호 시 필수 | 모든 스코프(data·schedule·email·ops)를 허용하는 root 토큰. 기존 단일 토큰 방식과 완전히 하위호환. |
 | `ADMIN_API_TOKEN_DATA` | 선택 | `data` 스코프 전용 토큰 — `/api/history`, `/api/analytics`, `/api/archive`, `/api/presets`, `/api/approvals`, `/api/source-policies` |
 | `ADMIN_API_TOKEN_SCHEDULE` | 선택 | `schedule` 스코프 전용 토큰 — `/api/schedule*`, `/api/schedules*` |
@@ -33,11 +33,11 @@
 | `ADMIN_API_TOKEN_OPS` | 선택 | `ops` 스코프 전용 토큰 — `/api/ops/*` |
 | `ALLOWED_ORIGINS` | 선택 | canonical Flask runtime CORS allow-list |
 
-### Search / LLM / Delivery
+### Search / LLM / Email / Delivery
 
 | 변수 | 필수 여부 | 용도 |
 |---|---|---|
-| `SERPER_API_KEY` | 생성 기능 필수 | 뉴스 검색 API |
+| `SERPER_API_KEY` | Serper 사용 시 필수 | Serper 뉴스 검색 API (F-14: Optional로 변경됨) |
 | `GEMINI_API_KEY` | LLM 중 하나 필수 | Gemini 제공자 |
 | `OPENAI_API_KEY` | LLM 중 하나 필수 | OpenAI 제공자 |
 | `ANTHROPIC_API_KEY` | LLM 중 하나 필수 | Anthropic 제공자 |
@@ -49,7 +49,7 @@
 | `NAVER_CLIENT_ID` | 네이버 API 사용 시 선택 | Naver client id |
 | `NAVER_CLIENT_SECRET` | 네이버 API 사용 시 선택 | Naver client secret |
 
-### Optional Integrations / Observability / Test
+### Observability, Persistence & Test
 
 | 변수 | 필수 여부 | 용도 |
 |---|---|---|

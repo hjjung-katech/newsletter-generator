@@ -13,3 +13,7 @@
 ## Lessons 정비
 - [x] tasks/lessons.md 에 LESSON-002 (test/ prefix 불허) 추가
 - [x] tasks/lessons.md 에 LESSON-003 (__init__.py 필수) 추가
+
+## P1-A — .env.example 가독성 개선
+- [x] .env.example 기능별 블록 헤더 추가 및 Required/Optional 인라인 주석 추가
+- [x] docs/reference/environment-variables.md 섹션명 정렬 및 SERPER_API_KEY 필수 여부 수정
