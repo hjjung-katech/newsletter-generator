@@ -7,7 +7,7 @@
 
 ## Active GitHub Actions Workflows
 
-현재 운영 워크플로우는 아래 8개입니다.
+현재 운영 워크플로우는 아래 9개입니다.
 
 1. `main-ci.yml`
 - 코드 품질, 테스트, 빌드 검증
@@ -42,6 +42,10 @@
 8. `shell-size-gate.yml`
 - freeze 모듈 5개의 LOC/복잡도 측정 — soft-gate(항상 통과)
 - PR comment + GitHub Step Summary 출력
+- PR 이벤트(`pull_request`, main 대상)에서 실행
+
+9. `e2e-smoke.yml`
+- 핵심 흐름 2개 (GET /health, GET /) Playwright E2E 스모크 테스트 — blocking CI gate
 - PR 이벤트(`pull_request`, main 대상)에서 실행
 
 ## Current Verification Truth
