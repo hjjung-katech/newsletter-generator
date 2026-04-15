@@ -185,3 +185,68 @@ CI mypy 동작을 local에서 재현한 후 수정:
 ### 적용 범위
 CI mypy 오류 수정 시 항상 `--follow-imports=skip` 모드 재현 후 수정.
 inline # type: ignore 대신 중간 변수 또는 pyproject.toml override 우선 사용.
+
+## LESSON-006: pytest-playwright 대신 playwright 단독 사용 — pytest-base-url scope 충돌 회피
+
+### 발생 시점
+PR #454 (chore/p1-d-e2e-playwright-smoke), 2026-04-15
+
+### 무슨 일이 있었나
+- `pytest-playwright` 설치 시 `pytest-base-url`이 자동 설치됨
+- `pytest-base-url`이 session-scoped `_verify_url` autouse fixture를 등록,
+  이 fixture가 `base_url`을 요청
+- `tests/conftest.py`의 `base_url`이 function-scoped이므로 ScopeMismatch 발생
+- 기존 테스트 전체에 영향 (e2e 외 테스트도 실패)
+
+### 근본 원인
+- `pytest-playwright`의 transitive 의존성인 `pytest-base-url`이 global autouse fixture를 등록
+- 기존 `base_url` fixture (function scope)와 충돌
+
+### 올바른 지시 패턴
+`pytest-playwright` 대신 `playwright` 단독 패키지를 사용하고
+`browser`, `page` fixture를 `tests/e2e/conftest.py`에 직접 구현:
+
+  # 나쁜 예
+  # pyproject.toml: pytest-playwright>=0.4.0
+  # tests/e2e/test_smoke.py: from playwright.sync_api import Page  # pytest-playwright가 제공
+
+  # 좋은 예
+  # pyproject.toml: playwright>=1.40.0 (e2e extras group)
+  # tests/e2e/conftest.py: browser/page fixture 직접 구현
+  @pytest.fixture(scope="session")
+  def browser():
+      with sync_playwright() as pw:
+          yield pw.chromium.launch(headless=True, args=["--no-sandbox"])
+
+### 적용 범위
+Playwright E2E 테스트 추가 시 항상 `playwright` 단독 사용.
+`pytest-playwright` 사용 시 반드시 tests/conftest.py의 base_url scope 충돌 여부 사전 확인.
+
+## LESSON-007: e2e CI job은 requirements.txt 설치 방식 사용 — pyproject.toml extras 불충분
+
+### 발생 시점
+PR #454 (chore/p1-d-e2e-playwright-smoke), 2026-04-15
+
+### 무슨 일이 있었나
+- `pip install -e ".[dev,e2e]"` 로 설치 시 `flask-cors` 누락
+- `flask-cors`는 `requirements.txt`에만 존재하고 `pyproject.toml` 의존성에 없음
+- e2e-smoke CI에서 `ModuleNotFoundError: No module named 'flask_cors'` 발생
+
+### 근본 원인
+- 이 저장소는 `requirements.txt` + `requirements-dev.txt` 방식과
+  `pyproject.toml` 방식이 동시에 존재 (혼용 구조)
+- web runtime 의존성(`flask-cors` 등)은 `requirements.txt`에만 있음
+
+### 올바른 지시 패턴
+이 저장소의 CI job은 `pip install -r requirements.txt` + `pip install -r requirements-dev.txt` 방식을 사용:
+
+  # 나쁜 예
+  pip install -e ".[dev,e2e]"  # flask-cors 등 web runtime 의존성 누락
+
+  # 좋은 예 (main-ci.yml 동일 패턴)
+  pip install -r requirements.txt
+  pip install -r requirements-dev.txt
+  pip install playwright  # e2e 전용 추가 패키지
+
+### 적용 범위
+이 저장소에서 새 CI job 추가 시 의존성 설치는 반드시 main-ci.yml 방식을 참조.
