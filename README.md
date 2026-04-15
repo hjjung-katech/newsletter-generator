@@ -51,7 +51,7 @@ Updates that reduce repetitive maintainer coordination work.
 - **Idempotency key:** A stable request identifier used to prevent duplicate jobs or duplicate email sends.
 
 ## 💡 Things to Watch
-> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+> Operators managing recurring digests can reduce review time by refining keyword sets and source policies as coverage patterns stabilize.
 ```
 
 ## Overview
@@ -60,7 +60,7 @@ Maintainers and teams spend significant time summarizing updates and rewriting i
 The production app renders HTML newsletters in `compact`, `detailed`, and `email_compatible` styles. This README keeps a static English preview of the default `compact` structure so first-time visitors can understand the real layout quickly; the shipped production templates in this repository are currently Korean-oriented. This repository also keeps the operational guidance that matters for real use: support policy, environment-variable contracts, local setup, deployment references, and verification gates.
 
 ## Use Cases
-- Open-source maintainers sending weekly or monthly project updates to contributors and users
+- Operators managing recurring keyword-based newsletter generation, review, and distribution
 - Small teams sharing cross-functional progress without asking engineers to hand-write summaries
 - Internal teams sharing domain-specific technical updates across product, platform, and operations groups
 - Communication automation for recurring community digests, stakeholder briefs, and team newsletters
@@ -109,7 +109,7 @@ Improvements that make updates easier to consume across community and internal a
 - **Docs gate:** An automated check that verifies documentation links, required references, and policy consistency.
 
 ## 💡 Things to Watch
-> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+> Operators managing recurring digests can reduce review time by refining keyword sets and source policies as coverage patterns stabilize.
 
 _Generated as an English compact preview of the production newsletter template._
 ```
