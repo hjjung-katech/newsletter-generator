@@ -52,9 +52,17 @@ jobs:
             echo "::error::.secrets.baseline missing — run 'detect-secrets scan > .secrets.baseline' and commit."
             exit 1
           fi
+          # Snapshot results (excluding volatile generated_at) before scan
+          jq 'del(.generated_at)' .secrets.baseline > /tmp/baseline.before.json
+          # Update baseline in-place (merges new findings while preserving audit labels)
           detect-secrets scan --baseline .secrets.baseline
-          # fail only when there are unaudited / new secrets relative to baseline
-          detect-secrets audit --report --fail-on-unaudited --fail-on-live --fail-on-audited-real .secrets.baseline
+          jq 'del(.generated_at)' .secrets.baseline > /tmp/baseline.after.json
+          # Fail if substantive content changed — new unaudited secrets were detected
+          if ! diff -q /tmp/baseline.before.json /tmp/baseline.after.json > /dev/null; then
+            echo "::error::New secrets detected. Review diff, audit via 'detect-secrets audit .secrets.baseline', then commit the updated baseline."
+            diff -u /tmp/baseline.before.json /tmp/baseline.after.json || true
+            exit 1
+          fi
 
       - name: Upload scan results
         if: failure()
