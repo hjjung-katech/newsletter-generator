@@ -1,0 +1,5 @@
+# E2E test dependencies
+# Mirrors pyproject.toml [project.optional-dependencies] e2e group
+# Install: pip install -r requirements-e2e.txt
+# Then: python -m playwright install chromium --with-deps
+playwright>=1.40.0

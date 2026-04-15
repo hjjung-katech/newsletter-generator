@@ -354,6 +354,29 @@ redis-server
 PORT=8001 python -m scripts.devtools.dev_entrypoint run web
 ```
 
+## 14. E2E 스모크 테스트 로컬 실행
+
+E2E 스모크 테스트는 Playwright를 사용하여 웹 서버의 핵심 흐름(GET /health, GET /)을 검증합니다.
+CI에서는 `e2e-smoke` job이 `main` branch protection required check로 등록되어 있습니다.
+
+### 의존성 설치
+
+```bash
+pip install -r requirements-e2e.txt
+python -m playwright install chromium --with-deps
+```
+
+### 실행
+
+```bash
+pytest tests/e2e/test_smoke.py -v
+```
+
+**참고**: `pytest-playwright`가 아닌 `playwright` 단독 패키지를 사용합니다.
+`tests/e2e/conftest.py`에 `browser`/`page` fixture가 직접 구현되어 있으며,
+`pytest-playwright`의 transitive 의존성인 `pytest-base-url`이 기존 `base_url` fixture와 충돌하기 때문입니다.
+자세한 내용은 `tasks/lessons.md` LESSON-006을 참조하세요.
+
 ## 추가 팁
 
 ### 개발 중 자동 재로드

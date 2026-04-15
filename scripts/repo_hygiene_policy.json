@@ -23,6 +23,7 @@
       "pyproject.toml",
       "railway.yml",
       "requirements-dev.txt",
+      "requirements-e2e.txt",
       "requirements-lock.txt",
       "requirements.txt",
       "run_ci_checks.py",
