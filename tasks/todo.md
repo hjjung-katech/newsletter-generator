@@ -1,5 +1,17 @@
 # Tasks
 
+## TASK-A — Pre-existing failing tests: add explicit skip markers
+- [x] tests/api_tests/test_article_filter_integration.py::test_cli_integration — skip (news_summarize removed)
+- [x] tests/unit_tests/test_llm.py::TestLLMSystem::test_api_keys_configuration — skip (requires GEMINI_API_KEY)
+- [x] tests/unit_tests/test_llm.py::TestLLMSystem::test_provider_availability — skip (requires API keys)
+- [x] tests/unit_tests/test_llm.py::TestLLMSystem::test_llm_instance_creation — skip (requires API keys)
+- [x] tests/unit_tests/test_llm.py::TestLLMSystem::test_fallback_mechanism — skip (requires API keys)
+- [x] tests/unit_tests/test_llm_providers.py::TestLLMProviders::test_all_task_llm_creation — skip (requires API keys)
+- [x] tests/unit_tests/test_llm_providers.py::TestLLMProviders::test_provider_distribution — skip (requires API keys)
+- [x] tests/unit_tests/test_llm_providers.py::TestLLMProviders::test_fallback_mechanism_detailed — skip (requires API keys)
+- [x] tests/contract/test_dev_entrypoint_consistency.py::test_active_docs_point_to_python_entrypoint_and_avoid_fixed_clone_paths — skip ("thin wrapper" missing from README)
+- 제약: 소스 코드 수정 없음, 테스트 파일만 수정
+
 ## Prompt C — generation contract 테스트
 - [x] tests/contract/test_generation_routes_contract.py 신규 작성
 - 대상 경로 4개:
