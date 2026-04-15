@@ -52,3 +52,63 @@ PR #434 (docs/readme-operator-positioning)
 파일 일부만 커밋해야 하는 모든 작업에 적용.
 특히 큰 파일(README.md, routes_generation.py 등)의
 부분 수정 시 필수.
+
+## LESSON-002: test/ 브랜치 prefix 는 CI 에서 허용되지 않는다
+
+### 발생 시점
+PR 계획 단계 (2026-04-15, 브랜치 생성 전 prefix 점검 과정에서 식별)
+
+### 무슨 일이 있었나
+- 브랜치명에 test/ prefix 사용 시도
+- CI branch-name policy 가 허용 prefix 를 `feat|fix|chore|docs|refactor|release|codex` 로
+  제한하며, test/ 는 이 목록에 포함되지 않음
+- 결과: CI branch-name gate 실패
+
+### 근본 원인
+- CLAUDE.md Workflow Contract 에 허용 prefix 목록이 명시되어 있으나
+  브랜치 생성 전 확인하지 않음
+- test/ 는 직관적으로 허용될 것처럼 보이나 실제로는 chore/ 로 대체해야 함
+
+### 올바른 지시 패턴
+브랜치 생성 전 항상 허용 prefix 목록 확인:
+
+  # 허용 목록 (CLAUDE.md Workflow Contract)
+  feat | fix | chore | docs | refactor | release | codex
+
+  # 나쁜 예
+  git checkout -b test/my-feature
+
+  # 좋은 예
+  git checkout -b chore/my-feature
+
+### 적용 범위
+모든 브랜치 생성 시 적용. 특히 테스트 관련 작업은 chore/ 사용.
+
+## LESSON-003: 신규 디렉토리 추가 시 __init__.py 를 즉시 추가해야 한다
+
+### 발생 시점
+PR 계획 단계 (2026-04-15, Step 6 pre-write checklist 항목으로 식별)
+
+### 무슨 일이 있었나
+- Python 패키지 디렉토리를 신규 생성했으나 __init__.py 누락
+- 해당 디렉토리가 implicit namespace package 로 처리되어
+  다른 패키지와 namespace 충돌 또는 import 오류 발생
+
+### 근본 원인
+- Python 3 의 implicit namespace package 기능으로 인해
+  __init__.py 없이도 디렉토리가 패키지처럼 동작
+- 그러나 기존 패키지와 동일 namespace 를 공유할 경우 예측 불가한 import 충돌
+
+### 올바른 지시 패턴
+신규 디렉토리 생성 직후 __init__.py 를 함께 추가:
+
+  # 나쁜 예
+  mkdir newsletter_core/new_module/
+  # __init__.py 없이 진행
+
+  # 좋은 예
+  mkdir newsletter_core/new_module/
+  touch newsletter_core/new_module/__init__.py
+
+### 적용 범위
+newsletter_core/, newsletter/, web/ 하위 모든 신규 디렉토리 추가 시 필수.
