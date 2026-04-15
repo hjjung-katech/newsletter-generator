@@ -13,6 +13,7 @@
   - `Unit Tests - ubuntu-latest-py3.11`, `Unit Tests - ubuntu-latest-py3.12`
   - `Source Smoke (ubuntu-latest)`, `Source Smoke (macos-latest)`, `Source Smoke (windows-latest)`
   - `Build Check (ubuntu-latest)`, `Build Check (windows-latest)`, `Container Smoke (ubuntu-latest)`
+  - `e2e-smoke`
 - 추가 PR validation: `Mock API Tests`
 
 2. `deployment.yml`
