@@ -250,3 +250,39 @@ PR #454 (chore/p1-d-e2e-playwright-smoke), 2026-04-15
 
 ### 적용 범위
 이 저장소에서 새 CI job 추가 시 의존성 설치는 반드시 main-ci.yml 방식을 참조.
+
+## LESSON-008: PR 작업 시작 및 각 push 전 main 최신성 확인 필수
+
+### 발생 시점
+PR #464 (chore/security-scan-restore), 2026-04-15
+
+### 무슨 일이 있었나
+- 워크트리 진입 시점에 이미 로컬 브랜치가 main 보다 4 커밋 뒤처져 있었고
+  `git status` 가 "behind main" 을 알려주었으나 확인하지 않고 작업 시작
+- 작업 도중 다른 PR 2개(#460, #462)가 main 에 머지됐으나 인지하지 못함
+- 두 번째 CI 실패(`.secrets.baseline` line_number 1 줄 shift)를 디버깅하다가
+  main 의 README.md 가 +1 줄로 업데이트됐음을 **우연히** 발견
+- 결과: CI 실패 2 회 반복, baseline 재생성 커밋 1 회 추가 비용 발생
+
+### 근본 원인
+- `pull_request` 이벤트는 merge preview ref(base + PR branch 가상 merge) 를
+  체크아웃하므로, 로컬 PR branch 에서는 재현 안 되는 실패가 CI 에서 발생 가능
+- 선제적으로 main 을 당기지 않으면 stale base 위에서 커밋을 쌓게 되고,
+  PR CI 의 merge ref 와 실제 브랜치 내용 간 괴리가 커짐
+
+### 올바른 지시 패턴
+PR 작업 전후 main-sync 를 루틴으로 강제:
+
+    # 작업 시작 시
+    git fetch origin main
+    git status -sb   # "behind" 가 보이면 먼저 rebase/merge
+
+    # 각 push 직전
+    git fetch origin main
+    git log --oneline HEAD..origin/main   # 비어 있지 않으면 rebase/merge 후 push
+
+### 적용 범위
+- 모든 PR 작업 (특히 CI 가 `pull_request` merge ref 에 의존하는 경우)
+- 작업이 1일 이상 지속되거나 중간에 다른 PR 활동이 있는 모든 브랜치
+- worktree 진입 시에도 동일하게 적용 (worktree 는 체크아웃 시점 base 가
+  이미 stale 일 수 있음)

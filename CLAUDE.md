@@ -116,6 +116,10 @@ Standard flow for all implementation work:
 Rules:
 - RR:PR = 1:1 — do not reuse one RR across multiple open PRs
 - Never push directly to `main` — always use feature branches and PRs
+- **Main-sync discipline** (see `tasks/lessons.md` LESSON-008):
+  - At start of work: `git fetch origin main && git status -sb`. If behind, rebase/merge before any commits.
+  - Before each `git push`: re-run `git fetch origin main && git log --oneline HEAD..origin/main`. If non-empty, rebase/merge and re-run local checks first.
+  - Rationale: `pull_request` CI uses the merge preview ref, so stale base can produce failures that do not reproduce on the PR branch alone (e.g. line-number shifts in `.secrets.baseline`, import changes from other merged PRs).
 
 ## CI Gates
 
