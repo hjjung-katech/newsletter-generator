@@ -1,5 +1,10 @@
 # Tasks
 
+## Security Scan 뱃지 ?branch=main 제거
+- [x] README.md L6: Security Scan 뱃지 URL에서 ?branch=main 제거
+- [x] README.ko.md L6: Security Scan 뱃지 URL에서 ?branch=main 제거
+
+
 ## TASK-C — requirements-e2e.txt + hygiene allowlist + E2E setup docs
 - [x] requirements-e2e.txt 신규 작성 (playwright>=1.40.0 pinned)
 - [x] scripts/repo_hygiene_policy.json: requirements-e2e.txt allowlist 추가
