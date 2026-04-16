@@ -1,5 +1,10 @@
 # Tasks
 
+## README.ko.md 소개문·로드맵·인용구 영문판 동기화
+- [x] README.ko.md L11: 소개문 "운영자를 위한..." 으로 수정 (4a)
+- [x] README.md: Roadmap 섹션 추가 (Current Priorities 아래) (4b)
+- [x] README.ko.md L54, L114: Things to Watch 인용구 영문판과 동일하게 수정 (4c)
+
 ## Start Here / Getting Started 섹션 통합
 - [x] README.md: "Start Here" → "Getting Started" 로 이름 변경, 빠른 시작 코드 블록 흡수, 구 "Getting Started" 섹션 삭제
 - [x] README.ko.md: "시작 가이드" 유지, "빠른 시작" 코드 블록 흡수, "빠른 시작" 섹션 삭제

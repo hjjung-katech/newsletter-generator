@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy Guide (Railway)](https://img.shields.io/badge/deploy-Railway-0B0D0E?logo=railway)](docs/setup/RAILWAY_DEPLOYMENT.md)
 
-원시 프로젝트 업데이트를 구조화된 뉴스레터로 자동 변환해 메인테이너의 커뮤니케이션 부담을 줄이는 도구입니다.
+운영자를 위한 한국어 뉴스 큐레이션 및 뉴스레터 배포 워크플로 시스템입니다.
 
 오픈소스 메인테이너, 소규모 팀, 사내 기술 커뮤니케이션 워크플로를 위해 설계되었습니다.
 
@@ -51,7 +51,7 @@ Updates that reduce repetitive maintainer coordination work.
 - **Idempotency key:** A stable request identifier used to prevent duplicate jobs or duplicate email sends.
 
 ## 💡 Things to Watch
-> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+> Operators managing recurring digests can reduce review time by refining keyword sets and source policies as coverage patterns stabilize.
 ```
 
 ## 개요
@@ -111,7 +111,7 @@ Improvements that make updates easier to consume across community and internal a
 - **Docs gate:** An automated check that verifies documentation links, required references, and policy consistency.
 
 ## 💡 Things to Watch
-> If GitHub issue and pull request summaries are added next, maintainers can publish weekly updates with much less manual editing.
+> Operators managing recurring digests can reduce review time by refining keyword sets and source policies as coverage patterns stabilize.
 
 _Generated as an English compact preview of the production newsletter template._
 ```
