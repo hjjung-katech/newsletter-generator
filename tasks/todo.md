@@ -1,5 +1,9 @@
 # Tasks
 
+## Start Here / Getting Started 섹션 통합
+- [x] README.md: "Start Here" → "Getting Started" 로 이름 변경, 빠른 시작 코드 블록 흡수, 구 "Getting Started" 섹션 삭제
+- [x] README.ko.md: "시작 가이드" 유지, "빠른 시작" 코드 블록 흡수, "빠른 시작" 섹션 삭제
+
 ## Example Output 섹션 <details> 접기 처리
 - [x] README.md: Example Output 코드 블록을 <details><summary>Full example output</summary> 로 감싸기
 - [x] README.ko.md: 동일 (<summary> 텍스트 "전체 예시 출력 보기")
