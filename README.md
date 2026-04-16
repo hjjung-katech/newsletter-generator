@@ -164,6 +164,11 @@ newsletter run --keywords "open source, maintainer tooling"
 - Hold legacy runtime surface in maintenance mode — no structural reopening without explicit trigger (G4)
 - Keep operational contracts, support policy, and documentation aligned to the same production reality (G5)
 
+## Roadmap
+- Integrate GitHub to pull repository updates directly
+- Automate maintainer digests from PR and issue summaries
+- Auto-generate release notes and stakeholder updates
+
 ## Project Docs
 | Purpose | Reference |
 |---|---|
