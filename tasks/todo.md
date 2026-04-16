@@ -1,5 +1,9 @@
 # Tasks
 
+## Example Output 섹션 <details> 접기 처리
+- [x] README.md: Example Output 코드 블록을 <details><summary>Full example output</summary> 로 감싸기
+- [x] README.ko.md: 동일 (<summary> 텍스트 "전체 예시 출력 보기")
+
 ## Security Scan 뱃지 ?branch=main 제거
 - [x] README.md L6: Security Scan 뱃지 URL에서 ?branch=main 제거
 - [x] README.ko.md L6: Security Scan 뱃지 URL에서 ?branch=main 제거

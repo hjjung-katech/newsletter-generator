@@ -75,6 +75,8 @@ The production app renders HTML newsletters in `compact`, `detailed`, and `email
 ## Example Output
 Example of a generated newsletter:
 
+<details><summary>Full example output</summary>
+
 ```md
 # Maintainer Communication Brief
 _Maintainer workflow automation · Issue 14 · 2026-03-19_
@@ -113,6 +115,8 @@ Improvements that make updates easier to consume across community and internal a
 
 _Generated as an English compact preview of the production newsletter template._
 ```
+
+</details>
 
 ## Why This Matters
 Maintainers already spend their time reviewing contributions, triaging issues, and keeping releases moving. Communication work is necessary, but it should not become another manual backlog. This project directly reduces maintainer workload in communication-heavy workflows such as updates, release notes, and stakeholder reporting.

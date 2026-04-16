@@ -75,6 +75,8 @@ Updates that reduce repetitive maintainer coordination work.
 ## 예시 출력
 생성 결과 예시는 다음과 같습니다. 아래 예시는 영문 공개 데모 기준이지만, 실제 구조는 기본 `compact` 템플릿 흐름을 따릅니다.
 
+<details><summary>전체 예시 출력 보기</summary>
+
 ```md
 # Maintainer Communication Brief
 _Maintainer workflow automation · Issue 14 · 2026-03-19_
@@ -113,6 +115,8 @@ Improvements that make updates easier to consume across community and internal a
 
 _Generated as an English compact preview of the production newsletter template._
 ```
+
+</details>
 
 ## 왜 중요한가
 메인테이너는 이미 리뷰, 이슈 분류, 릴리스 준비에 많은 시간을 쓰고 있습니다. 커뮤니케이션은 꼭 필요하지만 또 하나의 수작업 백로그가 되어서는 안 됩니다. 이 프로젝트는 업데이트 정리, 릴리스 노트, 이해관계자 보고처럼 커뮤니케이션 비중이 큰 워크플로에서 maintainer workload를 직접 줄이는 데 초점을 맞춥니다.
