@@ -130,8 +130,7 @@ _Generated as an English compact preview of the production newsletter template._
 
 공식 지원 범위와 운영 기준은 지원 정책 문서를 따릅니다. 요약하면 Python 3.11, 3.12가 주요 대상이고 Linux는 canonical production server, Windows는 native desktop bundle 대상, macOS는 source-based development와 smoke 중심 지원입니다.
 
-## 빠른 시작
-위 Quick Demo는 정적 preview입니다. 실제 제품을 로컬에서 실행하려면 아래 canonical setup과 CLI entrypoint를 사용하면 됩니다.
+로컬 실행:
 
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git

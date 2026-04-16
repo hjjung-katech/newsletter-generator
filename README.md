@@ -121,7 +121,7 @@ _Generated as an English compact preview of the production newsletter template._
 ## Why This Matters
 Maintainers already spend their time reviewing contributions, triaging issues, and keeping releases moving. Communication work is necessary, but it should not become another manual backlog. This project directly reduces maintainer workload in communication-heavy workflows such as updates, release notes, and stakeholder reporting.
 
-## Start Here
+## Getting Started
 1. Quick start: [`docs/setup/QUICK_START_GUIDE.md`](docs/setup/QUICK_START_GUIDE.md)
 2. Support policy: [`docs/reference/support-policy.md`](docs/reference/support-policy.md)
 3. Environment-variable contract: [`docs/reference/environment-variables.md`](docs/reference/environment-variables.md)
@@ -130,8 +130,7 @@ Maintainers already spend their time reviewing contributions, triaging issues, a
 
 Supported runtime guidance is defined in the support policy. In short, Python 3.11 and 3.12 are the active targets, Linux is the canonical production server, Windows is the native desktop bundle target, and macOS is supported mainly for source-based development and smoke checks.
 
-## Getting Started
-The quick demo above is a static preview. To run the actual product locally, use the canonical setup and CLI entrypoints below:
+To run locally:
 
 ```bash
 git clone https://github.com/hjjung-katech/newsletter-generator.git
